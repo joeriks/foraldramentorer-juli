@@ -7,124 +7,220 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">FöräldraMentorer</p>
-        <h1>Kommunens kontrollpanel</h1>
-      </div>
-      <div class="topbar-actions">
-        <button id="seedButton" type="button">Fyll på exempeldata</button>
-        <button id="resetButton" type="button" class="secondary">Nollställ</button>
-      </div>
-    </header>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Huvudnavigation">
+        <div class="system-brand">
+          <strong>FöräldraMentorer</strong>
+          <span>Kommunportal</span>
+        </div>
+        <nav class="main-nav">
+          <a class="active" href="#">Kandidater</a>
+          <a href="#">Matchningar</a>
+          <a href="#">Uppdrag</a>
+          <a href="#">Arvoden</a>
+          <a href="#">Statistik</a>
+          <a href="#">Administration</a>
+        </nav>
+      </aside>
 
-    <main class="layout">
-      <section class="summary" aria-label="Sammanfattning">
-        <article>
-          <span id="totalCount">0</span>
-          <p>Kandidater</p>
-        </article>
-        <article>
-          <span id="readyCount">0</span>
-          <p>Redo för beslut</p>
-        </article>
-        <article>
-          <span id="certifiedCount">0</span>
-          <p>Certifierade</p>
-        </article>
-        <article>
-          <span id="blockedCount">0</span>
-          <p>Saknar åtgärd</p>
-        </article>
-      </section>
-
-      <section class="workspace">
-        <aside class="panel list-panel" aria-label="Kandidater">
-          <div class="panel-header">
-            <div>
-              <h2>Kandidater</h2>
-              <p>Pipeline för onboarding och certifiering.</p>
-            </div>
+      <div class="main-shell">
+        <header class="topbar">
+          <div>
+            <p class="breadcrumb">Start / Onboarding / Kandidatregister</p>
+            <h1>Kandidatregister</h1>
           </div>
-
-          <form id="candidateForm" class="candidate-form">
-            <label>
-              Namn
-              <input id="nameInput" name="name" required autocomplete="off" placeholder="Ex. Anna Lind">
-            </label>
-            <label>
-              Område
-              <input id="areaInput" name="area" required autocomplete="off" placeholder="Ex. Centrum">
-            </label>
-            <label>
-              Språk
-              <input id="languagesInput" name="languages" required autocomplete="off" placeholder="Svenska, arabiska">
-            </label>
-            <label>
-              Tillgänglighet
-              <input id="availabilityInput" name="availability" required autocomplete="off" placeholder="Vardagskvällar">
-            </label>
-            <button type="submit">Lägg till kandidat</button>
-          </form>
-
-          <div id="candidateList" class="candidate-list"></div>
-        </aside>
-
-        <section class="panel detail-panel" aria-live="polite">
-          <div id="emptyState" class="empty-state">
-            <h2>Välj en kandidat</h2>
-            <p>Här visas status, checklistor och intervjuanteckningar.</p>
+          <div class="topbar-actions">
+            <button id="seedButton" type="button" class="secondary">Fyll på exempeldata</button>
+            <button id="resetButton" type="button" class="secondary">Nollställ lokal data</button>
           </div>
+        </header>
 
-          <div id="candidateDetail" class="detail" hidden>
-            <div class="detail-heading">
-              <div>
-                <p id="selectedStatus" class="status-pill">Anmäld</p>
-                <h2 id="selectedName"></h2>
-                <p id="selectedMeta"></p>
+        <main class="layout">
+          <section class="summary" aria-label="Sammanfattning">
+            <article>
+              <span id="totalCount">0</span>
+              <p>Totalt antal kandidater</p>
+            </article>
+            <article>
+              <span id="readyCount">0</span>
+              <p>Redo för beslut</p>
+            </article>
+            <article>
+              <span id="certifiedCount">0</span>
+              <p>Certifierade</p>
+            </article>
+            <article>
+              <span id="blockedCount">0</span>
+              <p>Kräver åtgärd</p>
+            </article>
+          </section>
+
+          <section class="workspace">
+            <section class="panel registry-panel" aria-label="Kandidatlista">
+              <div class="panel-title-row">
+                <div>
+                  <h2>Ärenden</h2>
+                  <p>Onboarding och certifiering av mentorkandidater.</p>
+                </div>
+                <button id="newCaseButton" type="button">Ny kandidat</button>
               </div>
-              <button id="deleteButton" type="button" class="danger">Ta bort</button>
-            </div>
 
-            <div class="field-row">
-              <label>
-                Pipeline-status
-                <select id="statusSelect"></select>
-              </label>
-              <label>
-                Samordnare
-                <input id="coordinatorInput" autocomplete="off">
-              </label>
-            </div>
+              <form id="candidateForm" class="candidate-form" hidden>
+                <div class="form-grid">
+                  <label>
+                    Namn
+                    <input id="nameInput" name="name" required autocomplete="off" placeholder="Ex. Anna Lind">
+                  </label>
+                  <label>
+                    Område
+                    <input id="areaInput" name="area" required autocomplete="off" placeholder="Ex. Centrum">
+                  </label>
+                  <label>
+                    Språk
+                    <input id="languagesInput" name="languages" required autocomplete="off" placeholder="Svenska, arabiska">
+                  </label>
+                  <label>
+                    Tillgänglighet
+                    <input id="availabilityInput" name="availability" required autocomplete="off" placeholder="Vardagskvällar">
+                  </label>
+                </div>
+                <div class="form-actions">
+                  <button type="submit">Spara kandidat</button>
+                  <button id="cancelNewCaseButton" type="button" class="secondary">Avbryt</button>
+                </div>
+              </form>
 
-            <section class="checklist-section">
-              <h3>Certifieringskrav</h3>
-              <div id="checklist" class="checklist"></div>
-            </section>
-
-            <section class="notes-section">
-              <h3>Intervjuprotokoll</h3>
-              <label>
-                Intervjutid
-                <input id="interviewDateInput" type="datetime-local">
-              </label>
-              <label>
-                Anteckningar
-                <textarea id="notesInput" rows="7" placeholder="Kort bedömning, styrkor, frågor att följa upp."></textarea>
-              </label>
-            </section>
-
-            <section class="decision-section">
-              <div>
-                <h3>Beslut</h3>
-                <p id="decisionHint">Alla kritiska steg måste vara klara innan certifiering.</p>
+              <div class="filter-row">
+                <label>
+                  Sök
+                  <input id="searchInput" autocomplete="off" placeholder="Namn, område, språk eller handläggare">
+                </label>
+                <label>
+                  Status
+                  <select id="statusFilter">
+                    <option value="">Alla statusar</option>
+                  </select>
+                </label>
               </div>
-              <button id="approveButton" type="button">Godkänn och certifiera</button>
+
+              <div class="table-wrap">
+                <table class="case-table">
+                  <thead>
+                    <tr>
+                      <th>Ärende</th>
+                      <th>Kandidat</th>
+                      <th>Status</th>
+                      <th>Område</th>
+                      <th>Handläggare</th>
+                      <th>Senast ändrad</th>
+                    </tr>
+                  </thead>
+                  <tbody id="candidateTableBody"></tbody>
+                </table>
+              </div>
             </section>
-          </div>
-        </section>
-      </section>
-    </main>
+
+            <section class="panel case-file" aria-live="polite">
+              <div id="emptyState" class="empty-state">
+                <h2>Ingen kandidat vald</h2>
+                <p>Välj ett ärende i registret för att öppna kandidatens akt.</p>
+              </div>
+
+              <div id="candidateDetail" hidden>
+                <div class="case-header">
+                  <div>
+                    <p id="selectedCaseId" class="case-id"></p>
+                    <h2 id="selectedName"></h2>
+                    <p id="selectedMeta"></p>
+                  </div>
+                  <div class="case-actions">
+                    <span id="selectedStatus" class="status-pill">Anmäld</span>
+                    <button id="deleteButton" type="button" class="danger">Ta bort</button>
+                  </div>
+                </div>
+
+                <div class="tabs" role="tablist" aria-label="Kandidatakt">
+                  <button class="tab active" type="button">Grunduppgifter</button>
+                  <button class="tab" type="button">Kontroller</button>
+                  <button class="tab" type="button">Intervju</button>
+                  <button class="tab" type="button">Beslut</button>
+                  <button class="tab" type="button">Logg</button>
+                </div>
+
+                <section class="case-section">
+                  <h3>Grunduppgifter</h3>
+                  <div class="field-row">
+                    <label>
+                      Pipeline-status
+                      <select id="statusSelect"></select>
+                    </label>
+                    <label>
+                      Handläggare
+                      <input id="coordinatorInput" autocomplete="off">
+                    </label>
+                  </div>
+                  <dl class="fact-list">
+                    <div>
+                      <dt>Språk</dt>
+                      <dd id="languageFact"></dd>
+                    </div>
+                    <div>
+                      <dt>Tillgänglighet</dt>
+                      <dd id="availabilityFact"></dd>
+                    </div>
+                    <div>
+                      <dt>Område</dt>
+                      <dd id="areaFact"></dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section class="case-section">
+                  <h3>Kontroller och certifieringskrav</h3>
+                  <div id="checklist" class="checklist"></div>
+                </section>
+
+                <section class="case-section">
+                  <h3>Intervju</h3>
+                  <div class="field-row">
+                    <label>
+                      Intervjutid
+                      <input id="interviewDateInput" type="datetime-local">
+                    </label>
+                    <label>
+                      Intervjuform
+                      <select id="interviewModeInput">
+                        <option value="">Ej angivet</option>
+                        <option>Fysiskt möte</option>
+                        <option>Digitalt möte</option>
+                        <option>Telefon</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label>
+                    Intervjuprotokoll
+                    <textarea id="notesInput" rows="6" placeholder="Kort bedömning, styrkor, frågor att följa upp."></textarea>
+                  </label>
+                </section>
+
+                <section class="case-section decision-section">
+                  <div>
+                    <h3>Beslut</h3>
+                    <p id="decisionHint">Alla kritiska steg måste vara klara innan certifiering.</p>
+                  </div>
+                  <button id="approveButton" type="button">Godkänn och certifiera</button>
+                </section>
+
+                <section class="case-section">
+                  <h3>Handläggningslogg</h3>
+                  <ol id="auditLog" class="audit-log"></ol>
+                </section>
+              </div>
+            </section>
+          </section>
+        </main>
+      </div>
+    </div>
 
     <script src="app.js"></script>
   </body>
