@@ -438,15 +438,8 @@ function renderPipeline() {
     const count = els.pipelineGrid.querySelector(`[data-pipeline-count="${cssEscape(status)}"]`);
     if (count) {
       count.textContent = statusCount(status);
-      count.className = pipelineBadgeClass(status);
     }
   }
-}
-
-function pipelineBadgeClass(status) {
-  if (status === "Godkänd/Certifierad") return "badge text-bg-success";
-  if (status === "Redo för intervju") return "badge text-bg-primary";
-  return "badge text-bg-secondary";
 }
 
 function pipelineDescription(status) {
