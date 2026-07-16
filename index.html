@@ -108,9 +108,9 @@
                       <th>Ärende</th>
                       <th>Kandidat</th>
                       <th>Status</th>
-                      <th>Område</th>
+                      <th class="d-none d-xl-table-cell">Område</th>
                       <th>Handläggare</th>
-                      <th>Senast ändrad</th>
+                      <th class="d-none d-xxl-table-cell">Senast ändrad</th>
                     </tr>
                   </thead>
                   <tbody id="candidateTableBody"></tbody>
@@ -120,8 +120,10 @@
 
             <section class="card" aria-live="polite">
               <div id="emptyState" class="card-body py-5">
-                <h2 class="h5">Ingen kandidat vald</h2>
-                <p class="text-secondary mb-0">Välj ett ärende i registret för att öppna kandidatens akt.</p>
+                <div class="text-secondary small fw-semibold mb-2">Kandidatakt</div>
+                <h2 class="h5">Välj ett ärende</h2>
+                <p class="text-secondary mb-3">Kandidatens grunduppgifter, kontroller, intervju, beslut och logg visas här.</p>
+                <button id="emptyNewCaseButton" type="button" class="btn btn-outline-primary btn-sm">Registrera ny kandidat</button>
               </div>
 
               <div id="candidateDetail" hidden>

@@ -94,6 +94,7 @@ const els = {
   seedButton: document.querySelector("#seedButton"),
   resetButton: document.querySelector("#resetButton"),
   newCaseButton: document.querySelector("#newCaseButton"),
+  emptyNewCaseButton: document.querySelector("#emptyNewCaseButton"),
   cancelNewCaseButton: document.querySelector("#cancelNewCaseButton"),
   candidateForm: document.querySelector("#candidateForm"),
   candidateTableBody: document.querySelector("#candidateTableBody"),
@@ -175,6 +176,7 @@ function clearCandidates() {
 async function refresh() {
   candidates = await getAllCandidates();
   candidates = candidates.map(normalizeCandidate);
+  await ensureUniqueCaseNumbers();
   candidates.sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.name.localeCompare(b.name, "sv"));
   renderSummary();
   renderTable();
@@ -184,7 +186,7 @@ async function refresh() {
 function normalizeCandidate(candidate) {
   return {
     ...candidate,
-    caseNumber: candidate.caseNumber || makeCaseNumber(candidate.createdAt || candidate.id),
+    caseNumber: candidate.caseNumber || makeCaseNumber(candidate.id || candidate.createdAt),
     coordinator: candidate.coordinator || "",
     interviewMode: candidate.interviewMode || "",
     history: candidate.history || [
@@ -194,6 +196,28 @@ function normalizeCandidate(candidate) {
       }
     ]
   };
+}
+
+async function ensureUniqueCaseNumbers() {
+  const seen = new Set();
+  let changed = false;
+
+  for (const candidate of candidates) {
+    if (!candidate.caseNumber || seen.has(candidate.caseNumber)) {
+      candidate.caseNumber = makeCaseNumber(candidate.id || candidate.createdAt, seen);
+      candidate.updatedAt = new Date().toISOString();
+      candidate.history = [
+        ...(candidate.history || []),
+        { at: candidate.updatedAt, text: `Ärendenummer satt till ${candidate.caseNumber}` }
+      ];
+      changed = true;
+    }
+    seen.add(candidate.caseNumber);
+  }
+
+  if (changed) {
+    await Promise.all(candidates.map(saveCandidate));
+  }
 }
 
 function selectedCandidate() {
@@ -250,9 +274,9 @@ function renderTable() {
       <td><strong>${escapeHtml(candidate.caseNumber)}</strong><small>${escapeHtml(daysSinceText(candidate.createdAt))}</small></td>
       <td>${escapeHtml(candidate.name)}<small>${escapeHtml(candidate.languages)}</small></td>
       <td><span class="${statusClass(candidate)}">${escapeHtml(candidate.status)}</span></td>
-      <td>${escapeHtml(candidate.area)}</td>
+      <td class="d-none d-xl-table-cell">${escapeHtml(candidate.area)}</td>
       <td>${escapeHtml(candidate.coordinator || "Ej tilldelad")}</td>
-      <td>${escapeHtml(formatDate(candidate.updatedAt || candidate.createdAt))}</td>
+      <td class="d-none d-xxl-table-cell">${escapeHtml(formatDate(candidate.updatedAt || candidate.createdAt))}</td>
     `;
     row.addEventListener("click", () => {
       selectedId = candidate.id;
@@ -358,9 +382,24 @@ function newCandidate(formData) {
   };
 }
 
-function makeCaseNumber(seed) {
-  const value = String(seed || Date.now()).replace(/\D/g, "").slice(-6).padStart(6, "0");
-  return `FM-${value}`;
+function makeCaseNumber(seed, reserved = new Set()) {
+  const digits = String(seed || Date.now()).replace(/\D/g, "");
+  const base = digits ? digits.slice(-4).padStart(4, "0") : String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+  let suffix = randomDigits(3);
+  let caseNumber = `FM-${base}-${suffix}`;
+
+  while (reserved.has(caseNumber)) {
+    suffix = randomDigits(3);
+    caseNumber = `FM-${base}-${suffix}`;
+  }
+
+  return caseNumber;
+}
+
+function randomDigits(length) {
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  return String(values[0] % 10 ** length).padStart(length, "0");
 }
 
 function statusClass(candidate) {
@@ -409,14 +448,17 @@ for (const status of STATUSES) {
   els.statusFilter.append(option);
 }
 
-els.newCaseButton.addEventListener("click", () => {
+function openCandidateModal() {
   if (candidateModal) {
     candidateModal.show();
     return;
   }
   els.candidateForm.hidden = false;
   document.querySelector("#nameInput").focus();
-});
+}
+
+els.newCaseButton.addEventListener("click", openCandidateModal);
+els.emptyNewCaseButton.addEventListener("click", openCandidateModal);
 
 els.cancelNewCaseButton.addEventListener("click", () => {
   els.candidateForm.reset();
@@ -484,12 +526,14 @@ els.deleteButton.addEventListener("click", async () => {
 
 els.seedButton.addEventListener("click", async () => {
   const now = new Date().toISOString();
+  let firstId = null;
   for (const candidate of seedCandidates) {
     const id = crypto.randomUUID();
+    firstId = firstId || id;
     await saveCandidate({
       ...candidate,
       id,
-      caseNumber: makeCaseNumber(`${now}${id}`),
+      caseNumber: makeCaseNumber(id),
       history: [
         { at: now, text: "Ärende skapat" },
         { at: now, text: `Status satt till ${candidate.status}` }
@@ -498,6 +542,7 @@ els.seedButton.addEventListener("click", async () => {
       updatedAt: now
     });
   }
+  selectedId = firstId;
   await refresh();
 });
 
