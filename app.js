@@ -76,8 +76,105 @@ const seedCandidates = [
     interviewDate: "2026-07-12T10:30",
     interviewMode: "Fysiskt möte",
     notes: "God förmåga att lyssna. Tydlig kring gränser och uppdragets roll."
+  },
+  {
+    name: "Karin Nyström",
+    area: "Norr",
+    languages: "Svenska, finska",
+    availability: "Tisdagar och torsdagar dagtid",
+    coordinator: "Jonas",
+    status: "Anmäld",
+    checks: {
+      identityVerified: false,
+      registryChecked: false,
+      referencesDone: false,
+      trainingDone: false,
+      quizDone: false,
+      interviewDone: false
+    },
+    interviewDate: "",
+    interviewMode: "",
+    notes: "Ny intresseanmälan. Behöver första kontakt och identitetskontroll."
+  },
+  {
+    name: "Leif Andersson",
+    area: "Söder",
+    languages: "Svenska",
+    availability: "Måndag kväll och lördag förmiddag",
+    coordinator: "Maja",
+    status: "Kontrollerad",
+    checks: {
+      identityVerified: true,
+      registryChecked: true,
+      referencesDone: false,
+      trainingDone: false,
+      quizDone: false,
+      interviewDone: false
+    },
+    interviewDate: "",
+    interviewMode: "",
+    notes: "Registerutdrag granskat. Väntar på en referens."
+  },
+  {
+    name: "Fatima El-Masri",
+    area: "Centrum",
+    languages: "Svenska, arabiska, engelska",
+    availability: "Vardagskvällar",
+    coordinator: "Sara",
+    status: "Utbildning pågår",
+    checks: {
+      identityVerified: true,
+      registryChecked: true,
+      referencesDone: true,
+      trainingDone: false,
+      quizDone: false,
+      interviewDone: false
+    },
+    interviewDate: "",
+    interviewMode: "Digitalt möte",
+    notes: "Stark motivation. Har erfarenhet av föreningsarbete med nyanlända familjer."
+  },
+  {
+    name: "Gunnar Pettersson",
+    area: "Väster",
+    languages: "Svenska, tyska",
+    availability: "Dagtid vardagar",
+    coordinator: "Sara",
+    status: "Redo för intervju",
+    checks: {
+      identityVerified: true,
+      registryChecked: true,
+      referencesDone: true,
+      trainingDone: true,
+      quizDone: true,
+      interviewDone: false
+    },
+    interviewDate: "2026-07-20T13:00",
+    interviewMode: "Fysiskt möte",
+    notes: "Intervju bokad. Följ upp gränsdragning kring praktiska tjänster."
+  },
+  {
+    name: "Mikael Holm",
+    area: "Norr",
+    languages: "Svenska, persiska",
+    availability: "Helger",
+    coordinator: "Jonas",
+    status: "Kontrollerad",
+    checks: {
+      identityVerified: true,
+      registryChecked: false,
+      referencesDone: true,
+      trainingDone: false,
+      quizDone: false,
+      interviewDone: false
+    },
+    interviewDate: "",
+    interviewMode: "",
+    notes: "Referenser klara. Väntar på belastningsregister."
   }
 ];
+
+const seedCandidateNames = new Set(seedCandidates.map((candidate) => candidate.name));
 
 let db;
 let candidates = [];
@@ -320,6 +417,17 @@ function renderSummary() {
   els.readyCount.textContent = candidates.filter((candidate) => isComplete(candidate) && candidate.status !== "Godkänd/Certifierad").length;
   els.certifiedCount.textContent = candidates.filter((candidate) => candidate.status === "Godkänd/Certifierad").length;
   els.blockedCount.textContent = candidates.filter(isBlocked).length;
+  renderSeedButtonState();
+}
+
+function hasSeedData() {
+  return candidates.some((candidate) => candidate.exampleData === true || seedCandidateNames.has(candidate.name));
+}
+
+function renderSeedButtonState() {
+  const seeded = hasSeedData();
+  els.seedButton.disabled = seeded;
+  els.seedButton.textContent = seeded ? "Exempeldata finns" : "Fyll på exempeldata";
 }
 
 function renderDashboard() {
@@ -622,12 +730,18 @@ els.deleteButton.addEventListener("click", async () => {
 });
 
 els.seedButton.addEventListener("click", async () => {
+  if (hasSeedData()) {
+    renderSeedButtonState();
+    return;
+  }
+
   const now = new Date().toISOString();
   for (const candidate of seedCandidates) {
     const id = crypto.randomUUID();
     await saveCandidate({
       ...candidate,
       id,
+      exampleData: true,
       caseNumber: makeCaseNumber(id),
       history: [
         { at: now, text: "Ärende skapat" },
