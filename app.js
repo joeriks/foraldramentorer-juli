@@ -404,6 +404,7 @@ for (const status of STATUSES) {
 
 els.newCaseButton.addEventListener("click", () => {
   els.candidateForm.hidden = false;
+  document.querySelector("#nameInput").focus();
 });
 
 els.cancelNewCaseButton.addEventListener("click", () => {
