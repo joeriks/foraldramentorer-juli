@@ -434,22 +434,12 @@ function statusCount(status) {
 }
 
 function renderPipeline() {
-  els.pipelineGrid.innerHTML = "";
-
-  for (const [index, status] of STATUSES.entries()) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "pipeline-step btn btn-light border text-start";
-    button.dataset.pipelineStatus = status;
-    button.innerHTML = `
-      <div class="d-flex justify-content-between align-items-start gap-2">
-        <span class="small text-secondary fw-semibold">${index + 1}</span>
-        <span class="${pipelineBadgeClass(status)}">${statusCount(status)}</span>
-      </div>
-      <div class="fw-semibold mt-2">${escapeHtml(status)}</div>
-      <div class="small text-secondary">${escapeHtml(pipelineDescription(status))}</div>
-    `;
-    els.pipelineGrid.append(button);
+  for (const status of STATUSES) {
+    const count = els.pipelineGrid.querySelector(`[data-pipeline-count="${cssEscape(status)}"]`);
+    if (count) {
+      count.textContent = statusCount(status);
+      count.className = pipelineBadgeClass(status);
+    }
   }
 }
 
@@ -467,6 +457,10 @@ function pipelineDescription(status) {
     "Redo för intervju": "Väntar på beslut",
     "Godkänd/Certifierad": "Aktiv i matchning"
   }[status] || "";
+}
+
+function cssEscape(value) {
+  return String(value).replace(/["\\]/g, "\\$&");
 }
 
 function hasSeedData() {
