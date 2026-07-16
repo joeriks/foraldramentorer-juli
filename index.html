@@ -235,16 +235,32 @@
                       <input id="coordinatorInput" class="form-control form-control-sm" autocomplete="off">
                     </div>
                   </div>
-                  <dl id="personReadView" class="row border rounded mb-0 small fact-list">
-                    <dt class="col-sm-4 bg-body-tertiary py-2">Namn</dt>
-                    <dd id="nameFact" class="col-sm-8 py-2 mb-0"></dd>
-                    <dt class="col-sm-4 bg-body-tertiary py-2">Språk</dt>
-                    <dd id="languageFact" class="col-sm-8 py-2 mb-0"></dd>
-                    <dt class="col-sm-4 bg-body-tertiary py-2">Tillgänglighet</dt>
-                    <dd id="availabilityFact" class="col-sm-8 py-2 mb-0"></dd>
-                    <dt class="col-sm-4 bg-body-tertiary py-2">Område</dt>
-                    <dd id="areaFact" class="col-sm-8 py-2 mb-0"></dd>
-                  </dl>
+                  <div id="personReadView" class="row g-3">
+                    <div class="col-md-6">
+                      <div class="readonly-field">
+                        <div class="form-label">Namn</div>
+                        <div id="nameFact" class="readonly-value"></div>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="readonly-field">
+                        <div class="form-label">Område</div>
+                        <div id="areaFact" class="readonly-value"></div>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="readonly-field">
+                        <div class="form-label">Språk</div>
+                        <div id="languageFact" class="readonly-value"></div>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="readonly-field">
+                        <div class="form-label">Tillgänglighet</div>
+                        <div id="availabilityFact" class="readonly-value"></div>
+                      </div>
+                    </div>
+                  </div>
                   <form id="personEditForm" hidden>
                     <div class="row g-3">
                       <div class="col-md-6">

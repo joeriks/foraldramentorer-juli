@@ -64,6 +64,15 @@
   color: var(--bs-secondary-color);
 }
 
+.readonly-field .form-label {
+  margin-bottom: 0.25rem;
+}
+
+.readonly-value {
+  min-height: calc(1.5em + 0.5rem + 2px);
+  padding: 0.25rem 0.5rem;
+}
+
 .fact-list dt,
 .fact-list dd {
   border-bottom: 1px solid var(--bs-border-color);
