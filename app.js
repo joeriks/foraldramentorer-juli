@@ -210,8 +210,17 @@ const els = {
   selectedStatus: document.querySelector("#selectedStatus"),
   selectedName: document.querySelector("#selectedName"),
   selectedMeta: document.querySelector("#selectedMeta"),
+  editPersonButton: document.querySelector("#editPersonButton"),
+  personReadView: document.querySelector("#personReadView"),
+  personEditForm: document.querySelector("#personEditForm"),
+  cancelPersonEditButton: document.querySelector("#cancelPersonEditButton"),
+  editNameInput: document.querySelector("#editNameInput"),
+  editAreaInput: document.querySelector("#editAreaInput"),
+  editLanguagesInput: document.querySelector("#editLanguagesInput"),
+  editAvailabilityInput: document.querySelector("#editAvailabilityInput"),
   statusSelect: document.querySelector("#statusSelect"),
   coordinatorInput: document.querySelector("#coordinatorInput"),
+  nameFact: document.querySelector("#nameFact"),
   languageFact: document.querySelector("#languageFact"),
   availabilityFact: document.querySelector("#availabilityFact"),
   areaFact: document.querySelector("#areaFact"),
@@ -533,9 +542,11 @@ function renderDetail() {
   els.selectedMeta.textContent = `${candidate.area} · ${candidate.languages} · ${candidate.availability}`;
   els.selectedStatus.textContent = candidate.status;
   els.selectedStatus.className = statusClass(candidate);
+  els.nameFact.textContent = candidate.name;
   els.languageFact.textContent = candidate.languages;
   els.availabilityFact.textContent = candidate.availability;
   els.areaFact.textContent = candidate.area;
+  setPersonEditMode(false);
 
   els.statusSelect.innerHTML = "";
   for (const status of STATUSES) {
@@ -575,6 +586,24 @@ function renderDetail() {
     const li = document.createElement("li");
     li.innerHTML = `<time>${escapeHtml(formatDateTime(item.at))}</time>${escapeHtml(item.text)}`;
     els.auditLog.append(li);
+  }
+}
+
+function setPersonEditMode(editing) {
+  const candidate = selectedCandidate();
+  if (editing && candidate) {
+    els.editNameInput.value = candidate.name || "";
+    els.editAreaInput.value = candidate.area || "";
+    els.editLanguagesInput.value = candidate.languages || "";
+    els.editAvailabilityInput.value = candidate.availability || "";
+  }
+
+  els.personReadView.hidden = editing;
+  els.personEditForm.hidden = !editing;
+  els.editPersonButton.hidden = editing;
+
+  if (editing) {
+    els.editNameInput.focus();
   }
 }
 
@@ -747,6 +776,18 @@ els.pipelineGrid.addEventListener("click", (event) => {
 
 els.statusSelect.addEventListener("change", () => updateSelected({ status: els.statusSelect.value }, `Status ändrad till ${els.statusSelect.value}`));
 els.coordinatorInput.addEventListener("change", () => updateSelected({ coordinator: els.coordinatorInput.value.trim() }, "Handläggare uppdaterad"));
+els.editPersonButton.addEventListener("click", () => setPersonEditMode(true));
+els.cancelPersonEditButton.addEventListener("click", () => setPersonEditMode(false));
+els.personEditForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await updateSelected({
+    name: els.editNameInput.value.trim(),
+    area: els.editAreaInput.value.trim(),
+    languages: els.editLanguagesInput.value.trim(),
+    availability: els.editAvailabilityInput.value.trim()
+  }, "Grunduppgifter uppdaterade");
+  setPersonEditMode(false);
+});
 els.interviewDateInput.addEventListener("change", () => updateSelected({ interviewDate: els.interviewDateInput.value }, "Intervjutid uppdaterad"));
 els.interviewModeInput.addEventListener("change", () => updateSelected({ interviewMode: els.interviewModeInput.value }, "Intervjuform uppdaterad"));
 els.notesInput.addEventListener("change", () => updateSelected({ notes: els.notesInput.value.trim() }, "Intervjuprotokoll uppdaterat"));
