@@ -370,37 +370,43 @@ function parseRoute() {
   const hash = window.location.hash || "#/dashboard";
   const [, view, id] = hash.match(/^#\/([^/]+)\/?(.+)?$/) || [];
   return {
-    view: view || "dashboard",
+    view: normalizeRouteView(view || "dashboard"),
     id: id || null
   };
 }
 
+function normalizeRouteView(view) {
+  if (view === "candidates") return "mentors";
+  if (view === "candidate") return "mentor";
+  return view;
+}
+
 function applyRoute() {
   const route = parseRoute();
-  currentView = ["dashboard", "candidates", "candidate"].includes(route.view) ? route.view : "dashboard";
-  selectedId = currentView === "candidate" ? route.id : selectedId;
+  currentView = ["dashboard", "mentors", "mentor"].includes(route.view) ? route.view : "dashboard";
+  selectedId = currentView === "mentor" ? route.id : selectedId;
 
   els.dashboardView.hidden = currentView !== "dashboard";
-  els.candidatesView.hidden = currentView !== "candidates";
-  els.detailView.hidden = currentView !== "candidate";
+  els.candidatesView.hidden = currentView !== "mentors";
+  els.detailView.hidden = currentView !== "mentor";
 
   els.navDashboard.classList.toggle("active", currentView === "dashboard");
-  els.navCandidates.classList.toggle("active", currentView === "candidates" || currentView === "candidate");
+  els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
 
   if (currentView === "dashboard") {
     els.pageTitle.textContent = "Dashboard";
     els.breadcrumb.textContent = "Start / Dashboard";
-  } else if (currentView === "candidates") {
-    els.pageTitle.textContent = "Kandidatlista";
-    els.breadcrumb.textContent = "Start / Onboarding / Kandidatlista";
+  } else if (currentView === "mentors") {
+    els.pageTitle.textContent = "Mentorregister";
+    els.breadcrumb.textContent = "Start / Onboarding / Mentorregister";
   } else {
-    els.pageTitle.textContent = "Kandidatkort";
-    els.breadcrumb.textContent = "Start / Onboarding / Kandidatkort";
+    els.pageTitle.textContent = "Mentorkort";
+    els.breadcrumb.textContent = "Start / Onboarding / Mentorkort";
   }
 }
 
 function navigateToCandidate(id) {
-  window.location.hash = `#/candidate/${id}`;
+  window.location.hash = `#/mentor/${id}`;
 }
 
 function navigateTo(hash) {
@@ -414,7 +420,7 @@ function navigateTo(hash) {
 function navigateToCandidateListWithStatus(status) {
   statusFilter = status;
   els.statusFilter.value = status;
-  navigateTo("#/candidates");
+  navigateTo("#/mentors");
   renderTable();
 }
 
@@ -466,7 +472,7 @@ function renderDashboard() {
 
   if (!rows.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="4" class="text-secondary">Inga kandidater kräver åtgärd just nu.</td>`;
+    row.innerHTML = `<td colspan="4" class="text-secondary">Inga mentorskandidater kräver åtgärd just nu.</td>`;
     els.actionTableBody.append(row);
     return;
   }
@@ -489,7 +495,7 @@ function renderTable() {
 
   if (!rows.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="6" class="text-secondary">Inga kandidater matchar urvalet.</td>`;
+    row.innerHTML = `<td colspan="6" class="text-secondary">Inga mentorer matchar urvalet.</td>`;
     els.candidateTableBody.append(row);
     return;
   }
@@ -560,7 +566,7 @@ function renderDetail() {
   const complete = isComplete(candidate);
   els.approveButton.disabled = !complete;
   els.decisionHint.textContent = complete
-    ? "Kandidaten uppfyller samtliga krav och kan certifieras."
+    ? "Mentorskandidaten uppfyller samtliga krav och kan certifieras."
     : "Alla kontroller, utbildningsmoment och intervjun måste vara klara innan certifiering.";
 
   els.auditLog.innerHTML = "";
@@ -688,7 +694,7 @@ els.navDashboard.addEventListener("click", (event) => {
 
 els.navCandidates.addEventListener("click", (event) => {
   event.preventDefault();
-  navigateTo("#/candidates");
+  navigateTo("#/mentors");
 });
 
 els.newCaseButton.addEventListener("click", openCandidateModal);
@@ -753,7 +759,7 @@ els.checklist.addEventListener("change", async (event) => {
 els.approveButton.addEventListener("click", async () => {
   const candidate = selectedCandidate();
   if (!candidate || !isComplete(candidate)) return;
-  await updateSelected({ status: "Godkänd/Certifierad" }, "Kandidat godkänd och certifierad");
+  await updateSelected({ status: "Godkänd/Certifierad" }, "Mentor godkänd och certifierad");
 });
 
 els.deleteButton.addEventListener("click", async () => {
@@ -762,7 +768,7 @@ els.deleteButton.addEventListener("click", async () => {
   await deleteCandidate(candidate.id);
   selectedId = null;
   await refresh();
-  window.location.hash = "#/candidates";
+  window.location.hash = "#/mentors";
 });
 
 els.seedButton.addEventListener("click", async () => {

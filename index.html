@@ -17,7 +17,7 @@
         </div>
         <nav class="nav nav-pills flex-column gap-1 p-2">
           <a id="navDashboard" class="nav-link" href="#/dashboard">Dashboard</a>
-          <a id="navCandidates" class="nav-link" href="#/candidates">Kandidater</a>
+          <a id="navCandidates" class="nav-link" href="#/mentors">Mentorer</a>
           <a class="nav-link disabled" href="#" aria-disabled="true">Matchningar</a>
           <a class="nav-link disabled" href="#" aria-disabled="true">Uppdrag</a>
           <a class="nav-link disabled" href="#" aria-disabled="true">Arvoden</a>
@@ -45,11 +45,11 @@
             <section class="card mb-3">
               <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
                 <div>
-                  <h2 class="h5 mb-1">Kandidatens tidslinje</h2>
-                  <p class="text-secondary mb-0">Översikt över var kandidaterna befinner sig i certifieringsflödet.</p>
+                  <h2 class="h5 mb-1">Mentorernas tidslinje</h2>
+                  <p class="text-secondary mb-0">Översikt över var mentorskandidaterna befinner sig i certifieringsflödet.</p>
                 </div>
                 <div class="text-secondary small">
-                  Totalt <strong id="totalCount">0</strong> kandidater
+                  Totalt <strong id="totalCount">0</strong> personer
                 </div>
               </div>
               <div id="pipelineBoard" class="card-body">
@@ -57,31 +57,31 @@
                   <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Anmäld">
                     <div class="fw-semibold">Anmäld</div>
                     <div class="h3 mt-2 mb-0" data-pipeline-count="Anmäld">0</div>
-                    <div class="small text-secondary">kandidater</div>
+                    <div class="small text-secondary">personer</div>
                     <div class="small text-secondary">Ny intresseanmälan</div>
                   </button>
                   <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Kontrollerad">
                     <div class="fw-semibold">Kontrollerad</div>
                     <div class="h3 mt-2 mb-0" data-pipeline-count="Kontrollerad">0</div>
-                    <div class="small text-secondary">kandidater</div>
+                    <div class="small text-secondary">personer</div>
                     <div class="small text-secondary">Register och referenser</div>
                   </button>
                   <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Utbildning pågår">
                     <div class="fw-semibold">Utbildning pågår</div>
                     <div class="h3 mt-2 mb-0" data-pipeline-count="Utbildning pågår">0</div>
-                    <div class="small text-secondary">kandidater</div>
+                    <div class="small text-secondary">personer</div>
                     <div class="small text-secondary">E-learning kvar</div>
                   </button>
                   <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Redo för intervju">
                     <div class="fw-semibold">Redo för intervju</div>
                     <div class="h3 mt-2 mb-0" data-pipeline-count="Redo för intervju">0</div>
-                    <div class="small text-secondary">kandidater</div>
+                    <div class="small text-secondary">personer</div>
                     <div class="small text-secondary">Väntar på beslut</div>
                   </button>
                   <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Godkänd/Certifierad">
                     <div class="fw-semibold">Godkänd/Certifierad</div>
                     <div class="h3 mt-2 mb-0" data-pipeline-count="Godkänd/Certifierad">0</div>
-                    <div class="small text-secondary">kandidater</div>
+                    <div class="small text-secondary">personer</div>
                     <div class="small text-secondary">Aktiv i matchning</div>
                   </button>
                 </div>
@@ -94,16 +94,16 @@
                   <div class="card-header bg-white d-flex justify-content-between align-items-start gap-2">
                     <div>
                       <h2 class="h5 mb-1">Att hantera</h2>
-                      <p class="text-secondary mb-0">Kandidater som behöver handläggning.</p>
+                      <p class="text-secondary mb-0">Mentorskandidater som behöver handläggning.</p>
                     </div>
-                    <a class="btn btn-outline-primary btn-sm" href="#/candidates">Öppna listan</a>
+                    <a class="btn btn-outline-primary btn-sm" href="#/mentors">Öppna listan</a>
                   </div>
                   <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle mb-0">
                       <thead class="table-light">
                         <tr>
                           <th>Ärende</th>
-                          <th>Kandidat</th>
+                          <th>Person</th>
                           <th>Status</th>
                           <th>Åtgärd</th>
                         </tr>
@@ -121,8 +121,8 @@
                     <p class="text-secondary mb-0">Vanliga arbetsmoment.</p>
                   </div>
                   <div class="card-body d-grid gap-2">
-                    <button id="dashboardNewCaseButton" type="button" class="btn btn-primary">Registrera ny kandidat</button>
-                    <a class="btn btn-outline-secondary" href="#/candidates">Sök i kandidatlistan</a>
+                    <button id="dashboardNewCaseButton" type="button" class="btn btn-primary">Registrera mentor</button>
+                    <a class="btn btn-outline-secondary" href="#/mentors">Sök i mentorregistret</a>
                     <button type="button" class="btn btn-outline-secondary" disabled>Exportera beslutsunderlag</button>
                   </div>
                 </div>
@@ -131,14 +131,14 @@
           </section>
 
           <section id="candidatesView" hidden>
-            <div class="card" aria-label="Kandidatlista">
+            <div class="card" aria-label="Mentorregister">
               <div class="card-header bg-white">
                 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
                   <div>
-                    <h2 class="h5 mb-1">Kandidatlista</h2>
+                    <h2 class="h5 mb-1">Mentorregister</h2>
                     <p class="text-secondary mb-0">Register för onboarding och certifiering.</p>
                   </div>
-                  <button id="newCaseButton" type="button" class="btn btn-primary btn-sm">Ny kandidat</button>
+                  <button id="newCaseButton" type="button" class="btn btn-primary btn-sm">Ny mentor</button>
                 </div>
               </div>
 
@@ -162,7 +162,7 @@
                   <thead class="table-light">
                     <tr>
                       <th>Ärende</th>
-                      <th>Kandidat</th>
+                      <th>Person</th>
                       <th>Status</th>
                       <th>Område</th>
                       <th>Handläggare</th>
@@ -178,10 +178,10 @@
           <section id="detailView" hidden>
             <div id="detailEmpty" class="card">
               <div class="card-body py-5">
-                <div class="text-secondary small fw-semibold mb-2">Kandidatkort</div>
-                <h2 class="h5">Ingen kandidat vald</h2>
-                <p class="text-secondary mb-3">Gå till kandidatlistan och välj ett ärende.</p>
-                <a class="btn btn-outline-primary btn-sm" href="#/candidates">Öppna kandidatlistan</a>
+                <div class="text-secondary small fw-semibold mb-2">Mentorkort</div>
+                <h2 class="h5">Ingen mentor vald</h2>
+                <p class="text-secondary mb-3">Gå till mentorregistret och välj ett ärende.</p>
+                <a class="btn btn-outline-primary btn-sm" href="#/mentors">Öppna mentorregistret</a>
               </div>
             </div>
 
@@ -189,7 +189,7 @@
               <div class="card-header bg-white">
                 <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
                   <div>
-                    <a class="small" href="#/candidates">Tillbaka till kandidatlistan</a>
+                    <a class="small" href="#/mentors">Tillbaka till mentorregistret</a>
                     <p id="selectedCaseId" class="small fw-semibold text-secondary mt-2 mb-1"></p>
                     <h2 id="selectedName" class="h5 mb-1"></h2>
                     <p id="selectedMeta" class="text-secondary mb-0"></p>
@@ -201,7 +201,7 @@
                 </div>
               </div>
 
-              <ul class="nav nav-tabs px-3 pt-2" role="tablist" aria-label="Kandidatkort">
+              <ul class="nav nav-tabs px-3 pt-2" role="tablist" aria-label="Mentorkort">
                 <li class="nav-item"><button class="nav-link active" type="button">Grunduppgifter</button></li>
                 <li class="nav-item"><button class="nav-link" type="button">Kontroller</button></li>
                 <li class="nav-item"><button class="nav-link" type="button">Intervju</button></li>
@@ -281,7 +281,7 @@
       <div class="modal-dialog">
         <form id="candidateForm" class="modal-content">
           <div class="modal-header">
-            <h2 id="candidateModalTitle" class="modal-title h5">Ny kandidat</h2>
+            <h2 id="candidateModalTitle" class="modal-title h5">Ny mentor</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button>
           </div>
           <div class="modal-body">
@@ -306,7 +306,7 @@
           </div>
           <div class="modal-footer">
             <button id="cancelNewCaseButton" type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Avbryt</button>
-            <button type="submit" class="btn btn-primary">Spara kandidat</button>
+            <button type="submit" class="btn btn-primary">Spara mentor</button>
           </div>
         </form>
       </div>
