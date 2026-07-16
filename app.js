@@ -211,6 +211,7 @@ const els = {
   selectedName: document.querySelector("#selectedName"),
   selectedMeta: document.querySelector("#selectedMeta"),
   editPersonButton: document.querySelector("#editPersonButton"),
+  personEditActions: document.querySelector("#personEditActions"),
   personReadView: document.querySelector("#personReadView"),
   personEditForm: document.querySelector("#personEditForm"),
   cancelPersonEditButton: document.querySelector("#cancelPersonEditButton"),
@@ -601,9 +602,10 @@ function setPersonEditMode(editing) {
   els.personReadView.hidden = editing;
   els.personEditForm.hidden = !editing;
   els.editPersonButton.hidden = editing;
+  els.personEditActions.hidden = !editing;
 
   if (editing) {
-    els.editNameInput.focus();
+    els.editNameInput.focus({ preventScroll: true });
   }
 }
 

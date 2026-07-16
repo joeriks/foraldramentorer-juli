@@ -223,7 +223,13 @@
                 <section class="tab-pane fade show active card-body" id="mentor-base-pane" role="tabpanel" aria-labelledby="mentor-base-tab" tabindex="0">
                   <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-3">
                     <h3 class="h6 mb-0">Grunduppgifter</h3>
-                    <button id="editPersonButton" type="button" class="btn btn-outline-primary btn-sm">Redigera uppgifter</button>
+                    <div class="d-flex gap-2">
+                      <button id="editPersonButton" type="button" class="btn btn-outline-primary btn-sm">Redigera uppgifter</button>
+                      <div id="personEditActions" class="d-flex gap-2" hidden>
+                        <button id="savePersonEditButton" type="submit" form="personEditForm" class="btn btn-primary btn-sm">Spara ändringar</button>
+                        <button id="cancelPersonEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                      </div>
+                    </div>
                   </div>
                   <div class="row g-2 mb-3">
                     <div class="col-md-6">
@@ -279,10 +285,6 @@
                         <label class="form-label" for="editAvailabilityInput">Tillgänglighet</label>
                         <input id="editAvailabilityInput" class="form-control form-control-sm" required autocomplete="off">
                       </div>
-                    </div>
-                    <div class="d-flex gap-2 mt-3">
-                      <button type="submit" class="btn btn-primary btn-sm">Spara ändringar</button>
-                      <button id="cancelPersonEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
                     </div>
                   </form>
                 </section>
