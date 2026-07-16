@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
+    <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
   </head>
@@ -15,12 +16,13 @@
           <div class="small text-white-50">Kommunportal</div>
         </div>
         <nav class="nav nav-pills flex-column gap-1 p-2">
-          <a class="nav-link active" href="#">Kandidater</a>
-          <a class="nav-link" href="#">Matchningar</a>
-          <a class="nav-link" href="#">Uppdrag</a>
-          <a class="nav-link" href="#">Arvoden</a>
-          <a class="nav-link" href="#">Statistik</a>
-          <a class="nav-link" href="#">Administration</a>
+          <a id="navDashboard" class="nav-link" href="#/dashboard">Dashboard</a>
+          <a id="navCandidates" class="nav-link" href="#/candidates">Kandidater</a>
+          <a class="nav-link disabled" href="#" aria-disabled="true">Matchningar</a>
+          <a class="nav-link disabled" href="#" aria-disabled="true">Uppdrag</a>
+          <a class="nav-link disabled" href="#" aria-disabled="true">Arvoden</a>
+          <a class="nav-link disabled" href="#" aria-disabled="true">Statistik</a>
+          <a class="nav-link disabled" href="#" aria-disabled="true">Administration</a>
         </nav>
       </aside>
 
@@ -28,8 +30,8 @@
         <header class="bg-white border-bottom px-4 py-3">
           <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
             <div>
-              <nav class="small text-secondary mb-1" aria-label="Brödsmulor">Start / Onboarding / Kandidatregister</nav>
-              <h1 class="h4 mb-0">Kandidatregister</h1>
+              <nav id="breadcrumb" class="small text-secondary mb-1" aria-label="Brödsmulor">Start / Dashboard</nav>
+              <h1 id="pageTitle" class="h4 mb-0">Dashboard</h1>
             </div>
             <div class="d-flex flex-wrap gap-2">
               <button id="seedButton" type="button" class="btn btn-outline-secondary btn-sm">Fyll på exempeldata</button>
@@ -39,48 +41,91 @@
         </header>
 
         <main class="p-3 p-lg-4">
-          <section class="row g-3 mb-3" aria-label="Sammanfattning">
-            <div class="col-6 col-xl-3">
-              <article class="card h-100">
-                <div class="card-body py-3">
-                  <div id="totalCount" class="h3 mb-1">0</div>
-                  <div class="text-secondary small">Totalt antal kandidater</div>
-                </div>
-              </article>
+          <section id="dashboardView">
+            <div class="row g-3 mb-3" aria-label="Sammanfattning">
+              <div class="col-6 col-xl-3">
+                <article class="card h-100">
+                  <div class="card-body py-3">
+                    <div id="totalCount" class="h3 mb-1">0</div>
+                    <div class="text-secondary small">Totalt antal kandidater</div>
+                  </div>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="card h-100">
+                  <div class="card-body py-3">
+                    <div id="readyCount" class="h3 mb-1">0</div>
+                    <div class="text-secondary small">Redo för beslut</div>
+                  </div>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="card h-100">
+                  <div class="card-body py-3">
+                    <div id="certifiedCount" class="h3 mb-1">0</div>
+                    <div class="text-secondary small">Certifierade</div>
+                  </div>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="card h-100">
+                  <div class="card-body py-3">
+                    <div id="blockedCount" class="h3 mb-1">0</div>
+                    <div class="text-secondary small">Kräver åtgärd</div>
+                  </div>
+                </article>
+              </div>
             </div>
-            <div class="col-6 col-xl-3">
-              <article class="card h-100">
-                <div class="card-body py-3">
-                  <div id="readyCount" class="h3 mb-1">0</div>
-                  <div class="text-secondary small">Redo för beslut</div>
+
+            <div class="row g-3">
+              <section class="col-xl-7">
+                <div class="card h-100">
+                  <div class="card-header bg-white d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                      <h2 class="h5 mb-1">Att hantera</h2>
+                      <p class="text-secondary mb-0">Kandidater som behöver handläggning.</p>
+                    </div>
+                    <a class="btn btn-outline-primary btn-sm" href="#/candidates">Öppna listan</a>
+                  </div>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Ärende</th>
+                          <th>Kandidat</th>
+                          <th>Status</th>
+                          <th>Åtgärd</th>
+                        </tr>
+                      </thead>
+                      <tbody id="actionTableBody"></tbody>
+                    </table>
+                  </div>
                 </div>
-              </article>
-            </div>
-            <div class="col-6 col-xl-3">
-              <article class="card h-100">
-                <div class="card-body py-3">
-                  <div id="certifiedCount" class="h3 mb-1">0</div>
-                  <div class="text-secondary small">Certifierade</div>
+              </section>
+
+              <section class="col-xl-5">
+                <div class="card h-100">
+                  <div class="card-header bg-white">
+                    <h2 class="h5 mb-1">Snabbvägar</h2>
+                    <p class="text-secondary mb-0">Vanliga arbetsmoment.</p>
+                  </div>
+                  <div class="card-body d-grid gap-2">
+                    <button id="dashboardNewCaseButton" type="button" class="btn btn-primary">Registrera ny kandidat</button>
+                    <a class="btn btn-outline-secondary" href="#/candidates">Sök i kandidatlistan</a>
+                    <button type="button" class="btn btn-outline-secondary" disabled>Exportera beslutsunderlag</button>
+                  </div>
                 </div>
-              </article>
-            </div>
-            <div class="col-6 col-xl-3">
-              <article class="card h-100">
-                <div class="card-body py-3">
-                  <div id="blockedCount" class="h3 mb-1">0</div>
-                  <div class="text-secondary small">Kräver åtgärd</div>
-                </div>
-              </article>
+              </section>
             </div>
           </section>
 
-          <section class="workspace">
-            <section class="card" aria-label="Kandidatlista">
+          <section id="candidatesView" hidden>
+            <div class="card" aria-label="Kandidatlista">
               <div class="card-header bg-white">
                 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
                   <div>
-                    <h2 class="h5 mb-1">Ärenden</h2>
-                    <p class="text-secondary mb-0">Onboarding och certifiering av mentorkandidater.</p>
+                    <h2 class="h5 mb-1">Kandidatlista</h2>
+                    <p class="text-secondary mb-0">Register för onboarding och certifiering.</p>
                   </div>
                   <button id="newCaseButton" type="button" class="btn btn-primary btn-sm">Ny kandidat</button>
                 </div>
@@ -108,111 +153,114 @@
                       <th>Ärende</th>
                       <th>Kandidat</th>
                       <th>Status</th>
-                      <th class="d-none d-xl-table-cell">Område</th>
+                      <th>Område</th>
                       <th>Handläggare</th>
-                      <th class="d-none d-xxl-table-cell">Senast ändrad</th>
+                      <th>Senast ändrad</th>
                     </tr>
                   </thead>
                   <tbody id="candidateTableBody"></tbody>
                 </table>
               </div>
-            </section>
+            </div>
+          </section>
 
-            <section class="card" aria-live="polite">
-              <div id="emptyState" class="card-body py-5">
-                <div class="text-secondary small fw-semibold mb-2">Kandidatakt</div>
-                <h2 class="h5">Välj ett ärende</h2>
-                <p class="text-secondary mb-3">Kandidatens grunduppgifter, kontroller, intervju, beslut och logg visas här.</p>
-                <button id="emptyNewCaseButton" type="button" class="btn btn-outline-primary btn-sm">Registrera ny kandidat</button>
+          <section id="detailView" hidden>
+            <div id="detailEmpty" class="card">
+              <div class="card-body py-5">
+                <div class="text-secondary small fw-semibold mb-2">Kandidatkort</div>
+                <h2 class="h5">Ingen kandidat vald</h2>
+                <p class="text-secondary mb-3">Gå till kandidatlistan och välj ett ärende.</p>
+                <a class="btn btn-outline-primary btn-sm" href="#/candidates">Öppna kandidatlistan</a>
               </div>
+            </div>
 
-              <div id="candidateDetail" hidden>
-                <div class="card-header bg-white">
-                  <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
-                    <div>
-                      <p id="selectedCaseId" class="small fw-semibold text-secondary mb-1"></p>
-                      <h2 id="selectedName" class="h5 mb-1"></h2>
-                      <p id="selectedMeta" class="text-secondary mb-0"></p>
-                    </div>
-                    <div class="d-flex flex-wrap gap-2 justify-content-end">
-                      <span id="selectedStatus" class="badge text-bg-secondary">Anmäld</span>
-                      <button id="deleteButton" type="button" class="btn btn-outline-danger btn-sm">Ta bort</button>
-                    </div>
+            <div id="candidateDetail" class="card" hidden>
+              <div class="card-header bg-white">
+                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
+                  <div>
+                    <a class="small" href="#/candidates">Tillbaka till kandidatlistan</a>
+                    <p id="selectedCaseId" class="small fw-semibold text-secondary mt-2 mb-1"></p>
+                    <h2 id="selectedName" class="h5 mb-1"></h2>
+                    <p id="selectedMeta" class="text-secondary mb-0"></p>
+                  </div>
+                  <div class="d-flex flex-wrap gap-2 justify-content-end">
+                    <span id="selectedStatus" class="badge text-bg-secondary">Anmäld</span>
+                    <button id="deleteButton" type="button" class="btn btn-outline-danger btn-sm">Ta bort</button>
                   </div>
                 </div>
-
-                <ul class="nav nav-tabs px-3 pt-2" role="tablist" aria-label="Kandidatakt">
-                  <li class="nav-item"><button class="nav-link active" type="button">Grunduppgifter</button></li>
-                  <li class="nav-item"><button class="nav-link" type="button">Kontroller</button></li>
-                  <li class="nav-item"><button class="nav-link" type="button">Intervju</button></li>
-                  <li class="nav-item"><button class="nav-link" type="button">Beslut</button></li>
-                  <li class="nav-item"><button class="nav-link" type="button">Logg</button></li>
-                </ul>
-
-                <section class="card-body border-bottom">
-                  <h3 class="h6">Grunduppgifter</h3>
-                  <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                      <label class="form-label" for="statusSelect">Pipeline-status</label>
-                      <select id="statusSelect" class="form-select form-select-sm"></select>
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="coordinatorInput">Handläggare</label>
-                      <input id="coordinatorInput" class="form-control form-control-sm" autocomplete="off">
-                    </div>
-                  </div>
-                  <dl class="row border rounded mb-0 small fact-list">
-                    <dt class="col-sm-4 bg-body-tertiary py-2">Språk</dt>
-                    <dd id="languageFact" class="col-sm-8 py-2 mb-0"></dd>
-                    <dt class="col-sm-4 bg-body-tertiary py-2">Tillgänglighet</dt>
-                    <dd id="availabilityFact" class="col-sm-8 py-2 mb-0"></dd>
-                    <dt class="col-sm-4 bg-body-tertiary py-2">Område</dt>
-                    <dd id="areaFact" class="col-sm-8 py-2 mb-0"></dd>
-                  </dl>
-                </section>
-
-                <section class="card-body border-bottom">
-                  <h3 class="h6">Kontroller och certifieringskrav</h3>
-                  <div id="checklist" class="row g-2"></div>
-                </section>
-
-                <section class="card-body border-bottom">
-                  <h3 class="h6">Intervju</h3>
-                  <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                      <label class="form-label" for="interviewDateInput">Intervjutid</label>
-                      <input id="interviewDateInput" class="form-control form-control-sm" type="datetime-local">
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="interviewModeInput">Intervjuform</label>
-                      <select id="interviewModeInput" class="form-select form-select-sm">
-                        <option value="">Ej angivet</option>
-                        <option>Fysiskt möte</option>
-                        <option>Digitalt möte</option>
-                        <option>Telefon</option>
-                      </select>
-                    </div>
-                  </div>
-                  <label class="form-label" for="notesInput">Intervjuprotokoll</label>
-                  <textarea id="notesInput" class="form-control form-control-sm" rows="6" placeholder="Kort bedömning, styrkor, frågor att följa upp."></textarea>
-                </section>
-
-                <section class="card-body border-bottom">
-                  <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
-                    <div>
-                      <h3 class="h6">Beslut</h3>
-                      <p id="decisionHint" class="text-secondary mb-0">Alla kritiska steg måste vara klara innan certifiering.</p>
-                    </div>
-                    <button id="approveButton" type="button" class="btn btn-primary btn-sm">Godkänn och certifiera</button>
-                  </div>
-                </section>
-
-                <section class="card-body">
-                  <h3 class="h6">Handläggningslogg</h3>
-                  <ol id="auditLog" class="mb-0 small"></ol>
-                </section>
               </div>
-            </section>
+
+              <ul class="nav nav-tabs px-3 pt-2" role="tablist" aria-label="Kandidatkort">
+                <li class="nav-item"><button class="nav-link active" type="button">Grunduppgifter</button></li>
+                <li class="nav-item"><button class="nav-link" type="button">Kontroller</button></li>
+                <li class="nav-item"><button class="nav-link" type="button">Intervju</button></li>
+                <li class="nav-item"><button class="nav-link" type="button">Beslut</button></li>
+                <li class="nav-item"><button class="nav-link" type="button">Logg</button></li>
+              </ul>
+
+              <section class="card-body border-bottom">
+                <h3 class="h6">Grunduppgifter</h3>
+                <div class="row g-2 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label" for="statusSelect">Pipeline-status</label>
+                    <select id="statusSelect" class="form-select form-select-sm"></select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="coordinatorInput">Handläggare</label>
+                    <input id="coordinatorInput" class="form-control form-control-sm" autocomplete="off">
+                  </div>
+                </div>
+                <dl class="row border rounded mb-0 small fact-list">
+                  <dt class="col-sm-4 bg-body-tertiary py-2">Språk</dt>
+                  <dd id="languageFact" class="col-sm-8 py-2 mb-0"></dd>
+                  <dt class="col-sm-4 bg-body-tertiary py-2">Tillgänglighet</dt>
+                  <dd id="availabilityFact" class="col-sm-8 py-2 mb-0"></dd>
+                  <dt class="col-sm-4 bg-body-tertiary py-2">Område</dt>
+                  <dd id="areaFact" class="col-sm-8 py-2 mb-0"></dd>
+                </dl>
+              </section>
+
+              <section class="card-body border-bottom">
+                <h3 class="h6">Kontroller och certifieringskrav</h3>
+                <div id="checklist" class="row g-2"></div>
+              </section>
+
+              <section class="card-body border-bottom">
+                <h3 class="h6">Intervju</h3>
+                <div class="row g-2 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label" for="interviewDateInput">Intervjutid</label>
+                    <input id="interviewDateInput" class="form-control form-control-sm" type="datetime-local">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="interviewModeInput">Intervjuform</label>
+                    <select id="interviewModeInput" class="form-select form-select-sm">
+                      <option value="">Ej angivet</option>
+                      <option>Fysiskt möte</option>
+                      <option>Digitalt möte</option>
+                      <option>Telefon</option>
+                    </select>
+                  </div>
+                </div>
+                <label class="form-label" for="notesInput">Intervjuprotokoll</label>
+                <textarea id="notesInput" class="form-control form-control-sm" rows="6" placeholder="Kort bedömning, styrkor, frågor att följa upp."></textarea>
+              </section>
+
+              <section class="card-body border-bottom">
+                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
+                  <div>
+                    <h3 class="h6">Beslut</h3>
+                    <p id="decisionHint" class="text-secondary mb-0">Alla kritiska steg måste vara klara innan certifiering.</p>
+                  </div>
+                  <button id="approveButton" type="button" class="btn btn-primary btn-sm">Godkänn och certifiera</button>
+                </div>
+              </section>
+
+              <section class="card-body">
+                <h3 class="h6">Handläggningslogg</h3>
+                <ol id="auditLog" class="mb-0 small"></ol>
+              </section>
+            </div>
           </section>
         </main>
       </div>

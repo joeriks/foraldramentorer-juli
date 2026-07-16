@@ -23,30 +23,16 @@
   background: #1d5f8c;
 }
 
+.sidebar .nav-link.disabled {
+  color: rgba(255, 255, 255, 0.42);
+}
+
 .main-shell {
   min-width: 0;
 }
 
-.workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.65fr);
-  gap: 1rem;
-  align-items: start;
-}
-
 .case-table {
-  min-width: 0;
-}
-
-.case-table th,
-.case-table td {
-  white-space: nowrap;
-}
-
-.case-table th:nth-child(2),
-.case-table td:nth-child(2) {
-  min-width: 160px;
-  white-space: normal;
+  min-width: 760px;
 }
 
 .case-table tbody tr {
@@ -57,7 +43,8 @@
   background: #e8f2f8;
 }
 
-.case-table small {
+.case-table small,
+#actionTableBody small {
   display: block;
   color: var(--bs-secondary-color);
 }
@@ -84,9 +71,5 @@
 
   .sidebar {
     display: none;
-  }
-
-  .workspace {
-    grid-template-columns: 1fr;
   }
 }

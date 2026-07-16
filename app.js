@@ -85,22 +85,31 @@ let selectedId = null;
 let searchTerm = "";
 let statusFilter = "";
 let candidateModal;
+let currentView = "dashboard";
 
 const els = {
+  pageTitle: document.querySelector("#pageTitle"),
+  breadcrumb: document.querySelector("#breadcrumb"),
+  navDashboard: document.querySelector("#navDashboard"),
+  navCandidates: document.querySelector("#navCandidates"),
+  dashboardView: document.querySelector("#dashboardView"),
+  candidatesView: document.querySelector("#candidatesView"),
+  detailView: document.querySelector("#detailView"),
   totalCount: document.querySelector("#totalCount"),
   readyCount: document.querySelector("#readyCount"),
   certifiedCount: document.querySelector("#certifiedCount"),
   blockedCount: document.querySelector("#blockedCount"),
+  actionTableBody: document.querySelector("#actionTableBody"),
   seedButton: document.querySelector("#seedButton"),
   resetButton: document.querySelector("#resetButton"),
   newCaseButton: document.querySelector("#newCaseButton"),
-  emptyNewCaseButton: document.querySelector("#emptyNewCaseButton"),
+  dashboardNewCaseButton: document.querySelector("#dashboardNewCaseButton"),
   cancelNewCaseButton: document.querySelector("#cancelNewCaseButton"),
   candidateForm: document.querySelector("#candidateForm"),
   candidateTableBody: document.querySelector("#candidateTableBody"),
   searchInput: document.querySelector("#searchInput"),
   statusFilter: document.querySelector("#statusFilter"),
-  emptyState: document.querySelector("#emptyState"),
+  detailEmpty: document.querySelector("#detailEmpty"),
   candidateDetail: document.querySelector("#candidateDetail"),
   selectedCaseId: document.querySelector("#selectedCaseId"),
   selectedStatus: document.querySelector("#selectedStatus"),
@@ -178,7 +187,13 @@ async function refresh() {
   candidates = candidates.map(normalizeCandidate);
   await ensureUniqueCaseNumbers();
   candidates.sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.name.localeCompare(b.name, "sv"));
+  renderAll();
+}
+
+function renderAll() {
+  applyRoute();
   renderSummary();
+  renderDashboard();
   renderTable();
   renderDetail();
 }
@@ -241,12 +256,63 @@ function filteredCandidates() {
   });
 }
 
+function candidatesNeedingAction() {
+  return candidates.filter((candidate) => {
+    return isBlocked(candidate) || isComplete(candidate) && candidate.status !== "Godkänd/Certifierad";
+  });
+}
+
 function isComplete(candidate) {
   return CHECKS.every(([key]) => candidate.checks?.[key]);
 }
 
 function isBlocked(candidate) {
   return !candidate.checks?.identityVerified || !candidate.checks?.registryChecked || !candidate.checks?.referencesDone;
+}
+
+function parseRoute() {
+  const hash = window.location.hash || "#/dashboard";
+  const [, view, id] = hash.match(/^#\/([^/]+)\/?(.+)?$/) || [];
+  return {
+    view: view || "dashboard",
+    id: id || null
+  };
+}
+
+function applyRoute() {
+  const route = parseRoute();
+  currentView = ["dashboard", "candidates", "candidate"].includes(route.view) ? route.view : "dashboard";
+  selectedId = currentView === "candidate" ? route.id : selectedId;
+
+  els.dashboardView.hidden = currentView !== "dashboard";
+  els.candidatesView.hidden = currentView !== "candidates";
+  els.detailView.hidden = currentView !== "candidate";
+
+  els.navDashboard.classList.toggle("active", currentView === "dashboard");
+  els.navCandidates.classList.toggle("active", currentView === "candidates" || currentView === "candidate");
+
+  if (currentView === "dashboard") {
+    els.pageTitle.textContent = "Dashboard";
+    els.breadcrumb.textContent = "Start / Dashboard";
+  } else if (currentView === "candidates") {
+    els.pageTitle.textContent = "Kandidatlista";
+    els.breadcrumb.textContent = "Start / Onboarding / Kandidatlista";
+  } else {
+    els.pageTitle.textContent = "Kandidatkort";
+    els.breadcrumb.textContent = "Start / Onboarding / Kandidatkort";
+  }
+}
+
+function navigateToCandidate(id) {
+  window.location.hash = `#/candidate/${id}`;
+}
+
+function navigateTo(hash) {
+  if (window.location.hash === hash) {
+    renderAll();
+    return;
+  }
+  window.location.hash = hash;
 }
 
 function renderSummary() {
@@ -256,13 +322,36 @@ function renderSummary() {
   els.blockedCount.textContent = candidates.filter(isBlocked).length;
 }
 
+function renderDashboard() {
+  els.actionTableBody.innerHTML = "";
+  const rows = candidatesNeedingAction().slice(0, 8);
+
+  if (!rows.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="4" class="text-secondary">Inga kandidater kräver åtgärd just nu.</td>`;
+    els.actionTableBody.append(row);
+    return;
+  }
+
+  for (const candidate of rows) {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td><strong>${escapeHtml(candidate.caseNumber)}</strong></td>
+      <td>${escapeHtml(candidate.name)}<small>${escapeHtml(candidate.coordinator || "Ej tilldelad")}</small></td>
+      <td><span class="${statusClass(candidate)}">${escapeHtml(candidate.status)}</span></td>
+      <td><button type="button" class="btn btn-outline-primary btn-sm" data-open-candidate="${candidate.id}">Öppna</button></td>
+    `;
+    els.actionTableBody.append(row);
+  }
+}
+
 function renderTable() {
   els.candidateTableBody.innerHTML = "";
   const rows = filteredCandidates();
 
   if (!rows.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="6">Inga kandidater matchar urvalet.</td>`;
+    row.innerHTML = `<td colspan="6" class="text-secondary">Inga kandidater matchar urvalet.</td>`;
     els.candidateTableBody.append(row);
     return;
   }
@@ -274,15 +363,11 @@ function renderTable() {
       <td><strong>${escapeHtml(candidate.caseNumber)}</strong><small>${escapeHtml(daysSinceText(candidate.createdAt))}</small></td>
       <td>${escapeHtml(candidate.name)}<small>${escapeHtml(candidate.languages)}</small></td>
       <td><span class="${statusClass(candidate)}">${escapeHtml(candidate.status)}</span></td>
-      <td class="d-none d-xl-table-cell">${escapeHtml(candidate.area)}</td>
+      <td>${escapeHtml(candidate.area)}</td>
       <td>${escapeHtml(candidate.coordinator || "Ej tilldelad")}</td>
-      <td class="d-none d-xxl-table-cell">${escapeHtml(formatDate(candidate.updatedAt || candidate.createdAt))}</td>
+      <td>${escapeHtml(formatDate(candidate.updatedAt || candidate.createdAt))}</td>
     `;
-    row.addEventListener("click", () => {
-      selectedId = candidate.id;
-      renderTable();
-      renderDetail();
-    });
+    row.addEventListener("click", () => navigateToCandidate(candidate.id));
     els.candidateTableBody.append(row);
   }
 }
@@ -291,12 +376,12 @@ function renderDetail() {
   const candidate = selectedCandidate();
 
   if (!candidate) {
-    els.emptyState.hidden = false;
+    els.detailEmpty.hidden = false;
     els.candidateDetail.hidden = true;
     return;
   }
 
-  els.emptyState.hidden = true;
+  els.detailEmpty.hidden = true;
   els.candidateDetail.hidden = false;
   els.selectedCaseId.textContent = `Ärende ${candidate.caseNumber}`;
   els.selectedName.textContent = candidate.name;
@@ -323,13 +408,15 @@ function renderDetail() {
   els.checklist.innerHTML = "";
 
   for (const [key, label] of CHECKS) {
-    const item = document.createElement("label");
-    item.className = "check-item";
-    item.innerHTML = `
-      <input type="checkbox" data-check="${key}" ${candidate.checks?.[key] ? "checked" : ""}>
-      <span>${label}</span>
+    const column = document.createElement("div");
+    column.className = "col-md-6";
+    column.innerHTML = `
+      <label class="form-check border rounded p-2 h-100">
+        <input class="form-check-input ms-0 me-2" type="checkbox" data-check="${key}" ${candidate.checks?.[key] ? "checked" : ""}>
+        <span class="form-check-label">${label}</span>
+      </label>
     `;
-    els.checklist.append(item);
+    els.checklist.append(column);
   }
 
   const complete = isComplete(candidate);
@@ -363,9 +450,10 @@ async function updateSelected(patch, logText) {
 
 function newCandidate(formData) {
   const now = new Date().toISOString();
+  const id = crypto.randomUUID();
   return {
-    id: crypto.randomUUID(),
-    caseNumber: makeCaseNumber(now),
+    id,
+    caseNumber: makeCaseNumber(id),
     name: formData.get("name").trim(),
     area: formData.get("area").trim(),
     languages: formData.get("languages").trim(),
@@ -403,8 +491,11 @@ function randomDigits(length) {
 }
 
 function statusClass(candidate) {
-  if (candidate.status === "Godkänd/Certifierad" || isComplete(candidate)) {
+  if (candidate.status === "Godkänd/Certifierad") {
     return "badge rounded-pill text-bg-success";
+  }
+  if (isComplete(candidate)) {
+    return "badge rounded-pill text-bg-primary";
   }
   if (isBlocked(candidate)) {
     return "badge rounded-pill text-bg-warning";
@@ -449,22 +540,24 @@ for (const status of STATUSES) {
 }
 
 function openCandidateModal() {
-  if (candidateModal) {
-    candidateModal.show();
-    return;
-  }
-  els.candidateForm.hidden = false;
-  document.querySelector("#nameInput").focus();
+  candidateModal.show();
 }
 
+els.navDashboard.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/dashboard");
+});
+
+els.navCandidates.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/candidates");
+});
+
 els.newCaseButton.addEventListener("click", openCandidateModal);
-els.emptyNewCaseButton.addEventListener("click", openCandidateModal);
+els.dashboardNewCaseButton.addEventListener("click", openCandidateModal);
 
 els.cancelNewCaseButton.addEventListener("click", () => {
   els.candidateForm.reset();
-  if (!candidateModal) {
-    els.candidateForm.hidden = true;
-  }
 });
 
 els.candidateForm.addEventListener("submit", async (event) => {
@@ -473,12 +566,9 @@ els.candidateForm.addEventListener("submit", async (event) => {
   await saveCandidate(candidate);
   selectedId = candidate.id;
   els.candidateForm.reset();
-  if (candidateModal) {
-    candidateModal.hide();
-  } else {
-    els.candidateForm.hidden = true;
-  }
+  candidateModal.hide();
   await refresh();
+  navigateToCandidate(candidate.id);
 });
 
 els.searchInput.addEventListener("input", () => {
@@ -489,6 +579,12 @@ els.searchInput.addEventListener("input", () => {
 els.statusFilter.addEventListener("change", () => {
   statusFilter = els.statusFilter.value;
   renderTable();
+});
+
+els.actionTableBody.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-open-candidate]");
+  if (!button) return;
+  navigateToCandidate(button.dataset.openCandidate);
 });
 
 els.statusSelect.addEventListener("change", () => updateSelected({ status: els.statusSelect.value }, `Status ändrad till ${els.statusSelect.value}`));
@@ -522,14 +618,13 @@ els.deleteButton.addEventListener("click", async () => {
   await deleteCandidate(candidate.id);
   selectedId = null;
   await refresh();
+  window.location.hash = "#/candidates";
 });
 
 els.seedButton.addEventListener("click", async () => {
   const now = new Date().toISOString();
-  let firstId = null;
   for (const candidate of seedCandidates) {
     const id = crypto.randomUUID();
-    firstId = firstId || id;
     await saveCandidate({
       ...candidate,
       id,
@@ -542,7 +637,6 @@ els.seedButton.addEventListener("click", async () => {
       updatedAt: now
     });
   }
-  selectedId = firstId;
   await refresh();
 });
 
@@ -552,16 +646,19 @@ els.resetButton.addEventListener("click", async () => {
   await refresh();
 });
 
+window.addEventListener("hashchange", renderAll);
+
 openDatabase()
   .then(async (database) => {
     const modalElement = document.querySelector("#candidateModal");
-    if (window.bootstrap && modalElement) {
-      candidateModal = new bootstrap.Modal(modalElement);
-      modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());
-    }
+    candidateModal = new bootstrap.Modal(modalElement);
+    modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());
     db = database;
+    if (!window.location.hash) {
+      window.location.hash = "#/dashboard";
+    }
     await refresh();
   })
   .catch((error) => {
-    document.body.innerHTML = `<main class="empty-state"><h1>Kunde inte öppna IndexedDB</h1><p>${escapeHtml(error.message)}</p></main>`;
+    document.body.innerHTML = `<main class="p-4"><h1>Kunde inte öppna IndexedDB</h1><p>${escapeHtml(error.message)}</p></main>`;
   });
