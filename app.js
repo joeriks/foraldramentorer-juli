@@ -84,6 +84,7 @@ let candidates = [];
 let selectedId = null;
 let searchTerm = "";
 let statusFilter = "";
+let candidateModal;
 
 const els = {
   totalCount: document.querySelector("#totalCount"),
@@ -363,7 +364,13 @@ function makeCaseNumber(seed) {
 }
 
 function statusClass(candidate) {
-  return `status-pill ${isComplete(candidate) ? "ready" : isBlocked(candidate) ? "blocked" : ""}`;
+  if (candidate.status === "Godkänd/Certifierad" || isComplete(candidate)) {
+    return "badge rounded-pill text-bg-success";
+  }
+  if (isBlocked(candidate)) {
+    return "badge rounded-pill text-bg-warning";
+  }
+  return "badge rounded-pill text-bg-secondary";
 }
 
 function formatDate(value) {
@@ -403,13 +410,19 @@ for (const status of STATUSES) {
 }
 
 els.newCaseButton.addEventListener("click", () => {
+  if (candidateModal) {
+    candidateModal.show();
+    return;
+  }
   els.candidateForm.hidden = false;
   document.querySelector("#nameInput").focus();
 });
 
 els.cancelNewCaseButton.addEventListener("click", () => {
   els.candidateForm.reset();
-  els.candidateForm.hidden = true;
+  if (!candidateModal) {
+    els.candidateForm.hidden = true;
+  }
 });
 
 els.candidateForm.addEventListener("submit", async (event) => {
@@ -418,7 +431,11 @@ els.candidateForm.addEventListener("submit", async (event) => {
   await saveCandidate(candidate);
   selectedId = candidate.id;
   els.candidateForm.reset();
-  els.candidateForm.hidden = true;
+  if (candidateModal) {
+    candidateModal.hide();
+  } else {
+    els.candidateForm.hidden = true;
+  }
   await refresh();
 });
 
@@ -492,6 +509,11 @@ els.resetButton.addEventListener("click", async () => {
 
 openDatabase()
   .then(async (database) => {
+    const modalElement = document.querySelector("#candidateModal");
+    if (window.bootstrap && modalElement) {
+      candidateModal = new bootstrap.Modal(modalElement);
+      modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());
+    }
     db = database;
     await refresh();
   })
