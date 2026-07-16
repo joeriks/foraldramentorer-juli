@@ -202,75 +202,87 @@
               </div>
 
               <ul class="nav nav-tabs px-3 pt-2" role="tablist" aria-label="Mentorkort">
-                <li class="nav-item"><button class="nav-link active" type="button">Grunduppgifter</button></li>
-                <li class="nav-item"><button class="nav-link" type="button">Kontroller</button></li>
-                <li class="nav-item"><button class="nav-link" type="button">Intervju</button></li>
-                <li class="nav-item"><button class="nav-link" type="button">Beslut</button></li>
-                <li class="nav-item"><button class="nav-link" type="button">Logg</button></li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active" id="mentor-base-tab" data-bs-toggle="tab" data-bs-target="#mentor-base-pane" type="button" role="tab" aria-controls="mentor-base-pane" aria-selected="true">Grunduppgifter</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="mentor-checks-tab" data-bs-toggle="tab" data-bs-target="#mentor-checks-pane" type="button" role="tab" aria-controls="mentor-checks-pane" aria-selected="false">Kontroller</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="mentor-interview-tab" data-bs-toggle="tab" data-bs-target="#mentor-interview-pane" type="button" role="tab" aria-controls="mentor-interview-pane" aria-selected="false">Intervju</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="mentor-decision-tab" data-bs-toggle="tab" data-bs-target="#mentor-decision-pane" type="button" role="tab" aria-controls="mentor-decision-pane" aria-selected="false">Beslut</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="mentor-log-tab" data-bs-toggle="tab" data-bs-target="#mentor-log-pane" type="button" role="tab" aria-controls="mentor-log-pane" aria-selected="false">Logg</button>
+                </li>
               </ul>
 
-              <section class="card-body border-bottom">
-                <h3 class="h6">Grunduppgifter</h3>
-                <div class="row g-2 mb-3">
-                  <div class="col-md-6">
-                    <label class="form-label" for="statusSelect">Pipeline-status</label>
-                    <select id="statusSelect" class="form-select form-select-sm"></select>
+              <div class="tab-content">
+                <section class="tab-pane fade show active card-body" id="mentor-base-pane" role="tabpanel" aria-labelledby="mentor-base-tab" tabindex="0">
+                  <h3 class="h6">Grunduppgifter</h3>
+                  <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                      <label class="form-label" for="statusSelect">Pipeline-status</label>
+                      <select id="statusSelect" class="form-select form-select-sm"></select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="coordinatorInput">Handläggare</label>
+                      <input id="coordinatorInput" class="form-control form-control-sm" autocomplete="off">
+                    </div>
                   </div>
-                  <div class="col-md-6">
-                    <label class="form-label" for="coordinatorInput">Handläggare</label>
-                    <input id="coordinatorInput" class="form-control form-control-sm" autocomplete="off">
-                  </div>
-                </div>
-                <dl class="row border rounded mb-0 small fact-list">
-                  <dt class="col-sm-4 bg-body-tertiary py-2">Språk</dt>
-                  <dd id="languageFact" class="col-sm-8 py-2 mb-0"></dd>
-                  <dt class="col-sm-4 bg-body-tertiary py-2">Tillgänglighet</dt>
-                  <dd id="availabilityFact" class="col-sm-8 py-2 mb-0"></dd>
-                  <dt class="col-sm-4 bg-body-tertiary py-2">Område</dt>
-                  <dd id="areaFact" class="col-sm-8 py-2 mb-0"></dd>
-                </dl>
-              </section>
+                  <dl class="row border rounded mb-0 small fact-list">
+                    <dt class="col-sm-4 bg-body-tertiary py-2">Språk</dt>
+                    <dd id="languageFact" class="col-sm-8 py-2 mb-0"></dd>
+                    <dt class="col-sm-4 bg-body-tertiary py-2">Tillgänglighet</dt>
+                    <dd id="availabilityFact" class="col-sm-8 py-2 mb-0"></dd>
+                    <dt class="col-sm-4 bg-body-tertiary py-2">Område</dt>
+                    <dd id="areaFact" class="col-sm-8 py-2 mb-0"></dd>
+                  </dl>
+                </section>
 
-              <section class="card-body border-bottom">
-                <h3 class="h6">Kontroller och certifieringskrav</h3>
-                <div id="checklist" class="row g-2"></div>
-              </section>
+                <section class="tab-pane fade card-body" id="mentor-checks-pane" role="tabpanel" aria-labelledby="mentor-checks-tab" tabindex="0">
+                  <h3 class="h6">Kontroller och certifieringskrav</h3>
+                  <div id="checklist" class="row g-2"></div>
+                </section>
 
-              <section class="card-body border-bottom">
-                <h3 class="h6">Intervju</h3>
-                <div class="row g-2 mb-3">
-                  <div class="col-md-6">
-                    <label class="form-label" for="interviewDateInput">Intervjutid</label>
-                    <input id="interviewDateInput" class="form-control form-control-sm" type="datetime-local">
+                <section class="tab-pane fade card-body" id="mentor-interview-pane" role="tabpanel" aria-labelledby="mentor-interview-tab" tabindex="0">
+                  <h3 class="h6">Intervju</h3>
+                  <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                      <label class="form-label" for="interviewDateInput">Intervjutid</label>
+                      <input id="interviewDateInput" class="form-control form-control-sm" type="datetime-local">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="interviewModeInput">Intervjuform</label>
+                      <select id="interviewModeInput" class="form-select form-select-sm">
+                        <option value="">Ej angivet</option>
+                        <option>Fysiskt möte</option>
+                        <option>Digitalt möte</option>
+                        <option>Telefon</option>
+                      </select>
+                    </div>
                   </div>
-                  <div class="col-md-6">
-                    <label class="form-label" for="interviewModeInput">Intervjuform</label>
-                    <select id="interviewModeInput" class="form-select form-select-sm">
-                      <option value="">Ej angivet</option>
-                      <option>Fysiskt möte</option>
-                      <option>Digitalt möte</option>
-                      <option>Telefon</option>
-                    </select>
-                  </div>
-                </div>
-                <label class="form-label" for="notesInput">Intervjuprotokoll</label>
-                <textarea id="notesInput" class="form-control form-control-sm" rows="6" placeholder="Kort bedömning, styrkor, frågor att följa upp."></textarea>
-              </section>
+                  <label class="form-label" for="notesInput">Intervjuprotokoll</label>
+                  <textarea id="notesInput" class="form-control form-control-sm" rows="6" placeholder="Kort bedömning, styrkor, frågor att följa upp."></textarea>
+                </section>
 
-              <section class="card-body border-bottom">
-                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
-                  <div>
-                    <h3 class="h6">Beslut</h3>
-                    <p id="decisionHint" class="text-secondary mb-0">Alla kritiska steg måste vara klara innan certifiering.</p>
+                <section class="tab-pane fade card-body" id="mentor-decision-pane" role="tabpanel" aria-labelledby="mentor-decision-tab" tabindex="0">
+                  <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
+                    <div>
+                      <h3 class="h6">Beslut</h3>
+                      <p id="decisionHint" class="text-secondary mb-0">Alla kritiska steg måste vara klara innan certifiering.</p>
+                    </div>
+                    <button id="approveButton" type="button" class="btn btn-primary btn-sm">Godkänn och certifiera</button>
                   </div>
-                  <button id="approveButton" type="button" class="btn btn-primary btn-sm">Godkänn och certifiera</button>
-                </div>
-              </section>
+                </section>
 
-              <section class="card-body">
-                <h3 class="h6">Handläggningslogg</h3>
-                <ol id="auditLog" class="mb-0 small"></ol>
-              </section>
+                <section class="tab-pane fade card-body" id="mentor-log-pane" role="tabpanel" aria-labelledby="mentor-log-tab" tabindex="0">
+                  <h3 class="h6">Handläggningslogg</h3>
+                  <ol id="auditLog" class="mb-0 small"></ol>
+                </section>
+              </div>
             </div>
           </section>
         </main>

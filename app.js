@@ -527,6 +527,7 @@ function renderDetail() {
 
   els.detailEmpty.hidden = true;
   els.candidateDetail.hidden = false;
+  showDefaultMentorTab();
   els.selectedCaseId.textContent = `Ärende ${candidate.caseNumber}`;
   els.selectedName.textContent = candidate.name;
   els.selectedMeta.textContent = `${candidate.area} · ${candidate.languages} · ${candidate.availability}`;
@@ -574,6 +575,13 @@ function renderDetail() {
     const li = document.createElement("li");
     li.innerHTML = `<time>${escapeHtml(formatDateTime(item.at))}</time>${escapeHtml(item.text)}`;
     els.auditLog.append(li);
+  }
+}
+
+function showDefaultMentorTab() {
+  const tab = document.querySelector("#mentor-base-tab");
+  if (window.bootstrap && tab) {
+    bootstrap.Tab.getOrCreateInstance(tab).show();
   }
 }
 
