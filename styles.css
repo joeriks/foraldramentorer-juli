@@ -31,6 +31,21 @@
   min-width: 0;
 }
 
+.pipeline-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.pipeline-step {
+  min-height: 112px;
+}
+
+.pipeline-step:hover {
+  background: var(--bs-primary-bg-subtle);
+  border-color: var(--bs-primary) !important;
+}
+
 .case-table {
   min-width: 760px;
 }
@@ -71,5 +86,15 @@
 
   .sidebar {
     display: none;
+  }
+
+  .pipeline-grid {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .pipeline-grid {
+    grid-template-columns: 1fr;
   }
 }

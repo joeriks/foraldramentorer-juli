@@ -196,6 +196,7 @@ const els = {
   readyCount: document.querySelector("#readyCount"),
   certifiedCount: document.querySelector("#certifiedCount"),
   blockedCount: document.querySelector("#blockedCount"),
+  pipelineGrid: document.querySelector("#pipelineBoard .pipeline-grid"),
   actionTableBody: document.querySelector("#actionTableBody"),
   seedButton: document.querySelector("#seedButton"),
   resetButton: document.querySelector("#resetButton"),
@@ -290,6 +291,7 @@ async function refresh() {
 function renderAll() {
   applyRoute();
   renderSummary();
+  renderPipeline();
   renderDashboard();
   renderTable();
   renderDetail();
@@ -412,12 +414,59 @@ function navigateTo(hash) {
   window.location.hash = hash;
 }
 
+function navigateToCandidateListWithStatus(status) {
+  statusFilter = status;
+  els.statusFilter.value = status;
+  navigateTo("#/candidates");
+  renderTable();
+}
+
 function renderSummary() {
   els.totalCount.textContent = candidates.length;
   els.readyCount.textContent = candidates.filter((candidate) => isComplete(candidate) && candidate.status !== "Godkänd/Certifierad").length;
   els.certifiedCount.textContent = candidates.filter((candidate) => candidate.status === "Godkänd/Certifierad").length;
   els.blockedCount.textContent = candidates.filter(isBlocked).length;
   renderSeedButtonState();
+}
+
+function statusCount(status) {
+  return candidates.filter((candidate) => candidate.status === status).length;
+}
+
+function renderPipeline() {
+  els.pipelineGrid.innerHTML = "";
+
+  for (const [index, status] of STATUSES.entries()) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pipeline-step btn btn-light border text-start";
+    button.dataset.pipelineStatus = status;
+    button.innerHTML = `
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <span class="small text-secondary fw-semibold">${index + 1}</span>
+        <span class="${pipelineBadgeClass(status)}">${statusCount(status)}</span>
+      </div>
+      <div class="fw-semibold mt-2">${escapeHtml(status)}</div>
+      <div class="small text-secondary">${escapeHtml(pipelineDescription(status))}</div>
+    `;
+    els.pipelineGrid.append(button);
+  }
+}
+
+function pipelineBadgeClass(status) {
+  if (status === "Godkänd/Certifierad") return "badge text-bg-success";
+  if (status === "Redo för intervju") return "badge text-bg-primary";
+  return "badge text-bg-secondary";
+}
+
+function pipelineDescription(status) {
+  return {
+    "Anmäld": "Ny intresseanmälan",
+    "Kontrollerad": "Register och referenser",
+    "Utbildning pågår": "E-learning kvar",
+    "Redo för intervju": "Väntar på beslut",
+    "Godkänd/Certifierad": "Aktiv i matchning"
+  }[status] || "";
 }
 
 function hasSeedData() {
@@ -693,6 +742,12 @@ els.actionTableBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-candidate]");
   if (!button) return;
   navigateToCandidate(button.dataset.openCandidate);
+});
+
+els.pipelineGrid.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-pipeline-status]");
+  if (!button) return;
+  navigateToCandidateListWithStatus(button.dataset.pipelineStatus);
 });
 
 els.statusSelect.addEventListener("change", () => updateSelected({ status: els.statusSelect.value }, `Status ändrad till ${els.statusSelect.value}`));
