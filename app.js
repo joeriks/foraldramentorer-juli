@@ -193,9 +193,6 @@ const els = {
   candidatesView: document.querySelector("#candidatesView"),
   detailView: document.querySelector("#detailView"),
   totalCount: document.querySelector("#totalCount"),
-  readyCount: document.querySelector("#readyCount"),
-  certifiedCount: document.querySelector("#certifiedCount"),
-  blockedCount: document.querySelector("#blockedCount"),
   pipelineGrid: document.querySelector("#pipelineBoard .pipeline-grid"),
   actionTableBody: document.querySelector("#actionTableBody"),
   seedButton: document.querySelector("#seedButton"),
@@ -423,9 +420,6 @@ function navigateToCandidateListWithStatus(status) {
 
 function renderSummary() {
   els.totalCount.textContent = candidates.length;
-  els.readyCount.textContent = candidates.filter((candidate) => isComplete(candidate) && candidate.status !== "Godkänd/Certifierad").length;
-  els.certifiedCount.textContent = candidates.filter((candidate) => candidate.status === "Godkänd/Certifierad").length;
-  els.blockedCount.textContent = candidates.filter(isBlocked).length;
   renderSeedButtonState();
 }
 

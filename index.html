@@ -42,45 +42,15 @@
 
         <main class="p-3 p-lg-4">
           <section id="dashboardView">
-            <div class="row g-3 mb-3" aria-label="Sammanfattning">
-              <div class="col-6 col-xl-3">
-                <article class="card h-100">
-                  <div class="card-body py-3">
-                    <div id="totalCount" class="h3 mb-1">0</div>
-                    <div class="text-secondary small">Totalt antal kandidater</div>
-                  </div>
-                </article>
-              </div>
-              <div class="col-6 col-xl-3">
-                <article class="card h-100">
-                  <div class="card-body py-3">
-                    <div id="readyCount" class="h3 mb-1">0</div>
-                    <div class="text-secondary small">Redo för beslut</div>
-                  </div>
-                </article>
-              </div>
-              <div class="col-6 col-xl-3">
-                <article class="card h-100">
-                  <div class="card-body py-3">
-                    <div id="certifiedCount" class="h3 mb-1">0</div>
-                    <div class="text-secondary small">Certifierade</div>
-                  </div>
-                </article>
-              </div>
-              <div class="col-6 col-xl-3">
-                <article class="card h-100">
-                  <div class="card-body py-3">
-                    <div id="blockedCount" class="h3 mb-1">0</div>
-                    <div class="text-secondary small">Kräver åtgärd</div>
-                  </div>
-                </article>
-              </div>
-            </div>
-
             <section class="card mb-3">
-              <div class="card-header bg-white">
-                <h2 class="h5 mb-1">Kandidatens tidslinje</h2>
-                <p class="text-secondary mb-0">Översikt över var kandidaterna befinner sig i certifieringsflödet.</p>
+              <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
+                <div>
+                  <h2 class="h5 mb-1">Kandidatens tidslinje</h2>
+                  <p class="text-secondary mb-0">Översikt över var kandidaterna befinner sig i certifieringsflödet.</p>
+                </div>
+                <div class="text-secondary small">
+                  Totalt <strong id="totalCount">0</strong> kandidater
+                </div>
               </div>
               <div id="pipelineBoard" class="card-body">
                 <div class="pipeline-grid">
