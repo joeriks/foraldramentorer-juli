@@ -2,6 +2,7 @@ const DB_NAME = "foraldramentorer";
 const DB_VERSION = 2;
 const STORE = "candidates";
 const HANDLERS_STORE = "handlers";
+const CURRENT_USER_ID = "handler-sara";
 
 const STATUSES = [
   "Anmäld",
@@ -275,6 +276,9 @@ let selectedHandlerId = null;
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
   breadcrumb: document.querySelector("#breadcrumb"),
+  currentUserInitials: document.querySelector("#currentUserInitials"),
+  currentUserName: document.querySelector("#currentUserName"),
+  currentUserRole: document.querySelector("#currentUserRole"),
   navDashboard: document.querySelector("#navDashboard"),
   navCandidates: document.querySelector("#navCandidates"),
   navAdministration: document.querySelector("#navAdministration"),
@@ -572,6 +576,7 @@ async function refresh() {
 
 function renderAll() {
   applyRoute();
+  renderCurrentUser();
   renderSummary();
   renderPipeline();
   renderDashboard();
@@ -579,6 +584,32 @@ function renderAll() {
   renderDetail();
   renderHandlers();
   renderHandlerDetail();
+}
+
+function currentUser() {
+  return handlers.find((handler) => handler.id === CURRENT_USER_ID)
+    || { id: CURRENT_USER_ID, name: "Sara", role: "Samordnare" };
+}
+
+function currentUserName() {
+  return currentUser().name;
+}
+
+function userInitials(name) {
+  return String(name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toLocaleUpperCase("sv-SE") || "?";
+}
+
+function renderCurrentUser() {
+  const user = currentUser();
+  els.currentUserName.textContent = user.name;
+  els.currentUserRole.textContent = user.active === false ? `${user.role} · Inaktiv` : user.role;
+  els.currentUserInitials.textContent = userInitials(user.name);
 }
 
 async function migrateCoordinatorReferences() {
@@ -1190,7 +1221,7 @@ async function updateSelected(patch, logText) {
   if (logText) {
     updated.history = [
       ...(candidate.history || []),
-      { at: updated.updatedAt, text: logText, actor: candidate.coordinator || "System" }
+      { at: updated.updatedAt, text: logText, actor: currentUserName() }
     ];
   }
   await saveCandidate(updated);
@@ -1219,7 +1250,7 @@ function newCandidate(formData) {
     identityMethod: "",
     identityVerifiedAt: "",
     identityVerifiedBy: "",
-    history: [{ at: now, text: "Ärende skapat", actor: "System" }],
+    history: [{ at: now, text: "Ärende skapat", actor: currentUserName() }],
     createdAt: now,
     updatedAt: now
   };
@@ -1458,7 +1489,7 @@ els.handlerEditForm.addEventListener("submit", async (event) => {
       ...candidate,
       coordinator: name,
       updatedAt: now,
-      history: [...(candidate.history || []), { at: now, text: `Handläggarnamn uppdaterat till ${name}`, actor: "System" }]
+      history: [...(candidate.history || []), { at: now, text: `Handläggarnamn uppdaterat till ${name}`, actor: currentUserName() }]
     })));
   }
   markSaved();
@@ -1504,7 +1535,7 @@ els.handlerForm.addEventListener("submit", async (event) => {
       ...candidate,
       coordinator: name,
       updatedAt: now,
-      history: [...(candidate.history || []), { at: now, text: `Handläggarnamn uppdaterat till ${name}`, actor: "System" }]
+      history: [...(candidate.history || []), { at: now, text: `Handläggarnamn uppdaterat till ${name}`, actor: currentUserName() }]
     })));
   }
   handlerModal.hide();
@@ -1585,7 +1616,7 @@ els.saveIdentityVerificationButton.addEventListener("click", async () => {
     personalNumber: els.identityPersonalNumberInput.value.trim(),
     identityMethod: method,
     identityVerifiedAt: verifiedAt,
-    identityVerifiedBy: candidate.coordinator || "Ej tilldelad",
+    identityVerifiedBy: currentUserName(),
     checks: { ...candidate.checks, identityVerified: true }
   }, `Identitet verifierad med ${identityMethodLabel(method)}`);
   showFeedback(`Identiteten har verifierats med ${identityMethodLabel(method)}.`);

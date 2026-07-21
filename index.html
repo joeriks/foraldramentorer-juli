@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260721-handler-record">
+    <link rel="stylesheet" href="styles.css?v=20260721-session-user">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -32,6 +32,13 @@
             <div>
               <nav id="breadcrumb" class="small text-secondary mb-1" aria-label="Brödsmulor">Start / Dashboard</nav>
               <h1 id="pageTitle" class="h4 mb-0">Dashboard</h1>
+            </div>
+            <div class="session-user" aria-label="Inloggad användare">
+              <div id="currentUserInitials" class="session-user-initials" aria-hidden="true">S</div>
+              <div>
+                <div class="session-user-label">Inloggad som</div>
+                <div class="session-user-identity"><strong id="currentUserName">Sara</strong><span id="currentUserRole">Samordnare</span></div>
+              </div>
             </div>
           </div>
         </header>
@@ -621,6 +628,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260721-handler-record"></script>
+    <script src="app.js?v=20260721-session-user"></script>
   </body>
 </html>

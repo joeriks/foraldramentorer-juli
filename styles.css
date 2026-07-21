@@ -152,6 +152,45 @@
   padding: var(--app-space-3) var(--app-space-4);
 }
 
+.session-user {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  min-height: 2.5rem;
+}
+
+.session-user-initials {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 2.25rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--bs-border-radius);
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.session-user-label {
+  color: var(--app-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.session-user-identity {
+  display: flex;
+  align-items: baseline;
+  gap: var(--app-space-2);
+  line-height: 1.25;
+}
+
+.session-user-identity span {
+  color: var(--app-text-muted);
+  font-size: 0.8125rem;
+}
+
 .app-main {
   padding: var(--app-space-4);
 }
@@ -677,6 +716,12 @@
 
   .record-actions {
     justify-content: flex-start !important;
+  }
+
+  .session-user {
+    width: 100%;
+    padding-top: var(--app-space-2);
+    border-top: 1px solid var(--app-border-soft);
   }
 
   .record-edit-slot {
