@@ -649,8 +649,7 @@ function userInitials(name) {
 function renderCurrentUser() {
   const user = currentUser();
   els.currentUserName.textContent = user.name;
-  const status = user.active === false ? " · Inaktiv" : "";
-  els.currentUserRole.textContent = `${user.role} · ${user.userId}${status}`;
+  els.currentUserRole.textContent = user.active === false ? `${user.role} · Inaktiv` : user.role;
   els.currentUserInitials.textContent = userInitials(user.name);
 }
 
