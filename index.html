@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260721-guided-next-action">
+    <link rel="stylesheet" href="styles.css?v=20260721-identity-verification">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -41,6 +41,8 @@
           <strong>Kommunportal</strong>
           <span aria-hidden="true">·</span>
           <span>Prototypmiljö</span>
+          <span aria-hidden="true">·</span>
+          <strong>Endast testdata</strong>
           <span aria-hidden="true">·</span>
           <span>Data sparas lokalt i den här webbläsaren</span>
           <span class="ms-lg-auto" id="saveStatus" role="status">Lokal lagring aktiv</span>
@@ -163,7 +165,7 @@
                 <div class="row g-3">
                   <div class="col-md">
                     <label class="form-label" for="searchInput">Sök</label>
-                    <input id="searchInput" class="form-control form-control-sm" autocomplete="off" placeholder="Namn, område, språk eller handläggare">
+                    <input id="searchInput" class="form-control form-control-sm" autocomplete="off" placeholder="Namn, personnummer, område, språk eller handläggare">
                   </div>
                   <div class="col-md-4 col-xl-3">
                     <label class="form-label" for="statusFilter">Status</label>
@@ -269,6 +271,7 @@
                       <h3 class="record-section-title">Personuppgifter</h3>
                       <dl class="record-fields mb-0">
                         <div><dt>Namn</dt><dd id="nameFact"></dd></div>
+                        <div><dt>Personnummer</dt><dd id="personalNumberFact"></dd></div>
                         <div><dt>Område</dt><dd id="areaFact"></dd></div>
                         <div><dt>Språk</dt><dd id="languageFact"></dd></div>
                         <div><dt>Tillgänglighet</dt><dd id="availabilityFact"></dd></div>
@@ -279,6 +282,7 @@
                       <dl class="record-fields mb-0">
                         <div><dt>Status</dt><dd id="statusFact"></dd></div>
                         <div><dt>Handläggare</dt><dd id="coordinatorFact"></dd></div>
+                        <div><dt>Identitetsverifiering</dt><dd id="identityMethodFact"></dd></div>
                         <div><dt>Nästa steg</dt><dd id="nextStepFact"></dd></div>
                       </dl>
                     </section>
@@ -288,6 +292,7 @@
                       <h3 class="record-section-title">Personuppgifter</h3>
                       <dl class="record-fields record-fields-edit mb-0">
                         <div><dt><label for="editNameInput">Namn</label></dt><dd><input id="editNameInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
+                        <div><dt><label for="editPersonalNumberInput">Personnummer</label></dt><dd><input id="editPersonalNumberInput" class="form-control form-control-sm" required inputmode="numeric" autocomplete="off" placeholder="ÅÅÅÅMMDD-XXXX" pattern="(19|20)[0-9]{6}-?[0-9]{4}"></dd></div>
                         <div><dt><label for="editAreaInput">Område</label></dt><dd><input id="editAreaInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
                         <div><dt><label for="editLanguagesInput">Språk</label></dt><dd><input id="editLanguagesInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
                         <div><dt><label for="editAvailabilityInput">Tillgänglighet</label></dt><dd><input id="editAvailabilityInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
@@ -298,6 +303,7 @@
                       <dl class="record-fields record-fields-edit mb-0">
                         <div><dt><label for="statusSelect">Status</label></dt><dd><select id="statusSelect" class="form-select form-select-sm"></select></dd></div>
                         <div><dt><label for="coordinatorInput">Handläggare</label></dt><dd><input id="coordinatorInput" class="form-control form-control-sm" autocomplete="off"></dd></div>
+                        <div><dt>Identitetsverifiering</dt><dd id="identityMethodEditFact"></dd></div>
                         <div><dt>Nästa steg</dt><dd id="nextStepEditFact"></dd></div>
                       </dl>
                     </section>
@@ -306,6 +312,38 @@
 
                 <section class="tab-pane fade card-body" id="mentor-checks-pane" role="tabpanel" aria-labelledby="mentor-checks-tab" tabindex="0">
                   <h3 class="h6">Kontroller och certifieringskrav</h3>
+                  <section id="identityVerificationPanel" class="identity-verification mb-3">
+                    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-3">
+                      <div>
+                        <h4 class="h6 mb-1">Identitetsverifiering</h4>
+                        <p class="small text-secondary mb-0">Registrera endast testuppgifter i prototypmiljön.</p>
+                      </div>
+                      <span id="identityVerificationStatus" class="badge text-bg-warning">Ej verifierad</span>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label" for="identityPersonalNumberInput">Personnummer</label>
+                        <input id="identityPersonalNumberInput" class="form-control form-control-sm" required inputmode="numeric" autocomplete="off" placeholder="ÅÅÅÅMMDD-XXXX" pattern="(19|20)[0-9]{6}-?[0-9]{4}">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="identityMethodSelect">Verifieringssätt</label>
+                        <select id="identityMethodSelect" class="form-select form-select-sm" required>
+                          <option value="">Välj verifieringssätt</option>
+                          <option value="bankid">BankID</option>
+                          <option value="physical_id">ID-kort kontrollerat på plats</option>
+                        </select>
+                        <div class="form-text">BankID-valet registrerar verifieringssättet. Ingen BankID-tjänst anropas i prototypen.</div>
+                      </div>
+                    </div>
+                    <dl id="identityVerificationMeta" class="identity-meta mt-3 mb-0" hidden>
+                      <div><dt>Verifierad</dt><dd id="identityVerifiedAtFact"></dd></div>
+                      <div><dt>Verifierad av</dt><dd id="identityVerifiedByFact"></dd></div>
+                    </dl>
+                    <div class="d-flex justify-content-end mt-3">
+                      <button id="saveIdentityVerificationButton" type="button" class="btn btn-primary btn-sm">Registrera verifiering</button>
+                    </div>
+                  </section>
+                  <h4 class="record-section-title">Övriga kontroller</h4>
                   <div id="checklist" class="row g-3"></div>
                 </section>
 
@@ -385,6 +423,11 @@
                 <input id="nameInput" name="name" class="form-control" required autocomplete="off" placeholder="Ex. Anna Lind">
               </div>
               <div class="col-12">
+                <label class="form-label" for="personalNumberInput">Personnummer</label>
+                <input id="personalNumberInput" name="personalNumber" class="form-control" required inputmode="numeric" autocomplete="off" placeholder="ÅÅÅÅMMDD-XXXX" pattern="(19|20)[0-9]{6}-?[0-9]{4}">
+                <div class="form-text">Använd endast ett fiktivt personnummer i prototypen.</div>
+              </div>
+              <div class="col-12">
                 <label class="form-label" for="areaInput">Område</label>
                 <input id="areaInput" name="area" class="form-control" required autocomplete="off" placeholder="Ex. Centrum">
               </div>
@@ -407,6 +450,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260721-guided-next-action"></script>
+    <script src="app.js?v=20260721-identity-verification"></script>
   </body>
 </html>

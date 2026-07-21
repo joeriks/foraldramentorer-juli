@@ -304,22 +304,34 @@ const els = {
   personEditForm: document.querySelector("#personEditForm"),
   cancelPersonEditButton: document.querySelector("#cancelPersonEditButton"),
   editNameInput: document.querySelector("#editNameInput"),
+  editPersonalNumberInput: document.querySelector("#editPersonalNumberInput"),
   editAreaInput: document.querySelector("#editAreaInput"),
   editLanguagesInput: document.querySelector("#editLanguagesInput"),
   editAvailabilityInput: document.querySelector("#editAvailabilityInput"),
   statusSelect: document.querySelector("#statusSelect"),
   coordinatorInput: document.querySelector("#coordinatorInput"),
   nameFact: document.querySelector("#nameFact"),
+  personalNumberFact: document.querySelector("#personalNumberFact"),
   languageFact: document.querySelector("#languageFact"),
   availabilityFact: document.querySelector("#availabilityFact"),
   areaFact: document.querySelector("#areaFact"),
   statusFact: document.querySelector("#statusFact"),
   coordinatorFact: document.querySelector("#coordinatorFact"),
+  identityMethodFact: document.querySelector("#identityMethodFact"),
+  identityMethodEditFact: document.querySelector("#identityMethodEditFact"),
   nextStepFact: document.querySelector("#nextStepFact"),
   nextStepEditFact: document.querySelector("#nextStepEditFact"),
   checksTabCount: document.querySelector("#checksTabCount"),
   logTabCount: document.querySelector("#logTabCount"),
   checklist: document.querySelector("#checklist"),
+  identityVerificationPanel: document.querySelector("#identityVerificationPanel"),
+  identityVerificationStatus: document.querySelector("#identityVerificationStatus"),
+  identityPersonalNumberInput: document.querySelector("#identityPersonalNumberInput"),
+  identityMethodSelect: document.querySelector("#identityMethodSelect"),
+  identityVerificationMeta: document.querySelector("#identityVerificationMeta"),
+  identityVerifiedAtFact: document.querySelector("#identityVerifiedAtFact"),
+  identityVerifiedByFact: document.querySelector("#identityVerifiedByFact"),
+  saveIdentityVerificationButton: document.querySelector("#saveIdentityVerificationButton"),
   interviewDateInput: document.querySelector("#interviewDateInput"),
   interviewModeInput: document.querySelector("#interviewModeInput"),
   notesInput: document.querySelector("#notesInput"),
@@ -430,12 +442,17 @@ function exampleTemplates(count) {
 
 function buildExampleDataset(count) {
   const now = new Date().toISOString();
-  return exampleTemplates(count).map((candidate) => {
+  return exampleTemplates(count).map((candidate, index) => {
     const id = crypto.randomUUID();
+    const identityVerified = Boolean(candidate.checks?.identityVerified);
     return {
       ...candidate,
       checks: { ...candidate.checks },
       id,
+      personalNumber: makeExamplePersonalNumber(index),
+      identityMethod: identityVerified ? (index % 2 === 0 ? "bankid" : "physical_id") : "",
+      identityVerifiedAt: identityVerified ? now : "",
+      identityVerifiedBy: identityVerified ? candidate.coordinator || "System" : "",
       exampleData: true,
       exampleDatasetSize: count,
       caseNumber: makeCaseNumber(id),
@@ -466,9 +483,21 @@ function renderAll() {
   renderDetail();
 }
 
-function normalizeCandidate(candidate) {
+function normalizeCandidate(candidate, index = 0) {
+  const personalNumber = candidate.personalNumber || (candidate.exampleData ? makeExamplePersonalNumber(index) : "");
+  const identityMethod = candidate.identityMethod
+    || (candidate.exampleData && candidate.checks?.identityVerified ? (index % 2 === 0 ? "bankid" : "physical_id") : "");
+  const identityVerified = Boolean(candidate.checks?.identityVerified && personalNumber && identityMethod);
   return {
     ...candidate,
+    personalNumber,
+    identityMethod,
+    identityVerifiedAt: identityVerified ? candidate.identityVerifiedAt || candidate.updatedAt || candidate.createdAt : "",
+    identityVerifiedBy: identityVerified ? candidate.identityVerifiedBy || candidate.coordinator || "System" : "",
+    checks: {
+      ...(candidate.checks || {}),
+      identityVerified
+    },
     caseNumber: candidate.caseNumber || makeCaseNumber(candidate.id || candidate.createdAt),
     coordinator: candidate.coordinator || "",
     interviewMode: candidate.interviewMode || "",
@@ -515,6 +544,7 @@ function filteredCandidates() {
     const text = [
       candidate.caseNumber,
       candidate.name,
+      candidate.personalNumber,
       candidate.area,
       candidate.languages,
       candidate.availability,
@@ -763,11 +793,17 @@ function renderDetail() {
   els.selectedStatus.textContent = candidate.status;
   els.selectedStatus.className = statusClass(candidate);
   els.nameFact.textContent = candidate.name;
+  els.personalNumberFact.textContent = candidate.personalNumber || "Saknas";
   els.languageFact.textContent = candidate.languages;
   els.availabilityFact.textContent = candidate.availability;
   els.areaFact.textContent = candidate.area;
   els.statusFact.textContent = candidate.status;
   els.coordinatorFact.textContent = candidate.coordinator || "Ej tilldelad";
+  const identitySummary = candidate.checks?.identityVerified
+    ? `Verifierad med ${identityMethodLabel(candidate.identityMethod)}`
+    : "Ej verifierad";
+  els.identityMethodFact.textContent = identitySummary;
+  els.identityMethodEditFact.textContent = identitySummary;
   const nextAction = nextActionFor(candidate);
   els.nextStepFact.textContent = nextAction.label;
   els.nextStepEditFact.textContent = nextAction.label;
@@ -800,9 +836,24 @@ function renderDetail() {
   els.notesInput.value = candidate.notes || "";
   els.interviewDoneInput.checked = Boolean(candidate.checks?.interviewDone);
   els.interviewCompletion.classList.toggle("next-required", nextAction.key === "interviewDone");
+  const identityVerified = Boolean(candidate.checks?.identityVerified);
+  els.identityPersonalNumberInput.value = candidate.personalNumber || "";
+  els.identityMethodSelect.value = candidate.identityMethod || "";
+  els.identityVerificationStatus.textContent = identityVerified
+    ? `Verifierad med ${identityMethodLabel(candidate.identityMethod)}`
+    : "Ej verifierad";
+  els.identityVerificationStatus.className = identityVerified
+    ? "badge text-bg-success"
+    : "badge text-bg-warning";
+  els.identityVerificationMeta.hidden = !identityVerified;
+  els.identityVerifiedAtFact.textContent = identityVerified ? formatDateTime(candidate.identityVerifiedAt) : "";
+  els.identityVerifiedByFact.textContent = identityVerified ? candidate.identityVerifiedBy || "Ej angivet" : "";
+  els.saveIdentityVerificationButton.textContent = identityVerified ? "Uppdatera verifiering" : "Registrera verifiering";
+  els.identityVerificationPanel.classList.toggle("next-required", nextAction.key === "identityVerified");
   els.checklist.innerHTML = "";
 
   for (const [key, label] of CHECKS) {
+    if (key === "identityVerified") continue;
     const column = document.createElement("div");
     column.className = "col-md-6";
     const isNextAction = nextAction.key === key;
@@ -844,6 +895,7 @@ function setPersonEditMode(editing) {
   const candidate = selectedCandidate();
   if (editing && candidate) {
     els.editNameInput.value = candidate.name || "";
+    els.editPersonalNumberInput.value = candidate.personalNumber || "";
     els.editAreaInput.value = candidate.area || "";
     els.editLanguagesInput.value = candidate.languages || "";
     els.editAvailabilityInput.value = candidate.availability || "";
@@ -876,7 +928,9 @@ function showNextAction(candidate) {
   bootstrap.Tab.getOrCreateInstance(tabElement).show();
 
   requestAnimationFrame(() => {
-    const target = action.key === "decision"
+    const target = action.key === "identityVerified"
+      ? els.identityPersonalNumberInput
+      : action.key === "decision"
       ? els.approveButton
       : action.key === "interviewDone"
         ? els.interviewDateInput.value ? els.interviewDoneInput : els.interviewDateInput
@@ -912,6 +966,7 @@ function newCandidate(formData) {
     id,
     caseNumber: makeCaseNumber(id),
     name: formData.get("name").trim(),
+    personalNumber: formData.get("personalNumber").trim(),
     area: formData.get("area").trim(),
     languages: formData.get("languages").trim(),
     availability: formData.get("availability").trim(),
@@ -921,6 +976,9 @@ function newCandidate(formData) {
     interviewDate: "",
     interviewMode: "",
     notes: "",
+    identityMethod: "",
+    identityVerifiedAt: "",
+    identityVerifiedBy: "",
     history: [{ at: now, text: "Ärende skapat", actor: "System" }],
     createdAt: now,
     updatedAt: now
@@ -945,6 +1003,33 @@ function randomDigits(length) {
   const values = new Uint32Array(1);
   crypto.getRandomValues(values);
   return String(values[0] % 10 ** length).padStart(length, "0");
+}
+
+function makeExamplePersonalNumber(index) {
+  const year = 1970 + index % 30;
+  const month = String(index % 12 + 1).padStart(2, "0");
+  const day = String(index % 27 + 1).padStart(2, "0");
+  const serial = String(100 + index % 900).padStart(3, "0");
+  const luhnBase = `${String(year).slice(-2)}${month}${day}${serial}`;
+  const validDigit = luhnCheckDigit(luhnBase);
+  const invalidDigit = (validDigit + 1) % 10;
+  return `${year}${month}${day}-${serial}${invalidDigit}`;
+}
+
+function luhnCheckDigit(digits) {
+  const sum = [...digits].reduce((total, digit, index) => {
+    let value = Number(digit) * (index % 2 === 0 ? 2 : 1);
+    if (value > 9) value -= 9;
+    return total + value;
+  }, 0);
+  return (10 - sum % 10) % 10;
+}
+
+function identityMethodLabel(method) {
+  return {
+    bankid: "BankID",
+    physical_id: "ID-kort kontrollerat på plats"
+  }[method] || "Ej angivet";
 }
 
 function statusClass(candidate) {
@@ -1075,20 +1160,56 @@ els.editPersonButton.addEventListener("click", () => setPersonEditMode(true));
 els.cancelPersonEditButton.addEventListener("click", () => setPersonEditMode(false));
 els.personEditForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  await updateSelected({
+  const candidate = selectedCandidate();
+  if (!candidate) return;
+  const personalNumber = els.editPersonalNumberInput.value.trim();
+  const identityInvalidated = candidate.checks?.identityVerified && personalNumber !== candidate.personalNumber;
+  const patch = {
     name: els.editNameInput.value.trim(),
+    personalNumber,
     area: els.editAreaInput.value.trim(),
     languages: els.editLanguagesInput.value.trim(),
     availability: els.editAvailabilityInput.value.trim(),
     status: els.statusSelect.value,
     coordinator: els.coordinatorInput.value.trim()
-  }, "Grund- och ärendeuppgifter uppdaterade");
+  };
+  if (identityInvalidated) {
+    patch.checks = { ...candidate.checks, identityVerified: false };
+    patch.identityMethod = "";
+    patch.identityVerifiedAt = "";
+    patch.identityVerifiedBy = "";
+  }
+  await updateSelected(
+    patch,
+    identityInvalidated
+      ? "Personnummer ändrat; identitetsverifiering måste göras om"
+      : "Grund- och ärendeuppgifter uppdaterade"
+  );
   setPersonEditMode(false);
   showFeedback("Grunduppgifterna har sparats.");
 });
 els.interviewDateInput.addEventListener("change", () => updateSelected({ interviewDate: els.interviewDateInput.value }, "Intervjutid uppdaterad"));
 els.interviewModeInput.addEventListener("change", () => updateSelected({ interviewMode: els.interviewModeInput.value }, "Intervjuform uppdaterad"));
 els.notesInput.addEventListener("change", () => updateSelected({ notes: els.notesInput.value.trim() }, "Intervjuprotokoll uppdaterat"));
+
+els.saveIdentityVerificationButton.addEventListener("click", async () => {
+  const candidate = selectedCandidate();
+  if (!candidate) return;
+  const personalNumberValid = els.identityPersonalNumberInput.reportValidity();
+  const methodValid = els.identityMethodSelect.reportValidity();
+  if (!personalNumberValid || !methodValid) return;
+
+  const verifiedAt = new Date().toISOString();
+  const method = els.identityMethodSelect.value;
+  await updateSelected({
+    personalNumber: els.identityPersonalNumberInput.value.trim(),
+    identityMethod: method,
+    identityVerifiedAt: verifiedAt,
+    identityVerifiedBy: candidate.coordinator || "Ej tilldelad",
+    checks: { ...candidate.checks, identityVerified: true }
+  }, `Identitet verifierad med ${identityMethodLabel(method)}`);
+  showFeedback(`Identiteten har verifierats med ${identityMethodLabel(method)}.`);
+});
 
 async function updateCandidateCheck(key, checked) {
   const candidate = selectedCandidate();
