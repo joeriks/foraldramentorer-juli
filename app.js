@@ -72,7 +72,7 @@ const seedCandidates = [
     area: "Centrum",
     languages: "Svenska, engelska",
     availability: "Vardagskvällar",
-    coordinator: "Maja",
+    coordinator: "Maja Ekström",
     status: "Utbildning pågår",
     checks: {
       identityVerified: true,
@@ -91,7 +91,7 @@ const seedCandidates = [
     area: "Väster",
     languages: "Svenska",
     availability: "Dagtid",
-    coordinator: "Maja",
+    coordinator: "Maja Ekström",
     status: "Redo för intervju",
     checks: {
       identityVerified: true,
@@ -110,7 +110,7 @@ const seedCandidates = [
     area: "Öster",
     languages: "Svenska, arabiska",
     availability: "Helgförmiddagar",
-    coordinator: "Jonas",
+    coordinator: "Jonas Berg",
     status: "Godkänd/Certifierad",
     checks: {
       identityVerified: true,
@@ -129,7 +129,7 @@ const seedCandidates = [
     area: "Norr",
     languages: "Svenska, finska",
     availability: "Tisdagar och torsdagar dagtid",
-    coordinator: "Jonas",
+    coordinator: "Jonas Berg",
     status: "Anmäld",
     checks: {
       identityVerified: false,
@@ -148,7 +148,7 @@ const seedCandidates = [
     area: "Söder",
     languages: "Svenska",
     availability: "Måndag kväll och lördag förmiddag",
-    coordinator: "Maja",
+    coordinator: "Maja Ekström",
     status: "Kontrollerad",
     checks: {
       identityVerified: true,
@@ -167,7 +167,7 @@ const seedCandidates = [
     area: "Centrum",
     languages: "Svenska, arabiska, engelska",
     availability: "Vardagskvällar",
-    coordinator: "Sara",
+    coordinator: "Sara Lind",
     status: "Utbildning pågår",
     checks: {
       identityVerified: true,
@@ -186,7 +186,7 @@ const seedCandidates = [
     area: "Väster",
     languages: "Svenska, tyska",
     availability: "Dagtid vardagar",
-    coordinator: "Sara",
+    coordinator: "Sara Lind",
     status: "Redo för intervju",
     checks: {
       identityVerified: true,
@@ -205,7 +205,7 @@ const seedCandidates = [
     area: "Norr",
     languages: "Svenska, persiska",
     availability: "Helger",
-    coordinator: "Jonas",
+    coordinator: "Jonas Berg",
     status: "Kontrollerad",
     checks: {
       identityVerified: true,
@@ -229,7 +229,7 @@ const seedCandidates10 = [
     area: "Söder",
     languages: "Svenska, engelska",
     availability: "Kvällstid vardagar",
-    coordinator: "Sara"
+    coordinator: "Sara Lind"
   },
   {
     ...seedCandidates[6],
@@ -237,7 +237,7 @@ const seedCandidates10 = [
     area: "Öster",
     languages: "Svenska, dari",
     availability: "Dagtid och helger",
-    coordinator: "Maja"
+    coordinator: "Maja Ekström"
   }
 ];
 
@@ -252,9 +252,9 @@ const exampleLastNames = [
 ];
 
 const seedHandlers = [
-  { id: "handler-maja", name: "Maja", email: "maja@kommun.example", role: "Handläggare", active: true },
-  { id: "handler-jonas", name: "Jonas", email: "jonas@kommun.example", role: "Handläggare", active: true },
-  { id: "handler-sara", name: "Sara", email: "sara@kommun.example", role: "Samordnare", active: true }
+  { id: "handler-maja", name: "Maja Ekström", email: "maja.ekstrom@kommun.example", role: "Handläggare", active: true },
+  { id: "handler-jonas", name: "Jonas Berg", email: "jonas.berg@kommun.example", role: "Handläggare", active: true },
+  { id: "handler-sara", name: "Sara Lind", email: "sara.lind@kommun.example", role: "Samordnare", active: true }
 ];
 
 let db;
@@ -319,7 +319,6 @@ const els = {
   handlerEmailInput: document.querySelector("#handlerEmailInput"),
   handlerRoleInput: document.querySelector("#handlerRoleInput"),
   handlerActiveInput: document.querySelector("#handlerActiveInput"),
-  selectedHandlerId: document.querySelector("#selectedHandlerId"),
   selectedHandlerName: document.querySelector("#selectedHandlerName"),
   selectedHandlerStatus: document.querySelector("#selectedHandlerStatus"),
   selectedHandlerRoleMeta: document.querySelector("#selectedHandlerRoleMeta"),
@@ -565,6 +564,7 @@ function buildExampleDataset(count) {
 
 async function refresh() {
   handlers = await getAllHandlers();
+  await migrateDefaultHandlerRecords();
   handlers.sort((a, b) => a.name.localeCompare(b.name, "sv"));
   candidates = await getAllCandidates();
   candidates = candidates.map(normalizeCandidate);
@@ -572,6 +572,26 @@ async function refresh() {
   await ensureUniqueCaseNumbers();
   candidates.sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.name.localeCompare(b.name, "sv"));
   renderAll();
+}
+
+async function migrateDefaultHandlerRecords() {
+  const legacyNames = {
+    "handler-maja": "Maja",
+    "handler-jonas": "Jonas",
+    "handler-sara": "Sara"
+  };
+  const updates = [];
+  for (const handler of handlers) {
+    const template = seedHandlers.find((item) => item.id === handler.id);
+    if (!template) continue;
+    const legacyEmail = `${legacyNames[handler.id]?.toLowerCase()}@kommun.example`;
+    const name = handler.name === legacyNames[handler.id] ? template.name : handler.name;
+    const email = handler.email === legacyEmail ? template.email : handler.email;
+    if (name === handler.name && email === handler.email) continue;
+    Object.assign(handler, { name, email, updatedAt: new Date().toISOString() });
+    updates.push(saveHandler(handler));
+  }
+  await Promise.all(updates);
 }
 
 function renderAll() {
@@ -588,7 +608,7 @@ function renderAll() {
 
 function currentUser() {
   return handlers.find((handler) => handler.id === CURRENT_USER_ID)
-    || { id: CURRENT_USER_ID, name: "Sara", role: "Samordnare" };
+    || { id: CURRENT_USER_ID, name: "Sara Lind", role: "Samordnare" };
 }
 
 function currentUserName() {
@@ -613,12 +633,32 @@ function renderCurrentUser() {
 }
 
 async function migrateCoordinatorReferences() {
+  const fullNames = {
+    Maja: "Maja Ekström",
+    Jonas: "Jonas Berg",
+    Sara: "Sara Lind"
+  };
   const changed = [];
   for (const candidate of candidates) {
-    if (candidate.coordinatorId) continue;
-    const handler = handlers.find((item) => item.name === candidate.coordinator);
-    if (!handler) continue;
-    candidate.coordinatorId = handler.id;
+    const handler = candidate.coordinatorId
+      ? handlers.find((item) => item.id === candidate.coordinatorId)
+      : handlers.find((item) => item.name === candidate.coordinator
+        || item.name.split(/\s+/)[0] === candidate.coordinator);
+    const coordinatorChanged = Boolean(handler
+      && (candidate.coordinatorId !== handler.id || candidate.coordinator !== handler.name));
+    const identityVerifiedBy = fullNames[candidate.identityVerifiedBy] || candidate.identityVerifiedBy;
+    const history = (candidate.history || []).map((item) => ({
+      ...item,
+      actor: fullNames[item.actor] || item.actor
+    }));
+    const historyChanged = history.some((item, index) => item.actor !== candidate.history?.[index]?.actor);
+    const identityChanged = identityVerifiedBy !== candidate.identityVerifiedBy;
+    if (!coordinatorChanged && !historyChanged && !identityChanged) continue;
+    Object.assign(candidate, {
+      ...(handler ? { coordinatorId: handler.id, coordinator: handler.name } : {}),
+      identityVerifiedBy,
+      history
+    });
     changed.push(saveCandidate(candidate));
   }
   await Promise.all(changed);
@@ -959,7 +999,7 @@ function renderHandlers() {
     const assignedCount = handlerMentorCount(handler);
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td><strong>${escapeHtml(handler.name)}</strong><small>${escapeHtml(handler.id)}</small></td>
+      <td><strong>${escapeHtml(handler.name)}</strong></td>
       <td><a href="mailto:${escapeHtml(handler.email)}">${escapeHtml(handler.email)}</a></td>
       <td>${escapeHtml(handler.role)}</td>
       <td>${assignedCount}</td>
@@ -993,7 +1033,6 @@ function renderHandlerDetail() {
   els.handlerDetail.hidden = false;
   const assignedCount = handlerMentorCount(handler);
   const status = handler.active ? "Aktiv" : "Inaktiv";
-  els.selectedHandlerId.textContent = handler.id;
   els.selectedHandlerName.textContent = handler.name;
   els.selectedHandlerStatus.textContent = status;
   els.selectedHandlerStatus.className = `badge ${handler.active ? "text-bg-success" : "text-bg-secondary"}`;
