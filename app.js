@@ -174,7 +174,35 @@ const seedCandidates = [
   }
 ];
 
-const seedCandidateNames = new Set(seedCandidates.map((candidate) => candidate.name));
+const seedCandidates10 = [
+  ...seedCandidates,
+  {
+    ...seedCandidates[3],
+    name: "Elin Berg",
+    area: "Söder",
+    languages: "Svenska, engelska",
+    availability: "Kvällstid vardagar",
+    coordinator: "Sara"
+  },
+  {
+    ...seedCandidates[6],
+    name: "Omar Rahimi",
+    area: "Öster",
+    languages: "Svenska, dari",
+    availability: "Dagtid och helger",
+    coordinator: "Maja"
+  }
+];
+
+const exampleFirstNames = [
+  "Amina", "Anders", "Aya", "Camilla", "Daniel", "Elin", "Farah", "Gunnar", "Helena", "Isak",
+  "Jasmin", "Johan", "Karin", "Leila", "Magnus", "Maria", "Nadia", "Omar", "Per", "Rania",
+  "Samir", "Sara", "Thomas", "Yasmin", "Åsa"
+];
+
+const exampleLastNames = [
+  "Andersson", "Berg", "Dahl", "Ekström", "Haddad", "Holm", "Lind", "Nilsson", "Rahimi", "Svensson"
+];
 
 let db;
 let candidates = [];
@@ -196,12 +224,14 @@ const els = {
   pipelineGrid: document.querySelector("#pipelineBoard .pipeline-grid"),
   actionTableBody: document.querySelector("#actionTableBody"),
   seedButton: document.querySelector("#seedButton"),
+  exampleDataMenu: document.querySelector("#exampleDataMenu"),
   resetButton: document.querySelector("#resetButton"),
   newCaseButton: document.querySelector("#newCaseButton"),
   dashboardNewCaseButton: document.querySelector("#dashboardNewCaseButton"),
   cancelNewCaseButton: document.querySelector("#cancelNewCaseButton"),
   candidateForm: document.querySelector("#candidateForm"),
   candidateTableBody: document.querySelector("#candidateTableBody"),
+  mentorListCount: document.querySelector("#mentorListCount"),
   searchInput: document.querySelector("#searchInput"),
   statusFilter: document.querySelector("#statusFilter"),
   detailEmpty: document.querySelector("#detailEmpty"),
@@ -301,6 +331,56 @@ function clearCandidates() {
     const request = tx("readwrite").clear();
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
+  });
+}
+
+function replaceCandidates(nextCandidates) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE, "readwrite");
+    const store = transaction.objectStore(STORE);
+    store.clear();
+    for (const candidate of nextCandidates) {
+      store.put(candidate);
+    }
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+function exampleTemplates(count) {
+  if (count === 1) return seedCandidates.slice(0, 1);
+  if (count === 10) return seedCandidates10;
+
+  return Array.from({ length: count }, (_, index) => {
+    const template = seedCandidates[index % seedCandidates.length];
+    const firstName = exampleFirstNames[index % exampleFirstNames.length];
+    const lastName = exampleLastNames[Math.floor(index / exampleFirstNames.length) % exampleLastNames.length];
+    return {
+      ...template,
+      name: `${firstName} ${lastName}`
+    };
+  });
+}
+
+function buildExampleDataset(count) {
+  const now = new Date().toISOString();
+  return exampleTemplates(count).map((candidate) => {
+    const id = crypto.randomUUID();
+    return {
+      ...candidate,
+      checks: { ...candidate.checks },
+      id,
+      exampleData: true,
+      exampleDatasetSize: count,
+      caseNumber: makeCaseNumber(id),
+      history: [
+        { at: now, text: "Ärende skapat som exempeldata" },
+        { at: now, text: `Status satt till ${candidate.status}` }
+      ],
+      createdAt: now,
+      updatedAt: now
+    };
   });
 }
 
@@ -483,14 +563,15 @@ function cssEscape(value) {
   return String(value).replace(/["\\]/g, "\\$&");
 }
 
-function hasSeedData() {
-  return candidates.some((candidate) => candidate.exampleData === true || seedCandidateNames.has(candidate.name));
-}
-
 function renderSeedButtonState() {
-  const seeded = hasSeedData();
-  els.seedButton.disabled = seeded;
-  els.seedButton.textContent = seeded ? "Exempeldata finns" : "Fyll på exempeldata";
+  const sizes = [1, 10, 250];
+  const size = sizes.includes(candidates.length)
+    && candidates.every((candidate) => candidate.exampleData === true && candidate.exampleDatasetSize === candidates.length)
+    ? candidates.length
+    : null;
+  els.seedButton.textContent = size
+    ? `Exempeldata: ${size} ${size === 1 ? "mentor" : "mentorer"}`
+    : "Välj exempeldata";
 }
 
 function renderDashboard() {
@@ -519,6 +600,10 @@ function renderDashboard() {
 function renderTable() {
   els.candidateTableBody.innerHTML = "";
   const rows = filteredCandidates();
+  const mentorLabel = candidates.length === 1 ? "mentor" : "mentorer";
+  els.mentorListCount.textContent = rows.length === candidates.length
+    ? `${candidates.length} ${mentorLabel} i registret.`
+    : `Visar ${rows.length} av ${candidates.length} ${mentorLabel}.`;
 
   if (!rows.length) {
     const row = document.createElement("tr");
@@ -849,31 +934,29 @@ els.deleteButton.addEventListener("click", async () => {
   window.location.hash = "#/mentors";
 });
 
-els.seedButton.addEventListener("click", async () => {
-  if (hasSeedData()) {
-    renderSeedButtonState();
-    return;
+els.exampleDataMenu.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-example-count]");
+  if (!button) return;
+  const count = Number(button.dataset.exampleCount);
+  if (![1, 10, 250].includes(count)) return;
+
+  if (candidates.length) {
+    const confirmed = window.confirm(`Ersätt nuvarande lokala data med en exempelsamling med ${count} ${count === 1 ? "mentor" : "mentorer"}?`);
+    if (!confirmed) return;
   }
 
-  const now = new Date().toISOString();
-  for (const candidate of seedCandidates) {
-    const id = crypto.randomUUID();
-    await saveCandidate({
-      ...candidate,
-      id,
-      exampleData: true,
-      caseNumber: makeCaseNumber(id),
-      history: [
-        { at: now, text: "Ärende skapat" },
-        { at: now, text: `Status satt till ${candidate.status}` }
-      ],
-      createdAt: now,
-      updatedAt: now
-    });
-  }
+  await replaceCandidates(buildExampleDataset(count));
+  selectedId = null;
+  searchTerm = "";
+  statusFilter = "";
+  els.searchInput.value = "";
+  els.statusFilter.value = "";
   markSaved();
-  showFeedback("Åtta exempelmentorer har lagts till.");
+  showFeedback(`Exempeldata med ${count} ${count === 1 ? "mentor" : "mentorer"} har laddats.`);
   await refresh();
+  if (currentView === "mentor") {
+    window.location.hash = "#/mentors";
+  }
 });
 
 els.resetButton.addEventListener("click", async () => {
