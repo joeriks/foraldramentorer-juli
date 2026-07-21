@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260721-spacing-system">
+    <link rel="stylesheet" href="styles.css?v=20260721-record-layout">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -202,21 +202,35 @@
               </div>
             </div>
 
-            <div id="candidateDetail" class="card" hidden>
-              <div class="card-header bg-white">
-                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
+            <div id="candidateDetail" class="card mentor-record" hidden>
+              <div class="card-header record-header bg-white">
+                <a class="small" href="#/mentors">Tillbaka till mentorregistret</a>
+                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start mt-2">
                   <div>
-                    <a class="small" href="#/mentors">Tillbaka till mentorregistret</a>
-                    <p id="selectedCaseId" class="small fw-semibold text-secondary mt-2 mb-1"></p>
-                    <h2 id="selectedName" class="h5 mb-1"></h2>
-                    <p id="selectedMeta" class="text-secondary mb-0"></p>
-                    <p id="selectedUpdated" class="small text-secondary mt-2 mb-0"></p>
+                    <div class="record-type">Mentorpost</div>
+                    <p id="selectedCaseId" class="record-id mb-1"></p>
+                    <h2 id="selectedName" class="h5 mb-0"></h2>
                   </div>
-                  <div class="d-flex flex-wrap gap-2 justify-content-end">
+                  <div class="record-actions d-flex flex-wrap gap-2 justify-content-end align-items-center">
                     <span id="selectedStatus" class="badge text-bg-secondary">Anmäld</span>
-                    <button id="deleteButton" type="button" class="btn btn-outline-danger btn-sm">Ta bort</button>
+                    <button id="editPersonButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
+                    <div id="personEditActions" class="d-flex gap-2" hidden>
+                      <button id="savePersonEditButton" type="submit" form="personEditForm" class="btn btn-primary btn-sm">Spara ändringar</button>
+                      <button id="cancelPersonEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                    </div>
+                    <div class="dropdown">
+                      <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Fler åtgärder</button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button id="deleteButton" type="button" class="dropdown-item text-danger">Ta bort mentorpost</button></li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
+                <dl class="record-meta mb-0 mt-3">
+                  <div><dt>Handläggare</dt><dd id="selectedCoordinatorMeta"></dd></div>
+                  <div><dt>Skapad</dt><dd id="selectedCreatedMeta"></dd></div>
+                  <div><dt>Senast ändrad</dt><dd id="selectedUpdatedMeta"></dd></div>
+                </dl>
               </div>
 
               <ul class="detail-tabs nav nav-tabs" role="tablist" aria-label="Mentorkort">
@@ -224,7 +238,7 @@
                   <button class="nav-link active" id="mentor-base-tab" data-bs-toggle="tab" data-bs-target="#mentor-base-pane" type="button" role="tab" aria-controls="mentor-base-pane" aria-selected="true">Grunduppgifter</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                  <button class="nav-link" id="mentor-checks-tab" data-bs-toggle="tab" data-bs-target="#mentor-checks-pane" type="button" role="tab" aria-controls="mentor-checks-pane" aria-selected="false">Kontroller</button>
+                  <button class="nav-link" id="mentor-checks-tab" data-bs-toggle="tab" data-bs-target="#mentor-checks-pane" type="button" role="tab" aria-controls="mentor-checks-pane" aria-selected="false">Kontroller <span id="checksTabCount" class="tab-count">0/6</span></button>
                 </li>
                 <li class="nav-item" role="presentation">
                   <button class="nav-link" id="mentor-interview-tab" data-bs-toggle="tab" data-bs-target="#mentor-interview-pane" type="button" role="tab" aria-controls="mentor-interview-pane" aria-selected="false">Intervju</button>
@@ -233,59 +247,33 @@
                   <button class="nav-link" id="mentor-decision-tab" data-bs-toggle="tab" data-bs-target="#mentor-decision-pane" type="button" role="tab" aria-controls="mentor-decision-pane" aria-selected="false">Beslut</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                  <button class="nav-link" id="mentor-log-tab" data-bs-toggle="tab" data-bs-target="#mentor-log-pane" type="button" role="tab" aria-controls="mentor-log-pane" aria-selected="false">Logg</button>
+                  <button class="nav-link" id="mentor-log-tab" data-bs-toggle="tab" data-bs-target="#mentor-log-pane" type="button" role="tab" aria-controls="mentor-log-pane" aria-selected="false">Logg <span id="logTabCount" class="tab-count">0</span></button>
                 </li>
               </ul>
 
               <div class="tab-content">
                 <section class="tab-pane fade show active card-body" id="mentor-base-pane" role="tabpanel" aria-labelledby="mentor-base-tab" tabindex="0">
-                  <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-3">
-                    <h3 class="h6 mb-0">Grunduppgifter</h3>
-                    <div class="d-flex gap-2">
-                      <button id="editPersonButton" type="button" class="btn btn-outline-primary btn-sm">Redigera uppgifter</button>
-                      <div id="personEditActions" class="d-flex gap-2" hidden>
-                        <button id="savePersonEditButton" type="submit" form="personEditForm" class="btn btn-primary btn-sm">Spara ändringar</button>
-                        <button id="cancelPersonEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="row g-3 mb-3">
-                    <div class="col-md-6">
-                      <label class="form-label" for="statusSelect">Status i introduktionen</label>
-                      <select id="statusSelect" class="form-select form-select-sm"></select>
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="coordinatorInput">Handläggare</label>
-                      <input id="coordinatorInput" class="form-control form-control-sm" autocomplete="off">
-                    </div>
-                  </div>
-                  <div id="personReadView" class="row g-3">
-                    <div class="col-md-6">
-                      <div class="readonly-field">
-                        <div class="form-label">Namn</div>
-                        <div id="nameFact" class="readonly-value"></div>
-                      </div>
-                    </div>
-                    <div class="col-md-6">
-                      <div class="readonly-field">
-                        <div class="form-label">Område</div>
-                        <div id="areaFact" class="readonly-value"></div>
-                      </div>
-                    </div>
-                    <div class="col-md-6">
-                      <div class="readonly-field">
-                        <div class="form-label">Språk</div>
-                        <div id="languageFact" class="readonly-value"></div>
-                      </div>
-                    </div>
-                    <div class="col-md-6">
-                      <div class="readonly-field">
-                        <div class="form-label">Tillgänglighet</div>
-                        <div id="availabilityFact" class="readonly-value"></div>
-                      </div>
-                    </div>
+                  <div id="personReadView">
+                    <section class="record-section">
+                      <h3 class="record-section-title">Personuppgifter</h3>
+                      <dl class="record-fields mb-0">
+                        <div><dt>Namn</dt><dd id="nameFact"></dd></div>
+                        <div><dt>Område</dt><dd id="areaFact"></dd></div>
+                        <div><dt>Språk</dt><dd id="languageFact"></dd></div>
+                        <div><dt>Tillgänglighet</dt><dd id="availabilityFact"></dd></div>
+                      </dl>
+                    </section>
+                    <section class="record-section mt-4">
+                      <h3 class="record-section-title">Ärendeuppgifter</h3>
+                      <dl class="record-fields mb-0">
+                        <div><dt>Status</dt><dd id="statusFact"></dd></div>
+                        <div><dt>Handläggare</dt><dd id="coordinatorFact"></dd></div>
+                        <div><dt>Nästa steg</dt><dd id="nextStepFact"></dd></div>
+                      </dl>
+                    </section>
                   </div>
                   <form id="personEditForm" hidden>
+                    <h3 class="record-section-title">Personuppgifter</h3>
                     <div class="row g-3">
                       <div class="col-md-6">
                         <label class="form-label" for="editNameInput">Namn</label>
@@ -302,6 +290,17 @@
                       <div class="col-md-6">
                         <label class="form-label" for="editAvailabilityInput">Tillgänglighet</label>
                         <input id="editAvailabilityInput" class="form-control form-control-sm" required autocomplete="off">
+                      </div>
+                    </div>
+                    <h3 class="record-section-title mt-4">Ärendeuppgifter</h3>
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label" for="statusSelect">Status i introduktionen</label>
+                        <select id="statusSelect" class="form-select form-select-sm"></select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="coordinatorInput">Handläggare</label>
+                        <input id="coordinatorInput" class="form-control form-control-sm" autocomplete="off">
                       </div>
                     </div>
                   </form>
@@ -344,8 +343,15 @@
                 </section>
 
                 <section class="tab-pane fade card-body" id="mentor-log-pane" role="tabpanel" aria-labelledby="mentor-log-tab" tabindex="0">
-                  <h3 class="h6">Handläggningslogg</h3>
-                  <ol id="auditLog" class="mb-0 small"></ol>
+                  <h3 class="record-section-title">Handläggningslogg</h3>
+                  <div class="table-responsive border rounded">
+                    <table class="table table-sm align-middle mb-0 audit-table">
+                      <thead class="table-light">
+                        <tr><th>Tidpunkt</th><th>Händelse</th><th>Handläggare</th></tr>
+                      </thead>
+                      <tbody id="auditLog"></tbody>
+                    </table>
+                  </div>
                 </section>
               </div>
             </div>
@@ -399,6 +405,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260721-example-sets"></script>
+    <script src="app.js?v=20260721-record-layout"></script>
   </body>
 </html>

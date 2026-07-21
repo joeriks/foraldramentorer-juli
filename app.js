@@ -211,6 +211,7 @@ let searchTerm = "";
 let statusFilter = "";
 let candidateModal;
 let currentView = "dashboard";
+let renderedDetailId = null;
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
@@ -239,8 +240,9 @@ const els = {
   selectedCaseId: document.querySelector("#selectedCaseId"),
   selectedStatus: document.querySelector("#selectedStatus"),
   selectedName: document.querySelector("#selectedName"),
-  selectedMeta: document.querySelector("#selectedMeta"),
-  selectedUpdated: document.querySelector("#selectedUpdated"),
+  selectedCoordinatorMeta: document.querySelector("#selectedCoordinatorMeta"),
+  selectedCreatedMeta: document.querySelector("#selectedCreatedMeta"),
+  selectedUpdatedMeta: document.querySelector("#selectedUpdatedMeta"),
   editPersonButton: document.querySelector("#editPersonButton"),
   personEditActions: document.querySelector("#personEditActions"),
   personReadView: document.querySelector("#personReadView"),
@@ -256,6 +258,11 @@ const els = {
   languageFact: document.querySelector("#languageFact"),
   availabilityFact: document.querySelector("#availabilityFact"),
   areaFact: document.querySelector("#areaFact"),
+  statusFact: document.querySelector("#statusFact"),
+  coordinatorFact: document.querySelector("#coordinatorFact"),
+  nextStepFact: document.querySelector("#nextStepFact"),
+  checksTabCount: document.querySelector("#checksTabCount"),
+  logTabCount: document.querySelector("#logTabCount"),
   checklist: document.querySelector("#checklist"),
   interviewDateInput: document.querySelector("#interviewDateInput"),
   interviewModeInput: document.querySelector("#interviewModeInput"),
@@ -473,6 +480,20 @@ function isBlocked(candidate) {
   return !candidate.checks?.identityVerified || !candidate.checks?.registryChecked || !candidate.checks?.referencesDone;
 }
 
+function nextStepText(candidate) {
+  if (candidate.status === "Godkänd/Certifierad") return "Aktiv för matchning";
+  const nextSteps = [
+    ["identityVerified", "Verifiera identitet"],
+    ["registryChecked", "Granska belastningsregister"],
+    ["referencesDone", "Slutför referenser"],
+    ["trainingDone", "Slutför e-learning"],
+    ["quizDone", "Genomför kunskapsavstämning"],
+    ["interviewDone", "Genomför intervju"]
+  ];
+  const next = nextSteps.find(([key]) => !candidate.checks?.[key]);
+  return next?.[1] || "Fatta beslut";
+}
+
 function parseRoute() {
   const hash = window.location.hash || "#/dashboard";
   const [, view, id] = hash.match(/^#\/([^/]+)\/?(.+)?$/) || [];
@@ -634,22 +655,33 @@ function renderDetail() {
   if (!candidate) {
     els.detailEmpty.hidden = false;
     els.candidateDetail.hidden = true;
+    renderedDetailId = null;
     return;
   }
 
   els.detailEmpty.hidden = true;
   els.candidateDetail.hidden = false;
-  showDefaultMentorTab();
-  els.selectedCaseId.textContent = `Ärende ${candidate.caseNumber}`;
+  if (renderedDetailId !== candidate.id) {
+    showDefaultMentorTab();
+    renderedDetailId = candidate.id;
+  }
+  els.selectedCaseId.textContent = candidate.caseNumber;
   els.selectedName.textContent = candidate.name;
-  els.selectedMeta.textContent = `${candidate.area} · ${candidate.languages} · ${candidate.availability}`;
-  els.selectedUpdated.textContent = `Senast ändrad ${formatDateTime(candidate.updatedAt || candidate.createdAt)}`;
+  els.selectedCoordinatorMeta.textContent = candidate.coordinator || "Ej tilldelad";
+  els.selectedCreatedMeta.textContent = formatDateTime(candidate.createdAt);
+  els.selectedUpdatedMeta.textContent = formatDateTime(candidate.updatedAt || candidate.createdAt);
   els.selectedStatus.textContent = candidate.status;
   els.selectedStatus.className = statusClass(candidate);
   els.nameFact.textContent = candidate.name;
   els.languageFact.textContent = candidate.languages;
   els.availabilityFact.textContent = candidate.availability;
   els.areaFact.textContent = candidate.area;
+  els.statusFact.textContent = candidate.status;
+  els.coordinatorFact.textContent = candidate.coordinator || "Ej tilldelad";
+  els.nextStepFact.textContent = nextStepText(candidate);
+  const completedChecks = CHECKS.filter(([key]) => candidate.checks?.[key]).length;
+  els.checksTabCount.textContent = `${completedChecks}/${CHECKS.length}`;
+  els.logTabCount.textContent = candidate.history.length;
   setPersonEditMode(false);
 
   els.statusSelect.innerHTML = "";
@@ -687,9 +719,14 @@ function renderDetail() {
 
   els.auditLog.innerHTML = "";
   for (const item of [...candidate.history].reverse()) {
-    const li = document.createElement("li");
-    li.innerHTML = `<time>${escapeHtml(formatDateTime(item.at))}</time>${escapeHtml(item.text)}`;
-    els.auditLog.append(li);
+    const row = document.createElement("tr");
+    const actor = item.actor || (item.text.startsWith("Ärende skapat") ? "System" : candidate.coordinator || "System");
+    row.innerHTML = `
+      <td><time datetime="${escapeHtml(item.at)}">${escapeHtml(formatDateTime(item.at))}</time></td>
+      <td>${escapeHtml(item.text)}</td>
+      <td>${escapeHtml(actor)}</td>
+    `;
+    els.auditLog.append(row);
   }
 }
 
@@ -700,6 +737,8 @@ function setPersonEditMode(editing) {
     els.editAreaInput.value = candidate.area || "";
     els.editLanguagesInput.value = candidate.languages || "";
     els.editAvailabilityInput.value = candidate.availability || "";
+    els.statusSelect.value = candidate.status || STATUSES[0];
+    els.coordinatorInput.value = candidate.coordinator || "";
   }
 
   els.personReadView.hidden = editing;
@@ -728,7 +767,10 @@ async function updateSelected(patch, logText) {
     updatedAt: new Date().toISOString()
   };
   if (logText) {
-    updated.history = [...(candidate.history || []), { at: updated.updatedAt, text: logText }];
+    updated.history = [
+      ...(candidate.history || []),
+      { at: updated.updatedAt, text: logText, actor: candidate.coordinator || "System" }
+    ];
   }
   await saveCandidate(updated);
   markSaved();
@@ -751,7 +793,7 @@ function newCandidate(formData) {
     interviewDate: "",
     interviewMode: "",
     notes: "",
-    history: [{ at: now, text: "Ärende skapat" }],
+    history: [{ at: now, text: "Ärende skapat", actor: "System" }],
     createdAt: now,
     updatedAt: now
   };
@@ -882,8 +924,6 @@ els.pipelineGrid.addEventListener("click", (event) => {
   navigateToCandidateListWithStatus(button.dataset.pipelineStatus);
 });
 
-els.statusSelect.addEventListener("change", () => updateSelected({ status: els.statusSelect.value }, `Status ändrad till ${els.statusSelect.value}`));
-els.coordinatorInput.addEventListener("change", () => updateSelected({ coordinator: els.coordinatorInput.value.trim() }, "Handläggare uppdaterad"));
 els.editPersonButton.addEventListener("click", () => setPersonEditMode(true));
 els.cancelPersonEditButton.addEventListener("click", () => setPersonEditMode(false));
 els.personEditForm.addEventListener("submit", async (event) => {
@@ -892,8 +932,10 @@ els.personEditForm.addEventListener("submit", async (event) => {
     name: els.editNameInput.value.trim(),
     area: els.editAreaInput.value.trim(),
     languages: els.editLanguagesInput.value.trim(),
-    availability: els.editAvailabilityInput.value.trim()
-  }, "Grunduppgifter uppdaterade");
+    availability: els.editAvailabilityInput.value.trim(),
+    status: els.statusSelect.value,
+    coordinator: els.coordinatorInput.value.trim()
+  }, "Grund- och ärendeuppgifter uppdaterade");
   setPersonEditMode(false);
   showFeedback("Grunduppgifterna har sparats.");
 });
