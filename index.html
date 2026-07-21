@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260721-handler-admin">
+    <link rel="stylesheet" href="styles.css?v=20260721-handler-record">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -236,6 +236,89 @@
                   </thead>
                   <tbody id="handlerTableBody"></tbody>
                 </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="handlerDetailView" hidden>
+            <div id="handlerDetailEmpty" class="card">
+              <div class="card-body py-5">
+                <div class="text-secondary small fw-semibold mb-2">Handläggarkort</div>
+                <h2 class="h5">Ingen handläggare vald</h2>
+                <p class="text-secondary mb-3">Gå till handläggarregistret och välj en post.</p>
+                <a class="btn btn-outline-primary btn-sm" href="#/administration">Öppna handläggarregistret</a>
+              </div>
+            </div>
+
+            <div id="handlerDetail" class="card mentor-record" hidden>
+              <div class="card-header record-header bg-white">
+                <a class="small" href="#/administration">Tillbaka till handläggarregistret</a>
+                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start mt-2">
+                  <div>
+                    <div class="record-type">Handläggarpost</div>
+                    <p id="selectedHandlerId" class="record-id mb-1"></p>
+                    <h2 id="selectedHandlerName" class="h5 mb-0"></h2>
+                  </div>
+                  <div class="record-actions d-flex flex-wrap gap-2 justify-content-end align-items-center">
+                    <span id="selectedHandlerStatus" class="badge text-bg-secondary">Aktiv</span>
+                    <div class="record-edit-slot">
+                      <button id="editHandlerButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
+                      <div id="handlerEditActions" class="d-flex gap-2" hidden>
+                        <button type="submit" form="handlerEditForm" class="btn btn-primary btn-sm">Spara ändringar</button>
+                        <button id="cancelHandlerEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                      </div>
+                    </div>
+                    <div class="dropdown">
+                      <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Fler åtgärder</button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button id="toggleSelectedHandlerButton" type="button" class="dropdown-item">Inaktivera handläggare</button></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                <dl class="record-meta mb-0 mt-3">
+                  <div><dt>Roll</dt><dd id="selectedHandlerRoleMeta"></dd></div>
+                  <div><dt>Skapad</dt><dd id="selectedHandlerCreatedMeta"></dd></div>
+                  <div><dt>Senast ändrad</dt><dd id="selectedHandlerUpdatedMeta"></dd></div>
+                </dl>
+              </div>
+
+              <div class="card-body">
+                <div id="handlerReadView" class="record-grid">
+                  <section class="record-section">
+                    <h3 class="record-section-title">Grunduppgifter</h3>
+                    <dl class="record-fields mb-0">
+                      <div><dt>Namn</dt><dd id="handlerNameFact"></dd></div>
+                      <div><dt>E-post</dt><dd id="handlerEmailFact"></dd></div>
+                      <div><dt>Roll</dt><dd id="handlerRoleFact"></dd></div>
+                      <div><dt>Status</dt><dd id="handlerStatusFact"></dd></div>
+                    </dl>
+                  </section>
+                  <section class="record-section">
+                    <h3 class="record-section-title">Arbetsbelastning</h3>
+                    <dl class="record-fields mb-0">
+                      <div><dt>Tilldelade mentorer</dt><dd id="handlerAssignedFact"></dd></div>
+                    </dl>
+                  </section>
+                </div>
+
+                <form id="handlerEditForm" class="record-grid" hidden>
+                  <section class="record-section">
+                    <h3 class="record-section-title">Grunduppgifter</h3>
+                    <dl class="record-fields record-fields-edit mb-0">
+                      <div><dt><label for="editHandlerNameInput">Namn</label></dt><dd><input id="editHandlerNameInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
+                      <div><dt><label for="editHandlerEmailInput">E-post</label></dt><dd><input id="editHandlerEmailInput" class="form-control form-control-sm" type="email" required autocomplete="off"></dd></div>
+                      <div><dt><label for="editHandlerRoleInput">Roll</label></dt><dd><select id="editHandlerRoleInput" class="form-select form-select-sm" required><option value="Handläggare">Handläggare</option><option value="Samordnare">Samordnare</option><option value="Administratör">Administratör</option></select></dd></div>
+                      <div><dt><label for="editHandlerActiveInput">Status</label></dt><dd><select id="editHandlerActiveInput" class="form-select form-select-sm"><option value="active">Aktiv</option><option value="inactive">Inaktiv</option></select></dd></div>
+                    </dl>
+                  </section>
+                  <section class="record-section">
+                    <h3 class="record-section-title">Arbetsbelastning</h3>
+                    <dl class="record-fields record-fields-edit mb-0">
+                      <div><dt>Tilldelade mentorer</dt><dd id="handlerAssignedEditFact"></dd></div>
+                    </dl>
+                  </section>
+                </form>
               </div>
             </div>
           </section>
@@ -538,6 +621,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260721-handler-admin"></script>
+    <script src="app.js?v=20260721-handler-record"></script>
   </body>
 </html>

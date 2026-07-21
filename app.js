@@ -270,6 +270,7 @@ let pendingNextActionId = null;
 let handlerSearchTerm = "";
 let handlerStatusFilter = "";
 let handlerModal;
+let selectedHandlerId = null;
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
@@ -281,6 +282,9 @@ const els = {
   candidatesView: document.querySelector("#candidatesView"),
   detailView: document.querySelector("#detailView"),
   administrationView: document.querySelector("#administrationView"),
+  handlerDetailView: document.querySelector("#handlerDetailView"),
+  handlerDetailEmpty: document.querySelector("#handlerDetailEmpty"),
+  handlerDetail: document.querySelector("#handlerDetail"),
   totalCount: document.querySelector("#totalCount"),
   pipelineGrid: document.querySelector("#pipelineBoard .pipeline-grid"),
   actionTableBody: document.querySelector("#actionTableBody"),
@@ -311,6 +315,28 @@ const els = {
   handlerEmailInput: document.querySelector("#handlerEmailInput"),
   handlerRoleInput: document.querySelector("#handlerRoleInput"),
   handlerActiveInput: document.querySelector("#handlerActiveInput"),
+  selectedHandlerId: document.querySelector("#selectedHandlerId"),
+  selectedHandlerName: document.querySelector("#selectedHandlerName"),
+  selectedHandlerStatus: document.querySelector("#selectedHandlerStatus"),
+  selectedHandlerRoleMeta: document.querySelector("#selectedHandlerRoleMeta"),
+  selectedHandlerCreatedMeta: document.querySelector("#selectedHandlerCreatedMeta"),
+  selectedHandlerUpdatedMeta: document.querySelector("#selectedHandlerUpdatedMeta"),
+  editHandlerButton: document.querySelector("#editHandlerButton"),
+  handlerEditActions: document.querySelector("#handlerEditActions"),
+  cancelHandlerEditButton: document.querySelector("#cancelHandlerEditButton"),
+  toggleSelectedHandlerButton: document.querySelector("#toggleSelectedHandlerButton"),
+  handlerReadView: document.querySelector("#handlerReadView"),
+  handlerEditForm: document.querySelector("#handlerEditForm"),
+  handlerNameFact: document.querySelector("#handlerNameFact"),
+  handlerEmailFact: document.querySelector("#handlerEmailFact"),
+  handlerRoleFact: document.querySelector("#handlerRoleFact"),
+  handlerStatusFact: document.querySelector("#handlerStatusFact"),
+  handlerAssignedFact: document.querySelector("#handlerAssignedFact"),
+  handlerAssignedEditFact: document.querySelector("#handlerAssignedEditFact"),
+  editHandlerNameInput: document.querySelector("#editHandlerNameInput"),
+  editHandlerEmailInput: document.querySelector("#editHandlerEmailInput"),
+  editHandlerRoleInput: document.querySelector("#editHandlerRoleInput"),
+  editHandlerActiveInput: document.querySelector("#editHandlerActiveInput"),
   detailEmpty: document.querySelector("#detailEmpty"),
   candidateDetail: document.querySelector("#candidateDetail"),
   nextActionBar: document.querySelector("#nextActionBar"),
@@ -552,6 +578,7 @@ function renderAll() {
   renderTable();
   renderDetail();
   renderHandlers();
+  renderHandlerDetail();
 }
 
 async function migrateCoordinatorReferences() {
@@ -697,18 +724,20 @@ function normalizeRouteView(view) {
 
 function applyRoute() {
   const route = parseRoute();
-  currentView = ["dashboard", "mentors", "mentor", "administration"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "mentors", "mentor", "administration", "handler"].includes(route.view) ? route.view : "dashboard";
   selectedId = currentView === "mentor" ? route.id : selectedId;
+  selectedHandlerId = currentView === "handler" ? route.id : selectedHandlerId;
   workQueueOnly = currentView === "mentors" && route.id === "action";
 
   els.dashboardView.hidden = currentView !== "dashboard";
   els.candidatesView.hidden = currentView !== "mentors";
   els.detailView.hidden = currentView !== "mentor";
   els.administrationView.hidden = currentView !== "administration";
+  els.handlerDetailView.hidden = currentView !== "handler";
 
   els.navDashboard.classList.toggle("active", currentView === "dashboard");
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
-  els.navAdministration.classList.toggle("active", currentView === "administration");
+  els.navAdministration.classList.toggle("active", currentView === "administration" || currentView === "handler");
 
   if (currentView === "dashboard") {
     els.pageTitle.textContent = "Dashboard";
@@ -720,14 +749,21 @@ function applyRoute() {
   } else if (currentView === "mentor") {
     els.pageTitle.textContent = "Mentorkort";
     els.breadcrumb.textContent = "Start / Onboarding / Mentorkort";
-  } else {
+  } else if (currentView === "administration") {
     els.pageTitle.textContent = "Administration";
     els.breadcrumb.textContent = "Start / Administration / Handläggare";
+  } else {
+    els.pageTitle.textContent = "Handläggarkort";
+    els.breadcrumb.textContent = "Start / Administration / Handläggarkort";
   }
 }
 
 function navigateToCandidate(id) {
   window.location.hash = `#/mentor/${id}`;
+}
+
+function navigateToHandler(id) {
+  window.location.hash = `#/handler/${id}`;
 }
 
 function navigateTo(hash) {
@@ -899,12 +935,65 @@ function renderHandlers() {
       <td><span class="badge ${handler.active ? "text-bg-success" : "text-bg-secondary"}">${handler.active ? "Aktiv" : "Inaktiv"}</span></td>
       <td>${escapeHtml(formatDate(handler.updatedAt || handler.createdAt))}</td>
       <td class="text-end text-nowrap">
-        <button type="button" class="btn btn-outline-primary btn-sm" data-edit-handler="${handler.id}">Redigera</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle-handler="${handler.id}">${handler.active ? "Inaktivera" : "Aktivera"}</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-open-handler="${handler.id}">Öppna</button>
       </td>
     `;
+    row.addEventListener("click", (event) => {
+      if (event.target.closest("a")) return;
+      navigateToHandler(handler.id);
+    });
     els.handlerTableBody.append(row);
   }
+}
+
+function selectedHandler() {
+  return handlers.find((handler) => handler.id === selectedHandlerId);
+}
+
+function renderHandlerDetail() {
+  const handler = selectedHandler();
+  if (!handler) {
+    els.handlerDetailEmpty.hidden = false;
+    els.handlerDetail.hidden = true;
+    return;
+  }
+
+  els.handlerDetailEmpty.hidden = true;
+  els.handlerDetail.hidden = false;
+  const assignedCount = handlerMentorCount(handler);
+  const status = handler.active ? "Aktiv" : "Inaktiv";
+  els.selectedHandlerId.textContent = handler.id;
+  els.selectedHandlerName.textContent = handler.name;
+  els.selectedHandlerStatus.textContent = status;
+  els.selectedHandlerStatus.className = `badge ${handler.active ? "text-bg-success" : "text-bg-secondary"}`;
+  els.selectedHandlerRoleMeta.textContent = handler.role;
+  els.selectedHandlerCreatedMeta.textContent = formatDateTime(handler.createdAt);
+  els.selectedHandlerUpdatedMeta.textContent = formatDateTime(handler.updatedAt || handler.createdAt);
+  els.handlerNameFact.textContent = handler.name;
+  els.handlerEmailFact.textContent = handler.email;
+  els.handlerRoleFact.textContent = handler.role;
+  els.handlerStatusFact.textContent = status;
+  els.handlerAssignedFact.textContent = assignedCount;
+  els.handlerAssignedEditFact.textContent = assignedCount;
+  els.toggleSelectedHandlerButton.textContent = handler.active ? "Inaktivera handläggare" : "Aktivera handläggare";
+  els.toggleSelectedHandlerButton.classList.toggle("text-danger", handler.active);
+  setHandlerEditMode(false);
+}
+
+function setHandlerEditMode(editing) {
+  const handler = selectedHandler();
+  if (editing && handler) {
+    els.editHandlerNameInput.value = handler.name;
+    els.editHandlerEmailInput.value = handler.email;
+    els.editHandlerEmailInput.setCustomValidity("");
+    els.editHandlerRoleInput.value = handler.role;
+    els.editHandlerActiveInput.value = handler.active ? "active" : "inactive";
+  }
+  els.handlerReadView.hidden = editing;
+  els.handlerEditForm.hidden = !editing;
+  els.editHandlerButton.hidden = editing;
+  els.handlerEditActions.hidden = !editing;
+  if (editing) els.editHandlerNameInput.focus({ preventScroll: true });
 }
 
 function populateCoordinatorSelect(candidate) {
@@ -1318,16 +1407,11 @@ els.handlerStatusFilter.addEventListener("change", () => {
 
 els.newHandlerButton.addEventListener("click", () => openHandlerModal());
 
-els.handlerTableBody.addEventListener("click", async (event) => {
-  const editButton = event.target.closest("[data-edit-handler]");
-  if (editButton) {
-    openHandlerModal(handlers.find((handler) => handler.id === editButton.dataset.editHandler));
-    return;
-  }
+els.editHandlerButton.addEventListener("click", () => setHandlerEditMode(true));
+els.cancelHandlerEditButton.addEventListener("click", () => setHandlerEditMode(false));
 
-  const toggleButton = event.target.closest("[data-toggle-handler]");
-  if (!toggleButton) return;
-  const handler = handlers.find((item) => item.id === toggleButton.dataset.toggleHandler);
+els.toggleSelectedHandlerButton.addEventListener("click", async () => {
+  const handler = selectedHandler();
   if (!handler) return;
   const assignedCount = handlerMentorCount(handler);
   if (handler.active && assignedCount) {
@@ -1339,6 +1423,50 @@ els.handlerTableBody.addEventListener("click", async (event) => {
   showFeedback(`${handler.name} har ${handler.active ? "inaktiverats" : "aktiverats"}.`);
   await refresh();
 });
+
+els.handlerEditForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const handler = selectedHandler();
+  if (!handler) return;
+  const name = els.editHandlerNameInput.value.trim();
+  const email = els.editHandlerEmailInput.value.trim().toLowerCase();
+  const active = els.editHandlerActiveInput.value === "active";
+  const duplicate = handlers.some((item) => item.id !== handler.id && item.email.toLowerCase() === email);
+  if (duplicate) {
+    els.editHandlerEmailInput.setCustomValidity("E-postadressen används redan av en annan handläggare.");
+    els.editHandlerEmailInput.reportValidity();
+    return;
+  }
+  els.editHandlerEmailInput.setCustomValidity("");
+  const assignedCount = handlerMentorCount(handler);
+  if (handler.active && !active && assignedCount) {
+    const confirmed = window.confirm(`${handler.name} har ${assignedCount} tilldelade mentorärenden. Inaktivera ändå? Befintliga tilldelningar behålls.`);
+    if (!confirmed) return;
+  }
+  const now = new Date().toISOString();
+  await saveHandler({
+    ...handler,
+    name,
+    email,
+    role: els.editHandlerRoleInput.value,
+    active,
+    updatedAt: now
+  });
+  if (handler.name !== name) {
+    const assigned = candidates.filter((candidate) => candidate.coordinatorId === handler.id);
+    await Promise.all(assigned.map((candidate) => saveCandidate({
+      ...candidate,
+      coordinator: name,
+      updatedAt: now,
+      history: [...(candidate.history || []), { at: now, text: `Handläggarnamn uppdaterat till ${name}`, actor: "System" }]
+    })));
+  }
+  markSaved();
+  showFeedback("Handläggaren har uppdaterats.");
+  await refresh();
+});
+
+els.editHandlerEmailInput.addEventListener("input", () => els.editHandlerEmailInput.setCustomValidity(""));
 
 els.handlerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1383,6 +1511,7 @@ els.handlerForm.addEventListener("submit", async (event) => {
   markSaved();
   showFeedback(existing ? "Handläggaren har uppdaterats." : "Handläggaren har registrerats.");
   await refresh();
+  if (!existing) navigateToHandler(id);
 });
 
 els.handlerEmailInput.addEventListener("input", () => els.handlerEmailInput.setCustomValidity(""));
