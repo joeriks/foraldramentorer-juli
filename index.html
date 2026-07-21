@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260721-unassigned-examples">
+    <link rel="stylesheet" href="styles.css?v=20260721-base-edit-action">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -351,13 +351,6 @@
                   </div>
                   <div class="record-actions d-flex flex-wrap gap-2 justify-content-end align-items-center">
                     <span id="selectedStatus" class="badge text-bg-secondary">Anmäld</span>
-                    <div class="record-edit-slot">
-                      <button id="editPersonButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
-                      <div id="personEditActions" class="d-flex gap-2" hidden>
-                        <button id="savePersonEditButton" type="submit" form="personEditForm" class="btn btn-primary btn-sm">Spara ändringar</button>
-                        <button id="cancelPersonEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
-                      </div>
-                    </div>
                     <div class="dropdown">
                       <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Fler åtgärder</button>
                       <ul class="dropdown-menu dropdown-menu-end">
@@ -402,6 +395,16 @@
 
               <div class="tab-content">
                 <section class="tab-pane fade show active card-body" id="mentor-base-pane" role="tabpanel" aria-labelledby="mentor-base-tab" tabindex="0">
+                  <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+                    <h3 class="h6 mb-0">Grunduppgifter</h3>
+                    <div class="record-edit-slot">
+                      <button id="editPersonButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
+                      <div id="personEditActions" class="d-flex gap-2" hidden>
+                        <button id="savePersonEditButton" type="submit" form="personEditForm" class="btn btn-primary btn-sm">Spara ändringar</button>
+                        <button id="cancelPersonEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                      </div>
+                    </div>
+                  </div>
                   <div id="personReadView">
                     <section class="record-section">
                       <h3 class="record-section-title">Personuppgifter</h3>
@@ -629,6 +632,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260721-unassigned-examples"></script>
+    <script src="app.js?v=20260721-base-edit-action"></script>
   </body>
 </html>
