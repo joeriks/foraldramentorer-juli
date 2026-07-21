@@ -1,6 +1,7 @@
 const DB_NAME = "foraldramentorer";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = "candidates";
+const HANDLERS_STORE = "handlers";
 
 const STATUSES = [
   "Anmäld",
@@ -249,8 +250,15 @@ const exampleLastNames = [
   "Andersson", "Berg", "Dahl", "Ekström", "Haddad", "Holm", "Lind", "Nilsson", "Rahimi", "Svensson"
 ];
 
+const seedHandlers = [
+  { id: "handler-maja", name: "Maja", email: "maja@kommun.example", role: "Handläggare", active: true },
+  { id: "handler-jonas", name: "Jonas", email: "jonas@kommun.example", role: "Handläggare", active: true },
+  { id: "handler-sara", name: "Sara", email: "sara@kommun.example", role: "Samordnare", active: true }
+];
+
 let db;
 let candidates = [];
+let handlers = [];
 let selectedId = null;
 let searchTerm = "";
 let statusFilter = "";
@@ -259,15 +267,20 @@ let currentView = "dashboard";
 let renderedDetailId = null;
 let workQueueOnly = false;
 let pendingNextActionId = null;
+let handlerSearchTerm = "";
+let handlerStatusFilter = "";
+let handlerModal;
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
   breadcrumb: document.querySelector("#breadcrumb"),
   navDashboard: document.querySelector("#navDashboard"),
   navCandidates: document.querySelector("#navCandidates"),
+  navAdministration: document.querySelector("#navAdministration"),
   dashboardView: document.querySelector("#dashboardView"),
   candidatesView: document.querySelector("#candidatesView"),
   detailView: document.querySelector("#detailView"),
+  administrationView: document.querySelector("#administrationView"),
   totalCount: document.querySelector("#totalCount"),
   pipelineGrid: document.querySelector("#pipelineBoard .pipeline-grid"),
   actionTableBody: document.querySelector("#actionTableBody"),
@@ -286,6 +299,18 @@ const els = {
   mentorListCount: document.querySelector("#mentorListCount"),
   searchInput: document.querySelector("#searchInput"),
   statusFilter: document.querySelector("#statusFilter"),
+  handlerListCount: document.querySelector("#handlerListCount"),
+  handlerSearchInput: document.querySelector("#handlerSearchInput"),
+  handlerStatusFilter: document.querySelector("#handlerStatusFilter"),
+  handlerTableBody: document.querySelector("#handlerTableBody"),
+  newHandlerButton: document.querySelector("#newHandlerButton"),
+  handlerForm: document.querySelector("#handlerForm"),
+  handlerModalTitle: document.querySelector("#handlerModalTitle"),
+  handlerIdInput: document.querySelector("#handlerIdInput"),
+  handlerNameInput: document.querySelector("#handlerNameInput"),
+  handlerEmailInput: document.querySelector("#handlerEmailInput"),
+  handlerRoleInput: document.querySelector("#handlerRoleInput"),
+  handlerActiveInput: document.querySelector("#handlerActiveInput"),
   detailEmpty: document.querySelector("#detailEmpty"),
   candidateDetail: document.querySelector("#candidateDetail"),
   nextActionBar: document.querySelector("#nextActionBar"),
@@ -368,6 +393,9 @@ function openDatabase() {
       if (!nextDb.objectStoreNames.contains(STORE)) {
         nextDb.createObjectStore(STORE, { keyPath: "id" });
       }
+      if (!nextDb.objectStoreNames.contains(HANDLERS_STORE)) {
+        nextDb.createObjectStore(HANDLERS_STORE, { keyPath: "id" });
+      }
     };
 
     request.onsuccess = () => resolve(request.result);
@@ -377,6 +405,10 @@ function openDatabase() {
 
 function tx(mode = "readonly") {
   return db.transaction(STORE, mode).objectStore(STORE);
+}
+
+function handlerTx(mode = "readonly") {
+  return db.transaction(HANDLERS_STORE, mode).objectStore(HANDLERS_STORE);
 }
 
 function getAllCandidates() {
@@ -409,6 +441,41 @@ function clearCandidates() {
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
+}
+
+function getAllHandlers() {
+  return new Promise((resolve, reject) => {
+    const request = handlerTx().getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function saveHandler(handler) {
+  return new Promise((resolve, reject) => {
+    const request = handlerTx("readwrite").put(handler);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function clearHandlers() {
+  return new Promise((resolve, reject) => {
+    const request = handlerTx("readwrite").clear();
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function ensureDefaultHandlers() {
+  const existing = await getAllHandlers();
+  if (existing.length) return;
+  const now = new Date().toISOString();
+  await Promise.all(seedHandlers.map((handler) => saveHandler({
+    ...handler,
+    createdAt: now,
+    updatedAt: now
+  })));
 }
 
 function replaceCandidates(nextCandidates) {
@@ -467,8 +534,11 @@ function buildExampleDataset(count) {
 }
 
 async function refresh() {
+  handlers = await getAllHandlers();
+  handlers.sort((a, b) => a.name.localeCompare(b.name, "sv"));
   candidates = await getAllCandidates();
   candidates = candidates.map(normalizeCandidate);
+  await migrateCoordinatorReferences();
   await ensureUniqueCaseNumbers();
   candidates.sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.name.localeCompare(b.name, "sv"));
   renderAll();
@@ -481,6 +551,19 @@ function renderAll() {
   renderDashboard();
   renderTable();
   renderDetail();
+  renderHandlers();
+}
+
+async function migrateCoordinatorReferences() {
+  const changed = [];
+  for (const candidate of candidates) {
+    if (candidate.coordinatorId) continue;
+    const handler = handlers.find((item) => item.name === candidate.coordinator);
+    if (!handler) continue;
+    candidate.coordinatorId = handler.id;
+    changed.push(saveCandidate(candidate));
+  }
+  await Promise.all(changed);
 }
 
 function normalizeCandidate(candidate, index = 0) {
@@ -499,6 +582,7 @@ function normalizeCandidate(candidate, index = 0) {
       identityVerified
     },
     caseNumber: candidate.caseNumber || makeCaseNumber(candidate.id || candidate.createdAt),
+    coordinatorId: candidate.coordinatorId || "",
     coordinator: candidate.coordinator || "",
     interviewMode: candidate.interviewMode || "",
     history: candidate.history || [
@@ -613,16 +697,18 @@ function normalizeRouteView(view) {
 
 function applyRoute() {
   const route = parseRoute();
-  currentView = ["dashboard", "mentors", "mentor"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "mentors", "mentor", "administration"].includes(route.view) ? route.view : "dashboard";
   selectedId = currentView === "mentor" ? route.id : selectedId;
   workQueueOnly = currentView === "mentors" && route.id === "action";
 
   els.dashboardView.hidden = currentView !== "dashboard";
   els.candidatesView.hidden = currentView !== "mentors";
   els.detailView.hidden = currentView !== "mentor";
+  els.administrationView.hidden = currentView !== "administration";
 
   els.navDashboard.classList.toggle("active", currentView === "dashboard");
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
+  els.navAdministration.classList.toggle("active", currentView === "administration");
 
   if (currentView === "dashboard") {
     els.pageTitle.textContent = "Dashboard";
@@ -631,9 +717,12 @@ function applyRoute() {
     els.pageTitle.textContent = workQueueOnly ? "Arbetskö" : "Mentorregister";
     els.breadcrumb.textContent = workQueueOnly ? "Start / Onboarding / Arbetskö" : "Start / Onboarding / Mentorregister";
     els.mentorListTitle.textContent = workQueueOnly ? "Arbetskö" : "Mentorregister";
-  } else {
+  } else if (currentView === "mentor") {
     els.pageTitle.textContent = "Mentorkort";
     els.breadcrumb.textContent = "Start / Onboarding / Mentorkort";
+  } else {
+    els.pageTitle.textContent = "Administration";
+    els.breadcrumb.textContent = "Start / Administration / Handläggare";
   }
 }
 
@@ -769,6 +858,67 @@ function renderTable() {
   }
 }
 
+function filteredHandlers() {
+  const term = handlerSearchTerm.trim().toLowerCase();
+  return handlers.filter((handler) => {
+    const statusMatches = !handlerStatusFilter
+      || (handlerStatusFilter === "active" ? handler.active : !handler.active);
+    const text = [handler.name, handler.email, handler.role].join(" ").toLowerCase();
+    return statusMatches && (!term || text.includes(term));
+  });
+}
+
+function handlerMentorCount(handler) {
+  return candidates.filter((candidate) => candidate.coordinatorId === handler.id
+    || (!candidate.coordinatorId && candidate.coordinator === handler.name)).length;
+}
+
+function renderHandlers() {
+  const rows = filteredHandlers();
+  const activeCount = handlers.filter((handler) => handler.active).length;
+  els.handlerListCount.textContent = rows.length === handlers.length
+    ? `${handlers.length} handläggare i registret, varav ${activeCount} aktiva.`
+    : `Visar ${rows.length} av ${handlers.length} handläggare.`;
+  els.handlerTableBody.innerHTML = "";
+
+  if (!rows.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = '<td colspan="7" class="text-secondary">Inga handläggare matchar urvalet.</td>';
+    els.handlerTableBody.append(row);
+    return;
+  }
+
+  for (const handler of rows) {
+    const assignedCount = handlerMentorCount(handler);
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td><strong>${escapeHtml(handler.name)}</strong><small>${escapeHtml(handler.id)}</small></td>
+      <td><a href="mailto:${escapeHtml(handler.email)}">${escapeHtml(handler.email)}</a></td>
+      <td>${escapeHtml(handler.role)}</td>
+      <td>${assignedCount}</td>
+      <td><span class="badge ${handler.active ? "text-bg-success" : "text-bg-secondary"}">${handler.active ? "Aktiv" : "Inaktiv"}</span></td>
+      <td>${escapeHtml(formatDate(handler.updatedAt || handler.createdAt))}</td>
+      <td class="text-end text-nowrap">
+        <button type="button" class="btn btn-outline-primary btn-sm" data-edit-handler="${handler.id}">Redigera</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle-handler="${handler.id}">${handler.active ? "Inaktivera" : "Aktivera"}</button>
+      </td>
+    `;
+    els.handlerTableBody.append(row);
+  }
+}
+
+function populateCoordinatorSelect(candidate) {
+  els.coordinatorInput.innerHTML = '<option value="">Ej tilldelad</option>';
+  const available = handlers.filter((handler) => handler.active || handler.id === candidate.coordinatorId);
+  for (const handler of available) {
+    const option = document.createElement("option");
+    option.value = handler.id;
+    option.textContent = handler.active ? handler.name : `${handler.name} (inaktiv)`;
+    els.coordinatorInput.append(option);
+  }
+  els.coordinatorInput.value = candidate.coordinatorId || "";
+}
+
 function renderDetail() {
   const candidate = selectedCandidate();
 
@@ -830,7 +980,7 @@ function renderDetail() {
     els.statusSelect.append(option);
   }
 
-  els.coordinatorInput.value = candidate.coordinator || "";
+  populateCoordinatorSelect(candidate);
   els.interviewDateInput.value = candidate.interviewDate || "";
   els.interviewModeInput.value = candidate.interviewMode || "";
   els.notesInput.value = candidate.notes || "";
@@ -900,7 +1050,7 @@ function setPersonEditMode(editing) {
     els.editLanguagesInput.value = candidate.languages || "";
     els.editAvailabilityInput.value = candidate.availability || "";
     els.statusSelect.value = candidate.status || STATUSES[0];
-    els.coordinatorInput.value = candidate.coordinator || "";
+    els.coordinatorInput.value = candidate.coordinatorId || "";
   }
 
   els.personReadView.hidden = editing;
@@ -970,6 +1120,7 @@ function newCandidate(formData) {
     area: formData.get("area").trim(),
     languages: formData.get("languages").trim(),
     availability: formData.get("availability").trim(),
+    coordinatorId: "",
     coordinator: "",
     status: "Anmäld",
     checks: Object.fromEntries(CHECKS.map(([key]) => [key, false])),
@@ -1085,6 +1236,18 @@ function openCandidateModal() {
   candidateModal.show();
 }
 
+function openHandlerModal(handler = null) {
+  els.handlerForm.reset();
+  els.handlerEmailInput.setCustomValidity("");
+  els.handlerIdInput.value = handler?.id || "";
+  els.handlerNameInput.value = handler?.name || "";
+  els.handlerEmailInput.value = handler?.email || "";
+  els.handlerRoleInput.value = handler?.role || "Handläggare";
+  els.handlerActiveInput.checked = handler ? Boolean(handler.active) : true;
+  els.handlerModalTitle.textContent = handler ? "Redigera handläggare" : "Ny handläggare";
+  handlerModal.show();
+}
+
 els.navDashboard.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/dashboard");
@@ -1094,6 +1257,11 @@ els.navCandidates.addEventListener("click", (event) => {
   event.preventDefault();
   resetMentorFilters();
   navigateTo("#/mentors");
+});
+
+els.navAdministration.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/administration");
 });
 
 els.openActionQueueButton.addEventListener("click", (event) => {
@@ -1138,6 +1306,87 @@ els.statusFilter.addEventListener("change", () => {
   renderTable();
 });
 
+els.handlerSearchInput.addEventListener("input", () => {
+  handlerSearchTerm = els.handlerSearchInput.value;
+  renderHandlers();
+});
+
+els.handlerStatusFilter.addEventListener("change", () => {
+  handlerStatusFilter = els.handlerStatusFilter.value;
+  renderHandlers();
+});
+
+els.newHandlerButton.addEventListener("click", () => openHandlerModal());
+
+els.handlerTableBody.addEventListener("click", async (event) => {
+  const editButton = event.target.closest("[data-edit-handler]");
+  if (editButton) {
+    openHandlerModal(handlers.find((handler) => handler.id === editButton.dataset.editHandler));
+    return;
+  }
+
+  const toggleButton = event.target.closest("[data-toggle-handler]");
+  if (!toggleButton) return;
+  const handler = handlers.find((item) => item.id === toggleButton.dataset.toggleHandler);
+  if (!handler) return;
+  const assignedCount = handlerMentorCount(handler);
+  if (handler.active && assignedCount) {
+    const confirmed = window.confirm(`${handler.name} har ${assignedCount} tilldelade mentorärenden. Inaktivera ändå? Befintliga tilldelningar behålls.`);
+    if (!confirmed) return;
+  }
+  await saveHandler({ ...handler, active: !handler.active, updatedAt: new Date().toISOString() });
+  markSaved();
+  showFeedback(`${handler.name} har ${handler.active ? "inaktiverats" : "aktiverats"}.`);
+  await refresh();
+});
+
+els.handlerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const id = els.handlerIdInput.value || crypto.randomUUID();
+  const existing = handlers.find((handler) => handler.id === id);
+  const name = els.handlerNameInput.value.trim();
+  const email = els.handlerEmailInput.value.trim().toLowerCase();
+  const duplicate = handlers.some((handler) => handler.id !== id && handler.email.toLowerCase() === email);
+  if (duplicate) {
+    els.handlerEmailInput.setCustomValidity("E-postadressen används redan av en annan handläggare.");
+    els.handlerEmailInput.reportValidity();
+    return;
+  }
+  els.handlerEmailInput.setCustomValidity("");
+  if (existing?.active && !els.handlerActiveInput.checked) {
+    const assignedCount = handlerMentorCount(existing);
+    if (assignedCount) {
+      const confirmed = window.confirm(`${existing.name} har ${assignedCount} tilldelade mentorärenden. Inaktivera ändå? Befintliga tilldelningar behålls.`);
+      if (!confirmed) return;
+    }
+  }
+  const now = new Date().toISOString();
+  await saveHandler({
+    id,
+    name,
+    email,
+    role: els.handlerRoleInput.value,
+    active: els.handlerActiveInput.checked,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now
+  });
+  if (existing && existing.name !== name) {
+    const assigned = candidates.filter((candidate) => candidate.coordinatorId === id);
+    await Promise.all(assigned.map((candidate) => saveCandidate({
+      ...candidate,
+      coordinator: name,
+      updatedAt: now,
+      history: [...(candidate.history || []), { at: now, text: `Handläggarnamn uppdaterat till ${name}`, actor: "System" }]
+    })));
+  }
+  handlerModal.hide();
+  markSaved();
+  showFeedback(existing ? "Handläggaren har uppdaterats." : "Handläggaren har registrerats.");
+  await refresh();
+});
+
+els.handlerEmailInput.addEventListener("input", () => els.handlerEmailInput.setCustomValidity(""));
+
 els.actionTableBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-candidate]");
   if (!button) return;
@@ -1163,6 +1412,7 @@ els.personEditForm.addEventListener("submit", async (event) => {
   const candidate = selectedCandidate();
   if (!candidate) return;
   const personalNumber = els.editPersonalNumberInput.value.trim();
+  const coordinator = handlers.find((handler) => handler.id === els.coordinatorInput.value);
   const identityInvalidated = candidate.checks?.identityVerified && personalNumber !== candidate.personalNumber;
   const patch = {
     name: els.editNameInput.value.trim(),
@@ -1171,7 +1421,8 @@ els.personEditForm.addEventListener("submit", async (event) => {
     languages: els.editLanguagesInput.value.trim(),
     availability: els.editAvailabilityInput.value.trim(),
     status: els.statusSelect.value,
-    coordinator: els.coordinatorInput.value.trim()
+    coordinatorId: coordinator?.id || "",
+    coordinator: coordinator?.name || ""
   };
   if (identityInvalidated) {
     patch.checks = { ...candidate.checks, identityVerified: false };
@@ -1262,6 +1513,7 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
     if (!confirmed) return;
   }
 
+  await ensureDefaultHandlers();
   await replaceCandidates(buildExampleDataset(count));
   selectedId = null;
   searchTerm = "";
@@ -1277,12 +1529,13 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
 });
 
 els.resetButton.addEventListener("click", async () => {
-  const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata i den här webbläsaren? Åtgärden kan inte ångras.");
+  const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata? Mentorärenden tas bort och grundhandläggarna återställs. Åtgärden kan inte ångras.");
   if (!confirmed) return;
-  await clearCandidates();
+  await Promise.all([clearCandidates(), clearHandlers()]);
+  await ensureDefaultHandlers();
   selectedId = null;
   markSaved();
-  showFeedback("Den lokala prototypdatan har nollställts.");
+  showFeedback("Prototypdatan har nollställts och grundhandläggare har återställts.");
   await refresh();
 });
 
@@ -1292,8 +1545,12 @@ openDatabase()
   .then(async (database) => {
     const modalElement = document.querySelector("#candidateModal");
     candidateModal = new bootstrap.Modal(modalElement);
+    const handlerModalElement = document.querySelector("#handlerModal");
+    handlerModal = new bootstrap.Modal(handlerModalElement);
     modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());
+    handlerModalElement.addEventListener("shown.bs.modal", () => els.handlerNameInput.focus());
     db = database;
+    await ensureDefaultHandlers();
     if (!window.location.hash) {
       window.location.hash = "#/dashboard";
     }

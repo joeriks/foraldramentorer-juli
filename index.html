@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260721-identity-verification">
+    <link rel="stylesheet" href="styles.css?v=20260721-handler-admin">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -22,7 +22,7 @@
           <span class="nav-link disabled" aria-disabled="true"><span>Uppdrag</span><small>Kommer senare</small></span>
           <span class="nav-link disabled" aria-disabled="true"><span>Arvoden</span><small>Kommer senare</small></span>
           <span class="nav-link disabled" aria-disabled="true"><span>Statistik</span><small>Kommer senare</small></span>
-          <span class="nav-link disabled" aria-disabled="true"><span>Administration</span><small>Kommer senare</small></span>
+          <a id="navAdministration" class="nav-link" href="#/administration">Administration</a>
         </nav>
       </aside>
 
@@ -194,6 +194,52 @@
             </div>
           </section>
 
+          <section id="administrationView" hidden>
+            <div class="card" aria-label="Handläggarregister">
+              <div class="card-header bg-white">
+                <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
+                  <div>
+                    <h2 class="h5 mb-1">Handläggarregister</h2>
+                    <p id="handlerListCount" class="text-secondary mb-0">0 handläggare i registret.</p>
+                  </div>
+                  <button id="newHandlerButton" type="button" class="btn btn-primary btn-sm">Ny handläggare</button>
+                </div>
+              </div>
+              <div class="card-body border-bottom">
+                <div class="row g-3">
+                  <div class="col-md">
+                    <label class="form-label" for="handlerSearchInput">Sök</label>
+                    <input id="handlerSearchInput" class="form-control form-control-sm" autocomplete="off" placeholder="Namn, e-post eller roll">
+                  </div>
+                  <div class="col-md-4 col-xl-3">
+                    <label class="form-label" for="handlerStatusFilter">Status</label>
+                    <select id="handlerStatusFilter" class="form-select form-select-sm">
+                      <option value="">Alla statusar</option>
+                      <option value="active">Aktiva</option>
+                      <option value="inactive">Inaktiva</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0 handler-table">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Namn</th>
+                      <th>E-post</th>
+                      <th>Roll</th>
+                      <th>Tilldelade mentorer</th>
+                      <th>Status</th>
+                      <th>Senast ändrad</th>
+                      <th class="text-end">Åtgärder</th>
+                    </tr>
+                  </thead>
+                  <tbody id="handlerTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <section id="detailView" hidden>
             <div id="detailEmpty" class="card">
               <div class="card-body py-5">
@@ -302,7 +348,7 @@
                       <h3 class="record-section-title">Ärendeuppgifter</h3>
                       <dl class="record-fields record-fields-edit mb-0">
                         <div><dt><label for="statusSelect">Status</label></dt><dd><select id="statusSelect" class="form-select form-select-sm"></select></dd></div>
-                        <div><dt><label for="coordinatorInput">Handläggare</label></dt><dd><input id="coordinatorInput" class="form-control form-control-sm" autocomplete="off"></dd></div>
+                        <div><dt><label for="coordinatorInput">Handläggare</label></dt><dd><select id="coordinatorInput" class="form-select form-select-sm"></select></dd></div>
                         <div><dt>Identitetsverifiering</dt><dd id="identityMethodEditFact"></dd></div>
                         <div><dt>Nästa steg</dt><dd id="nextStepEditFact"></dd></div>
                       </dl>
@@ -449,7 +495,49 @@
       </div>
     </div>
 
+    <div class="modal fade" id="handlerModal" tabindex="-1" aria-labelledby="handlerModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <form id="handlerForm" class="modal-content">
+          <div class="modal-header">
+            <h2 id="handlerModalTitle" class="modal-title h5">Ny handläggare</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button>
+          </div>
+          <div class="modal-body">
+            <input id="handlerIdInput" name="id" type="hidden">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label" for="handlerNameInput">Namn</label>
+                <input id="handlerNameInput" name="name" class="form-control" required autocomplete="off">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="handlerEmailInput">E-post</label>
+                <input id="handlerEmailInput" name="email" class="form-control" type="email" required autocomplete="off" placeholder="namn@kommun.se">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="handlerRoleInput">Roll</label>
+                <select id="handlerRoleInput" name="role" class="form-select" required>
+                  <option value="Handläggare">Handläggare</option>
+                  <option value="Samordnare">Samordnare</option>
+                  <option value="Administratör">Administratör</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <div class="form-check form-switch">
+                  <input id="handlerActiveInput" name="active" class="form-check-input" type="checkbox" checked>
+                  <label class="form-check-label" for="handlerActiveInput">Aktiv och valbar i mentorärenden</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Avbryt</button>
+            <button type="submit" class="btn btn-primary">Spara handläggare</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260721-identity-verification"></script>
+    <script src="app.js?v=20260721-handler-admin"></script>
   </body>
 </html>

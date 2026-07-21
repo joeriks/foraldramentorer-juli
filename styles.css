@@ -267,6 +267,10 @@
   min-width: 760px;
 }
 
+.handler-table {
+  min-width: 980px;
+}
+
 .card > .table-responsive .table > :not(caption) > * > * {
   padding: var(--app-space-2) var(--app-space-4);
 }
@@ -285,9 +289,15 @@
 }
 
 .case-table small,
+#handlerTableBody small,
 #actionTableBody small {
   display: block;
   color: var(--bs-secondary-color);
+}
+
+.handler-table th:last-child,
+.handler-table td:last-child {
+  width: 12.5rem;
 }
 
 .readonly-field .form-label {
