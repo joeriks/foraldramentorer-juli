@@ -261,6 +261,7 @@ const els = {
   statusFact: document.querySelector("#statusFact"),
   coordinatorFact: document.querySelector("#coordinatorFact"),
   nextStepFact: document.querySelector("#nextStepFact"),
+  nextStepEditFact: document.querySelector("#nextStepEditFact"),
   checksTabCount: document.querySelector("#checksTabCount"),
   logTabCount: document.querySelector("#logTabCount"),
   checklist: document.querySelector("#checklist"),
@@ -679,6 +680,7 @@ function renderDetail() {
   els.statusFact.textContent = candidate.status;
   els.coordinatorFact.textContent = candidate.coordinator || "Ej tilldelad";
   els.nextStepFact.textContent = nextStepText(candidate);
+  els.nextStepEditFact.textContent = nextStepText(candidate);
   const completedChecks = CHECKS.filter(([key]) => candidate.checks?.[key]).length;
   els.checksTabCount.textContent = `${completedChecks}/${CHECKS.length}`;
   els.logTabCount.textContent = candidate.history.length;

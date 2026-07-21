@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260721-color-system">
+    <link rel="stylesheet" href="styles.css?v=20260721-stable-edit-layout">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -213,10 +213,12 @@
                   </div>
                   <div class="record-actions d-flex flex-wrap gap-2 justify-content-end align-items-center">
                     <span id="selectedStatus" class="badge text-bg-secondary">Anmäld</span>
-                    <button id="editPersonButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
-                    <div id="personEditActions" class="d-flex gap-2" hidden>
-                      <button id="savePersonEditButton" type="submit" form="personEditForm" class="btn btn-primary btn-sm">Spara ändringar</button>
-                      <button id="cancelPersonEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                    <div class="record-edit-slot">
+                      <button id="editPersonButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
+                      <div id="personEditActions" class="d-flex gap-2" hidden>
+                        <button id="savePersonEditButton" type="submit" form="personEditForm" class="btn btn-primary btn-sm">Spara ändringar</button>
+                        <button id="cancelPersonEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                      </div>
                     </div>
                     <div class="dropdown">
                       <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Fler åtgärder</button>
@@ -273,36 +275,23 @@
                     </section>
                   </div>
                   <form id="personEditForm" hidden>
-                    <h3 class="record-section-title">Personuppgifter</h3>
-                    <div class="row g-3">
-                      <div class="col-md-6">
-                        <label class="form-label" for="editNameInput">Namn</label>
-                        <input id="editNameInput" class="form-control form-control-sm" required autocomplete="off">
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label" for="editAreaInput">Område</label>
-                        <input id="editAreaInput" class="form-control form-control-sm" required autocomplete="off">
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label" for="editLanguagesInput">Språk</label>
-                        <input id="editLanguagesInput" class="form-control form-control-sm" required autocomplete="off">
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label" for="editAvailabilityInput">Tillgänglighet</label>
-                        <input id="editAvailabilityInput" class="form-control form-control-sm" required autocomplete="off">
-                      </div>
-                    </div>
-                    <h3 class="record-section-title mt-4">Ärendeuppgifter</h3>
-                    <div class="row g-3">
-                      <div class="col-md-6">
-                        <label class="form-label" for="statusSelect">Status i introduktionen</label>
-                        <select id="statusSelect" class="form-select form-select-sm"></select>
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label" for="coordinatorInput">Handläggare</label>
-                        <input id="coordinatorInput" class="form-control form-control-sm" autocomplete="off">
-                      </div>
-                    </div>
+                    <section class="record-section">
+                      <h3 class="record-section-title">Personuppgifter</h3>
+                      <dl class="record-fields record-fields-edit mb-0">
+                        <div><dt><label for="editNameInput">Namn</label></dt><dd><input id="editNameInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
+                        <div><dt><label for="editAreaInput">Område</label></dt><dd><input id="editAreaInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
+                        <div><dt><label for="editLanguagesInput">Språk</label></dt><dd><input id="editLanguagesInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
+                        <div><dt><label for="editAvailabilityInput">Tillgänglighet</label></dt><dd><input id="editAvailabilityInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
+                      </dl>
+                    </section>
+                    <section class="record-section mt-4">
+                      <h3 class="record-section-title">Ärendeuppgifter</h3>
+                      <dl class="record-fields record-fields-edit mb-0">
+                        <div><dt><label for="statusSelect">Status</label></dt><dd><select id="statusSelect" class="form-select form-select-sm"></select></dd></div>
+                        <div><dt><label for="coordinatorInput">Handläggare</label></dt><dd><input id="coordinatorInput" class="form-control form-control-sm" autocomplete="off"></dd></div>
+                        <div><dt>Nästa steg</dt><dd id="nextStepEditFact"></dd></div>
+                      </dl>
+                    </section>
                   </form>
                 </section>
 
@@ -405,6 +394,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260721-record-layout"></script>
+    <script src="app.js?v=20260721-stable-edit-layout"></script>
   </body>
 </html>
