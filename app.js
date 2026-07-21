@@ -542,15 +542,19 @@ function buildExampleDataset(count) {
   return exampleTemplates(count).map((candidate, index) => {
     const id = crypto.randomUUID();
     const identityVerified = Boolean(candidate.checks?.identityVerified);
+    const coordinator = index % 2 === 0 ? "" : candidate.coordinator;
     return {
       ...candidate,
       checks: { ...candidate.checks },
       id,
+      coordinatorId: "",
+      coordinator,
       personalNumber: makeExamplePersonalNumber(index),
       identityMethod: identityVerified ? (index % 2 === 0 ? "bankid" : "physical_id") : "",
       identityVerifiedAt: identityVerified ? now : "",
-      identityVerifiedBy: identityVerified ? candidate.coordinator || "System" : "",
+      identityVerifiedBy: identityVerified ? "Sara Lind" : "",
       exampleData: true,
+      exampleDataVersion: 2,
       exampleDatasetSize: count,
       caseNumber: makeCaseNumber(id),
       history: [
@@ -569,10 +573,23 @@ async function refresh() {
   handlers.sort((a, b) => a.name.localeCompare(b.name, "sv"));
   candidates = await getAllCandidates();
   candidates = candidates.map(normalizeCandidate);
+  await migrateExampleCoordinatorDistribution();
   await migrateCoordinatorReferences();
   await ensureUniqueCaseNumbers();
   candidates.sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.name.localeCompare(b.name, "sv"));
   renderAll();
+}
+
+async function migrateExampleCoordinatorDistribution() {
+  const legacyExamples = candidates.filter((candidate) => candidate.exampleData === true && !candidate.exampleDataVersion);
+  if (!legacyExamples.length) return;
+  await Promise.all(legacyExamples.map((candidate, index) => {
+    Object.assign(candidate, {
+      ...(index % 2 === 0 ? { coordinatorId: "", coordinator: "" } : {}),
+      exampleDataVersion: 2
+    });
+    return saveCandidate(candidate);
+  }));
 }
 
 async function migrateDefaultHandlerRecords() {
