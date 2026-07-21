@@ -6,16 +6,16 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260721-trust-polish">
+    <link rel="stylesheet" href="styles.css?v=20260721-spacing-system">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
       <aside class="sidebar" aria-label="Huvudnavigation">
-        <div class="px-3 py-3 border-bottom border-secondary-subtle">
+        <div class="sidebar-brand border-bottom border-secondary-subtle">
           <div class="fw-semibold text-white">FöräldraMentorer</div>
           <div class="small text-white-50">Kommunportal</div>
         </div>
-        <nav class="nav nav-pills flex-column gap-1 p-2">
+        <nav class="sidebar-nav nav nav-pills flex-column gap-1">
           <a id="navDashboard" class="nav-link" href="#/dashboard">Dashboard</a>
           <a id="navCandidates" class="nav-link" href="#/mentors">Mentorer</a>
           <span class="nav-link disabled" aria-disabled="true"><span>Matchningar</span><small>Kommer senare</small></span>
@@ -27,7 +27,7 @@
       </aside>
 
       <div class="main-shell">
-        <header class="bg-white border-bottom px-4 py-3">
+        <header class="app-header bg-white border-bottom">
           <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
             <div>
               <nav id="breadcrumb" class="small text-secondary mb-1" aria-label="Brödsmulor">Start / Dashboard</nav>
@@ -40,7 +40,7 @@
           </div>
         </header>
 
-        <div class="system-status border-bottom px-4 py-2" role="status">
+        <div class="system-status border-bottom" role="status">
           <span class="status-dot" aria-hidden="true"></span>
           <strong>Kommunportal</strong>
           <span aria-hidden="true">·</span>
@@ -50,9 +50,9 @@
           <span class="ms-lg-auto" id="saveStatus">Lokal lagring aktiv</span>
         </div>
 
-        <main class="p-3 p-lg-4">
-          <section id="dashboardView">
-            <section class="card mb-3">
+        <main class="app-main">
+          <section id="dashboardView" class="view-stack">
+            <section class="card">
               <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
                 <div>
                   <h2 class="h5 mb-1">Mentorernas tidslinje</h2>
@@ -98,7 +98,7 @@
               </div>
             </section>
 
-            <div class="row g-3">
+            <div class="row g-4">
               <section class="col-xl-7">
                 <div class="card h-100">
                   <div class="card-header bg-white d-flex justify-content-between align-items-start gap-2">
@@ -153,7 +153,7 @@
               </div>
 
               <div class="card-body border-bottom">
-                <div class="row g-2">
+                <div class="row g-3">
                   <div class="col-md">
                     <label class="form-label" for="searchInput">Sök</label>
                     <input id="searchInput" class="form-control form-control-sm" autocomplete="off" placeholder="Namn, område, språk eller handläggare">
@@ -212,7 +212,7 @@
                 </div>
               </div>
 
-              <ul class="nav nav-tabs px-3 pt-2" role="tablist" aria-label="Mentorkort">
+              <ul class="detail-tabs nav nav-tabs" role="tablist" aria-label="Mentorkort">
                 <li class="nav-item" role="presentation">
                   <button class="nav-link active" id="mentor-base-tab" data-bs-toggle="tab" data-bs-target="#mentor-base-pane" type="button" role="tab" aria-controls="mentor-base-pane" aria-selected="true">Grunduppgifter</button>
                 </li>
@@ -242,7 +242,7 @@
                       </div>
                     </div>
                   </div>
-                  <div class="row g-2 mb-3">
+                  <div class="row g-3 mb-3">
                     <div class="col-md-6">
                       <label class="form-label" for="statusSelect">Status i introduktionen</label>
                       <select id="statusSelect" class="form-select form-select-sm"></select>
@@ -302,12 +302,12 @@
 
                 <section class="tab-pane fade card-body" id="mentor-checks-pane" role="tabpanel" aria-labelledby="mentor-checks-tab" tabindex="0">
                   <h3 class="h6">Kontroller och certifieringskrav</h3>
-                  <div id="checklist" class="row g-2"></div>
+                  <div id="checklist" class="row g-3"></div>
                 </section>
 
                 <section class="tab-pane fade card-body" id="mentor-interview-pane" role="tabpanel" aria-labelledby="mentor-interview-tab" tabindex="0">
                   <h3 class="h6">Intervju</h3>
-                  <div class="row g-2 mb-3">
+                  <div class="row g-3 mb-3">
                     <div class="col-md-6">
                       <label class="form-label" for="interviewDateInput">Intervjutid</label>
                       <input id="interviewDateInput" class="form-control form-control-sm" type="datetime-local">

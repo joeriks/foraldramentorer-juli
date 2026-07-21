@@ -2,6 +2,13 @@
   display: none !important;
 }
 
+:root {
+  --app-space-1: 0.5rem;
+  --app-space-2: 0.75rem;
+  --app-space-3: 1rem;
+  --app-space-4: 1.5rem;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
@@ -13,9 +20,18 @@
   border-right: 1px solid #1e2831;
 }
 
+.sidebar-brand {
+  padding: var(--app-space-3) var(--app-space-4);
+}
+
+.sidebar-nav {
+  padding: var(--app-space-2);
+}
+
 .sidebar .nav-link {
   color: rgba(255, 255, 255, 0.82);
   border-radius: 0.25rem;
+  padding: var(--app-space-2) var(--app-space-3);
 }
 
 .sidebar .nav-link:hover,
@@ -29,7 +45,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--app-space-1);
 }
 
 .sidebar .nav-link.disabled small {
@@ -41,11 +57,25 @@
   min-width: 0;
 }
 
+.app-header {
+  padding: var(--app-space-3) var(--app-space-4);
+}
+
+.app-main {
+  padding: var(--app-space-4);
+}
+
+.view-stack {
+  display: grid;
+  gap: var(--app-space-4);
+}
+
 .system-status {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--app-space-1);
+  padding: var(--app-space-1) var(--app-space-4);
   color: #53616d;
   background: #f7f9fa;
   font-size: 0.78rem;
@@ -66,17 +96,30 @@
 
 .card-header {
   border-color: #d7dde2;
+  padding: var(--app-space-3) var(--app-space-4);
+}
+
+.card-body,
+.tab-pane.card-body {
+  padding: var(--app-space-3) var(--app-space-4);
+}
+
+.card-header > :last-child,
+.card-body > :last-child,
+.tab-pane.card-body > :last-child {
+  margin-bottom: 0;
 }
 
 .pipeline-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(150px, 1fr));
-  gap: 0.75rem;
+  gap: var(--app-space-3);
 }
 
 .pipeline-step {
   min-height: 132px;
   border-color: #ccd4da !important;
+  padding: var(--app-space-3);
 }
 
 .pipeline-step:hover {
@@ -86,6 +129,15 @@
 
 .case-table {
   min-width: 760px;
+}
+
+.card > .table-responsive .table > :not(caption) > * > * {
+  padding: var(--app-space-2) var(--app-space-4);
+}
+
+.card > .table-responsive .table > thead > tr > th {
+  padding-top: var(--app-space-1);
+  padding-bottom: var(--app-space-1);
 }
 
 .case-table tbody tr {
@@ -109,6 +161,18 @@
 .readonly-value {
   min-height: calc(1.5em + 0.5rem + 2px);
   padding: 0.25rem 0.5rem;
+}
+
+.detail-tabs {
+  padding: var(--app-space-2) var(--app-space-4) 0;
+}
+
+.detail-tabs .nav-link {
+  padding: var(--app-space-2) var(--app-space-3);
+}
+
+#checklist .form-check {
+  padding: var(--app-space-2) var(--app-space-3) !important;
 }
 
 .fact-list dt,
@@ -147,6 +211,36 @@
 }
 
 @media (max-width: 560px) {
+  .app-header,
+  .app-main,
+  .system-status {
+    padding-left: var(--app-space-3);
+    padding-right: var(--app-space-3);
+  }
+
+  .app-main,
+  .view-stack {
+    gap: var(--app-space-3);
+  }
+
+  .card-header,
+  .card-body,
+  .tab-pane.card-body {
+    padding: var(--app-space-3);
+  }
+
+  .detail-tabs {
+    padding-left: var(--app-space-3);
+    padding-right: var(--app-space-3);
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .card > .table-responsive .table > :not(caption) > * > * {
+    padding-left: var(--app-space-3);
+    padding-right: var(--app-space-3);
+  }
+
   .pipeline-grid {
     grid-template-columns: 1fr;
   }
