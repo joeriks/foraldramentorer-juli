@@ -172,6 +172,12 @@
   font-size: 0.78rem;
 }
 
+.prototype-tools .btn {
+  --bs-btn-font-size: 0.75rem;
+  --bs-btn-padding-y: 0.2rem;
+  --bs-btn-padding-x: 0.5rem;
+}
+
 .status-dot {
   width: 0.5rem;
   height: 0.5rem;
@@ -208,7 +214,9 @@
 }
 
 .pipeline-step {
-  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  min-height: 148px;
   border-color: var(--app-border-strong) !important;
   padding: var(--app-space-3);
 }
@@ -216,6 +224,43 @@
 .pipeline-step:hover {
   background: var(--bs-primary-bg-subtle);
   border-color: var(--app-primary) !important;
+}
+
+.pipeline-count {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin-top: var(--app-space-1);
+}
+
+.pipeline-count strong {
+  color: var(--app-text);
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pipeline-count span,
+.pipeline-description,
+.pipeline-action {
+  font-size: 0.78rem;
+}
+
+.pipeline-count span,
+.pipeline-description {
+  color: var(--app-text-muted);
+}
+
+.pipeline-description {
+  margin-top: 0.15rem;
+}
+
+.pipeline-action {
+  margin-top: auto;
+  padding-top: var(--app-space-1);
+  color: var(--app-primary);
+  font-weight: 600;
 }
 
 .case-table {
@@ -486,6 +531,14 @@
     gap: var(--app-space-3);
   }
 
+  .system-status > .ms-lg-auto {
+    margin-left: 0 !important;
+  }
+
+  .prototype-tools {
+    width: 100%;
+  }
+
   .card-header,
   .card-body,
   .tab-pane.card-body {
@@ -533,5 +586,43 @@
 
   .pipeline-grid {
     grid-template-columns: 1fr;
+    gap: var(--app-space-1);
+  }
+
+  .pipeline-step {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name count"
+      "description count";
+    min-height: 0;
+    gap: 0.15rem var(--app-space-3);
+    padding: var(--app-space-2) var(--app-space-3);
+  }
+
+  .pipeline-name {
+    grid-area: name;
+  }
+
+  .pipeline-count {
+    grid-area: count;
+    align-self: center;
+    margin-top: 0;
+  }
+
+  .pipeline-count strong {
+    min-width: 2.5rem;
+    font-size: 1.35rem;
+    text-align: right;
+  }
+
+  .pipeline-count span,
+  .pipeline-action {
+    display: none;
+  }
+
+  .pipeline-description {
+    grid-area: description;
+    margin-top: 0;
   }
 }

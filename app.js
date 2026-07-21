@@ -212,6 +212,7 @@ let statusFilter = "";
 let candidateModal;
 let currentView = "dashboard";
 let renderedDetailId = null;
+let workQueueOnly = false;
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
@@ -224,6 +225,9 @@ const els = {
   totalCount: document.querySelector("#totalCount"),
   pipelineGrid: document.querySelector("#pipelineBoard .pipeline-grid"),
   actionTableBody: document.querySelector("#actionTableBody"),
+  actionQueueSummary: document.querySelector("#actionQueueSummary"),
+  openActionQueueButton: document.querySelector("#openActionQueueButton"),
+  dashboardMentorRegisterLink: document.querySelector("#dashboardMentorRegisterLink"),
   seedButton: document.querySelector("#seedButton"),
   exampleDataMenu: document.querySelector("#exampleDataMenu"),
   resetButton: document.querySelector("#resetButton"),
@@ -232,6 +236,7 @@ const els = {
   cancelNewCaseButton: document.querySelector("#cancelNewCaseButton"),
   candidateForm: document.querySelector("#candidateForm"),
   candidateTableBody: document.querySelector("#candidateTableBody"),
+  mentorListTitle: document.querySelector("#mentorListTitle"),
   mentorListCount: document.querySelector("#mentorListCount"),
   searchInput: document.querySelector("#searchInput"),
   statusFilter: document.querySelector("#statusFilter"),
@@ -454,6 +459,7 @@ function filteredCandidates() {
   const term = searchTerm.trim().toLowerCase();
   return candidates.filter((candidate) => {
     const statusMatches = !statusFilter || candidate.status === statusFilter;
+    const queueMatches = !workQueueOnly || candidateNeedsAction(candidate);
     const text = [
       candidate.caseNumber,
       candidate.name,
@@ -463,14 +469,16 @@ function filteredCandidates() {
       candidate.coordinator,
       candidate.status
     ].join(" ").toLowerCase();
-    return statusMatches && (!term || text.includes(term));
+    return queueMatches && statusMatches && (!term || text.includes(term));
   });
 }
 
 function candidatesNeedingAction() {
-  return candidates.filter((candidate) => {
-    return isBlocked(candidate) || isComplete(candidate) && candidate.status !== "Godkänd/Certifierad";
-  });
+  return candidates.filter(candidateNeedsAction);
+}
+
+function candidateNeedsAction(candidate) {
+  return candidate.status !== "Godkänd/Certifierad";
 }
 
 function isComplete(candidate) {
@@ -514,6 +522,7 @@ function applyRoute() {
   const route = parseRoute();
   currentView = ["dashboard", "mentors", "mentor"].includes(route.view) ? route.view : "dashboard";
   selectedId = currentView === "mentor" ? route.id : selectedId;
+  workQueueOnly = currentView === "mentors" && route.id === "action";
 
   els.dashboardView.hidden = currentView !== "dashboard";
   els.candidatesView.hidden = currentView !== "mentors";
@@ -526,8 +535,9 @@ function applyRoute() {
     els.pageTitle.textContent = "Dashboard";
     els.breadcrumb.textContent = "Start / Dashboard";
   } else if (currentView === "mentors") {
-    els.pageTitle.textContent = "Mentorregister";
-    els.breadcrumb.textContent = "Start / Onboarding / Mentorregister";
+    els.pageTitle.textContent = workQueueOnly ? "Arbetskö" : "Mentorregister";
+    els.breadcrumb.textContent = workQueueOnly ? "Start / Onboarding / Arbetskö" : "Start / Onboarding / Mentorregister";
+    els.mentorListTitle.textContent = workQueueOnly ? "Arbetskö" : "Mentorregister";
   } else {
     els.pageTitle.textContent = "Mentorkort";
     els.breadcrumb.textContent = "Start / Onboarding / Mentorkort";
@@ -553,6 +563,13 @@ function navigateToCandidateListWithStatus(status) {
   renderTable();
 }
 
+function resetMentorFilters() {
+  searchTerm = "";
+  statusFilter = "";
+  els.searchInput.value = "";
+  els.statusFilter.value = "";
+}
+
 function renderSummary() {
   els.totalCount.textContent = candidates.length;
   renderSeedButtonState();
@@ -574,10 +591,10 @@ function renderPipeline() {
 function pipelineDescription(status) {
   return {
     "Anmäld": "Ny intresseanmälan",
-    "Kontrollerad": "Register och referenser",
-    "Utbildning pågår": "E-learning kvar",
-    "Redo för intervju": "Väntar på beslut",
-    "Godkänd/Certifierad": "Aktiv i matchning"
+    "Kontrollerad": "Register och referenser klara",
+    "Utbildning pågår": "Utbildningsmoment återstår",
+    "Redo för intervju": "Intervju ska bokas eller genomföras",
+    "Godkänd/Certifierad": "Tillgänglig för matchning"
   }[status] || "";
 }
 
@@ -592,13 +609,22 @@ function renderSeedButtonState() {
     ? candidates.length
     : null;
   els.seedButton.textContent = size
-    ? `Exempeldata: ${size} ${size === 1 ? "mentor" : "mentorer"}`
-    : "Välj exempeldata";
+    ? `Prototypdata: ${size} ${size === 1 ? "mentor" : "mentorer"}`
+    : "Prototypdata";
 }
 
 function renderDashboard() {
   els.actionTableBody.innerHTML = "";
-  const rows = candidatesNeedingAction().slice(0, 8);
+  const queue = candidatesNeedingAction();
+  const rows = queue.slice(0, 8);
+  els.actionQueueSummary.textContent = queue.length > rows.length
+    ? `Visar ${rows.length} av ${queue.length} ärenden som har ett nästa steg.`
+    : queue.length === 1
+      ? "1 ärende har ett nästa steg."
+      : queue.length > 1
+        ? `${queue.length} ärenden har ett nästa steg.`
+        : "Inga ärenden att hantera.";
+  els.openActionQueueButton.hidden = queue.length === 0;
 
   if (!rows.length) {
     const row = document.createElement("tr");
@@ -612,7 +638,7 @@ function renderDashboard() {
     row.innerHTML = `
       <td><strong>${escapeHtml(candidate.caseNumber)}</strong></td>
       <td>${escapeHtml(candidate.name)}<small>${escapeHtml(candidate.coordinator || "Ej tilldelad")}</small></td>
-      <td><span class="${statusClass(candidate)}">${escapeHtml(candidate.status)}</span></td>
+      <td>${escapeHtml(nextStepText(candidate))}<small>${escapeHtml(candidate.status)}</small></td>
       <td><button type="button" class="btn btn-outline-primary btn-sm" data-open-candidate="${candidate.id}">Öppna</button></td>
     `;
     els.actionTableBody.append(row);
@@ -881,6 +907,19 @@ els.navDashboard.addEventListener("click", (event) => {
 
 els.navCandidates.addEventListener("click", (event) => {
   event.preventDefault();
+  resetMentorFilters();
+  navigateTo("#/mentors");
+});
+
+els.openActionQueueButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  resetMentorFilters();
+  navigateTo("#/mentors/action");
+});
+
+els.dashboardMentorRegisterLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  resetMentorFilters();
   navigateTo("#/mentors");
 });
 
