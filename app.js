@@ -252,9 +252,9 @@ const exampleLastNames = [
 ];
 
 const seedHandlers = [
-  { id: "handler-maja", name: "Maja Ekström", email: "maja.ekstrom@kommun.example", role: "Handläggare", active: true },
-  { id: "handler-jonas", name: "Jonas Berg", email: "jonas.berg@kommun.example", role: "Handläggare", active: true },
-  { id: "handler-sara", name: "Sara Lind", email: "sara.lind@kommun.example", role: "Samordnare", active: true }
+  { id: "handler-maja", userId: "FMU-1001", name: "Maja Ekström", email: "maja.ekstrom@kommun.example", role: "Handläggare", active: true },
+  { id: "handler-jonas", userId: "FMU-1002", name: "Jonas Berg", email: "jonas.berg@kommun.example", role: "Handläggare", active: true },
+  { id: "handler-sara", userId: "FMU-1003", name: "Sara Lind", email: "sara.lind@kommun.example", role: "Samordnare", active: true }
 ];
 
 let db;
@@ -320,6 +320,7 @@ const els = {
   handlerRoleInput: document.querySelector("#handlerRoleInput"),
   handlerActiveInput: document.querySelector("#handlerActiveInput"),
   selectedHandlerName: document.querySelector("#selectedHandlerName"),
+  selectedHandlerUserId: document.querySelector("#selectedHandlerUserId"),
   selectedHandlerStatus: document.querySelector("#selectedHandlerStatus"),
   selectedHandlerRoleMeta: document.querySelector("#selectedHandlerRoleMeta"),
   selectedHandlerCreatedMeta: document.querySelector("#selectedHandlerCreatedMeta"),
@@ -580,15 +581,35 @@ async function migrateDefaultHandlerRecords() {
     "handler-jonas": "Jonas",
     "handler-sara": "Sara"
   };
+  const usedUserIds = new Set();
+  const reservedUserIds = new Set(handlers
+    .map((handler) => String(handler.userId || "").trim().toUpperCase())
+    .filter(Boolean));
+  let nextUserId = 1004;
+  const allocateUserId = () => {
+    let value;
+    do {
+      value = `FMU-${nextUserId}`;
+      nextUserId += 1;
+    } while (usedUserIds.has(value) || reservedUserIds.has(value));
+    return value;
+  };
   const updates = [];
-  for (const handler of handlers) {
+  const orderedHandlers = [...handlers].sort((a, b) => {
+    const aIsDefault = seedHandlers.some((item) => item.id === a.id);
+    const bIsDefault = seedHandlers.some((item) => item.id === b.id);
+    return Number(bIsDefault) - Number(aIsDefault);
+  });
+  for (const handler of orderedHandlers) {
     const template = seedHandlers.find((item) => item.id === handler.id);
-    if (!template) continue;
-    const legacyEmail = `${legacyNames[handler.id]?.toLowerCase()}@kommun.example`;
-    const name = handler.name === legacyNames[handler.id] ? template.name : handler.name;
-    const email = handler.email === legacyEmail ? template.email : handler.email;
-    if (name === handler.name && email === handler.email) continue;
-    Object.assign(handler, { name, email, updatedAt: new Date().toISOString() });
+    const legacyEmail = template ? `${legacyNames[handler.id]?.toLowerCase()}@kommun.example` : "";
+    const name = template && handler.name === legacyNames[handler.id] ? template.name : handler.name;
+    const email = template && handler.email === legacyEmail ? template.email : handler.email;
+    const requestedUserId = template?.userId || String(handler.userId || "").trim().toUpperCase();
+    const userId = requestedUserId && !usedUserIds.has(requestedUserId) ? requestedUserId : allocateUserId();
+    usedUserIds.add(userId);
+    if (name === handler.name && email === handler.email && userId === handler.userId) continue;
+    Object.assign(handler, { name, email, userId, updatedAt: new Date().toISOString() });
     updates.push(saveHandler(handler));
   }
   await Promise.all(updates);
@@ -608,7 +629,7 @@ function renderAll() {
 
 function currentUser() {
   return handlers.find((handler) => handler.id === CURRENT_USER_ID)
-    || { id: CURRENT_USER_ID, name: "Sara Lind", role: "Samordnare" };
+    || { id: CURRENT_USER_ID, userId: "FMU-1003", name: "Sara Lind", role: "Samordnare" };
 }
 
 function currentUserName() {
@@ -628,7 +649,8 @@ function userInitials(name) {
 function renderCurrentUser() {
   const user = currentUser();
   els.currentUserName.textContent = user.name;
-  els.currentUserRole.textContent = user.active === false ? `${user.role} · Inaktiv` : user.role;
+  const status = user.active === false ? " · Inaktiv" : "";
+  els.currentUserRole.textContent = `${user.role} · ${user.userId}${status}`;
   els.currentUserInitials.textContent = userInitials(user.name);
 }
 
@@ -999,7 +1021,7 @@ function renderHandlers() {
     const assignedCount = handlerMentorCount(handler);
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td><strong>${escapeHtml(handler.name)}</strong></td>
+      <td><strong>${escapeHtml(handler.name)}</strong><small>Användar-ID ${escapeHtml(handler.userId)}</small></td>
       <td><a href="mailto:${escapeHtml(handler.email)}">${escapeHtml(handler.email)}</a></td>
       <td>${escapeHtml(handler.role)}</td>
       <td>${assignedCount}</td>
@@ -1033,6 +1055,7 @@ function renderHandlerDetail() {
   els.handlerDetail.hidden = false;
   const assignedCount = handlerMentorCount(handler);
   const status = handler.active ? "Aktiv" : "Inaktiv";
+  els.selectedHandlerUserId.textContent = `Användar-ID ${handler.userId}`;
   els.selectedHandlerName.textContent = handler.name;
   els.selectedHandlerStatus.textContent = status;
   els.selectedHandlerStatus.className = `badge ${handler.active ? "text-bg-success" : "text-bg-secondary"}`;
@@ -1315,6 +1338,14 @@ function randomDigits(length) {
   return String(values[0] % 10 ** length).padStart(length, "0");
 }
 
+function nextHandlerUserId() {
+  const highest = handlers.reduce((max, handler) => {
+    const match = String(handler.userId || "").match(/^FMU-(\d+)$/);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 1000);
+  return `FMU-${highest + 1}`;
+}
+
 function makeExamplePersonalNumber(index) {
   const year = 1970 + index % 30;
   const month = String(index % 12 + 1).padStart(2, "0");
@@ -1561,6 +1592,7 @@ els.handlerForm.addEventListener("submit", async (event) => {
   const now = new Date().toISOString();
   await saveHandler({
     id,
+    userId: existing?.userId || nextHandlerUserId(),
     name,
     email,
     role: els.handlerRoleInput.value,

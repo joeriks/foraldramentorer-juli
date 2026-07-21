@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260721-full-handler-names">
+    <link rel="stylesheet" href="styles.css?v=20260721-visible-user-ids">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -37,7 +37,7 @@
               <div id="currentUserInitials" class="session-user-initials" aria-hidden="true">S</div>
               <div>
                 <div class="session-user-label">Inloggad som</div>
-                <div class="session-user-identity"><strong id="currentUserName">Sara Lind</strong><span id="currentUserRole">Samordnare</span></div>
+                <div class="session-user-identity"><strong id="currentUserName">Sara Lind</strong><span id="currentUserRole">Samordnare · FMU-1003</span></div>
               </div>
             </div>
           </div>
@@ -263,6 +263,7 @@
                 <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start mt-2">
                   <div>
                     <div class="record-type">Handläggarpost</div>
+                    <p id="selectedHandlerUserId" class="record-id mb-1">Användar-ID</p>
                     <h2 id="selectedHandlerName" class="h5 mb-0"></h2>
                   </div>
                   <div class="record-actions d-flex flex-wrap gap-2 justify-content-end align-items-center">
@@ -628,6 +629,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260721-full-handler-names"></script>
+    <script src="app.js?v=20260721-visible-user-ids"></script>
   </body>
 </html>

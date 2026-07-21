@@ -181,6 +181,7 @@
 
 .session-user-identity {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: var(--app-space-2);
   line-height: 1.25;
