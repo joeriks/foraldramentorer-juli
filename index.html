@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260716-edit-mode">
+    <link rel="stylesheet" href="styles.css?v=20260721-trust-polish">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -18,11 +18,11 @@
         <nav class="nav nav-pills flex-column gap-1 p-2">
           <a id="navDashboard" class="nav-link" href="#/dashboard">Dashboard</a>
           <a id="navCandidates" class="nav-link" href="#/mentors">Mentorer</a>
-          <a class="nav-link disabled" href="#" aria-disabled="true">Matchningar</a>
-          <a class="nav-link disabled" href="#" aria-disabled="true">Uppdrag</a>
-          <a class="nav-link disabled" href="#" aria-disabled="true">Arvoden</a>
-          <a class="nav-link disabled" href="#" aria-disabled="true">Statistik</a>
-          <a class="nav-link disabled" href="#" aria-disabled="true">Administration</a>
+          <span class="nav-link disabled" aria-disabled="true"><span>Matchningar</span><small>Kommer senare</small></span>
+          <span class="nav-link disabled" aria-disabled="true"><span>Uppdrag</span><small>Kommer senare</small></span>
+          <span class="nav-link disabled" aria-disabled="true"><span>Arvoden</span><small>Kommer senare</small></span>
+          <span class="nav-link disabled" aria-disabled="true"><span>Statistik</span><small>Kommer senare</small></span>
+          <span class="nav-link disabled" aria-disabled="true"><span>Administration</span><small>Kommer senare</small></span>
         </nav>
       </aside>
 
@@ -40,13 +40,23 @@
           </div>
         </header>
 
+        <div class="system-status border-bottom px-4 py-2" role="status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <strong>Kommunportal</strong>
+          <span aria-hidden="true">·</span>
+          <span>Prototypmiljö</span>
+          <span aria-hidden="true">·</span>
+          <span>Data sparas lokalt i den här webbläsaren</span>
+          <span class="ms-lg-auto" id="saveStatus">Lokal lagring aktiv</span>
+        </div>
+
         <main class="p-3 p-lg-4">
           <section id="dashboardView">
             <section class="card mb-3">
               <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
                 <div>
                   <h2 class="h5 mb-1">Mentorernas tidslinje</h2>
-                  <p class="text-secondary mb-0">Översikt över var mentorskandidaterna befinner sig i certifieringsflödet.</p>
+                  <p class="text-secondary mb-0">Översikt över var mentorerna befinner sig i introduktionsflödet.</p>
                 </div>
                 <div class="text-secondary small">
                   Totalt <strong id="totalCount">0</strong> personer
@@ -94,7 +104,7 @@
                   <div class="card-header bg-white d-flex justify-content-between align-items-start gap-2">
                     <div>
                       <h2 class="h5 mb-1">Att hantera</h2>
-                      <p class="text-secondary mb-0">Mentorskandidater som behöver handläggning.</p>
+                      <p class="text-secondary mb-0">Mentorer som behöver handläggning.</p>
                     </div>
                     <a class="btn btn-outline-primary btn-sm" href="#/mentors">Öppna listan</a>
                   </div>
@@ -193,6 +203,7 @@
                     <p id="selectedCaseId" class="small fw-semibold text-secondary mt-2 mb-1"></p>
                     <h2 id="selectedName" class="h5 mb-1"></h2>
                     <p id="selectedMeta" class="text-secondary mb-0"></p>
+                    <p id="selectedUpdated" class="small text-secondary mt-2 mb-0"></p>
                   </div>
                   <div class="d-flex flex-wrap gap-2 justify-content-end">
                     <span id="selectedStatus" class="badge text-bg-secondary">Anmäld</span>
@@ -233,7 +244,7 @@
                   </div>
                   <div class="row g-2 mb-3">
                     <div class="col-md-6">
-                      <label class="form-label" for="statusSelect">Pipeline-status</label>
+                      <label class="form-label" for="statusSelect">Status i introduktionen</label>
                       <select id="statusSelect" class="form-select form-select-sm"></select>
                     </div>
                     <div class="col-md-6">
@@ -336,6 +347,15 @@
       </div>
     </div>
 
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" aria-live="polite" aria-atomic="true">
+      <div id="feedbackToast" class="toast border-0 shadow" role="status" aria-live="polite" aria-atomic="true">
+        <div class="d-flex">
+          <div id="feedbackToastBody" class="toast-body"></div>
+          <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Stäng"></button>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="candidateModal" tabindex="-1" aria-labelledby="candidateModalTitle" aria-hidden="true">
       <div class="modal-dialog">
         <form id="candidateForm" class="modal-content">
@@ -372,6 +392,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260716-edit-mode"></script>
+    <script src="app.js?v=20260721-trust-polish"></script>
   </body>
 </html>

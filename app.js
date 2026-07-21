@@ -210,6 +210,7 @@ const els = {
   selectedStatus: document.querySelector("#selectedStatus"),
   selectedName: document.querySelector("#selectedName"),
   selectedMeta: document.querySelector("#selectedMeta"),
+  selectedUpdated: document.querySelector("#selectedUpdated"),
   editPersonButton: document.querySelector("#editPersonButton"),
   personEditActions: document.querySelector("#personEditActions"),
   personReadView: document.querySelector("#personReadView"),
@@ -232,8 +233,24 @@ const els = {
   decisionHint: document.querySelector("#decisionHint"),
   approveButton: document.querySelector("#approveButton"),
   deleteButton: document.querySelector("#deleteButton"),
-  auditLog: document.querySelector("#auditLog")
+  auditLog: document.querySelector("#auditLog"),
+  saveStatus: document.querySelector("#saveStatus"),
+  feedbackToast: document.querySelector("#feedbackToast"),
+  feedbackToastBody: document.querySelector("#feedbackToastBody")
 };
+
+function markSaved() {
+  const time = new Intl.DateTimeFormat("sv-SE", {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date());
+  els.saveStatus.textContent = `Senast sparad ${time}`;
+}
+
+function showFeedback(message) {
+  els.feedbackToastBody.textContent = message;
+  bootstrap.Toast.getOrCreateInstance(els.feedbackToast, { delay: 3200 }).show();
+}
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -482,7 +499,7 @@ function renderDashboard() {
 
   if (!rows.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="4" class="text-secondary">Inga mentorskandidater kräver åtgärd just nu.</td>`;
+    row.innerHTML = `<td colspan="4" class="text-secondary">Inga mentorer kräver åtgärd just nu.</td>`;
     els.actionTableBody.append(row);
     return;
   }
@@ -541,6 +558,7 @@ function renderDetail() {
   els.selectedCaseId.textContent = `Ärende ${candidate.caseNumber}`;
   els.selectedName.textContent = candidate.name;
   els.selectedMeta.textContent = `${candidate.area} · ${candidate.languages} · ${candidate.availability}`;
+  els.selectedUpdated.textContent = `Senast ändrad ${formatDateTime(candidate.updatedAt || candidate.createdAt)}`;
   els.selectedStatus.textContent = candidate.status;
   els.selectedStatus.className = statusClass(candidate);
   els.nameFact.textContent = candidate.name;
@@ -579,7 +597,7 @@ function renderDetail() {
   const complete = isComplete(candidate);
   els.approveButton.disabled = !complete;
   els.decisionHint.textContent = complete
-    ? "Mentorskandidaten uppfyller samtliga krav och kan certifieras."
+    ? "Mentorn uppfyller samtliga krav och kan certifieras."
     : "Alla kontroller, utbildningsmoment och intervjun måste vara klara innan certifiering.";
 
   els.auditLog.innerHTML = "";
@@ -628,6 +646,7 @@ async function updateSelected(patch, logText) {
     updated.history = [...(candidate.history || []), { at: updated.updatedAt, text: logText }];
   }
   await saveCandidate(updated);
+  markSaved();
   await refresh();
 }
 
@@ -750,6 +769,8 @@ els.candidateForm.addEventListener("submit", async (event) => {
   selectedId = candidate.id;
   els.candidateForm.reset();
   candidateModal.hide();
+  markSaved();
+  showFeedback("Mentorn har registrerats.");
   await refresh();
   navigateToCandidate(candidate.id);
 });
@@ -789,6 +810,7 @@ els.personEditForm.addEventListener("submit", async (event) => {
     availability: els.editAvailabilityInput.value.trim()
   }, "Grunduppgifter uppdaterade");
   setPersonEditMode(false);
+  showFeedback("Grunduppgifterna har sparats.");
 });
 els.interviewDateInput.addEventListener("change", () => updateSelected({ interviewDate: els.interviewDateInput.value }, "Intervjutid uppdaterad"));
 els.interviewModeInput.addEventListener("change", () => updateSelected({ interviewMode: els.interviewModeInput.value }, "Intervjuform uppdaterad"));
@@ -811,13 +833,18 @@ els.approveButton.addEventListener("click", async () => {
   const candidate = selectedCandidate();
   if (!candidate || !isComplete(candidate)) return;
   await updateSelected({ status: "Godkänd/Certifierad" }, "Mentor godkänd och certifierad");
+  showFeedback("Mentorn är godkänd och certifierad.");
 });
 
 els.deleteButton.addEventListener("click", async () => {
   const candidate = selectedCandidate();
   if (!candidate) return;
+  const confirmed = window.confirm(`Ta bort ${candidate.name} och hela ärendet ${candidate.caseNumber}? Åtgärden kan inte ångras.`);
+  if (!confirmed) return;
   await deleteCandidate(candidate.id);
   selectedId = null;
+  markSaved();
+  showFeedback("Mentorn och ärendet har tagits bort.");
   await refresh();
   window.location.hash = "#/mentors";
 });
@@ -844,12 +871,18 @@ els.seedButton.addEventListener("click", async () => {
       updatedAt: now
     });
   }
+  markSaved();
+  showFeedback("Åtta exempelmentorer har lagts till.");
   await refresh();
 });
 
 els.resetButton.addEventListener("click", async () => {
+  const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata i den här webbläsaren? Åtgärden kan inte ångras.");
+  if (!confirmed) return;
   await clearCandidates();
   selectedId = null;
+  markSaved();
+  showFeedback("Den lokala prototypdatan har nollställts.");
   await refresh();
 });
 
