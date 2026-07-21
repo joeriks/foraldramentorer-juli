@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260721-dashboard-ux">
+    <link rel="stylesheet" href="styles.css?v=20260721-guided-next-action">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -92,7 +92,7 @@
                   <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Redo för intervju">
                     <div class="pipeline-name fw-semibold">Redo för intervju</div>
                     <div class="pipeline-count"><strong data-pipeline-count="Redo för intervju">0</strong><span>personer</span></div>
-                    <div class="pipeline-description">Intervju ska bokas eller genomföras</div>
+                    <div class="pipeline-description">Intervju eller beslut återstår</div>
                     <div class="pipeline-action">Visa mentorer</div>
                   </button>
                   <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Godkänd/Certifierad">
@@ -235,6 +235,15 @@
                 </dl>
               </div>
 
+              <div id="nextActionBar" class="next-action-bar">
+                <div role="status" aria-live="polite">
+                  <div class="next-action-label">Nästa åtgärd</div>
+                  <strong id="nextActionTitle"></strong>
+                  <span id="nextActionDescription" class="next-action-description"></span>
+                </div>
+                <button id="openNextActionButton" type="button" class="btn btn-primary btn-sm">Öppna arbetsmoment</button>
+              </div>
+
               <ul class="detail-tabs nav nav-tabs" role="tablist" aria-label="Mentorkort">
                 <li class="nav-item" role="presentation">
                   <button class="nav-link active" id="mentor-base-tab" data-bs-toggle="tab" data-bs-target="#mentor-base-pane" type="button" role="tab" aria-controls="mentor-base-pane" aria-selected="true">Grunduppgifter</button>
@@ -319,6 +328,10 @@
                   </div>
                   <label class="form-label" for="notesInput">Intervjuprotokoll</label>
                   <textarea id="notesInput" class="form-control form-control-sm" rows="6" placeholder="Kort bedömning, styrkor, frågor att följa upp."></textarea>
+                  <div id="interviewCompletion" class="interview-completion form-check border rounded mt-3">
+                    <input id="interviewDoneInput" class="form-check-input" type="checkbox">
+                    <label class="form-check-label" for="interviewDoneInput">Intervju genomförd</label>
+                  </div>
                 </section>
 
                 <section class="tab-pane fade card-body" id="mentor-decision-pane" role="tabpanel" aria-labelledby="mentor-decision-tab" tabindex="0">
@@ -394,6 +407,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260721-dashboard-ux"></script>
+    <script src="app.js?v=20260721-guided-next-action"></script>
   </body>
 </html>

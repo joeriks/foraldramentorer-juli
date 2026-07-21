@@ -19,6 +19,51 @@ const CHECKS = [
   ["interviewDone", "Intervju genomförd"]
 ];
 
+const NEXT_ACTIONS = [
+  {
+    key: "identityVerified",
+    label: "Verifiera identitet",
+    description: "Kontrollera personens identitet och markera kontrollen som klar.",
+    tabId: "mentor-checks-tab",
+    buttonLabel: "Öppna kontroller"
+  },
+  {
+    key: "registryChecked",
+    label: "Granska belastningsregister",
+    description: "Granska registerutdraget och markera kontrollen som klar.",
+    tabId: "mentor-checks-tab",
+    buttonLabel: "Öppna kontroller"
+  },
+  {
+    key: "referencesDone",
+    label: "Slutför referenser",
+    description: "Dokumentera att referenserna är färdiga.",
+    tabId: "mentor-checks-tab",
+    buttonLabel: "Öppna kontroller"
+  },
+  {
+    key: "trainingDone",
+    label: "Slutför e-learning",
+    description: "Följ upp utbildningen och markera momentet som klart.",
+    tabId: "mentor-checks-tab",
+    buttonLabel: "Öppna kontroller"
+  },
+  {
+    key: "quizDone",
+    label: "Genomför kunskapsavstämning",
+    description: "Genomför avstämningen och markera momentet som klart.",
+    tabId: "mentor-checks-tab",
+    buttonLabel: "Öppna kontroller"
+  },
+  {
+    key: "interviewDone",
+    label: "Genomför intervju",
+    description: "Boka eller dokumentera intervjun innan ärendet går till beslut.",
+    tabId: "mentor-interview-tab",
+    buttonLabel: "Öppna intervju"
+  }
+];
+
 const seedCandidates = [
   {
     name: "Anna Lind",
@@ -213,6 +258,7 @@ let candidateModal;
 let currentView = "dashboard";
 let renderedDetailId = null;
 let workQueueOnly = false;
+let pendingNextActionId = null;
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
@@ -242,6 +288,10 @@ const els = {
   statusFilter: document.querySelector("#statusFilter"),
   detailEmpty: document.querySelector("#detailEmpty"),
   candidateDetail: document.querySelector("#candidateDetail"),
+  nextActionBar: document.querySelector("#nextActionBar"),
+  nextActionTitle: document.querySelector("#nextActionTitle"),
+  nextActionDescription: document.querySelector("#nextActionDescription"),
+  openNextActionButton: document.querySelector("#openNextActionButton"),
   selectedCaseId: document.querySelector("#selectedCaseId"),
   selectedStatus: document.querySelector("#selectedStatus"),
   selectedName: document.querySelector("#selectedName"),
@@ -273,6 +323,8 @@ const els = {
   interviewDateInput: document.querySelector("#interviewDateInput"),
   interviewModeInput: document.querySelector("#interviewModeInput"),
   notesInput: document.querySelector("#notesInput"),
+  interviewCompletion: document.querySelector("#interviewCompletion"),
+  interviewDoneInput: document.querySelector("#interviewDoneInput"),
   decisionHint: document.querySelector("#decisionHint"),
   approveButton: document.querySelector("#approveButton"),
   deleteButton: document.querySelector("#deleteButton"),
@@ -490,17 +542,28 @@ function isBlocked(candidate) {
 }
 
 function nextStepText(candidate) {
-  if (candidate.status === "Godkänd/Certifierad") return "Aktiv för matchning";
-  const nextSteps = [
-    ["identityVerified", "Verifiera identitet"],
-    ["registryChecked", "Granska belastningsregister"],
-    ["referencesDone", "Slutför referenser"],
-    ["trainingDone", "Slutför e-learning"],
-    ["quizDone", "Genomför kunskapsavstämning"],
-    ["interviewDone", "Genomför intervju"]
-  ];
-  const next = nextSteps.find(([key]) => !candidate.checks?.[key]);
-  return next?.[1] || "Fatta beslut";
+  return nextActionFor(candidate).label;
+}
+
+function nextActionFor(candidate) {
+  if (candidate.status === "Godkänd/Certifierad") {
+    return {
+      key: null,
+      label: "Ingen åtgärd",
+      description: "Mentorn är certifierad och tillgänglig för matchning.",
+      tabId: null,
+      buttonLabel: ""
+    };
+  }
+
+  const next = NEXT_ACTIONS.find((action) => !candidate.checks?.[action.key]);
+  return next || {
+    key: "decision",
+    label: "Fatta beslut",
+    description: "Alla krav är klara. Granska underlaget och certifiera mentorn.",
+    tabId: "mentor-decision-tab",
+    buttonLabel: "Öppna beslut"
+  };
 }
 
 function parseRoute() {
@@ -593,7 +656,7 @@ function pipelineDescription(status) {
     "Anmäld": "Ny intresseanmälan",
     "Kontrollerad": "Register och referenser klara",
     "Utbildning pågår": "Utbildningsmoment återstår",
-    "Redo för intervju": "Intervju ska bokas eller genomföras",
+    "Redo för intervju": "Intervju eller beslut återstår",
     "Godkänd/Certifierad": "Tillgänglig för matchning"
   }[status] || "";
 }
@@ -705,8 +768,18 @@ function renderDetail() {
   els.areaFact.textContent = candidate.area;
   els.statusFact.textContent = candidate.status;
   els.coordinatorFact.textContent = candidate.coordinator || "Ej tilldelad";
-  els.nextStepFact.textContent = nextStepText(candidate);
-  els.nextStepEditFact.textContent = nextStepText(candidate);
+  const nextAction = nextActionFor(candidate);
+  els.nextStepFact.textContent = nextAction.label;
+  els.nextStepEditFact.textContent = nextAction.label;
+  els.nextActionTitle.textContent = nextAction.label;
+  els.nextActionDescription.textContent = nextAction.description;
+  els.openNextActionButton.textContent = nextAction.buttonLabel;
+  els.openNextActionButton.hidden = !nextAction.tabId;
+  els.nextActionBar.classList.toggle("complete", !nextAction.tabId);
+  document.querySelectorAll(".detail-tabs .nav-link").forEach((tab) => tab.classList.remove("next-action-tab"));
+  if (nextAction.tabId) {
+    document.querySelector(`#${nextAction.tabId}`)?.classList.add("next-action-tab");
+  }
   const completedChecks = CHECKS.filter(([key]) => candidate.checks?.[key]).length;
   els.checksTabCount.textContent = `${completedChecks}/${CHECKS.length}`;
   els.logTabCount.textContent = candidate.history.length;
@@ -725,15 +798,19 @@ function renderDetail() {
   els.interviewDateInput.value = candidate.interviewDate || "";
   els.interviewModeInput.value = candidate.interviewMode || "";
   els.notesInput.value = candidate.notes || "";
+  els.interviewDoneInput.checked = Boolean(candidate.checks?.interviewDone);
+  els.interviewCompletion.classList.toggle("next-required", nextAction.key === "interviewDone");
   els.checklist.innerHTML = "";
 
   for (const [key, label] of CHECKS) {
     const column = document.createElement("div");
     column.className = "col-md-6";
+    const isNextAction = nextAction.key === key;
     column.innerHTML = `
-      <label class="form-check border rounded p-2 h-100">
+      <label class="form-check border rounded p-2 h-100 ${isNextAction ? "next-required" : ""}">
         <input class="form-check-input ms-0 me-2" type="checkbox" data-check="${key}" ${candidate.checks?.[key] ? "checked" : ""}>
         <span class="form-check-label">${label}</span>
+        ${isNextAction ? '<span class="next-required-marker">Nästa åtgärd</span>' : ""}
       </label>
     `;
     els.checklist.append(column);
@@ -755,6 +832,11 @@ function renderDetail() {
       <td>${escapeHtml(actor)}</td>
     `;
     els.auditLog.append(row);
+  }
+
+  if (pendingNextActionId === candidate.id) {
+    pendingNextActionId = null;
+    requestAnimationFrame(() => showNextAction(candidate));
   }
 }
 
@@ -784,6 +866,24 @@ function showDefaultMentorTab() {
   if (window.bootstrap && tab) {
     bootstrap.Tab.getOrCreateInstance(tab).show();
   }
+}
+
+function showNextAction(candidate) {
+  const action = nextActionFor(candidate);
+  if (!action.tabId) return;
+  const tabElement = document.querySelector(`#${action.tabId}`);
+  if (!tabElement || !window.bootstrap) return;
+  bootstrap.Tab.getOrCreateInstance(tabElement).show();
+
+  requestAnimationFrame(() => {
+    const target = action.key === "decision"
+      ? els.approveButton
+      : action.key === "interviewDone"
+        ? els.interviewDateInput.value ? els.interviewDoneInput : els.interviewDateInput
+        : els.checklist.querySelector(`[data-check="${cssEscape(action.key)}"]`);
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    target?.focus({ preventScroll: true });
+  });
 }
 
 async function updateSelected(patch, logText) {
@@ -956,6 +1056,7 @@ els.statusFilter.addEventListener("change", () => {
 els.actionTableBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-candidate]");
   if (!button) return;
+  pendingNextActionId = button.dataset.openCandidate;
   navigateToCandidate(button.dataset.openCandidate);
 });
 
@@ -963,6 +1064,11 @@ els.pipelineGrid.addEventListener("click", (event) => {
   const button = event.target.closest("[data-pipeline-status]");
   if (!button) return;
   navigateToCandidateListWithStatus(button.dataset.pipelineStatus);
+});
+
+els.openNextActionButton.addEventListener("click", () => {
+  const candidate = selectedCandidate();
+  if (candidate) showNextAction(candidate);
 });
 
 els.editPersonButton.addEventListener("click", () => setPersonEditMode(true));
@@ -984,18 +1090,25 @@ els.interviewDateInput.addEventListener("change", () => updateSelected({ intervi
 els.interviewModeInput.addEventListener("change", () => updateSelected({ interviewMode: els.interviewModeInput.value }, "Intervjuform uppdaterad"));
 els.notesInput.addEventListener("change", () => updateSelected({ notes: els.notesInput.value.trim() }, "Intervjuprotokoll uppdaterat"));
 
-els.checklist.addEventListener("change", async (event) => {
-  const input = event.target.closest("input[data-check]");
+async function updateCandidateCheck(key, checked) {
   const candidate = selectedCandidate();
-  if (!input || !candidate) return;
-  const checks = { ...candidate.checks, [input.dataset.check]: input.checked };
+  if (!candidate) return;
+  const checks = { ...candidate.checks, [key]: checked };
   let status = candidate.status;
   if (isComplete({ ...candidate, checks }) && status !== "Godkänd/Certifierad") {
     status = "Redo för intervju";
   }
-  const label = CHECKS.find(([key]) => key === input.dataset.check)?.[1] || "Kontroll";
-  await updateSelected({ checks, status }, `${label}: ${input.checked ? "klar" : "ej klar"}`);
+  const label = CHECKS.find(([checkKey]) => checkKey === key)?.[1] || "Kontroll";
+  await updateSelected({ checks, status }, `${label}: ${checked ? "klar" : "ej klar"}`);
+}
+
+els.checklist.addEventListener("change", async (event) => {
+  const input = event.target.closest("input[data-check]");
+  if (!input) return;
+  await updateCandidateCheck(input.dataset.check, input.checked);
 });
+
+els.interviewDoneInput.addEventListener("change", () => updateCandidateCheck("interviewDone", els.interviewDoneInput.checked));
 
 els.approveButton.addEventListener("click", async () => {
   const candidate = selectedCandidate();
