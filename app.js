@@ -523,7 +523,7 @@ function replaceCandidates(nextCandidates) {
 }
 
 function exampleTemplates(count) {
-  if (count === 1) return seedCandidates.slice(0, 1);
+  if (count === 1) return seedCandidates.slice(3, 4);
   if (count === 10) return seedCandidates10;
 
   return Array.from({ length: count }, (_, index) => {
@@ -554,7 +554,7 @@ function buildExampleDataset(count) {
       identityVerifiedAt: identityVerified ? now : "",
       identityVerifiedBy: identityVerified ? "Sara Lind" : "",
       exampleData: true,
-      exampleDataVersion: 2,
+      exampleDataVersion: 3,
       exampleDatasetSize: count,
       caseNumber: makeCaseNumber(id),
       history: [
@@ -573,11 +573,38 @@ async function refresh() {
   handlers.sort((a, b) => a.name.localeCompare(b.name, "sv"));
   candidates = await getAllCandidates();
   candidates = candidates.map(normalizeCandidate);
+  await migrateSingleExampleMentor();
   await migrateExampleCoordinatorDistribution();
   await migrateCoordinatorReferences();
   await ensureUniqueCaseNumbers();
   candidates.sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.name.localeCompare(b.name, "sv"));
   renderAll();
+}
+
+async function migrateSingleExampleMentor() {
+  if (candidates.length !== 1) return;
+  const candidate = candidates[0];
+  if (candidate.exampleData !== true || candidate.exampleDatasetSize !== 1 || candidate.name !== "Anna Lind") return;
+  const template = seedCandidates[3];
+  const now = new Date().toISOString();
+  Object.assign(candidate, {
+    ...template,
+    id: candidate.id,
+    caseNumber: candidate.caseNumber,
+    personalNumber: candidate.personalNumber,
+    coordinatorId: "",
+    coordinator: "",
+    identityMethod: "",
+    identityVerifiedAt: "",
+    identityVerifiedBy: "",
+    exampleData: true,
+    exampleDataVersion: 3,
+    exampleDatasetSize: 1,
+    createdAt: candidate.createdAt,
+    updatedAt: now,
+    history: [...(candidate.history || []), { at: now, text: "Exempelpost uppdaterad till Karin Nyström", actor: "System" }]
+  });
+  await saveCandidate(candidate);
 }
 
 async function migrateExampleCoordinatorDistribution() {
