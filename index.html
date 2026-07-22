@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260722-flow-guards">
+    <link rel="stylesheet" href="styles.css?v=20260722-shortcuts-height">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -141,12 +141,12 @@
               </section>
 
               <section class="col-xl-5">
-                <div class="card h-100">
+                <div class="card dashboard-shortcuts-card">
                   <div class="card-header bg-white">
                     <h2 class="h5 mb-1">Snabbvägar</h2>
                     <p class="text-secondary mb-0">Vanliga arbetsmoment.</p>
                   </div>
-                  <div class="card-body d-grid gap-2">
+                  <div class="card-body d-flex flex-column gap-2">
                     <button id="dashboardNewCaseButton" type="button" class="btn btn-primary">Registrera mentor</button>
                     <a id="dashboardMentorRegisterLink" class="btn btn-outline-secondary" href="#/mentors">Öppna mentorregistret</a>
                     <button type="button" class="btn btn-outline-secondary" disabled>Exportera beslutsunderlag (kommer senare)</button>
@@ -275,7 +275,7 @@
                         <button id="cancelHandlerEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
                       </div>
                     </div>
-                    <div class="dropdown">
+                    <div id="recordMoreActions" class="dropdown">
                       <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Fler åtgärder</button>
                       <ul class="dropdown-menu dropdown-menu-end">
                         <li><button id="toggleSelectedHandlerButton" type="button" class="dropdown-item">Inaktivera handläggare</button></li>
@@ -383,7 +383,7 @@
                   <button class="nav-link" id="mentor-checks-tab" data-bs-toggle="tab" data-bs-target="#mentor-checks-pane" type="button" role="tab" aria-controls="mentor-checks-pane" aria-selected="false">Kontroller <span id="checksTabCount" class="tab-count">0/6</span></button>
                 </li>
                 <li class="nav-item" role="presentation">
-                  <button class="nav-link" id="mentor-interview-tab" data-bs-toggle="tab" data-bs-target="#mentor-interview-pane" type="button" role="tab" aria-controls="mentor-interview-pane" aria-selected="false">Intervju</button>
+                  <button class="nav-link" id="mentor-interview-tab" data-bs-toggle="tab" data-bs-target="#mentor-interview-pane" type="button" role="tab" aria-controls="mentor-interview-pane" aria-selected="false">Möten <span id="meetingsTabCount" class="tab-count">0</span></button>
                 </li>
                 <li class="nav-item" role="presentation">
                   <button class="nav-link" id="mentor-decision-tab" data-bs-toggle="tab" data-bs-target="#mentor-decision-pane" type="button" role="tab" aria-controls="mentor-decision-pane" aria-selected="false">Beslut</button>
@@ -457,9 +457,15 @@
                         <h4 class="h6 mb-1">Identitetsverifiering</h4>
                         <p class="small text-secondary mb-0">Registrera endast testuppgifter i prototypmiljön.</p>
                       </div>
-                      <span id="identityVerificationStatus" class="badge text-bg-warning">Ej verifierad</span>
+                      <div class="d-flex flex-wrap gap-2 justify-content-end align-items-center">
+                        <button id="editIdentityVerificationButton" type="button" class="btn btn-outline-primary btn-sm" hidden>Redigera</button>
+                      </div>
                     </div>
-                    <div class="row g-3">
+                    <dl id="identityReadView" class="record-fields mb-0" hidden>
+                      <div><dt>Personnummer</dt><dd id="identityPersonalNumberFact"></dd></div>
+                      <div><dt>Verifieringssätt</dt><dd id="identityMethodCheckFact"></dd></div>
+                    </dl>
+                    <div id="identityEditView" class="row g-3">
                       <div class="col-md-6">
                         <label class="form-label" for="identityPersonalNumberInput">Personnummer</label>
                         <input id="identityPersonalNumberInput" class="form-control form-control-sm" required inputmode="numeric" autocomplete="off" placeholder="ÅÅÅÅMMDD-XXXX" pattern="(19|20)[0-9]{6}-?[0-9]{4}">
@@ -477,9 +483,11 @@
                     <dl id="identityVerificationMeta" class="identity-meta mt-3 mb-0" hidden>
                       <div><dt>Verifierad</dt><dd id="identityVerifiedAtFact"></dd></div>
                       <div><dt>Verifierad av</dt><dd id="identityVerifiedByFact"></dd></div>
+                      <div><dt>Notering</dt><dd id="identityNoteFact"></dd></div>
                     </dl>
-                    <div class="d-flex justify-content-end mt-3">
-                      <button id="saveIdentityVerificationButton" type="button" class="btn btn-primary btn-sm">Registrera verifiering</button>
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                      <button id="cancelIdentityVerificationButton" type="button" class="btn btn-outline-secondary btn-sm" hidden>Avbryt</button>
+                      <button id="saveIdentityVerificationButton" type="button" class="btn btn-primary btn-sm">Registrera identitet</button>
                     </div>
                   </section>
                   <h4 class="record-section-title">Övriga kontroller</h4>
@@ -487,7 +495,12 @@
                 </section>
 
                 <section class="tab-pane fade card-body" id="mentor-interview-pane" role="tabpanel" aria-labelledby="mentor-interview-tab" tabindex="0">
-                  <h3 class="h6">Intervju</h3>
+                  <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
+                    <div>
+                      <h3 class="h6 mb-1">Certifieringsintervju</h3>
+                      <p class="small text-secondary mb-3">Den här delen styr kravet i certifieringsflödet. Protokoll och andra anteckningar registreras i mötesjournalen nedan.</p>
+                    </div>
+                  </div>
                   <div class="row g-3 mb-3">
                     <div class="col-md-6">
                       <label class="form-label" for="interviewDateInput">Intervjutid</label>
@@ -503,12 +516,78 @@
                       </select>
                     </div>
                   </div>
-                  <label class="form-label" for="notesInput">Intervjuprotokoll</label>
-                  <textarea id="notesInput" class="form-control form-control-sm" rows="6" placeholder="Kort bedömning, styrkor, frågor att följa upp."></textarea>
                   <div id="interviewCompletion" class="interview-completion form-check border rounded mt-3">
                     <input id="interviewDoneInput" class="form-check-input" type="checkbox">
-                    <label class="form-check-label" for="interviewDoneInput">Intervju genomförd</label>
+                    <label class="form-check-label" for="interviewDoneInput">
+                      <span>Intervju genomförd</span>
+                      <span id="interviewDoneMeta" class="check-row-meta d-block">Ej klar</span>
+                    </label>
                   </div>
+
+                  <section class="record-section mt-4">
+                    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+                      <div>
+                        <h3 class="h6 mb-1">Mötesanteckningar</h3>
+                        <p class="small text-secondary mb-0">Intervjuer, uppföljningar och andra möten med mentorn.</p>
+                      </div>
+                      <button id="newMeetingButton" type="button" class="btn btn-primary btn-sm">Registrera möte</button>
+                    </div>
+
+                    <form id="meetingForm" class="meeting-form border rounded mb-3" hidden>
+                      <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+                        <h4 id="meetingFormTitle" class="h6 mb-0">Nytt möte</h4>
+                        <button id="cancelMeetingButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                      </div>
+                      <div class="row g-3">
+                        <div class="col-md-4">
+                          <label class="form-label" for="meetingTypeInput">Mötestyp</label>
+                          <select id="meetingTypeInput" class="form-select form-select-sm" required>
+                            <option value="">Välj mötestyp</option>
+                            <option>Certifieringsintervju</option>
+                            <option>Uppföljning</option>
+                            <option>Avstämning</option>
+                            <option>Övrig kontakt</option>
+                            <option>Annat möte</option>
+                          </select>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label" for="meetingDateInput">Datum och tid</label>
+                          <input id="meetingDateInput" class="form-control form-control-sm" type="datetime-local" required>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label" for="meetingModeInput">Mötesform</label>
+                          <select id="meetingModeInput" class="form-select form-select-sm" required>
+                            <option value="">Välj mötesform</option>
+                            <option>Fysiskt möte</option>
+                            <option>Digitalt möte</option>
+                            <option>Telefon</option>
+                          </select>
+                        </div>
+                        <div class="col-12">
+                          <label class="form-label" for="meetingSummaryInput">Anteckning</label>
+                          <textarea id="meetingSummaryInput" class="form-control form-control-sm" rows="4" required placeholder="Kort sammanfattning av mötet."></textarea>
+                        </div>
+                        <div class="col-12">
+                          <label class="form-label" for="meetingNextStepInput">Nästa steg <span class="text-secondary fw-normal">(valfritt)</span></label>
+                          <input id="meetingNextStepInput" class="form-control form-control-sm" autocomplete="off" placeholder="Exempel: boka uppföljning om tre månader">
+                        </div>
+                      </div>
+                      <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mt-3">
+                        <button id="deleteMeetingButton" type="button" class="btn btn-outline-danger btn-sm" hidden>Ta bort</button>
+                        <button type="submit" class="btn btn-primary btn-sm ms-auto">Spara möte</button>
+                      </div>
+                    </form>
+
+                    <div id="meetingsEmpty" class="empty-list border rounded text-secondary">Inga möten har registrerats.</div>
+                    <div id="meetingsTableWrap" class="table-responsive border rounded" hidden>
+                      <table class="table table-sm align-middle mb-0 meeting-table">
+                        <thead class="table-light">
+                          <tr><th>Datum</th><th>Mötestyp</th><th>Anteckning</th><th>Registrerad av</th><th><span class="visually-hidden">Åtgärd</span></th></tr>
+                        </thead>
+                        <tbody id="meetingsTableBody"></tbody>
+                      </table>
+                    </div>
+                  </section>
                 </section>
 
                 <section class="tab-pane fade card-body" id="mentor-decision-pane" role="tabpanel" aria-labelledby="mentor-decision-tab" tabindex="0">
@@ -631,7 +710,37 @@
       </div>
     </div>
 
+    <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-labelledby="confirmActionTitle" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content confirm-action-modal">
+          <div class="modal-header">
+            <div>
+              <p id="confirmActionEyebrow" class="modal-eyebrow mb-1">Bekräfta ändring</p>
+              <h2 id="confirmActionTitle" class="modal-title h5">Bekräfta åtgärd</h2>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button>
+          </div>
+          <div class="modal-body">
+            <p id="confirmActionBody" class="mb-3"></p>
+            <dl class="confirm-action-facts mb-0">
+              <div><dt>Mentor</dt><dd id="confirmActionMentor"></dd></div>
+              <div><dt>Registreras av</dt><dd id="confirmActionActor"></dd></div>
+              <div><dt>Tidpunkt</dt><dd id="confirmActionTime"></dd></div>
+            </dl>
+            <div class="mt-3">
+              <label class="form-label" for="confirmActionNote">Notering <span class="text-secondary fw-normal">(valfritt)</span></label>
+              <textarea id="confirmActionNote" class="form-control form-control-sm" rows="3" placeholder="Kort notering om underlag, avvikelse eller beslut."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancelConfirmActionButton" type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Avbryt</button>
+            <button id="confirmActionButton" type="button" class="btn btn-primary">Bekräfta</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260722-flow-guards"></script>
+    <script src="app.js?v=20260722-shortcuts-height"></script>
   </body>
 </html>

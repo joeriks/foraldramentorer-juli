@@ -218,6 +218,10 @@
   --bs-btn-padding-x: 0.5rem;
 }
 
+.dashboard-shortcuts-card {
+  align-self: flex-start;
+}
+
 .status-dot {
   width: 0.5rem;
   height: 0.5rem;
@@ -309,6 +313,88 @@
 
 .handler-table {
   min-width: 980px;
+}
+
+.meeting-table {
+  min-width: 760px;
+}
+
+.meeting-table th:first-child,
+.meeting-table td:first-child {
+  width: 10rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.meeting-table th:nth-child(2),
+.meeting-table td:nth-child(2) {
+  width: 10rem;
+}
+
+.meeting-table th:nth-child(4),
+.meeting-table td:nth-child(4) {
+  width: 11rem;
+}
+
+.meeting-summary {
+  min-width: 16rem;
+  white-space: normal;
+}
+
+.meeting-form {
+  padding: var(--app-space-3);
+  background: var(--app-surface-muted);
+}
+
+.empty-list {
+  padding: var(--app-space-4);
+  background: var(--app-surface-muted);
+  text-align: center;
+}
+
+.confirm-action-modal .modal-header {
+  align-items: flex-start;
+  background: var(--app-surface-muted);
+}
+
+.modal-eyebrow {
+  color: var(--app-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.confirm-action-facts {
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: var(--bs-border-radius);
+}
+
+.confirm-action-facts div {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  border-bottom: 1px solid var(--app-border-soft);
+}
+
+.confirm-action-facts div:last-child {
+  border-bottom: 0;
+}
+
+.confirm-action-facts dt,
+.confirm-action-facts dd {
+  margin: 0;
+  padding: var(--app-space-2) var(--app-space-3);
+  font-size: 0.875rem;
+}
+
+.confirm-action-facts dt {
+  background: var(--app-surface-muted);
+  color: #344553;
+  font-weight: 600;
+}
+
+.confirm-action-facts dd {
+  background: #fff;
+  color: #1f2c35;
 }
 
 .card > .table-responsive .table > :not(caption) > * > * {
@@ -575,18 +661,43 @@
   width: 10rem;
 }
 
-#checklist .form-check {
+#checklist .check-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  gap: var(--app-space-2);
   padding: var(--app-space-2) var(--app-space-3) !important;
   border-color: var(--app-border) !important;
   background: #fff;
 }
 
-#checklist .form-check.next-required {
+#checklist .check-row.next-required {
   border-color: var(--app-primary) !important;
   background: var(--app-primary-soft);
   box-shadow: inset 3px 0 var(--app-primary);
+}
+
+#checklist .form-check-input {
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+  margin-left: 0;
+}
+
+.check-row-body {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.check-row-meta {
+  color: var(--app-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.check-row-note {
+  color: #344553;
+  font-size: 0.75rem;
+  line-height: 1.25;
 }
 
 .next-required-marker {
@@ -602,6 +713,11 @@
   padding: var(--app-space-2) var(--app-space-3) var(--app-space-2) 2.25rem;
   border-color: var(--app-border) !important;
   background: #fff;
+}
+
+.interview-completion .form-check-label {
+  display: grid;
+  gap: 0.15rem;
 }
 
 .interview-completion.next-required {

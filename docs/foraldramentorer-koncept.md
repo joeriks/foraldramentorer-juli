@@ -32,6 +32,8 @@ Delfunktioner:
 - E-learning med korta utbildningsblock.
 - Kunskapsavstämningar.
 - Intervjubokning och intervjuprotokoll.
+- Gemensam mötesjournal för intervjuer, uppföljningar, avstämningar och andra kontakter med mentorn.
+- Kontroller ska vara spårbara med status, tidpunkt och ansvarig handläggare.
 - Certifieringsbeslut och aktivering i matchningsdatabasen.
 
 ### 2. Matchningsmotorn

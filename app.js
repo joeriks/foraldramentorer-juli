@@ -1,7 +1,8 @@
 const DB_NAME = "foraldramentorer";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE = "candidates";
 const HANDLERS_STORE = "handlers";
+const MEETINGS_STORE = "meetings";
 const CURRENT_USER_ID = "handler-sara";
 
 const STATUSES = [
@@ -20,6 +21,8 @@ const CHECKS = [
   ["quizDone", "Kunskapsavstämning klar"],
   ["interviewDone", "Intervju genomförd"]
 ];
+
+const CHECK_LABELS = Object.fromEntries(CHECKS);
 
 const NEXT_ACTIONS = [
   {
@@ -260,6 +263,7 @@ const seedHandlers = [
 let db;
 let candidates = [];
 let handlers = [];
+let meetings = [];
 let selectedId = null;
 let searchTerm = "";
 let statusFilter = "";
@@ -272,6 +276,10 @@ let handlerSearchTerm = "";
 let handlerStatusFilter = "";
 let handlerModal;
 let selectedHandlerId = null;
+let selectedMeetingId = null;
+let confirmActionModal;
+let pendingConfirmation = null;
+let identityEditMode = false;
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
@@ -353,10 +361,12 @@ const els = {
   selectedCoordinatorMeta: document.querySelector("#selectedCoordinatorMeta"),
   selectedCreatedMeta: document.querySelector("#selectedCreatedMeta"),
   selectedUpdatedMeta: document.querySelector("#selectedUpdatedMeta"),
+  recordMoreActions: document.querySelector("#recordMoreActions"),
   editPersonButton: document.querySelector("#editPersonButton"),
   personEditActions: document.querySelector("#personEditActions"),
   personReadView: document.querySelector("#personReadView"),
   personEditForm: document.querySelector("#personEditForm"),
+  savePersonEditButton: document.querySelector("#savePersonEditButton"),
   cancelPersonEditButton: document.querySelector("#cancelPersonEditButton"),
   editNameInput: document.querySelector("#editNameInput"),
   editPersonalNumberInput: document.querySelector("#editPersonalNumberInput"),
@@ -378,28 +388,57 @@ const els = {
   nextStepFact: document.querySelector("#nextStepFact"),
   nextStepEditFact: document.querySelector("#nextStepEditFact"),
   checksTabCount: document.querySelector("#checksTabCount"),
+  meetingsTabCount: document.querySelector("#meetingsTabCount"),
   logTabCount: document.querySelector("#logTabCount"),
   checklist: document.querySelector("#checklist"),
   identityVerificationPanel: document.querySelector("#identityVerificationPanel"),
-  identityVerificationStatus: document.querySelector("#identityVerificationStatus"),
+  identityReadView: document.querySelector("#identityReadView"),
+  identityEditView: document.querySelector("#identityEditView"),
+  identityPersonalNumberFact: document.querySelector("#identityPersonalNumberFact"),
+  identityMethodCheckFact: document.querySelector("#identityMethodCheckFact"),
   identityPersonalNumberInput: document.querySelector("#identityPersonalNumberInput"),
   identityMethodSelect: document.querySelector("#identityMethodSelect"),
   identityVerificationMeta: document.querySelector("#identityVerificationMeta"),
   identityVerifiedAtFact: document.querySelector("#identityVerifiedAtFact"),
   identityVerifiedByFact: document.querySelector("#identityVerifiedByFact"),
+  identityNoteFact: document.querySelector("#identityNoteFact"),
+  editIdentityVerificationButton: document.querySelector("#editIdentityVerificationButton"),
+  cancelIdentityVerificationButton: document.querySelector("#cancelIdentityVerificationButton"),
   saveIdentityVerificationButton: document.querySelector("#saveIdentityVerificationButton"),
   interviewDateInput: document.querySelector("#interviewDateInput"),
   interviewModeInput: document.querySelector("#interviewModeInput"),
-  notesInput: document.querySelector("#notesInput"),
   interviewCompletion: document.querySelector("#interviewCompletion"),
   interviewDoneInput: document.querySelector("#interviewDoneInput"),
+  interviewDoneMeta: document.querySelector("#interviewDoneMeta"),
+  newMeetingButton: document.querySelector("#newMeetingButton"),
+  meetingForm: document.querySelector("#meetingForm"),
+  meetingFormTitle: document.querySelector("#meetingFormTitle"),
+  cancelMeetingButton: document.querySelector("#cancelMeetingButton"),
+  deleteMeetingButton: document.querySelector("#deleteMeetingButton"),
+  meetingTypeInput: document.querySelector("#meetingTypeInput"),
+  meetingDateInput: document.querySelector("#meetingDateInput"),
+  meetingModeInput: document.querySelector("#meetingModeInput"),
+  meetingSummaryInput: document.querySelector("#meetingSummaryInput"),
+  meetingNextStepInput: document.querySelector("#meetingNextStepInput"),
+  meetingsEmpty: document.querySelector("#meetingsEmpty"),
+  meetingsTableWrap: document.querySelector("#meetingsTableWrap"),
+  meetingsTableBody: document.querySelector("#meetingsTableBody"),
   decisionHint: document.querySelector("#decisionHint"),
   approveButton: document.querySelector("#approveButton"),
   deleteButton: document.querySelector("#deleteButton"),
   auditLog: document.querySelector("#auditLog"),
   saveStatus: document.querySelector("#saveStatus"),
   feedbackToast: document.querySelector("#feedbackToast"),
-  feedbackToastBody: document.querySelector("#feedbackToastBody")
+  feedbackToastBody: document.querySelector("#feedbackToastBody"),
+  confirmActionModal: document.querySelector("#confirmActionModal"),
+  confirmActionEyebrow: document.querySelector("#confirmActionEyebrow"),
+  confirmActionTitle: document.querySelector("#confirmActionTitle"),
+  confirmActionBody: document.querySelector("#confirmActionBody"),
+  confirmActionMentor: document.querySelector("#confirmActionMentor"),
+  confirmActionActor: document.querySelector("#confirmActionActor"),
+  confirmActionTime: document.querySelector("#confirmActionTime"),
+  confirmActionNote: document.querySelector("#confirmActionNote"),
+  confirmActionButton: document.querySelector("#confirmActionButton")
 };
 
 function markSaved() {
@@ -415,6 +454,32 @@ function showFeedback(message) {
   bootstrap.Toast.getOrCreateInstance(els.feedbackToast, { delay: 3200 }).show();
 }
 
+function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, confirmLabel = "Bekräfta", danger = false }) {
+  if (!confirmActionModal) return Promise.resolve({ confirmed: window.confirm(body), note: "" });
+  els.confirmActionEyebrow.textContent = eyebrow;
+  els.confirmActionTitle.textContent = title;
+  els.confirmActionBody.textContent = body;
+  els.confirmActionMentor.textContent = mentorName || "Ej angivet";
+  els.confirmActionActor.textContent = currentUserName();
+  els.confirmActionTime.textContent = formatDateTime(new Date().toISOString());
+  els.confirmActionNote.value = "";
+  els.confirmActionButton.textContent = confirmLabel;
+  els.confirmActionButton.classList.toggle("btn-danger", danger);
+  els.confirmActionButton.classList.toggle("btn-primary", !danger);
+  confirmActionModal.show();
+
+  return new Promise((resolve) => {
+    pendingConfirmation = resolve;
+  });
+}
+
+function resolveConfirmation(value) {
+  if (!pendingConfirmation) return;
+  const resolve = pendingConfirmation;
+  pendingConfirmation = null;
+  resolve({ confirmed: value, note: value ? els.confirmActionNote.value.trim() : "" });
+}
+
 function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -426,6 +491,10 @@ function openDatabase() {
       }
       if (!nextDb.objectStoreNames.contains(HANDLERS_STORE)) {
         nextDb.createObjectStore(HANDLERS_STORE, { keyPath: "id" });
+      }
+      if (!nextDb.objectStoreNames.contains(MEETINGS_STORE)) {
+        const meetingStore = nextDb.createObjectStore(MEETINGS_STORE, { keyPath: "id" });
+        meetingStore.createIndex("mentorId", "mentorId", { unique: false });
       }
     };
 
@@ -440,6 +509,10 @@ function tx(mode = "readonly") {
 
 function handlerTx(mode = "readonly") {
   return db.transaction(HANDLERS_STORE, mode).objectStore(HANDLERS_STORE);
+}
+
+function meetingTx(mode = "readonly") {
+  return db.transaction(MEETINGS_STORE, mode).objectStore(MEETINGS_STORE);
 }
 
 function getAllCandidates() {
@@ -460,9 +533,19 @@ function saveCandidate(candidate) {
 
 function deleteCandidate(id) {
   return new Promise((resolve, reject) => {
-    const request = tx("readwrite").delete(id);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    const transaction = db.transaction([STORE, MEETINGS_STORE], "readwrite");
+    transaction.objectStore(STORE).delete(id);
+    const meetingIndex = transaction.objectStore(MEETINGS_STORE).index("mentorId");
+    const cursorRequest = meetingIndex.openCursor(IDBKeyRange.only(id));
+    cursorRequest.onsuccess = () => {
+      const cursor = cursorRequest.result;
+      if (!cursor) return;
+      cursor.delete();
+      cursor.continue();
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
   });
 }
 
@@ -493,6 +576,38 @@ function saveHandler(handler) {
 function clearHandlers() {
   return new Promise((resolve, reject) => {
     const request = handlerTx("readwrite").clear();
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function getAllMeetings() {
+  return new Promise((resolve, reject) => {
+    const request = meetingTx().getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function saveMeeting(meeting) {
+  return new Promise((resolve, reject) => {
+    const request = meetingTx("readwrite").put(meeting);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function deleteMeeting(id) {
+  return new Promise((resolve, reject) => {
+    const request = meetingTx("readwrite").delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function clearMeetings() {
+  return new Promise((resolve, reject) => {
+    const request = meetingTx("readwrite").clear();
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
@@ -544,9 +659,14 @@ function buildExampleDataset(count) {
     const id = crypto.randomUUID();
     const identityVerified = Boolean(candidate.checks?.identityVerified);
     const coordinator = index % 2 === 0 ? "" : candidate.coordinator;
+    const checkMeta = buildCheckMeta(candidate.checks, {
+      checkedAt: now,
+      checkedBy: coordinator || "System"
+    });
     return {
       ...candidate,
       checks: { ...candidate.checks },
+      checkMeta,
       id,
       coordinatorId: "",
       coordinator,
@@ -559,8 +679,8 @@ function buildExampleDataset(count) {
       exampleDatasetSize: count,
       caseNumber: makeCaseNumber(id),
       history: [
-        { at: now, text: "Ärende skapat som exempeldata" },
-        { at: now, text: `Status satt till ${candidate.status}` }
+        { at: now, text: "Ärende skapat som exempeldata", actor: "System" },
+        { at: now, text: `Status satt till ${candidate.status}`, actor: "System" }
       ],
       createdAt: now,
       updatedAt: now
@@ -574,12 +694,42 @@ async function refresh() {
   handlers.sort((a, b) => a.name.localeCompare(b.name, "sv"));
   candidates = await getAllCandidates();
   candidates = candidates.map(normalizeCandidate);
+  meetings = await getAllMeetings();
   await migrateSingleExampleMentor();
   await migrateExampleCoordinatorDistribution();
   await migrateCoordinatorReferences();
   await ensureUniqueCaseNumbers();
+  await migrateLegacyMeetingNotes();
+  meetings = await getAllMeetings();
+  meetings.sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt));
   candidates.sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.name.localeCompare(b.name, "sv"));
   renderAll();
+}
+
+async function migrateLegacyMeetingNotes() {
+  const existingIds = new Set(meetings.map((meeting) => meeting.id));
+  const legacyCandidates = candidates.filter((candidate) => candidate.notes);
+  const legacyMeetings = legacyCandidates
+    .filter((candidate) => !existingIds.has(`legacy-${candidate.id}`))
+    .map((candidate) => ({
+      id: `legacy-${candidate.id}`,
+      mentorId: candidate.id,
+      type: candidate.interviewDate || candidate.checks?.interviewDone ? "Certifieringsintervju" : "Övrig kontakt",
+      occurredAt: candidate.interviewDate || candidate.createdAt,
+      mode: candidate.interviewMode || "Ej angivet",
+      summary: candidate.notes,
+      nextStep: "",
+      createdBy: candidate.coordinator || "System",
+      createdAt: candidate.updatedAt || candidate.createdAt,
+      updatedAt: candidate.updatedAt || candidate.createdAt
+    }));
+  await Promise.all([
+    ...legacyMeetings.map(saveMeeting),
+    ...legacyCandidates.map((candidate) => {
+      candidate.notes = "";
+      return saveCandidate(candidate);
+    })
+  ]);
 }
 
 async function migrateSingleExampleMentor() {
@@ -681,6 +831,44 @@ function currentUserName() {
   return currentUser().name;
 }
 
+function buildCheckMeta(checks = {}, fallback = {}) {
+  return Object.fromEntries(CHECKS.map(([key]) => {
+    const checked = Boolean(checks?.[key]);
+    return [key, checked
+      ? {
+        checkedAt: fallback.checkedAt || new Date().toISOString(),
+        checkedBy: fallback.checkedBy || "System",
+        note: fallback.note || ""
+      }
+      : { checkedAt: "", checkedBy: "", note: "" }];
+  }));
+}
+
+function normalizeCheckMeta(candidate) {
+  const fallback = {
+    checkedAt: candidate.updatedAt || candidate.createdAt || new Date().toISOString(),
+    checkedBy: candidate.coordinator || "System"
+  };
+  const existing = candidate.checkMeta || {};
+  return Object.fromEntries(CHECKS.map(([key]) => {
+    const checked = Boolean(candidate.checks?.[key]);
+    const meta = existing[key] || {};
+    if (!checked) return [key, { checkedAt: "", checkedBy: "", note: "" }];
+    if (key === "identityVerified") {
+      return [key, {
+        checkedAt: candidate.identityVerifiedAt || meta.checkedAt || fallback.checkedAt,
+        checkedBy: candidate.identityVerifiedBy || meta.checkedBy || fallback.checkedBy,
+        note: meta.note || ""
+      }];
+    }
+    return [key, {
+      checkedAt: meta.checkedAt || fallback.checkedAt,
+      checkedBy: meta.checkedBy || fallback.checkedBy,
+      note: meta.note || ""
+    }];
+  }));
+}
+
 function userInitials(name) {
   return String(name || "")
     .split(/\s+/)
@@ -735,16 +923,22 @@ function normalizeCandidate(candidate, index = 0) {
   const identityMethod = candidate.identityMethod
     || (candidate.exampleData && candidate.checks?.identityVerified ? (index % 2 === 0 ? "bankid" : "physical_id") : "");
   const identityVerified = Boolean(candidate.checks?.identityVerified && personalNumber && identityMethod);
-  return {
+  const normalized = {
     ...candidate,
-    personalNumber,
-    identityMethod,
-    identityVerifiedAt: identityVerified ? candidate.identityVerifiedAt || candidate.updatedAt || candidate.createdAt : "",
-    identityVerifiedBy: identityVerified ? candidate.identityVerifiedBy || candidate.coordinator || "System" : "",
     checks: {
       ...(candidate.checks || {}),
       identityVerified
     },
+    personalNumber,
+    identityMethod,
+    identityVerifiedAt: identityVerified ? candidate.identityVerifiedAt || candidate.updatedAt || candidate.createdAt : "",
+    identityVerifiedBy: identityVerified ? candidate.identityVerifiedBy || candidate.coordinator || "System" : ""
+  };
+  return {
+    ...normalized,
+    personalNumber,
+    identityMethod,
+    checkMeta: normalizeCheckMeta(normalized),
     caseNumber: candidate.caseNumber || makeCaseNumber(candidate.id || candidate.createdAt),
     coordinatorId: candidate.coordinatorId || "",
     coordinator: candidate.coordinator || "",
@@ -782,6 +976,10 @@ async function ensureUniqueCaseNumbers() {
 
 function selectedCandidate() {
   return candidates.find((candidate) => candidate.id === selectedId);
+}
+
+function isCreatingMentor() {
+  return currentView === "mentor" && selectedId === "new";
 }
 
 function filteredCandidates() {
@@ -822,6 +1020,13 @@ function isComplete(candidate) {
 
 function isBlocked(candidate) {
   return !candidate.checks?.identityVerified || !candidate.checks?.registryChecked || !candidate.checks?.referencesDone;
+}
+
+function statusFromChecks(checks) {
+  if (!checks?.identityVerified) return "Anmäld";
+  if (!checks.registryChecked || !checks.referencesDone) return "Kontrollerad";
+  if (!checks.trainingDone || !checks.quizDone) return "Utbildning pågår";
+  return "Redo för intervju";
 }
 
 function nextStepText(candidate) {
@@ -899,8 +1104,9 @@ function applyRoute() {
     els.breadcrumb.textContent = workQueueOnly ? "Start / Onboarding / Arbetskö" : "Start / Onboarding / Mentorregister";
     els.mentorListTitle.textContent = workQueueOnly ? "Arbetskö" : "Mentorregister";
   } else if (currentView === "mentor") {
-    els.pageTitle.textContent = "Mentorkort";
-    els.breadcrumb.textContent = "Start / Onboarding / Mentorkort";
+    const isNewMentor = route.id === "new";
+    els.pageTitle.textContent = isNewMentor ? "Registrera mentor" : "Mentorkort";
+    els.breadcrumb.textContent = isNewMentor ? "Start / Onboarding / Registrera mentor" : "Start / Onboarding / Mentorkort";
   } else if (currentView === "administration") {
     els.pageTitle.textContent = "Administration";
     els.breadcrumb.textContent = "Start / Administration / Handläggare";
@@ -912,6 +1118,10 @@ function applyRoute() {
 
 function navigateToCandidate(id) {
   window.location.hash = `#/mentor/${id}`;
+}
+
+function navigateToNewCandidate() {
+  window.location.hash = "#/mentor/new";
 }
 
 function navigateToHandler(id) {
@@ -1161,6 +1371,11 @@ function populateCoordinatorSelect(candidate) {
 }
 
 function renderDetail() {
+  if (isCreatingMentor()) {
+    renderNewCandidateDetail();
+    return;
+  }
+
   const candidate = selectedCandidate();
 
   if (!candidate) {
@@ -1172,7 +1387,15 @@ function renderDetail() {
 
   els.detailEmpty.hidden = true;
   els.candidateDetail.hidden = false;
+  els.recordMoreActions.hidden = false;
+  els.nextActionBar.hidden = false;
+  document.querySelectorAll(".detail-tabs .nav-item").forEach((item) => {
+    item.hidden = false;
+  });
+  els.savePersonEditButton.textContent = "Spara ändringar";
   if (renderedDetailId !== candidate.id) {
+    closeMeetingForm();
+    identityEditMode = false;
     showDefaultMentorTab();
     renderedDetailId = candidate.id;
   }
@@ -1210,6 +1433,7 @@ function renderDetail() {
   const completedChecks = CHECKS.filter(([key]) => candidate.checks?.[key]).length;
   els.checksTabCount.textContent = `${completedChecks}/${CHECKS.length}`;
   els.logTabCount.textContent = candidate.history.length;
+  renderMeetings(candidate);
   setPersonEditMode(false);
 
   els.statusSelect.innerHTML = "";
@@ -1226,22 +1450,23 @@ function renderDetail() {
   els.coordinatorFieldRow.classList.toggle("next-required", nextAction.key === "coordinatorAssigned");
   els.interviewDateInput.value = candidate.interviewDate || "";
   els.interviewModeInput.value = candidate.interviewMode || "";
-  els.notesInput.value = candidate.notes || "";
   els.interviewDoneInput.checked = Boolean(candidate.checks?.interviewDone);
+  const interviewDoneMeta = candidate.checkMeta?.interviewDone || {};
+  els.interviewDoneMeta.textContent = candidate.checks?.interviewDone
+    ? `Klar ${formatDateTime(interviewDoneMeta.checkedAt)} av ${interviewDoneMeta.checkedBy || "Ej angivet"}`
+    : "Ej klar";
   els.interviewCompletion.classList.toggle("next-required", nextAction.key === "interviewDone");
   const identityVerified = Boolean(candidate.checks?.identityVerified);
+  const identityMethodText = identityMethodLabel(candidate.identityMethod);
+  els.identityPersonalNumberFact.textContent = candidate.personalNumber || "Saknas";
+  els.identityMethodCheckFact.textContent = identityVerified ? identityMethodText : "Ej verifierad";
   els.identityPersonalNumberInput.value = candidate.personalNumber || "";
   els.identityMethodSelect.value = candidate.identityMethod || "";
-  els.identityVerificationStatus.textContent = identityVerified
-    ? `Verifierad med ${identityMethodLabel(candidate.identityMethod)}`
-    : "Ej verifierad";
-  els.identityVerificationStatus.className = identityVerified
-    ? "badge text-bg-success"
-    : "badge text-bg-warning";
   els.identityVerificationMeta.hidden = !identityVerified;
   els.identityVerifiedAtFact.textContent = identityVerified ? formatDateTime(candidate.identityVerifiedAt) : "";
   els.identityVerifiedByFact.textContent = identityVerified ? candidate.identityVerifiedBy || "Ej angivet" : "";
-  els.saveIdentityVerificationButton.textContent = identityVerified ? "Uppdatera verifiering" : "Registrera verifiering";
+  els.identityNoteFact.textContent = identityVerified ? candidate.checkMeta?.identityVerified?.note || "Ingen notering" : "";
+  setIdentityEditMode(!identityVerified || identityEditMode);
   els.identityVerificationPanel.classList.toggle("next-required", nextAction.key === "identityVerified");
   els.checklist.innerHTML = "";
 
@@ -1250,10 +1475,22 @@ function renderDetail() {
     const column = document.createElement("div");
     column.className = "col-md-6";
     const isNextAction = nextAction.key === key;
+    const checked = Boolean(candidate.checks?.[key]);
+    const meta = candidate.checkMeta?.[key] || {};
+    const metaText = checked
+      ? `Klar ${formatDateTime(meta.checkedAt)} av ${meta.checkedBy || "Ej angivet"}`
+      : "Ej klar";
+    const noteText = checked && meta.note
+      ? `<span class="check-row-note">Notering: ${escapeHtml(meta.note)}</span>`
+      : "";
     column.innerHTML = `
-      <label class="form-check border rounded p-2 h-100 ${isNextAction ? "next-required" : ""}">
-        <input class="form-check-input ms-0 me-2" type="checkbox" data-check="${key}" ${candidate.checks?.[key] ? "checked" : ""}>
-        <span class="form-check-label">${label}</span>
+      <label class="check-row form-check border rounded h-100 ${isNextAction ? "next-required" : ""}">
+        <input class="form-check-input" type="checkbox" data-check="${key}" ${checked ? "checked" : ""}>
+        <span class="check-row-body">
+          <span class="form-check-label">${label}</span>
+          <span class="check-row-meta">${escapeHtml(metaText)}</span>
+          ${noteText}
+        </span>
         ${isNextAction ? '<span class="next-required-marker">Nästa åtgärd</span>' : ""}
       </label>
     `;
@@ -1281,6 +1518,118 @@ function renderDetail() {
   if (pendingNextActionId === candidate.id) {
     pendingNextActionId = null;
     requestAnimationFrame(() => showNextAction(candidate));
+  }
+}
+
+function renderNewCandidateDetail() {
+  els.detailEmpty.hidden = true;
+  els.candidateDetail.hidden = false;
+  if (renderedDetailId !== "new") {
+    closeMeetingForm();
+    identityEditMode = false;
+    showDefaultMentorTab();
+    renderedDetailId = "new";
+  }
+
+  els.selectedCaseId.textContent = "Nytt ärende";
+  els.selectedName.textContent = "Ny mentor";
+  els.selectedCoordinatorMeta.textContent = "Ej tilldelad";
+  els.selectedCreatedMeta.textContent = "Ej skapad";
+  els.selectedUpdatedMeta.textContent = "Ej sparad";
+  els.selectedStatus.textContent = "Ny";
+  els.selectedStatus.className = "badge rounded-pill text-bg-secondary";
+  els.recordMoreActions.hidden = true;
+  els.nextActionBar.hidden = true;
+  document.querySelectorAll(".detail-tabs .nav-item").forEach((item, index) => {
+    item.hidden = index > 0;
+  });
+
+  els.personReadView.hidden = true;
+  els.personEditForm.hidden = false;
+  els.editPersonButton.hidden = true;
+  els.personEditActions.hidden = false;
+  els.savePersonEditButton.textContent = "Spara mentor";
+  els.editNameInput.value = "";
+  els.editPersonalNumberInput.value = "";
+  els.editAreaInput.value = "";
+  els.editLanguagesInput.value = "";
+  els.editAvailabilityInput.value = "";
+  els.statusSelect.innerHTML = "";
+  const statusOption = document.createElement("option");
+  statusOption.value = "Anmäld";
+  statusOption.textContent = "Anmäld";
+  els.statusSelect.append(statusOption);
+  populateCoordinatorSelect({ coordinatorId: "" });
+  els.identityMethodEditFact.textContent = "Ej verifierad";
+  els.nextStepEditFact.textContent = "Tilldela handläggare";
+}
+
+function renderMeetings(candidate) {
+  const candidateMeetings = meetings.filter((meeting) => meeting.mentorId === candidate.id);
+  els.meetingsTabCount.textContent = candidateMeetings.length;
+  els.meetingsEmpty.hidden = candidateMeetings.length > 0;
+  els.meetingsTableWrap.hidden = candidateMeetings.length === 0;
+  els.meetingsTableBody.innerHTML = "";
+
+  for (const meeting of candidateMeetings) {
+    const meetingType = meeting.type === "Intervju" ? "Certifieringsintervju" : meeting.type;
+    const row = document.createElement("tr");
+    const nextStep = meeting.nextStep
+      ? `<small class="d-block text-secondary mt-1">Nästa steg: ${escapeHtml(meeting.nextStep)}</small>`
+      : "";
+    row.innerHTML = `
+      <td><time datetime="${escapeHtml(meeting.occurredAt)}">${escapeHtml(formatDateTime(meeting.occurredAt))}</time></td>
+      <td>${escapeHtml(meetingType)}<small class="d-block text-secondary">${escapeHtml(meeting.mode || "Ej angivet")}</small></td>
+      <td class="meeting-summary">${escapeHtml(meeting.summary)}${nextStep}</td>
+      <td>${escapeHtml(meeting.createdBy || "Ej angivet")}</td>
+      <td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-edit-meeting="${escapeHtml(meeting.id)}">Öppna</button></td>
+    `;
+    els.meetingsTableBody.append(row);
+  }
+}
+
+function localDateTimeValue(value = new Date()) {
+  const date = new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function closeMeetingForm() {
+  selectedMeetingId = null;
+  els.meetingForm.reset();
+  els.meetingForm.hidden = true;
+  els.deleteMeetingButton.hidden = true;
+}
+
+function openMeetingForm(meeting = null) {
+  selectedMeetingId = meeting?.id || null;
+  els.meetingForm.reset();
+  els.meetingFormTitle.textContent = meeting ? "Redigera möte" : "Nytt möte";
+  els.meetingTypeInput.value = meeting?.type === "Intervju" ? "Certifieringsintervju" : meeting?.type || "";
+  els.meetingDateInput.value = meeting?.occurredAt ? localDateTimeValue(meeting.occurredAt) : localDateTimeValue();
+  els.meetingModeInput.value = meeting?.mode === "Ej angivet" ? "" : meeting?.mode || "";
+  els.meetingSummaryInput.value = meeting?.summary || "";
+  els.meetingNextStepInput.value = meeting?.nextStep || "";
+  els.deleteMeetingButton.hidden = !meeting;
+  els.meetingForm.hidden = false;
+  els.meetingTypeInput.focus({ preventScroll: true });
+  els.meetingForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function setIdentityEditMode(editing) {
+  const candidate = selectedCandidate();
+  const identityVerified = Boolean(candidate?.checks?.identityVerified);
+  identityEditMode = !identityVerified || editing;
+  els.identityReadView.hidden = identityEditMode;
+  els.identityEditView.hidden = !identityEditMode;
+  els.editIdentityVerificationButton.hidden = identityEditMode || !identityVerified;
+  els.cancelIdentityVerificationButton.hidden = !identityEditMode || !identityVerified;
+  els.saveIdentityVerificationButton.hidden = !identityEditMode;
+  els.saveIdentityVerificationButton.textContent = identityVerified ? "Spara identitet" : "Registrera identitet";
+
+  if (identityEditMode) {
+    els.identityPersonalNumberInput.value = candidate?.personalNumber || "";
+    els.identityMethodSelect.value = candidate?.identityMethod || "";
   }
 }
 
@@ -1374,6 +1723,36 @@ function newCandidate(formData) {
     coordinator: "",
     status: "Anmäld",
     checks: Object.fromEntries(CHECKS.map(([key]) => [key, false])),
+    checkMeta: buildCheckMeta(),
+    interviewDate: "",
+    interviewMode: "",
+    notes: "",
+    identityMethod: "",
+    identityVerifiedAt: "",
+    identityVerifiedBy: "",
+    history: [{ at: now, text: "Ärende skapat", actor: currentUserName() }],
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function newCandidateFromEditor() {
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  const coordinator = handlers.find((handler) => handler.id === els.coordinatorInput.value);
+  return {
+    id,
+    caseNumber: makeCaseNumber(id),
+    name: els.editNameInput.value.trim(),
+    personalNumber: els.editPersonalNumberInput.value.trim(),
+    area: els.editAreaInput.value.trim(),
+    languages: els.editLanguagesInput.value.trim(),
+    availability: els.editAvailabilityInput.value.trim(),
+    coordinatorId: coordinator?.id || "",
+    coordinator: coordinator?.name || "",
+    status: "Anmäld",
+    checks: Object.fromEntries(CHECKS.map(([key]) => [key, false])),
+    checkMeta: buildCheckMeta(),
     interviewDate: "",
     interviewMode: "",
     notes: "",
@@ -1534,8 +1913,8 @@ els.dashboardMentorRegisterLink.addEventListener("click", (event) => {
   navigateTo("#/mentors");
 });
 
-els.newCaseButton.addEventListener("click", openCandidateModal);
-els.dashboardNewCaseButton.addEventListener("click", openCandidateModal);
+els.newCaseButton.addEventListener("click", navigateToNewCandidate);
+els.dashboardNewCaseButton.addEventListener("click", navigateToNewCandidate);
 
 els.cancelNewCaseButton.addEventListener("click", () => {
   els.candidateForm.reset();
@@ -1705,9 +2084,25 @@ els.openNextActionButton.addEventListener("click", () => {
 });
 
 els.editPersonButton.addEventListener("click", () => setPersonEditMode(true));
-els.cancelPersonEditButton.addEventListener("click", () => setPersonEditMode(false));
+els.cancelPersonEditButton.addEventListener("click", () => {
+  if (isCreatingMentor()) {
+    navigateTo("#/mentors");
+    return;
+  }
+  setPersonEditMode(false);
+});
 els.personEditForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (isCreatingMentor()) {
+    const candidate = newCandidateFromEditor();
+    await saveCandidate(candidate);
+    selectedId = candidate.id;
+    markSaved();
+    showFeedback("Mentorn har registrerats.");
+    await refresh();
+    navigateToCandidate(candidate.id);
+    return;
+  }
   const candidate = selectedCandidate();
   if (!candidate) return;
   const personalNumber = els.editPersonalNumberInput.value.trim();
@@ -1729,6 +2124,10 @@ els.personEditForm.addEventListener("submit", async (event) => {
   };
   if (identityInvalidated) {
     patch.checks = { ...candidate.checks, identityVerified: false };
+    patch.checkMeta = {
+      ...candidate.checkMeta,
+      identityVerified: { checkedAt: "", checkedBy: "", note: "" }
+    };
     patch.identityMethod = "";
     patch.identityVerifiedAt = "";
     patch.identityVerifiedBy = "";
@@ -1744,7 +2143,86 @@ els.personEditForm.addEventListener("submit", async (event) => {
 });
 els.interviewDateInput.addEventListener("change", () => updateSelected({ interviewDate: els.interviewDateInput.value }, "Intervjutid uppdaterad"));
 els.interviewModeInput.addEventListener("change", () => updateSelected({ interviewMode: els.interviewModeInput.value }, "Intervjuform uppdaterad"));
-els.notesInput.addEventListener("change", () => updateSelected({ notes: els.notesInput.value.trim() }, "Intervjuprotokoll uppdaterat"));
+
+els.newMeetingButton.addEventListener("click", () => openMeetingForm());
+els.cancelMeetingButton.addEventListener("click", closeMeetingForm);
+els.meetingsTableBody.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-edit-meeting]");
+  if (!button) return;
+  const meeting = meetings.find((item) => item.id === button.dataset.editMeeting);
+  if (meeting) openMeetingForm(meeting);
+});
+
+els.meetingForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const candidate = selectedCandidate();
+  if (!candidate) return;
+  const existing = meetings.find((meeting) => meeting.id === selectedMeetingId);
+  const now = new Date().toISOString();
+  const type = els.meetingTypeInput.value;
+  const occurredAt = els.meetingDateInput.value;
+  const mode = els.meetingModeInput.value;
+  await saveMeeting({
+    id: existing?.id || crypto.randomUUID(),
+    mentorId: candidate.id,
+    type,
+    occurredAt,
+    mode,
+    summary: els.meetingSummaryInput.value.trim(),
+    nextStep: els.meetingNextStepInput.value.trim(),
+    createdBy: existing?.createdBy || currentUserName(),
+    createdAt: existing?.createdAt || now,
+    updatedAt: now
+  });
+
+  const patch = type === "Certifieringsintervju"
+    ? { interviewDate: occurredAt, interviewMode: mode }
+    : {};
+  await saveCandidate({
+    ...candidate,
+    ...patch,
+    updatedAt: now,
+    history: [
+      ...(candidate.history || []),
+      { at: now, text: `${type} ${existing ? "uppdaterat" : "registrerat"}`, actor: currentUserName() }
+    ]
+  });
+  closeMeetingForm();
+  markSaved();
+  showFeedback(existing ? "Mötet har uppdaterats." : "Mötet har registrerats.");
+  await refresh();
+});
+
+els.deleteMeetingButton.addEventListener("click", async () => {
+  const meeting = meetings.find((item) => item.id === selectedMeetingId);
+  const candidate = selectedCandidate();
+  if (!meeting || !candidate) return;
+  if (!window.confirm(`Ta bort mötesanteckningen från ${formatDateTime(meeting.occurredAt)}?`)) return;
+  await deleteMeeting(meeting.id);
+  const now = new Date().toISOString();
+  await saveCandidate({
+    ...candidate,
+    updatedAt: now,
+    history: [
+      ...(candidate.history || []),
+      { at: now, text: `${meeting.type} borttaget`, actor: currentUserName() }
+    ]
+  });
+  closeMeetingForm();
+  markSaved();
+  showFeedback("Mötet har tagits bort.");
+  await refresh();
+});
+
+els.editIdentityVerificationButton.addEventListener("click", () => {
+  setIdentityEditMode(true);
+  els.identityPersonalNumberInput.focus({ preventScroll: true });
+});
+
+els.cancelIdentityVerificationButton.addEventListener("click", () => {
+  identityEditMode = false;
+  setIdentityEditMode(false);
+});
 
 els.saveIdentityVerificationButton.addEventListener("click", async () => {
   const candidate = selectedCandidate();
@@ -1755,32 +2233,71 @@ els.saveIdentityVerificationButton.addEventListener("click", async () => {
 
   const verifiedAt = new Date().toISOString();
   const method = els.identityMethodSelect.value;
+  const alreadyVerified = Boolean(candidate.checks?.identityVerified);
+  const confirmation = await confirmAction({
+    eyebrow: "Identitetsverifiering",
+    title: alreadyVerified ? "Spara ändrad identitet?" : "Registrera identitet?",
+    body: `Personnummer och verifieringssätt sparas. Verifieringssätt: ${identityMethodLabel(method)}. Åtgärden registreras med tidpunkt och ansvarig handläggare i ärendets logg.`,
+    mentorName: candidate.name,
+    confirmLabel: alreadyVerified ? "Spara identitet" : "Registrera identitet"
+  });
+  if (!confirmation.confirmed) return;
+  identityEditMode = false;
   await updateSelected({
     personalNumber: els.identityPersonalNumberInput.value.trim(),
     identityMethod: method,
     identityVerifiedAt: verifiedAt,
     identityVerifiedBy: currentUserName(),
-    checks: { ...candidate.checks, identityVerified: true }
-  }, `Identitet verifierad med ${identityMethodLabel(method)}`);
+    checks: { ...candidate.checks, identityVerified: true },
+    checkMeta: {
+      ...candidate.checkMeta,
+      identityVerified: { checkedAt: verifiedAt, checkedBy: currentUserName(), note: confirmation.note }
+    }
+  }, `Identitet registrerad med ${identityMethodLabel(method)}${confirmation.note ? `: ${confirmation.note}` : ""}`);
   showFeedback(`Identiteten har verifierats med ${identityMethodLabel(method)}.`);
 });
 
 async function updateCandidateCheck(key, checked) {
   const candidate = selectedCandidate();
-  if (!candidate) return;
+  if (!candidate) return false;
+  const previousChecked = Boolean(candidate.checks?.[key]);
+  if (previousChecked === checked) return true;
+  const label = CHECK_LABELS[key] || "Kontroll";
+  const confirmation = await confirmAction({
+    eyebrow: checked ? "Kontroll i certifieringsflödet" : "Ändra genomförd kontroll",
+    title: checked ? `Markera ${label.toLowerCase()} som klar?` : `Ta bort markering för ${label.toLowerCase()}?`,
+    body: checked
+      ? "Åtgärden registreras med tidpunkt och ansvarig handläggare i ärendets logg."
+      : "Kontrollen blir ej klar och ändringen registreras i ärendets logg.",
+    mentorName: candidate.name,
+    confirmLabel: checked ? "Markera som klar" : "Ta bort markering",
+    danger: !checked
+  });
+  if (!confirmation.confirmed) return false;
+  const now = new Date().toISOString();
   const checks = { ...candidate.checks, [key]: checked };
+  const checkMeta = {
+    ...candidate.checkMeta,
+    [key]: checked
+      ? { checkedAt: now, checkedBy: currentUserName(), note: confirmation.note }
+      : { checkedAt: "", checkedBy: "", note: "" }
+  };
   let status = candidate.status;
   if (isComplete({ ...candidate, checks }) && status !== "Godkänd/Certifierad") {
     status = "Redo för intervju";
+  } else if (!isComplete({ ...candidate, checks }) && status === "Godkänd/Certifierad") {
+    status = statusFromChecks(checks);
   }
-  const label = CHECKS.find(([checkKey]) => checkKey === key)?.[1] || "Kontroll";
-  await updateSelected({ checks, status }, `${label}: ${checked ? "klar" : "ej klar"}`);
+  const noteSuffix = confirmation.note ? `: ${confirmation.note}` : "";
+  await updateSelected({ checks, checkMeta, status }, `${label}: ${checked ? "klar" : "ej klar"}${noteSuffix}`);
+  return true;
 }
 
 els.checklist.addEventListener("change", async (event) => {
   const input = event.target.closest("input[data-check]");
   if (!input) return;
-  await updateCandidateCheck(input.dataset.check, input.checked);
+  const changed = await updateCandidateCheck(input.dataset.check, input.checked);
+  if (!changed) input.checked = !input.checked;
 });
 
 els.interviewDoneInput.addEventListener("change", async () => {
@@ -1791,7 +2308,8 @@ els.interviewDoneInput.addEventListener("change", async () => {
     missingField.focus();
     return;
   }
-  await updateCandidateCheck("interviewDone", els.interviewDoneInput.checked);
+  const changed = await updateCandidateCheck("interviewDone", els.interviewDoneInput.checked);
+  if (!changed) els.interviewDoneInput.checked = !els.interviewDoneInput.checked;
 });
 
 els.approveButton.addEventListener("click", async () => {
@@ -1826,6 +2344,7 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
   }
 
   await ensureDefaultHandlers();
+  await clearMeetings();
   await replaceCandidates(buildExampleDataset(count));
   selectedId = null;
   searchTerm = "";
@@ -1843,7 +2362,7 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
 els.resetButton.addEventListener("click", async () => {
   const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata? Mentorärenden tas bort och grundhandläggarna återställs. Åtgärden kan inte ångras.");
   if (!confirmed) return;
-  await Promise.all([clearCandidates(), clearHandlers()]);
+  await Promise.all([clearCandidates(), clearHandlers(), clearMeetings()]);
   await ensureDefaultHandlers();
   selectedId = null;
   markSaved();
@@ -1859,8 +2378,14 @@ openDatabase()
     candidateModal = new bootstrap.Modal(modalElement);
     const handlerModalElement = document.querySelector("#handlerModal");
     handlerModal = new bootstrap.Modal(handlerModalElement);
+    confirmActionModal = new bootstrap.Modal(els.confirmActionModal);
     modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());
     handlerModalElement.addEventListener("shown.bs.modal", () => els.handlerNameInput.focus());
+    els.confirmActionButton.addEventListener("click", () => {
+      resolveConfirmation(true);
+      confirmActionModal.hide();
+    });
+    els.confirmActionModal.addEventListener("hidden.bs.modal", () => resolveConfirmation(false));
     db = database;
     await ensureDefaultHandlers();
     if (!window.location.hash) {
