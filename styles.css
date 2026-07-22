@@ -488,6 +488,11 @@
   border-bottom: 1px solid var(--app-border-soft);
 }
 
+.record-fields > div.next-required {
+  background: var(--app-primary-soft);
+  box-shadow: inset 3px 0 var(--app-primary);
+}
+
 .record-fields > div:last-child {
   border-bottom: 0;
 }

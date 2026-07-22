@@ -365,6 +365,7 @@ const els = {
   editAvailabilityInput: document.querySelector("#editAvailabilityInput"),
   statusSelect: document.querySelector("#statusSelect"),
   coordinatorInput: document.querySelector("#coordinatorInput"),
+  coordinatorFieldRow: document.querySelector("#coordinatorFieldRow"),
   nameFact: document.querySelector("#nameFact"),
   personalNumberFact: document.querySelector("#personalNumberFact"),
   languageFact: document.querySelector("#languageFact"),
@@ -807,11 +808,16 @@ function candidatesNeedingAction() {
 }
 
 function candidateNeedsAction(candidate) {
-  return candidate.status !== "Godkänd/Certifierad";
+  return candidate.status !== "Godkänd/Certifierad" || !candidate.coordinatorId;
 }
 
 function isComplete(candidate) {
-  return CHECKS.every(([key]) => candidate.checks?.[key]);
+  return Boolean(
+    candidate.coordinatorId
+    && candidate.interviewDate
+    && candidate.interviewMode
+    && CHECKS.every(([key]) => candidate.checks?.[key])
+  );
 }
 
 function isBlocked(candidate) {
@@ -823,6 +829,16 @@ function nextStepText(candidate) {
 }
 
 function nextActionFor(candidate) {
+  if (!candidate.coordinatorId) {
+    return {
+      key: "coordinatorAssigned",
+      label: "Tilldela handläggare",
+      description: "Utse en ansvarig handläggare innan ärendet går vidare i introduktionsflödet.",
+      tabId: "mentor-base-tab",
+      buttonLabel: "Tilldela handläggare"
+    };
+  }
+
   if (candidate.status === "Godkänd/Certifierad") {
     return {
       key: null,
@@ -1198,6 +1214,7 @@ function renderDetail() {
 
   els.statusSelect.innerHTML = "";
   for (const status of STATUSES) {
+    if (status === "Godkänd/Certifierad" && candidate.status !== "Godkänd/Certifierad") continue;
     const option = document.createElement("option");
     option.value = status;
     option.textContent = status;
@@ -1206,6 +1223,7 @@ function renderDetail() {
   }
 
   populateCoordinatorSelect(candidate);
+  els.coordinatorFieldRow.classList.toggle("next-required", nextAction.key === "coordinatorAssigned");
   els.interviewDateInput.value = candidate.interviewDate || "";
   els.interviewModeInput.value = candidate.interviewMode || "";
   els.notesInput.value = candidate.notes || "";
@@ -1246,7 +1264,7 @@ function renderDetail() {
   els.approveButton.disabled = !complete;
   els.decisionHint.textContent = complete
     ? "Mentorn uppfyller samtliga krav och kan certifieras."
-    : "Alla kontroller, utbildningsmoment och intervjun måste vara klara innan certifiering.";
+    : "Handläggare, samtliga kontroller, intervjutid och intervjuform måste vara registrerade innan certifiering.";
 
   els.auditLog.innerHTML = "";
   for (const item of [...candidate.history].reverse()) {
@@ -1301,14 +1319,21 @@ function showNextAction(candidate) {
   const tabElement = document.querySelector(`#${action.tabId}`);
   if (!tabElement || !window.bootstrap) return;
   bootstrap.Tab.getOrCreateInstance(tabElement).show();
+  if (action.key === "coordinatorAssigned") setPersonEditMode(true);
 
   requestAnimationFrame(() => {
-    const target = action.key === "identityVerified"
+    const target = action.key === "coordinatorAssigned"
+      ? els.coordinatorInput
+      : action.key === "identityVerified"
       ? els.identityPersonalNumberInput
       : action.key === "decision"
       ? els.approveButton
       : action.key === "interviewDone"
-        ? els.interviewDateInput.value ? els.interviewDoneInput : els.interviewDateInput
+        ? !els.interviewDateInput.value
+          ? els.interviewDateInput
+          : !els.interviewModeInput.value
+            ? els.interviewModeInput
+            : els.interviewDoneInput
         : els.checklist.querySelector(`[data-check="${cssEscape(action.key)}"]`);
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
     target?.focus({ preventScroll: true });
@@ -1687,6 +1712,10 @@ els.personEditForm.addEventListener("submit", async (event) => {
   if (!candidate) return;
   const personalNumber = els.editPersonalNumberInput.value.trim();
   const coordinator = handlers.find((handler) => handler.id === els.coordinatorInput.value);
+  const requestedStatus = els.statusSelect.value;
+  const status = candidate.status !== "Godkänd/Certifierad" && requestedStatus === "Godkänd/Certifierad"
+    ? candidate.status
+    : requestedStatus;
   const identityInvalidated = candidate.checks?.identityVerified && personalNumber !== candidate.personalNumber;
   const patch = {
     name: els.editNameInput.value.trim(),
@@ -1694,7 +1723,7 @@ els.personEditForm.addEventListener("submit", async (event) => {
     area: els.editAreaInput.value.trim(),
     languages: els.editLanguagesInput.value.trim(),
     availability: els.editAvailabilityInput.value.trim(),
-    status: els.statusSelect.value,
+    status,
     coordinatorId: coordinator?.id || "",
     coordinator: coordinator?.name || ""
   };
@@ -1754,7 +1783,16 @@ els.checklist.addEventListener("change", async (event) => {
   await updateCandidateCheck(input.dataset.check, input.checked);
 });
 
-els.interviewDoneInput.addEventListener("change", () => updateCandidateCheck("interviewDone", els.interviewDoneInput.checked));
+els.interviewDoneInput.addEventListener("change", async () => {
+  if (els.interviewDoneInput.checked && (!els.interviewDateInput.value || !els.interviewModeInput.value)) {
+    els.interviewDoneInput.checked = false;
+    showFeedback("Ange intervjutid och intervjuform innan intervjun markeras som genomförd.");
+    const missingField = !els.interviewDateInput.value ? els.interviewDateInput : els.interviewModeInput;
+    missingField.focus();
+    return;
+  }
+  await updateCandidateCheck("interviewDone", els.interviewDoneInput.checked);
+});
 
 els.approveButton.addEventListener("click", async () => {
   const candidate = selectedCandidate();
