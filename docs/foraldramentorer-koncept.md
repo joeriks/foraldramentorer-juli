@@ -122,10 +122,53 @@ Prioriterade funktioner:
 
 - Enkel pipeline över kandidater.
 - Status för varje steg i certifieringen.
-- Kandidatdetaljer.
+- Mentordetaljer.
+- Centralt ärenderegister.
+- Personanknutna och generella ärenden.
+- En ansvarig handläggare och flera medhandläggare per ärende.
+- Aktiviteter som handläggarens huvudsakliga arbetsyta.
+- Handlingar och underlag kopplade till ärendet och vid behov till en aktivitet.
+- Automatisk händelselogg när aktiviteter eller handlingar ändras.
 - Intervjuanteckningar.
 - Manuell statusändring.
 - Certifieringsknapp när alla krav är uppfyllda.
 - Lokal datalagring i IndexedDB under prototypfasen.
 
 Denna prototyp är avsiktligt enkel. Målet är att tidigt kunna känna på arbetsflödet, inte att låsa slutlig informationsarkitektur eller visuell identitet.
+
+### Ärendemodell
+
+Ärendet är den sammanhållande handläggningsakten. Ett ärende kan vara kopplat till högst en mentor, medan en mentor kan ha flera ärenden över tid. Generella verksamhetsärenden kan sakna mentorkoppling.
+
+Handläggaren arbetar normalt med aktiviteter. När en aktivitet ändras eller slutförs skapar systemet en händelse i loggen med tidpunkt och användare. Ett dokument, meddelande eller annat underlag registreras som en handling och kan kopplas till den aktivitet där underlaget användes.
+
+Minnesregel:
+
+> Aktivitet = att göra. Händelse = gjort. Handling = underlaget.
+
+Ett certifieringsärende skapas automatiskt för varje ny mentor med aktiviteter för identitet, belastningsregister, referenser, e-learning, kunskapsavstämning, kallelse, intervju och beslut. Handläggaren kan även lägga till fria uppföljningsaktiviteter, exempelvis att kontakta mentorn när en referens inte går att nå.
+
+### Aktiviteter och kommunal handläggningsrutin
+
+Ärendet har en ansvarig handläggare. Aktiviteter ärver normalt denna ansvariga, men kan uttryckligen tilldelas en annan handläggare. Ett byte av ärendeansvarig påverkar endast aktiviteter som använder det ärvda ansvaret.
+
+Aktivitetens status och resultat är två skilda uppgifter:
+
+- Status beskriver arbetet: Ej påbörjad, Pågår, Väntar, Avslutad eller Ej aktuell.
+- Resultat beskriver utfallet och anpassas efter aktivitetstypen.
+
+När en aktivitet avslutas måste handläggaren välja resultat. Ett resultat som inte är godtagbart markerar ärendet som Kräver åtgärd och ligger kvar i arbetskön tills avvikelsen har hanterats. En kort tjänsteanteckning krävs för resultat som behöver följas upp.
+
+För belastningsregister registreras endast neutrala resultat som Visat och kontrollerat, Inte visat eller Äkthet inte bekräftad. Prototypen ska inte uppmana handläggaren att dokumentera innehållet i ett registerutdrag eller att ladda upp en kopia. Den slutliga rutinen måste fastställas utifrån kommunens verksamhet och tillämpligt lagstöd.
+
+Förfallodatum används när det finns en beslutad tidsfrist, bokad tid eller överenskommen återkoppling. Försenade och snart förfallna aktiviteter markeras särskilt. Ändringar av ansvarig, status, resultat och förfallodatum registreras automatiskt i ärendets händelselogg.
+
+Handlingar kan gälla hela ärendet eller kopplas till en viss aktivitet. Kopplingen ska visas både på aktivitetskortet och i ärendets handlingslista.
+
+Dashboardens arbetsköer utgår från den inloggade användaren:
+
+- Mina aktiviteter.
+- Otilldelade aktiviteter.
+- Försenade aktiviteter.
+
+Varje ärende bidrar normalt med nästa relevanta aktivitet. En avslutad aktivitet med ett resultat som kräver uppföljning prioriteras framför senare aktiviteter.

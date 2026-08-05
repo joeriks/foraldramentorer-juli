@@ -1,0 +1,10 @@
+{
+  "name": "foraldramentorer-kommunportal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-sites.mjs",
+    "test": "npm run build && node --test tests/sites-build.test.mjs"
+  }
+}
