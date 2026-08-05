@@ -1136,6 +1136,14 @@
   gap: var(--app-space-4);
 }
 
+.routines-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--app-space-2);
+}
+
 .routines-search {
   max-width: 52rem;
 }

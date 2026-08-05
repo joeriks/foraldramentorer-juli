@@ -22,7 +22,7 @@ import {
   stableHash
 } from "./case-domain.js";
 import { marked } from "./vendor/marked/marked.esm.js";
-import { resolveFeatureLink } from "./feature-links.js";
+import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js";
 
 const DB_NAME = "foraldramentorer";
 const DB_VERSION = 6;
@@ -447,6 +447,7 @@ const els = {
   routinesSearchResults: document.querySelector("#routinesSearchResults"),
   routinesToc: document.querySelector("#routinesToc"),
   routinesContent: document.querySelector("#routinesContent"),
+  copyRoutinesLinkButton: document.querySelector("#copyRoutinesLinkButton"),
   handlerDetailView: document.querySelector("#handlerDetailView"),
   handlerDetailEmpty: document.querySelector("#handlerDetailEmpty"),
   handlerDetail: document.querySelector("#handlerDetail"),
@@ -2014,18 +2015,17 @@ function normalizeRouteView(view) {
   return view;
 }
 
-function routineHeadingId(text, index) {
-  const slug = text
-    .toLocaleLowerCase("sv-SE")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-  return `rutin-${slug || "avsnitt"}-${index + 1}`;
-}
-
 function scrollToRoutineSection(targetId) {
   document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function navigateToRoutineSection(sectionKey) {
+  const route = routineSectionRoute(sectionKey);
+  if (window.location.hash === route) {
+    scrollToRoutineSection(`rutin-${sectionKey}`);
+    return;
+  }
+  window.location.hash = route;
 }
 
 function buildRoutinesNavigation() {
@@ -2034,19 +2034,22 @@ function buildRoutinesNavigation() {
   els.routinesToc.innerHTML = "";
 
   headings.forEach((heading, index) => {
-    heading.id = routineHeadingId(heading.textContent, index);
+    const headingText = heading.textContent;
+    const sectionKey = routineSectionKey(headingText, index);
+    heading.id = `rutin-${sectionKey}`;
+    heading.dataset.routineKey = sectionKey;
     const button = document.createElement("button");
     button.type = "button";
     button.className = `routines-toc-link routines-toc-${heading.tagName.toLowerCase()}`;
-    button.textContent = heading.textContent;
-    button.addEventListener("click", () => scrollToRoutineSection(heading.id));
+    button.textContent = headingText;
+    button.addEventListener("click", () => navigateToRoutineSection(sectionKey));
     els.routinesToc.append(button);
   });
 
   let currentHeading = headings[0]?.id || "";
   els.routinesContent.querySelectorAll("h2, h3, h4, p, li, td").forEach((node) => {
     if (/^H[2-4]$/.test(node.tagName)) {
-      if (!node.id) node.id = routineHeadingId(node.textContent, generatedHeadingIndex++);
+      if (!node.id) node.id = `rutin-${routineSectionKey(node.textContent, generatedHeadingIndex++)}`;
       currentHeading = node.id;
     }
     node.dataset.routineSection = currentHeading;
@@ -2085,13 +2088,20 @@ function searchRoutines() {
     const text = node.textContent.trim();
     excerpt.textContent = text.length > 150 ? `${text.slice(0, 147)}...` : text;
     button.append(title, excerpt);
-    button.addEventListener("click", () => scrollToRoutineSection(sectionId));
+    button.addEventListener("click", () => {
+      const sectionKey = document.getElementById(sectionId)?.dataset.routineKey;
+      if (sectionKey) navigateToRoutineSection(sectionKey);
+      else scrollToRoutineSection(sectionId);
+    });
     els.routinesSearchResults.append(button);
   });
 }
 
-async function loadRoutinesDocument() {
-  if (routinesLoaded) return;
+async function loadRoutinesDocument(sectionKey = "") {
+  if (routinesLoaded) {
+    if (sectionKey) requestAnimationFrame(() => scrollToRoutineSection(`rutin-${sectionKey}`));
+    return;
+  }
   els.routinesContent.innerHTML = '<p class="text-secondary">Läser in rutindokumentet...</p>';
 
   try {
@@ -2123,6 +2133,7 @@ async function loadRoutinesDocument() {
     });
     buildRoutinesNavigation();
     routinesLoaded = true;
+    if (sectionKey) requestAnimationFrame(() => scrollToRoutineSection(`rutin-${sectionKey}`));
   } catch (error) {
     els.routinesContent.innerHTML = `
       <div class="alert alert-danger" role="alert">
@@ -2198,7 +2209,7 @@ function applyRoute() {
   } else if (currentView === "routines") {
     els.pageTitle.textContent = "Rutiner";
     els.breadcrumb.textContent = "Start / Systemadministration / Rutiner";
-    loadRoutinesDocument();
+    loadRoutinesDocument(route.id || "");
   } else {
     els.pageTitle.textContent = "Handläggarkort";
     els.breadcrumb.textContent = "Start / Systemadministration / Handläggarkort";
@@ -4495,6 +4506,20 @@ els.navHandlers.addEventListener("click", (event) => {
 els.navRoutines.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/routines");
+});
+
+els.copyRoutinesLinkButton.addEventListener("click", async () => {
+  const route = window.location.hash.startsWith("#/routines") ? window.location.hash : "#/routines";
+  const url = `${window.location.origin}${window.location.pathname}${route}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    els.copyRoutinesLinkButton.textContent = "Länk kopierad";
+    window.setTimeout(() => {
+      els.copyRoutinesLinkButton.textContent = "Kopiera länk";
+    }, 1800);
+  } catch {
+    showFeedback("Länken kunde inte kopieras automatiskt.");
+  }
 });
 
 els.routinesSearchInput.addEventListener("input", searchRoutines);
