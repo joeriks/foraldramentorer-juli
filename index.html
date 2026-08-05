@@ -228,12 +228,12 @@
                     <label class="form-label" for="caseStatusFilter">Status</label>
                     <select id="caseStatusFilter" class="form-select form-select-sm">
                       <option value="">Alla statusar</option>
-                      <option>Nytt</option>
-                      <option>Pågår</option>
-                      <option>Väntar</option>
-                      <option>Kräver åtgärd</option>
-                      <option>Redo för beslut</option>
-                      <option>Avslutat</option>
+                      <option value="new">Nytt</option>
+                      <option value="in_progress">Pågår</option>
+                      <option value="waiting">Väntar</option>
+                      <option value="paused">Pausat</option>
+                      <option value="decision_required">Ställningstagande krävs</option>
+                      <option value="closed">Avslutat</option>
                     </select>
                   </div>
                 </div>
@@ -305,11 +305,11 @@
                         <label class="form-label" for="caseTypeInput">Ärendetyp</label>
                         <select id="caseTypeInput" class="form-select form-select-sm" required>
                           <option value="">Välj ärendetyp</option>
-                          <option>Certifiering av mentor</option>
-                          <option>Uppföljning</option>
-                          <option>Rekryteringsinsats</option>
-                          <option>Behovsanalys</option>
-                          <option>Övrigt ärende</option>
+                          <option value="mentor-certification">Certifiering av mentor</option>
+                          <option value="mentor-follow-up">Uppföljning</option>
+                          <option value="recruitment">Rekryteringsinsats</option>
+                          <option value="needs-analysis">Behovsanalys</option>
+                          <option value="other">Övrigt ärende</option>
                         </select>
                       </div>
                       <div class="col-md-6">
@@ -322,29 +322,30 @@
                         <input id="caseMentorIdInput" type="hidden">
                         <div id="caseMentorSuggestions" class="mentor-suggestions list-group mt-1" hidden></div>
                       </div>
-                      <div class="col-md-6">
-                        <label class="form-label" for="caseOwnerInput">Ansvarig handläggare</label>
-                        <select id="caseOwnerInput" class="form-select form-select-sm" required></select>
+                      <div class="col-12"><div id="caseDuplicatePanel" class="alert alert-warning py-2 mb-0" hidden></div></div>
+                      <div class="col-12">
+                        <label class="form-label" for="caseDescriptionInput">Kort beskrivning</label>
+                        <textarea id="caseDescriptionInput" class="form-control form-control-sm" rows="3"></textarea>
                       </div>
-                      <div class="col-md-6">
+                      <div class="col-md-6 case-advanced-field">
+                        <label class="form-label" for="caseOwnerInput">Ansvarig handläggare</label>
+                        <select id="caseOwnerInput" class="form-select form-select-sm"></select>
+                      </div>
+                      <div class="col-md-6 case-advanced-field">
                         <label class="form-label" for="casePriorityInput">Prioritet</label>
                         <select id="casePriorityInput" class="form-select form-select-sm">
-                          <option>Normal</option>
-                          <option>Hög</option>
-                          <option>Låg</option>
+                          <option value="normal">Normal</option>
+                          <option value="high">Hög</option>
+                          <option value="low">Låg</option>
                         </select>
                       </div>
-                      <div class="col-md-6">
+                      <div class="col-md-6 case-advanced-field">
                         <label class="form-label" for="caseDueDateInput">Förfallodatum <span class="text-secondary fw-normal">(valfritt)</span></label>
                         <input id="caseDueDateInput" class="form-control form-control-sm" type="date">
                       </div>
-                      <div class="col-12">
-                        <label class="form-label" for="caseDescriptionInput">Beskrivning</label>
-                        <textarea id="caseDescriptionInput" class="form-control form-control-sm" rows="4"></textarea>
-                      </div>
                     </div>
                   </section>
-                  <section class="record-section">
+                  <section class="record-section case-advanced-field">
                     <h3 class="record-section-title">Medhandläggare</h3>
                     <div id="caseCoHandlerInputs" class="case-cohandlers border rounded"></div>
                   </section>
@@ -360,6 +361,7 @@
                   <li class="nav-item"><button class="nav-link active" id="case-overview-tab" data-bs-toggle="tab" data-bs-target="#case-overview-pane" type="button">Översikt</button></li>
                   <li class="nav-item"><button class="nav-link" id="case-activities-tab" data-bs-toggle="tab" data-bs-target="#case-activities-pane" type="button">Aktiviteter <span id="caseActivityCount" class="tab-count">0</span></button></li>
                   <li class="nav-item"><button class="nav-link" id="case-documents-tab" data-bs-toggle="tab" data-bs-target="#case-documents-pane" type="button">Handlingar <span id="caseDocumentCount" class="tab-count">0</span></button></li>
+                  <li class="nav-item"><button class="nav-link" id="case-meetings-tab" data-bs-toggle="tab" data-bs-target="#case-meetings-pane" type="button">Möten <span id="caseMeetingCount" class="tab-count">0</span></button></li>
                   <li class="nav-item"><button class="nav-link" id="case-events-tab" data-bs-toggle="tab" data-bs-target="#case-events-pane" type="button">Logg <span id="caseEventCount" class="tab-count">0</span></button></li>
                 </ul>
                 <div class="tab-content">
@@ -383,6 +385,13 @@
                           <div><dt>Skapat</dt><dd id="caseCreatedFact"></dd></div>
                         </dl>
                       </section>
+                    </div>
+                    <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
+                      <button id="completeCaseButton" type="button" class="btn btn-outline-primary btn-sm">Komplettera ärendet</button>
+                      <button id="pauseCaseButton" type="button" class="btn btn-outline-warning btn-sm">Pausa</button>
+                      <button id="resumeCaseButton" type="button" class="btn btn-outline-primary btn-sm" hidden>Återuppta</button>
+                      <button id="closeCaseButton" type="button" class="btn btn-outline-danger btn-sm">Avsluta</button>
+                      <button id="reopenCaseButton" type="button" class="btn btn-outline-primary btn-sm" hidden>Återöppna</button>
                     </div>
                   </section>
                   <section class="tab-pane fade card-body" id="case-activities-pane">
@@ -411,11 +420,11 @@
                           <div class="col-md-6">
                             <label class="form-label" for="activityDetailStatusInput">Status</label>
                             <select id="activityDetailStatusInput" class="form-select form-select-sm">
-                              <option value="Ej påbörjad">Ej påbörjad</option>
-                              <option value="Pågår">Pågår</option>
-                              <option value="Väntar">Väntar</option>
-                              <option value="Klar">Avslutad</option>
-                              <option value="Ej aktuell">Ej aktuell</option>
+                              <option value="not_started">Ej påbörjad</option>
+                              <option value="in_progress">Pågår</option>
+                              <option value="waiting">Väntar</option>
+                              <option value="completed">Avslutad</option>
+                              <option value="not_applicable">Ej aktuell</option>
                             </select>
                           </div>
                           <div class="col-md-6">
@@ -439,9 +448,23 @@
                         </div>
                         <div class="activity-save-bar mt-3">
                           <span id="activityDetailSaveState" class="small text-secondary">Inga osparade ändringar</span>
-                          <button id="activityDetailSaveButton" type="submit" class="btn btn-primary btn-sm" disabled>Spara ändringar</button>
+                          <div class="d-flex gap-2">
+                            <button id="reopenActivityButton" type="button" class="btn btn-outline-primary btn-sm" hidden>Återöppna aktivitet</button>
+                            <button id="activityDetailSaveButton" type="submit" class="btn btn-primary btn-sm" disabled>Spara ändringar</button>
+                          </div>
                         </div>
                       </form>
+                      <section id="activityDeviationPanel" class="activity-deviation-panel border-top" hidden>
+                        <h4 class="h6">Ställningstagande krävs</h4>
+                        <p class="small text-secondary">Aktivitetsresultatet är avvikande. Ansvarig handläggare behöver besluta hur ärendet ska fortsätta.</p>
+                        <div class="row g-3">
+                          <div class="col-md-6"><label class="form-label" for="deviationOutcomeInput">Ställningstagande</label><select id="deviationOutcomeInput" class="form-select form-select-sm"><option value="continue">Fortsätt handläggningen</option><option value="request_supplement">Begär komplettering</option><option value="pause_case">Pausa ärendet</option><option value="close_case">Avsluta ärendet</option></select></div>
+                          <div class="col-md-6"><label class="form-label" for="deviationReasonInput">Orsak</label><select id="deviationReasonInput" class="form-select form-select-sm" required><option value="">Välj orsak</option><option value="insufficient_information">Otillräckligt underlag</option><option value="unsuitable">Bedöms inte lämplig</option><option value="awaiting_supplement">Inväntar komplettering</option><option value="other">Annan orsak</option></select></div>
+                          <div class="col-md-6"><label class="form-label" for="deviationResumeDateInput">Bevakningsdatum <span class="text-secondary fw-normal">(valfritt)</span></label><input id="deviationResumeDateInput" class="form-control form-control-sm" type="date"></div>
+                          <div class="col-12"><label class="form-label" for="deviationNoteInput">Motivering</label><textarea id="deviationNoteInput" class="form-control form-control-sm" rows="3" required></textarea></div>
+                        </div>
+                        <div class="d-flex justify-content-end mt-3"><button id="saveDeviationDecisionButton" type="button" class="btn btn-danger btn-sm">Registrera ställningstagande</button></div>
+                      </section>
                       <section class="activity-documents border-top">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                           <div>
@@ -467,14 +490,14 @@
                         </div>
                         <dl class="activity-summary-counts mb-0">
                           <div><dt id="activityOpenCount">0</dt><dd>Återstår</dd></div>
-                          <div><dt id="activityAttentionCount">0</dt><dd>Kräver åtgärd</dd></div>
+                          <div><dt id="activityAttentionCount">0</dt><dd>Ställningstagande</dd></div>
                         </dl>
                       </section>
                       <div class="activity-list-toolbar">
                         <div class="btn-group btn-group-sm" role="group" aria-label="Filtrera aktiviteter">
                           <button type="button" class="btn btn-outline-secondary active" data-activity-filter="all">Alla</button>
                           <button type="button" class="btn btn-outline-secondary" data-activity-filter="open">Öppna</button>
-                          <button type="button" class="btn btn-outline-secondary" data-activity-filter="attention">Kräver åtgärd</button>
+                          <button type="button" class="btn btn-outline-secondary" data-activity-filter="attention">Ställningstagande</button>
                           <button type="button" class="btn btn-outline-secondary" data-activity-filter="done">Avslutade</button>
                         </div>
                         <span id="activityFilteredCount" class="small text-secondary"></span>
@@ -510,16 +533,32 @@
                         <span>Handlingen gäller hela ärendet.</span>
                       </div>
                       <div class="row g-3">
-                        <div class="col-md-3"><label class="form-label" for="documentTypeInput">Typ</label><select id="documentTypeInput" class="form-select form-select-sm"><option>Inkommen handling</option><option>Upprättad handling</option><option>Anteckning</option></select></div>
+                        <div class="col-md-3"><label class="form-label" for="documentTypeInput">Typ</label><select id="documentTypeInput" class="form-select form-select-sm"><option value="incoming">Inkommen handling</option><option value="created">Upprättad handling</option><option value="service_note">Tjänsteanteckning</option></select></div>
                         <div class="col-md-3"><label class="form-label" for="documentActivityInput">Kopplad aktivitet</label><select id="documentActivityInput" class="form-select form-select-sm"><option value="">Hela ärendet</option></select></div>
                         <div class="col-md-4"><label class="form-label" for="documentTitleInput">Rubrik</label><input id="documentTitleInput" class="form-control form-control-sm" required autocomplete="off"></div>
                         <div class="col-md-2"><label class="form-label" for="documentDateInput">Datum</label><input id="documentDateInput" class="form-control form-control-sm" type="date" required></div>
+                        <div class="col-md-6"><label class="form-label" for="documentFileInput">Fil <span class="text-secondary fw-normal">(valfritt för tjänsteanteckning)</span></label><input id="documentFileInput" class="form-control form-control-sm" type="file"></div>
+                        <div class="col-md-6"><label class="form-label" for="documentInformationClassInput">Informationsklass</label><select id="documentInformationClassInput" class="form-select form-select-sm"><option value="normal">Normal</option><option value="restricted">Begränsad</option></select></div>
                         <div class="col-12"><label class="form-label" for="documentDescriptionInput">Beskrivning</label><textarea id="documentDescriptionInput" class="form-control form-control-sm" rows="2"></textarea></div>
                       </div>
                       <div class="d-flex justify-content-end mt-3"><button type="submit" class="btn btn-primary btn-sm">Registrera handling</button></div>
                     </form>
                     <div id="caseDocumentsEmpty" class="empty-list border rounded text-secondary">Inga handlingar har registrerats.</div>
                     <div id="caseDocumentsList" class="document-list"></div>
+                  </section>
+                  <section class="tab-pane fade card-body" id="case-meetings-pane">
+                    <form id="caseMeetingForm" class="inline-editor border rounded mb-3">
+                      <div class="row g-3">
+                        <div class="col-md-3"><label class="form-label" for="caseMeetingTypeInput">Mötestyp</label><select id="caseMeetingTypeInput" class="form-select form-select-sm"><option value="certification_interview">Certifieringsintervju</option><option value="follow_up">Uppföljning</option><option value="other">Annat möte</option></select></div>
+                        <div class="col-md-3"><label class="form-label" for="caseMeetingDateInput">Tidpunkt</label><input id="caseMeetingDateInput" class="form-control form-control-sm" type="datetime-local" required></div>
+                        <div class="col-md-3"><label class="form-label" for="caseMeetingModeInput">Mötesform</label><select id="caseMeetingModeInput" class="form-select form-select-sm"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option></select></div>
+                        <div class="col-md-3"><label class="form-label" for="caseMeetingActivityInput">Kopplad aktivitet</label><select id="caseMeetingActivityInput" class="form-select form-select-sm"><option value="">Ingen</option></select></div>
+                        <div class="col-12"><label class="form-label" for="caseMeetingSummaryInput">Sammanfattning</label><textarea id="caseMeetingSummaryInput" class="form-control form-control-sm" rows="3" required></textarea></div>
+                      </div>
+                      <div class="d-flex justify-content-end mt-3"><button type="submit" class="btn btn-primary btn-sm">Registrera möte</button></div>
+                    </form>
+                    <div id="caseMeetingsEmpty" class="empty-list border rounded text-secondary">Inga möten har registrerats.</div>
+                    <div id="caseMeetingsList" class="document-list"></div>
                   </section>
                   <section class="tab-pane fade card-body" id="case-events-pane">
                     <div class="table-responsive border rounded">
@@ -732,7 +771,7 @@
                     <div class="dropdown">
                       <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Fler åtgärder</button>
                       <ul class="dropdown-menu dropdown-menu-end">
-                        <li><button id="deleteButton" type="button" class="dropdown-item text-danger">Ta bort mentorpost</button></li>
+                        <li><button id="deleteButton" type="button" class="dropdown-item text-danger">Inaktivera mentor</button></li>
                       </ul>
                     </div>
                   </div>
@@ -812,7 +851,7 @@
                       <h3 class="record-section-title">Personuppgifter</h3>
                       <dl class="record-fields record-fields-edit mb-0">
                         <div><dt><label for="editNameInput">Namn</label></dt><dd><input id="editNameInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
-                        <div><dt><label for="editPersonalNumberInput">Personnummer</label></dt><dd><input id="editPersonalNumberInput" class="form-control form-control-sm" required inputmode="numeric" autocomplete="off" placeholder="ÅÅÅÅMMDD-XXXX" pattern="(19|20)[0-9]{6}-?[0-9]{4}"></dd></div>
+                        <div><dt><label for="editPersonalNumberInput">Personnummer</label></dt><dd><input id="editPersonalNumberInput" class="form-control form-control-sm" disabled></dd></div>
                         <div><dt><label for="editAreaInput">Område</label></dt><dd><input id="editAreaInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
                         <div><dt><label for="editLanguagesInput">Språk</label></dt><dd><input id="editLanguagesInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
                         <div><dt><label for="editAvailabilityInput">Tillgänglighet</label></dt><dd><input id="editAvailabilityInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
@@ -821,7 +860,7 @@
                     <section class="record-section mt-4">
                       <h3 class="record-section-title">Ärendeuppgifter</h3>
                       <dl class="record-fields record-fields-edit mb-0">
-                        <div><dt><label for="statusSelect">Status</label></dt><dd><select id="statusSelect" class="form-select form-select-sm"></select></dd></div>
+                        <div><dt><label for="statusSelect">Status</label></dt><dd><select id="statusSelect" class="form-select form-select-sm" disabled></select></dd></div>
                         <div id="coordinatorFieldRow"><dt><label for="coordinatorInput">Handläggare</label></dt><dd><select id="coordinatorInput" class="form-select form-select-sm"></select></dd></div>
                         <div><dt>Identitetsverifiering</dt><dd id="identityMethodEditFact"></dd></div>
                         <div><dt>Nästa steg</dt><dd id="nextStepEditFact"></dd></div>
@@ -970,7 +1009,7 @@
                         </div>
                       </div>
                       <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mt-3">
-                        <button id="deleteMeetingButton" type="button" class="btn btn-outline-danger btn-sm" hidden>Ta bort</button>
+                        <span class="small text-secondary">Ändringar sparas i ärendeloggen.</span>
                         <button type="submit" class="btn btn-primary btn-sm ms-auto">Spara möte</button>
                       </div>
                     </form>
@@ -1107,6 +1146,24 @@
       </div>
     </div>
 
+    <div class="modal fade" id="caseLifecycleModal" tabindex="-1" aria-labelledby="caseLifecycleTitle" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <form id="caseLifecycleForm" class="modal-content">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow mb-1">Ärendeåtgärd</p><h2 id="caseLifecycleTitle" class="modal-title h5">Ändra ärendet</h2></div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button>
+          </div>
+          <div class="modal-body">
+            <p id="caseLifecycleDescription" class="text-secondary"></p>
+            <div class="mb-3"><label class="form-label" for="caseLifecycleReasonInput">Orsak</label><select id="caseLifecycleReasonInput" class="form-select" required><option value="">Välj orsak</option><option value="awaiting_information">Inväntar information</option><option value="work_paused">Handläggningen pausad</option><option value="completed">Handläggningen slutförd</option><option value="unsuitable">Mentorn bedöms inte lämplig</option><option value="correction">Rättelse eller ny information</option><option value="other">Annan orsak</option></select></div>
+            <div id="caseLifecycleResumeRow" class="mb-3" hidden><label class="form-label" for="caseLifecycleResumeInput">Bevakningsdatum <span class="text-secondary fw-normal">(valfritt)</span></label><input id="caseLifecycleResumeInput" class="form-control" type="date"></div>
+            <div><label class="form-label" for="caseLifecycleNoteInput">Motivering</label><textarea id="caseLifecycleNoteInput" class="form-control" rows="4" required></textarea></div>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Avbryt</button><button id="caseLifecycleSubmitButton" type="submit" class="btn btn-primary">Bekräfta</button></div>
+        </form>
+      </div>
+    </div>
+
     <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-labelledby="confirmActionTitle" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content confirm-action-modal">
@@ -1138,6 +1195,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="app.js?v=20260724-activity-register2"></script>
+    <script type="module" src="app.js?v=20260805-case-domain-v6"></script>
   </body>
 </html>

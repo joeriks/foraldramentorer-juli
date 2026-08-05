@@ -1,5 +1,7 @@
 # FöräldraMentorer - koncept och systemskiss
 
+Teknisk fördjupning: [Progressiv ärendehantering](teknisk-specifikation-progressiv-arendehantering.md)
+
 ## Övergripande idé
 
 FöräldraMentorer är en webbtjänst för kommuner som vill koppla samman erfarna seniorer med föräldrar som behöver ett tryggt, mänskligt och prestigelöst stöd i vardagen.

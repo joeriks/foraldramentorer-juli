@@ -1315,10 +1315,24 @@
   }
 
   .detail-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     padding-left: var(--app-space-3);
     padding-right: var(--app-space-3);
-    overflow-x: auto;
-    flex-wrap: nowrap;
+    overflow: visible;
+    gap: var(--app-space-1);
+  }
+
+  .detail-tabs .nav-item,
+  .detail-tabs .nav-link {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .detail-tabs .nav-link {
+    padding-right: var(--app-space-2);
+    padding-left: var(--app-space-2);
+    white-space: normal;
   }
 
   .record-meta {

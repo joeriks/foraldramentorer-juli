@@ -1,5 +1,27 @@
+import {
+  ACTIVITY_STATUS_LABELS,
+  ACTIVITY_TEMPLATES,
+  AD_HOC_ACTIVITY_TEMPLATE_ID,
+  CASE_STATUS_LABELS,
+  CASE_TYPE_DEFINITIONS,
+  DEFAULT_ORGANIZATION_UNIT_ID,
+  DEFAULT_TENANT_ID,
+  activityStatusLabel as domainActivityStatusLabel,
+  activityTemplateById,
+  canTransitionActivity,
+  caseStatusLabel,
+  caseTypeById,
+  caseTypeByName,
+  deriveCaseStatus as deriveDomainCaseStatus,
+  normalizeActivityStatus,
+  normalizeCaseStatus,
+  resultClassification,
+  resultOptions,
+  stableHash
+} from "./case-domain.js";
+
 const DB_NAME = "foraldramentorer";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const STORE = "candidates";
 const HANDLERS_STORE = "handlers";
 const MEETINGS_STORE = "meetings";
@@ -9,6 +31,13 @@ const CASE_ASSIGNMENTS_STORE = "caseAssignments";
 const CASE_ACTIVITIES_STORE = "caseActivities";
 const CASE_DOCUMENTS_STORE = "caseDocuments";
 const CASE_EVENTS_STORE = "caseEvents";
+const ACTIVITY_DEVIATIONS_STORE = "activityDeviations";
+const DEVIATION_DECISIONS_STORE = "deviationDecisions";
+const CASE_MEETINGS_STORE = "caseMeetings";
+const CASE_DOCUMENT_BLOBS_STORE = "caseDocumentBlobs";
+const CASE_TYPE_DEFINITIONS_STORE = "caseTypeDefinitions";
+const ACTIVITY_TEMPLATE_DEFINITIONS_STORE = "activityTemplateDefinitions";
+const PROCESSED_COMMANDS_STORE = "processedCommands";
 const CURRENT_USER_ID = "handler-sara";
 
 const STATUSES = [
@@ -41,64 +70,16 @@ const CERTIFICATION_ACTIVITIES = [
   ["decision", "Fatta beslut om godkännande"]
 ];
 
-const CASE_STATUSES = ["Nytt", "Pågår", "Väntar", "Kräver åtgärd", "Redo för beslut", "Avslutat"];
+const CASE_STATUSES = Object.keys(CASE_STATUS_LABELS);
 const CASE_PAGE_SIZE = 50;
-const ACTIVITY_RESULT_OPTIONS = {
-  identityVerified: [
-    ["verified", "Verifierad"],
-    ["not_verified", "Inte verifierad"]
-  ],
-  registryChecked: [
-    ["shown_checked", "Visat och kontrollerat"],
-    ["not_shown", "Inte visat"],
-    ["authenticity_unconfirmed", "Äkthet inte bekräftad"]
-  ],
-  referencesDone: [
-    ["acceptable", "Godtagbara"],
-    ["not_acceptable", "Inte godtagbara"],
-    ["incomplete", "Ofullständiga"]
-  ],
-  trainingDone: [
-    ["completed", "Genomförd"],
-    ["not_completed", "Inte genomförd"]
-  ],
-  quizDone: [
-    ["passed", "Godkänd"],
-    ["not_passed", "Inte godkänd"]
-  ],
-  inviteInterview: [
-    ["invitation_sent", "Kallelse skickad"],
-    ["not_reached", "Kunde inte nå personen"]
-  ],
-  interviewDone: [
-    ["completed", "Genomförd"],
-    ["cancelled", "Inställd"],
-    ["no_show", "Uteblev"]
-  ],
-  decision: [
-    ["approved", "Godkänd"],
-    ["not_approved", "Inte godkänd"]
-  ],
-  default: [
-    ["completed", "Genomförd"],
-    ["not_completed", "Kunde inte genomföras"],
-    ["not_assessable", "Ej bedömningsbar"]
-  ]
-};
-const BLOCKING_ACTIVITY_RESULTS = new Set([
-  "not_verified",
-  "not_shown",
-  "authenticity_unconfirmed",
-  "not_acceptable",
-  "incomplete",
-  "not_completed",
-  "not_passed",
-  "not_reached",
-  "cancelled",
-  "no_show",
-  "not_approved",
-  "not_assessable"
-]);
+const ACTIVITY_RESULT_OPTIONS = Object.fromEntries(ACTIVITY_TEMPLATES.map((template) => [
+  template.id,
+  resultOptions(template.id)
+]));
+ACTIVITY_RESULT_OPTIONS.default = resultOptions(AD_HOC_ACTIVITY_TEMPLATE_ID);
+const BLOCKING_ACTIVITY_RESULTS = new Set(ACTIVITY_TEMPLATES.flatMap((template) => template.results
+  .filter(([, , classification]) => classification === "deviation")
+  .map(([code]) => code)));
 
 const NEXT_ACTIONS = [
   {
@@ -331,9 +312,9 @@ const exampleLastNames = [
 ];
 
 const seedHandlers = [
-  { id: "handler-maja", userId: "FMU-1001", name: "Maja Ekström", email: "maja.ekstrom@kommun.example", role: "Handläggare", active: true },
-  { id: "handler-jonas", userId: "FMU-1002", name: "Jonas Berg", email: "jonas.berg@kommun.example", role: "Handläggare", active: true },
-  { id: "handler-sara", userId: "FMU-1003", name: "Sara Lind", email: "sara.lind@kommun.example", role: "Samordnare", active: true }
+  { id: "handler-maja", tenantId: DEFAULT_TENANT_ID, userId: "FMU-1001", name: "Maja Ekström", email: "maja.ekstrom@kommun.example", role: "Handläggare", active: true },
+  { id: "handler-jonas", tenantId: DEFAULT_TENANT_ID, userId: "FMU-1002", name: "Jonas Berg", email: "jonas.berg@kommun.example", role: "Handläggare", active: true },
+  { id: "handler-sara", tenantId: DEFAULT_TENANT_ID, userId: "FMU-1003", name: "Sara Lind", email: "sara.lind@kommun.example", role: "Samordnare", active: true }
 ];
 
 const PRESENTATION_STEPS = [
@@ -391,6 +372,9 @@ let caseAssignments = [];
 let caseActivities = [];
 let caseDocuments = [];
 let caseEvents = [];
+let activityDeviations = [];
+let deviationDecisions = [];
+let caseMeetings = [];
 let selectedPresentationStepId = PRESENTATION_STEPS[0].id;
 let selectedId = null;
 let selectedCaseRecordId = null;
@@ -412,6 +396,8 @@ let selectedHandlerId = null;
 let selectedMeetingId = null;
 let confirmActionModal;
 let pendingConfirmation = null;
+let caseLifecycleModal;
+let pendingCaseLifecycleAction = null;
 let identityEditMode = false;
 let caseEditMode = false;
 let selectedCaseActivityId = null;
@@ -481,6 +467,7 @@ const els = {
   caseMentorInput: document.querySelector("#caseMentorInput"),
   caseMentorIdInput: document.querySelector("#caseMentorIdInput"),
   caseMentorSuggestions: document.querySelector("#caseMentorSuggestions"),
+  caseDuplicatePanel: document.querySelector("#caseDuplicatePanel"),
   caseOwnerInput: document.querySelector("#caseOwnerInput"),
   casePriorityInput: document.querySelector("#casePriorityInput"),
   caseDueDateInput: document.querySelector("#caseDueDateInput"),
@@ -490,8 +477,14 @@ const els = {
   saveCaseButton: document.querySelector("#saveCaseButton"),
   editCaseButton: document.querySelector("#editCaseButton"),
   newCaseActivityButton: document.querySelector("#newCaseActivityButton"),
+  completeCaseButton: document.querySelector("#completeCaseButton"),
+  pauseCaseButton: document.querySelector("#pauseCaseButton"),
+  resumeCaseButton: document.querySelector("#resumeCaseButton"),
+  closeCaseButton: document.querySelector("#closeCaseButton"),
+  reopenCaseButton: document.querySelector("#reopenCaseButton"),
   caseActivityCount: document.querySelector("#caseActivityCount"),
   caseDocumentCount: document.querySelector("#caseDocumentCount"),
+  caseMeetingCount: document.querySelector("#caseMeetingCount"),
   caseEventCount: document.querySelector("#caseEventCount"),
   caseStatusFact: document.querySelector("#caseStatusFact"),
   casePriorityFact: document.querySelector("#casePriorityFact"),
@@ -534,6 +527,13 @@ const els = {
   activityDetailNoteInput: document.querySelector("#activityDetailNoteInput"),
   activityDetailSaveState: document.querySelector("#activityDetailSaveState"),
   activityDetailSaveButton: document.querySelector("#activityDetailSaveButton"),
+  reopenActivityButton: document.querySelector("#reopenActivityButton"),
+  activityDeviationPanel: document.querySelector("#activityDeviationPanel"),
+  deviationOutcomeInput: document.querySelector("#deviationOutcomeInput"),
+  deviationReasonInput: document.querySelector("#deviationReasonInput"),
+  deviationResumeDateInput: document.querySelector("#deviationResumeDateInput"),
+  deviationNoteInput: document.querySelector("#deviationNoteInput"),
+  saveDeviationDecisionButton: document.querySelector("#saveDeviationDecisionButton"),
   activityDocumentsSummary: document.querySelector("#activityDocumentsSummary"),
   activityDocumentsList: document.querySelector("#activityDocumentsList"),
   addActivityDocumentButton: document.querySelector("#addActivityDocumentButton"),
@@ -544,8 +544,18 @@ const els = {
   documentTitleInput: document.querySelector("#documentTitleInput"),
   documentDateInput: document.querySelector("#documentDateInput"),
   documentDescriptionInput: document.querySelector("#documentDescriptionInput"),
+  documentFileInput: document.querySelector("#documentFileInput"),
+  documentInformationClassInput: document.querySelector("#documentInformationClassInput"),
   caseDocumentsEmpty: document.querySelector("#caseDocumentsEmpty"),
   caseDocumentsList: document.querySelector("#caseDocumentsList"),
+  caseMeetingForm: document.querySelector("#caseMeetingForm"),
+  caseMeetingTypeInput: document.querySelector("#caseMeetingTypeInput"),
+  caseMeetingDateInput: document.querySelector("#caseMeetingDateInput"),
+  caseMeetingModeInput: document.querySelector("#caseMeetingModeInput"),
+  caseMeetingActivityInput: document.querySelector("#caseMeetingActivityInput"),
+  caseMeetingSummaryInput: document.querySelector("#caseMeetingSummaryInput"),
+  caseMeetingsEmpty: document.querySelector("#caseMeetingsEmpty"),
+  caseMeetingsList: document.querySelector("#caseMeetingsList"),
   caseEventTableBody: document.querySelector("#caseEventTableBody"),
   seedButton: document.querySelector("#seedButton"),
   exampleDataMenu: document.querySelector("#exampleDataMenu"),
@@ -661,7 +671,6 @@ const els = {
   meetingForm: document.querySelector("#meetingForm"),
   meetingFormTitle: document.querySelector("#meetingFormTitle"),
   cancelMeetingButton: document.querySelector("#cancelMeetingButton"),
-  deleteMeetingButton: document.querySelector("#deleteMeetingButton"),
   meetingTypeInput: document.querySelector("#meetingTypeInput"),
   meetingDateInput: document.querySelector("#meetingDateInput"),
   meetingModeInput: document.querySelector("#meetingModeInput"),
@@ -677,6 +686,15 @@ const els = {
   saveStatus: document.querySelector("#saveStatus"),
   feedbackToast: document.querySelector("#feedbackToast"),
   feedbackToastBody: document.querySelector("#feedbackToastBody"),
+  caseLifecycleModal: document.querySelector("#caseLifecycleModal"),
+  caseLifecycleForm: document.querySelector("#caseLifecycleForm"),
+  caseLifecycleTitle: document.querySelector("#caseLifecycleTitle"),
+  caseLifecycleDescription: document.querySelector("#caseLifecycleDescription"),
+  caseLifecycleReasonInput: document.querySelector("#caseLifecycleReasonInput"),
+  caseLifecycleResumeRow: document.querySelector("#caseLifecycleResumeRow"),
+  caseLifecycleResumeInput: document.querySelector("#caseLifecycleResumeInput"),
+  caseLifecycleNoteInput: document.querySelector("#caseLifecycleNoteInput"),
+  caseLifecycleSubmitButton: document.querySelector("#caseLifecycleSubmitButton"),
   confirmActionModal: document.querySelector("#confirmActionModal"),
   confirmActionEyebrow: document.querySelector("#confirmActionEyebrow"),
   confirmActionTitle: document.querySelector("#confirmActionTitle"),
@@ -733,6 +751,13 @@ function openDatabase() {
 
     request.onupgradeneeded = () => {
       const nextDb = request.result;
+      const upgradeTransaction = request.transaction;
+      const ensureStore = (name, options = { keyPath: "id" }) => nextDb.objectStoreNames.contains(name)
+        ? upgradeTransaction.objectStore(name)
+        : nextDb.createObjectStore(name, options);
+      const ensureIndex = (store, name, keyPath, options = { unique: false }) => {
+        if (!store.indexNames.contains(name)) store.createIndex(name, keyPath, options);
+      };
       if (!nextDb.objectStoreNames.contains(STORE)) {
         nextDb.createObjectStore(STORE, { keyPath: "id" });
       }
@@ -748,26 +773,61 @@ function openDatabase() {
         commentStore.createIndex("stepId", "stepId", { unique: false });
       }
       if (!nextDb.objectStoreNames.contains(CASES_STORE)) {
-        const caseStore = nextDb.createObjectStore(CASES_STORE, { keyPath: "id" });
-        caseStore.createIndex("mentorId", "mentorId", { unique: false });
+        nextDb.createObjectStore(CASES_STORE, { keyPath: "id" });
       }
+      const caseStore = ensureStore(CASES_STORE);
+      ensureIndex(caseStore, "mentorId", "mentorId");
+      ensureIndex(caseStore, "tenantNumber", ["tenantId", "number"], { unique: true });
+      ensureIndex(caseStore, "tenantStatus", ["tenantId", "status"]);
+      ensureIndex(caseStore, "tenantMentor", ["tenantId", "mentorId"]);
+      ensureIndex(caseStore, "tenantOrganizationUnit", ["tenantId", "organizationUnitId"]);
+      ensureIndex(caseStore, "tenantUpdatedAt", ["tenantId", "updatedAt"]);
       if (!nextDb.objectStoreNames.contains(CASE_ASSIGNMENTS_STORE)) {
-        const assignmentStore = nextDb.createObjectStore(CASE_ASSIGNMENTS_STORE, { keyPath: "id" });
-        assignmentStore.createIndex("caseId", "caseId", { unique: false });
-        assignmentStore.createIndex("handlerId", "handlerId", { unique: false });
+        nextDb.createObjectStore(CASE_ASSIGNMENTS_STORE, { keyPath: "id" });
       }
+      const assignmentStore = ensureStore(CASE_ASSIGNMENTS_STORE);
+      ensureIndex(assignmentStore, "caseId", "caseId");
+      ensureIndex(assignmentStore, "handlerId", "handlerId");
+      ensureIndex(assignmentStore, "tenantCase", ["tenantId", "caseId"]);
+      ensureIndex(assignmentStore, "tenantHandler", ["tenantId", "handlerId"]);
       if (!nextDb.objectStoreNames.contains(CASE_ACTIVITIES_STORE)) {
-        const activityStore = nextDb.createObjectStore(CASE_ACTIVITIES_STORE, { keyPath: "id" });
-        activityStore.createIndex("caseId", "caseId", { unique: false });
+        nextDb.createObjectStore(CASE_ACTIVITIES_STORE, { keyPath: "id" });
       }
+      const activityStore = ensureStore(CASE_ACTIVITIES_STORE);
+      ensureIndex(activityStore, "caseId", "caseId");
+      ensureIndex(activityStore, "tenantCase", ["tenantId", "caseId"]);
+      ensureIndex(activityStore, "tenantStatus", ["tenantId", "status"]);
+      ensureIndex(activityStore, "tenantHandler", ["tenantId", "handlerIdOverride"]);
+      ensureIndex(activityStore, "tenantDueDate", ["tenantId", "dueDate"]);
       if (!nextDb.objectStoreNames.contains(CASE_DOCUMENTS_STORE)) {
-        const documentStore = nextDb.createObjectStore(CASE_DOCUMENTS_STORE, { keyPath: "id" });
-        documentStore.createIndex("caseId", "caseId", { unique: false });
+        nextDb.createObjectStore(CASE_DOCUMENTS_STORE, { keyPath: "id" });
       }
+      const documentStore = ensureStore(CASE_DOCUMENTS_STORE);
+      ensureIndex(documentStore, "caseId", "caseId");
+      ensureIndex(documentStore, "tenantCase", ["tenantId", "caseId"]);
+      ensureIndex(documentStore, "tenantActivity", ["tenantId", "activityId"]);
+      ensureIndex(documentStore, "tenantMeeting", ["tenantId", "meetingId"]);
       if (!nextDb.objectStoreNames.contains(CASE_EVENTS_STORE)) {
-        const eventStore = nextDb.createObjectStore(CASE_EVENTS_STORE, { keyPath: "id" });
-        eventStore.createIndex("caseId", "caseId", { unique: false });
+        nextDb.createObjectStore(CASE_EVENTS_STORE, { keyPath: "id" });
       }
+      const eventStore = ensureStore(CASE_EVENTS_STORE);
+      ensureIndex(eventStore, "caseId", "caseId");
+      ensureIndex(eventStore, "tenantCase", ["tenantId", "caseId"]);
+      ensureIndex(eventStore, "tenantOccurredAt", ["tenantId", "occurredAt"]);
+
+      const deviationStore = ensureStore(ACTIVITY_DEVIATIONS_STORE);
+      ensureIndex(deviationStore, "tenantActivity", ["tenantId", "activityId"]);
+      ensureIndex(deviationStore, "tenantStatus", ["tenantId", "status"]);
+      const decisionStore = ensureStore(DEVIATION_DECISIONS_STORE);
+      ensureIndex(decisionStore, "tenantDeviation", ["tenantId", "deviationId"]);
+      const caseMeetingStore = ensureStore(CASE_MEETINGS_STORE);
+      ensureIndex(caseMeetingStore, "tenantCase", ["tenantId", "caseId"]);
+      ensureIndex(caseMeetingStore, "tenantOccurredAt", ["tenantId", "occurredAt"]);
+      const blobStore = ensureStore(CASE_DOCUMENT_BLOBS_STORE);
+      ensureIndex(blobStore, "tenantDocument", ["tenantId", "documentId"], { unique: true });
+      ensureStore(CASE_TYPE_DEFINITIONS_STORE, { keyPath: ["tenantId", "id", "version"] });
+      ensureStore(ACTIVITY_TEMPLATE_DEFINITIONS_STORE, { keyPath: ["tenantId", "id", "version"] });
+      ensureStore(PROCESSED_COMMANDS_STORE, { keyPath: ["tenantId", "idempotencyKey"] });
     };
 
     request.onsuccess = () => resolve(request.result);
@@ -811,6 +871,18 @@ function caseEventTx(mode = "readonly") {
   return db.transaction(CASE_EVENTS_STORE, mode).objectStore(CASE_EVENTS_STORE);
 }
 
+function activityDeviationTx(mode = "readonly") {
+  return db.transaction(ACTIVITY_DEVIATIONS_STORE, mode).objectStore(ACTIVITY_DEVIATIONS_STORE);
+}
+
+function deviationDecisionTx(mode = "readonly") {
+  return db.transaction(DEVIATION_DECISIONS_STORE, mode).objectStore(DEVIATION_DECISIONS_STORE);
+}
+
+function caseMeetingTx(mode = "readonly") {
+  return db.transaction(CASE_MEETINGS_STORE, mode).objectStore(CASE_MEETINGS_STORE);
+}
+
 function getAllFrom(storeTx) {
   return new Promise((resolve, reject) => {
     const request = storeTx().getAll();
@@ -850,6 +922,9 @@ const clearCaseDocuments = () => clearStore(caseDocumentTx);
 const getAllCaseEvents = () => getAllFrom(caseEventTx);
 const saveCaseEvent = (value) => putInto(caseEventTx, value);
 const clearCaseEvents = () => clearStore(caseEventTx);
+const getAllActivityDeviations = () => getAllFrom(activityDeviationTx);
+const getAllDeviationDecisions = () => getAllFrom(deviationDecisionTx);
+const getAllCaseMeetings = () => getAllFrom(caseMeetingTx);
 
 function clearAllCaseData() {
   return Promise.all([
@@ -857,49 +932,11 @@ function clearAllCaseData() {
     clearCaseAssignments(),
     clearCaseActivities(),
     clearCaseDocuments(),
-    clearCaseEvents()
+    clearCaseEvents(),
+    clearStore(activityDeviationTx),
+    clearStore(deviationDecisionTx),
+    clearStore(caseMeetingTx)
   ]);
-}
-
-function deleteCaseBundle(caseId) {
-  return new Promise((resolve, reject) => {
-    const storeNames = [CASES_STORE, CASE_ASSIGNMENTS_STORE, CASE_ACTIVITIES_STORE, CASE_DOCUMENTS_STORE, CASE_EVENTS_STORE];
-    const transaction = db.transaction(storeNames, "readwrite");
-    transaction.objectStore(CASES_STORE).delete(caseId);
-    for (const storeName of storeNames.slice(1)) {
-      const index = transaction.objectStore(storeName).index("caseId");
-      const request = index.openCursor(IDBKeyRange.only(caseId));
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (!cursor) return;
-        cursor.delete();
-        cursor.continue();
-      };
-    }
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-  });
-}
-
-function replaceCaseAssignments(caseId, assignments) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(CASE_ASSIGNMENTS_STORE, "readwrite");
-    const store = transaction.objectStore(CASE_ASSIGNMENTS_STORE);
-    const request = store.index("caseId").openCursor(IDBKeyRange.only(caseId));
-    request.onsuccess = () => {
-      const cursor = request.result;
-      if (cursor) {
-        cursor.delete();
-        cursor.continue();
-        return;
-      }
-      for (const assignment of assignments) store.put(assignment);
-    };
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-  });
 }
 
 function getAllCandidates() {
@@ -915,24 +952,6 @@ function saveCandidate(candidate) {
     const request = tx("readwrite").put(candidate);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
-  });
-}
-
-function deleteCandidate(id) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE, MEETINGS_STORE], "readwrite");
-    transaction.objectStore(STORE).delete(id);
-    const meetingIndex = transaction.objectStore(MEETINGS_STORE).index("mentorId");
-    const cursorRequest = meetingIndex.openCursor(IDBKeyRange.only(id));
-    cursorRequest.onsuccess = () => {
-      const cursor = cursorRequest.result;
-      if (!cursor) return;
-      cursor.delete();
-      cursor.continue();
-    };
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
   });
 }
 
@@ -979,14 +998,6 @@ function getAllMeetings() {
 function saveMeeting(meeting) {
   return new Promise((resolve, reject) => {
     const request = meetingTx("readwrite").put(meeting);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-}
-
-function deleteMeeting(id) {
-  return new Promise((resolve, reject) => {
-    const request = meetingTx("readwrite").delete(id);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
@@ -1076,6 +1087,7 @@ function buildExampleDataset(count) {
     });
     return {
       ...candidate,
+      tenantId: DEFAULT_TENANT_ID,
       checks: { ...candidate.checks },
       checkMeta,
       id,
@@ -1100,28 +1112,320 @@ function buildExampleDataset(count) {
 }
 
 async function loadCaseData() {
-  [cases, caseAssignments, caseActivities, caseDocuments, caseEvents] = await Promise.all([
+  [cases, caseAssignments, caseActivities, caseDocuments, caseEvents, activityDeviations, deviationDecisions, caseMeetings] = await Promise.all([
     getAllCases(),
     getAllCaseAssignments(),
     getAllCaseActivities(),
     getAllCaseDocuments(),
-    getAllCaseEvents()
+    getAllCaseEvents(),
+    getAllActivityDeviations(),
+    getAllDeviationDecisions(),
+    getAllCaseMeetings()
   ]);
 }
 
-function certificationCaseStatus(candidate) {
-  if (candidate.status === "Godkänd/Certifierad") return "Avslutat";
-  if (CHECKS.every(([key]) => candidate.checks?.[key])) {
-    return "Redo för beslut";
+function actorId(value) {
+  if (!value || value === "System") return "system";
+  return handlers.find((handler) => [handler.id, handler.userId, handler.name].includes(value))?.id || "system";
+}
+
+function atomicPut(recordsByStore) {
+  const entries = Object.entries(recordsByStore).filter(([, records]) => records.length);
+  if (!entries.length) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(entries.map(([storeName]) => storeName), "readwrite");
+    for (const [storeName, records] of entries) {
+      const store = transaction.objectStore(storeName);
+      for (const record of records) store.put(record);
+    }
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+function normalizedCaseRecord(caseRecord) {
+  const type = caseTypeById(caseRecord.caseTypeId) || caseTypeByName(caseRecord.type);
+  return {
+    ...caseRecord,
+    tenantId: caseRecord.tenantId || DEFAULT_TENANT_ID,
+    organizationUnitId: caseRecord.organizationUnitId || DEFAULT_ORGANIZATION_UNIT_ID,
+    caseTypeId: type.id,
+    caseTypeVersion: caseRecord.caseTypeVersion || type.version,
+    type: type.name,
+    mentorId: caseRecord.mentorId || null,
+    status: normalizeCaseStatus(caseRecord.status),
+    priority: String(caseRecord.priority || type.defaultPriority).toLowerCase(),
+    dueDate: caseRecord.dueDate || null,
+    pauseReasonCode: caseRecord.pauseReasonCode || null,
+    pauseNote: caseRecord.pauseNote || null,
+    resumeAt: caseRecord.resumeAt || null,
+    closeReasonCode: caseRecord.closeReasonCode || null,
+    closeNote: caseRecord.closeNote || null,
+    version: Number(caseRecord.version || 1),
+    createdBy: actorId(caseRecord.createdBy),
+    updatedBy: actorId(caseRecord.updatedBy || caseRecord.createdBy),
+    closedAt: caseRecord.closedAt || null,
+    closedBy: caseRecord.closedBy ? actorId(caseRecord.closedBy) : null
+  };
+}
+
+function normalizedAssignment(assignment) {
+  return {
+    ...assignment,
+    tenantId: assignment.tenantId || DEFAULT_TENANT_ID,
+    role: assignment.role === "Medhandläggare" ? "co_handler" : assignment.role === "co_handler" ? "co_handler" : "responsible",
+    version: Number(assignment.version || 1),
+    assignedBy: actorId(assignment.assignedBy),
+    endedAt: assignment.endedAt || null,
+    endedBy: assignment.endedBy ? actorId(assignment.endedBy) : null
+  };
+}
+
+function normalizedActivity(activity, normalizedCases) {
+  const caseRecord = normalizedCases.find((item) => item.id === activity.caseId);
+  const templateId = activity.templateId || activity.templateKey || AD_HOC_ACTIVITY_TEMPLATE_ID;
+  const status = normalizeActivityStatus(activity.status);
+  const resultCode = activity.resultCode || activity.result || null;
+  const caseOwnerId = caseAssignments.find((assignment) => assignment.caseId === activity.caseId && ["Ansvarig", "responsible"].includes(assignment.role) && !assignment.endedAt)?.handlerId || null;
+  const legacyHandlerId = activity.handlerId || null;
+  return {
+    ...activity,
+    tenantId: activity.tenantId || caseRecord?.tenantId || DEFAULT_TENANT_ID,
+    templateId,
+    templateVersion: Number(activity.templateVersion || 1),
+    status,
+    resultCode,
+    resultClassification: resultCode ? resultClassification(templateId, resultCode) : null,
+    handlerIdOverride: activity.handlerIdOverride ?? (legacyHandlerId && legacyHandlerId !== caseOwnerId ? legacyHandlerId : null),
+    waitingForParty: status === "waiting" ? activity.waitingForParty || "external" : null,
+    dueDate: activity.dueDate || null,
+    sortOrder: Number(activity.sortOrder ?? activity.order ?? 0),
+    version: Number(activity.version || 1),
+    createdBy: actorId(activity.createdBy),
+    updatedBy: actorId(activity.updatedBy || activity.completedBy || activity.createdBy),
+    completedAt: status === "completed" ? activity.completedAt || activity.updatedAt : null,
+    completedBy: status === "completed" ? actorId(activity.completedBy || activity.updatedBy) : null
+  };
+}
+
+async function migrateCaseDomainV6() {
+  const normalizedCases = cases.map(normalizedCaseRecord);
+  const normalizedAssignments = caseAssignments.map(normalizedAssignment);
+  const migrationTime = new Date().toISOString();
+  for (const caseRecord of normalizedCases) {
+    const responsible = normalizedAssignments
+      .filter((assignment) => assignment.caseId === caseRecord.id && assignment.role === "responsible" && !assignment.endedAt)
+      .sort((a, b) => new Date(b.assignedAt || 0) - new Date(a.assignedAt || 0));
+    for (const duplicate of responsible.slice(1)) {
+      duplicate.endedAt = migrationTime;
+      duplicate.endedBy = "system";
+      duplicate.version += 1;
+    }
   }
-  if (Object.values(candidate.checks || {}).some(Boolean) || candidate.coordinatorId) return "Pågår";
-  return "Nytt";
+  const normalizedActivities = caseActivities.map((activity) => normalizedActivity(activity, normalizedCases));
+  const normalizedDocuments = caseDocuments.map((caseDocument) => ({
+    ...caseDocument,
+    tenantId: caseDocument.tenantId || DEFAULT_TENANT_ID,
+    activityId: caseDocument.activityId || null,
+    meetingId: caseDocument.meetingId || null,
+    type: ({ "Inkommen handling": "incoming", "Upprättad handling": "created", Anteckning: "service_note" })[caseDocument.type] || caseDocument.type || "service_note",
+    storageObjectId: caseDocument.storageObjectId || null,
+    mimeType: caseDocument.mimeType || null,
+    sizeBytes: caseDocument.sizeBytes ?? null,
+    checksum: caseDocument.checksum || null,
+    informationClass: caseDocument.informationClass || "normal",
+    supersedesDocumentId: caseDocument.supersedesDocumentId || null,
+    createdBy: actorId(caseDocument.createdBy)
+  }));
+  const existingDocumentIds = new Set(normalizedDocuments.map((document) => document.id));
+  for (const activity of normalizedActivities) {
+    if (!activity.note || existingDocumentIds.has(`legacy-note-${activity.id}`)) continue;
+    normalizedDocuments.push({
+      id: `legacy-note-${activity.id}`, tenantId: activity.tenantId, caseId: activity.caseId, activityId: activity.id, meetingId: null,
+      type: "service_note", title: `Tjänsteanteckning: ${activity.title}`, description: activity.note,
+      documentDate: (activity.updatedAt || activity.createdAt || new Date().toISOString()).slice(0, 10), storageObjectId: null, fileName: null,
+      mimeType: null, sizeBytes: null, checksum: null, informationClass: "normal", supersedesDocumentId: null,
+      createdAt: activity.updatedAt || activity.createdAt || new Date().toISOString(), createdBy: actorId(activity.updatedBy || activity.createdBy)
+    });
+  }
+  const normalizedEvents = caseEvents.map((caseEvent) => ({
+    ...caseEvent,
+    tenantId: caseEvent.tenantId || DEFAULT_TENANT_ID,
+    eventType: caseEvent.eventType || caseEvent.type || "case_updated",
+    schemaVersion: Number(caseEvent.schemaVersion || 1),
+    entityType: caseEvent.entityType || "case",
+    entityId: caseEvent.entityId || caseEvent.caseId,
+    actorId: caseEvent.actorId || actorId(caseEvent.actor),
+    occurredAt: caseEvent.occurredAt || caseEvent.createdAt,
+    correlationId: caseEvent.correlationId || crypto.randomUUID(),
+    idempotencyKey: caseEvent.idempotencyKey || `migration-${caseEvent.id}`,
+    payload: caseEvent.payload || { message: caseEvent.text || "Ärendet uppdaterades" }
+  }));
+  const migratedDeviations = [...activityDeviations];
+  for (const deviation of migratedDeviations) {
+    const latestDecision = deviationDecisions
+      .filter((decision) => decision.deviationId === deviation.id)
+      .sort((a, b) => new Date(b.decidedAt) - new Date(a.decidedAt))[0];
+    if (!latestDecision || deviation.activeDecisionId) continue;
+    deviation.status = "resolved";
+    deviation.activeDecisionId = latestDecision.id;
+    deviation.resolvedAt = latestDecision.decidedAt;
+    deviation.resolvedBy = latestDecision.decidedBy;
+  }
+  for (const decision of deviationDecisions.filter((item) => item.outcome === "request_supplement")) {
+    const deviation = migratedDeviations.find((item) => item.id === decision.deviationId);
+    if (!deviation || normalizedAssignments.some((assignment) => assignment.caseId === deviation.caseId && assignment.role === "responsible" && !assignment.endedAt)) continue;
+    normalizedAssignments.push({
+      id: `migration-responsible-${decision.id}`, tenantId: deviation.tenantId, caseId: deviation.caseId,
+      handlerId: decision.decidedBy, role: "responsible", version: 1, assignedAt: decision.decidedAt,
+      assignedBy: decision.decidedBy, endedAt: null, endedBy: null
+    });
+  }
+  const eventIds = new Set(normalizedEvents.map((event) => event.id));
+  for (const activity of normalizedActivities.filter((item) => item.status === "completed" && item.resultClassification === "deviation")) {
+    if (migratedDeviations.some((deviation) => deviation.activityId === activity.id)) continue;
+    const completionEventId = `migration-completion-${activity.id}`;
+    if (!eventIds.has(completionEventId)) {
+      normalizedEvents.push({
+        id: completionEventId, tenantId: activity.tenantId, caseId: activity.caseId, eventType: "activity_updated",
+        schemaVersion: 1, entityType: "activity", entityId: activity.id, actorId: activity.completedBy || "system",
+        occurredAt: activity.completedAt || activity.updatedAt || migrationTime, correlationId: `migration-${activity.id}`,
+        idempotencyKey: `migration-completion-${activity.id}`, payload: { message: `${activity.title} hade ett avvikande resultat vid migrering` }
+      });
+    }
+    migratedDeviations.push({
+      id: `migration-deviation-${activity.id}`, tenantId: activity.tenantId, caseId: activity.caseId, activityId: activity.id,
+      activityCompletionEventId: completionEventId, resultCode: activity.resultCode, status: "open", version: 1,
+      openedAt: activity.completedAt || activity.updatedAt || migrationTime, openedBy: activity.completedBy || "system",
+      resolvedAt: null, resolvedBy: null, activeDecisionId: null
+    });
+  }
+  for (const caseRecord of normalizedCases) {
+    caseRecord.status = deriveDomainCaseStatus(
+      caseRecord,
+      normalizedActivities.filter((activity) => activity.caseId === caseRecord.id),
+      migratedDeviations.filter((deviation) => deviation.caseId === caseRecord.id)
+    );
+  }
+  const existingMeetingIds = new Set(caseMeetings.map((meeting) => meeting.id));
+  const migratedMeetings = meetings.filter((meeting) => !existingMeetingIds.has(meeting.id)).flatMap((meeting) => {
+    const caseRecord = normalizedCases.find((item) => item.mentorId === meeting.mentorId && item.caseTypeId === "mentor-certification")
+      || normalizedCases.find((item) => item.mentorId === meeting.mentorId);
+    if (!caseRecord) return [];
+    return [{
+      id: meeting.id,
+      tenantId: caseRecord.tenantId,
+      caseId: caseRecord.id,
+      activityId: meeting.type === "Certifieringsintervju"
+        ? normalizedActivities.find((activity) => activity.caseId === caseRecord.id && activity.templateId === "interviewDone")?.id || null
+        : null,
+      meetingType: meeting.type === "Certifieringsintervju" ? "certification_interview" : meeting.type === "Uppföljning" ? "follow_up" : "other",
+      occurredAt: meeting.occurredAt,
+      mode: ({ "Fysiskt möte": "physical", "Digitalt möte": "digital", Telefon: "phone" })[meeting.mode] || meeting.mode || null,
+      participantHandlerIds: [actorId(meeting.createdBy)].filter((id) => id !== "system"),
+      externalParticipantNames: [],
+      summary: meeting.summary || "",
+      nextStep: meeting.nextStep || "",
+      version: Number(meeting.version || 1),
+      createdAt: meeting.createdAt || meeting.occurredAt,
+      createdBy: actorId(meeting.createdBy),
+      updatedAt: meeting.updatedAt || meeting.createdAt || meeting.occurredAt,
+      updatedBy: actorId(meeting.updatedBy || meeting.createdBy)
+    }];
+  });
+  const caseDefinitions = CASE_TYPE_DEFINITIONS.map((definition) => ({
+    ...definition,
+    tenantId: DEFAULT_TENANT_ID,
+    status: "published",
+    activityTemplateRefs: (definition.activityTemplateIds || []).map((templateId) => ({ templateId, version: 1 }))
+  }));
+  const activityDefinitions = ACTIVITY_TEMPLATES.map((template, sortOrder) => ({
+    id: template.id,
+    tenantId: DEFAULT_TENANT_ID,
+    version: template.version,
+    status: "published",
+    title: template.title,
+    sortOrder,
+    resultDefinitions: template.results.map(([code, label, classification]) => ({ code, label, classification, requiresNote: classification === "deviation" }))
+  }));
+
+  await atomicPut({
+    [CASES_STORE]: normalizedCases,
+    [CASE_ASSIGNMENTS_STORE]: normalizedAssignments,
+    [CASE_ACTIVITIES_STORE]: normalizedActivities,
+    [CASE_DOCUMENTS_STORE]: normalizedDocuments,
+    [CASE_EVENTS_STORE]: normalizedEvents,
+    [ACTIVITY_DEVIATIONS_STORE]: migratedDeviations,
+    [CASE_MEETINGS_STORE]: [...caseMeetings, ...migratedMeetings],
+    [CASE_TYPE_DEFINITIONS_STORE]: caseDefinitions,
+    [ACTIVITY_TEMPLATE_DEFINITIONS_STORE]: activityDefinitions
+  });
+}
+
+function handlerNameById(id) {
+  if (!id || id === "system") return "System";
+  return handlers.find((handler) => [handler.id, handler.userId, handler.name].includes(id))?.name || "Okänd användare";
+}
+
+function projectMentorWorkflow(candidate) {
+  const caseRecord = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
+  if (!caseRecord) return candidate;
+  const activities = caseActivities.filter((activity) => activity.caseId === caseRecord.id);
+  const activityByTemplate = Object.fromEntries(activities.map((activity) => [activity.templateId, activity]));
+  const checks = Object.fromEntries(CHECKS.map(([key]) => [
+    key,
+    activityByTemplate[key]?.status === "completed" && activityByTemplate[key]?.resultClassification !== "deviation"
+  ]));
+  const checkMeta = Object.fromEntries(CHECKS.map(([key]) => {
+    const activity = activityByTemplate[key];
+    return [key, checks[key] ? {
+      checkedAt: activity.completedAt || activity.updatedAt,
+      checkedBy: handlerNameById(activity.completedBy || activity.updatedBy),
+      note: latestActivityNote(activity.id)
+    } : { checkedAt: "", checkedBy: "", note: "" }];
+  }));
+  const assignment = caseAssignments.find((item) => item.caseId === caseRecord.id && item.role === "responsible" && !item.endedAt);
+  const owner = handlers.find((handler) => handler.id === assignment?.handlerId);
+  const interviewMeeting = [...caseMeetings]
+    .filter((meeting) => meeting.caseId === caseRecord.id && meeting.meetingType === "certification_interview")
+    .sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt))[0];
+  const decision = activityByTemplate.decision;
+  let status = statusFromChecks(checks);
+  if (decision?.status === "completed" && decision.resultCode === "approved" && caseRecord.status === "closed") status = "Godkänd/Certifierad";
+  else if (activityByTemplate.interviewDone?.status === "completed") status = "Redo för intervju";
+
+  return {
+    ...candidate,
+    caseNumber: caseRecord.number,
+    coordinatorId: owner?.id || "",
+    coordinator: owner?.name || "",
+    status,
+    checks,
+    checkMeta,
+    interviewDate: interviewMeeting?.occurredAt || "",
+    interviewMode: interviewMeeting?.mode || "",
+    history: caseEvents.filter((event) => event.caseId === caseRecord.id).map((event) => ({
+      at: event.occurredAt || event.createdAt,
+      text: event.payload?.message || event.text || event.eventType,
+      actor: handlerNameById(event.actorId) || event.actor
+    }))
+  };
+}
+
+function certificationCaseStatus(candidate) {
+  if (candidate.status === "Godkänd/Certifierad") return "closed";
+  if (CHECKS.every(([key]) => candidate.checks?.[key])) {
+    return "in_progress";
+  }
+  if (Object.values(candidate.checks || {}).some(Boolean) || candidate.coordinatorId) return "in_progress";
+  return "new";
 }
 
 function certificationActivityState(candidate, key) {
-  if (key === "inviteInterview") return candidate.interviewDate ? "Klar" : "Ej påbörjad";
-  if (key === "decision") return candidate.status === "Godkänd/Certifierad" ? "Klar" : "Ej påbörjad";
-  return candidate.checks?.[key] ? "Klar" : "Ej påbörjad";
+  if (key === "inviteInterview") return candidate.interviewDate ? "completed" : "not_started";
+  if (key === "decision") return candidate.status === "Godkänd/Certifierad" ? "completed" : "not_started";
+  return candidate.checks?.[key] ? "completed" : "not_started";
 }
 
 function certificationActivityMeta(candidate, key) {
@@ -1141,29 +1445,34 @@ async function ensureCertificationCases() {
   const writes = [];
 
   for (const candidate of candidates) {
-    const existingCase = cases.find((item) => item.mentorId === candidate.id && item.type === "Certifiering av mentor");
+    const existingCase = cases.find((item) => item.mentorId === candidate.id && (item.caseTypeId === "mentor-certification" || item.type === "Certifiering av mentor"));
     const caseId = existingCase?.id || `cert-${candidate.id}`;
     const now = new Date().toISOString();
     const existingCaseActivities = caseActivities.filter((activity) => activity.caseId === caseId);
-    const currentCaseStatus = candidate.status === "Godkänd/Certifierad"
-      ? "Avslutat"
-      : existingCaseActivities.length
-        ? derivedCaseStatus({ ...(existingCase || {}), status: "Nytt" }, existingCaseActivities)
-        : certificationCaseStatus(candidate);
+    const currentCaseStatus = existingCase
+      ? normalizeCaseStatus(existingCase.status)
+      : certificationCaseStatus(candidate);
     const caseRecord = {
       id: caseId,
+      tenantId: existingCase?.tenantId || DEFAULT_TENANT_ID,
       number: existingCase?.number || candidate.caseNumber || makeCaseNumber(caseId),
+      caseTypeId: "mentor-certification",
+      caseTypeVersion: 1,
+      organizationUnitId: existingCase?.organizationUnitId || DEFAULT_ORGANIZATION_UNIT_ID,
       type: "Certifiering av mentor",
       title: `Certifiering av ${candidate.name}`,
       mentorId: candidate.id,
       status: currentCaseStatus,
-      priority: existingCase?.priority || "Normal",
-      dueDate: existingCase?.dueDate || "",
+      priority: existingCase?.priority || "normal",
+      dueDate: existingCase?.dueDate || null,
       description: existingCase?.description || "Prövning och certifiering inför uppdrag som föräldramentor.",
       createdAt: existingCase?.createdAt || candidate.createdAt || now,
-      createdBy: existingCase?.createdBy || "System",
+      createdBy: existingCase?.createdBy || "system",
       updatedAt: existingCase?.updatedAt || candidate.updatedAt || now,
-      closedAt: candidate.status === "Godkänd/Certifierad" ? candidate.updatedAt : ""
+      updatedBy: existingCase?.updatedBy || "system",
+      version: Number(existingCase?.version || 1),
+      closedAt: existingCase?.closedAt || (candidate.status === "Godkänd/Certifierad" ? candidate.updatedAt : null),
+      closedBy: existingCase?.closedBy || (candidate.status === "Godkänd/Certifierad" ? actorId(candidate.coordinator) : null)
     };
     if (!existingCase) {
       writes.push(saveCase(caseRecord));
@@ -1171,34 +1480,46 @@ async function ensureCertificationCases() {
       writes.push(saveCaseEvent({
         id: crypto.randomUUID(),
         caseId,
+        tenantId: DEFAULT_TENANT_ID,
+        eventType: "case_created",
         type: "case_created",
         text: "Certifieringsärendet skapades från mentorposten",
+        actorId: "system",
         actor: "System",
-        createdAt: caseRecord.createdAt
+        occurredAt: caseRecord.createdAt,
+        createdAt: caseRecord.createdAt,
+        schemaVersion: 1,
+        entityType: "case",
+        entityId: caseId,
+        correlationId: crypto.randomUUID(),
+        idempotencyKey: `seed-case-${caseId}`,
+        payload: { message: "Certifieringsärendet skapades från mentorposten" }
       }));
     } else if (existingCase.title !== caseRecord.title
-      || existingCase.number !== caseRecord.number
-      || existingCase.status !== caseRecord.status) {
+      || existingCase.number !== caseRecord.number) {
       Object.assign(existingCase, {
         title: caseRecord.title,
         number: caseRecord.number,
-        status: caseRecord.status,
-        closedAt: caseRecord.closedAt,
         updatedAt: now
       });
       writes.push(saveCase(existingCase));
     }
 
-    const hasResponsibleAssignment = caseAssignments.some((assignment) => assignment.caseId === caseId && assignment.role === "Ansvarig");
+    const hasResponsibleAssignment = caseAssignments.some((assignment) => assignment.caseId === caseId && ["Ansvarig", "responsible"].includes(assignment.role) && !assignment.endedAt);
     if (candidate.coordinatorId && !hasResponsibleAssignment) {
       const assignmentId = `${caseId}-${candidate.coordinatorId}`;
       if (!existingAssignments.has(assignmentId)) {
         const assignment = {
           id: assignmentId,
+          tenantId: DEFAULT_TENANT_ID,
           caseId,
           handlerId: candidate.coordinatorId,
-          role: "Ansvarig",
-          assignedAt: candidate.updatedAt || now
+          role: "responsible",
+          version: 1,
+          assignedAt: candidate.updatedAt || now,
+          assignedBy: "system",
+          endedAt: null,
+          endedBy: null
         };
         writes.push(saveCaseAssignment(assignment));
         caseAssignments.push(assignment);
@@ -1213,20 +1534,25 @@ async function ensureCertificationCases() {
       const meta = certificationActivityMeta(candidate, key);
       const activity = {
         id: activityId,
+        tenantId: DEFAULT_TENANT_ID,
         caseId,
-        templateKey: key,
+        templateId: key,
+        templateVersion: 1,
         title,
         status: state,
-        handlerId: "",
-        dueDate: "",
-        note: meta.note,
-        order,
+        handlerIdOverride: null,
+        waitingForParty: null,
+        dueDate: null,
+        sortOrder: order,
+        version: 1,
         createdAt: candidate.createdAt || now,
-        createdBy: "System",
+        createdBy: "system",
         updatedAt: meta.completedAt || candidate.createdAt || now,
-        completedAt: state === "Klar" ? meta.completedAt || candidate.updatedAt || now : "",
-        completedBy: state === "Klar" ? meta.completedBy || "System" : "",
-        result: state === "Klar" ? defaultCompletedResult({ templateKey: key }) : ""
+        updatedBy: actorId(meta.completedBy),
+        completedAt: state === "completed" ? meta.completedAt || candidate.updatedAt || now : null,
+        completedBy: state === "completed" ? actorId(meta.completedBy) : null,
+        resultCode: state === "completed" ? defaultCompletedResult({ templateId: key }) : null,
+        resultClassification: state === "completed" ? "acceptable" : null
       };
       writes.push(saveCaseActivity(activity));
       caseActivities.push(activity);
@@ -1240,8 +1566,9 @@ async function refresh() {
   handlers = await getAllHandlers();
   await migrateDefaultHandlerRecords();
   handlers.sort((a, b) => a.name.localeCompare(b.name, "sv"));
-  candidates = await getAllCandidates();
-  candidates = candidates.map(normalizeCandidate);
+  const storedCandidates = await getAllCandidates();
+  candidates = storedCandidates.map(normalizeCandidate);
+  await Promise.all(candidates.filter((candidate, index) => !storedCandidates[index].tenantId).map(saveCandidate));
   meetings = await getAllMeetings();
   presentationComments = await getAllPresentationComments();
   await migrateSingleExampleMentor();
@@ -1252,11 +1579,15 @@ async function refresh() {
   await loadCaseData();
   await ensureCertificationCases();
   await loadCaseData();
+  await migrateCaseDomainV6();
+  await loadCaseData();
+  candidates = candidates.map(projectMentorWorkflow);
   meetings = await getAllMeetings();
   meetings.sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt));
+  caseMeetings.sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt));
   cases.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-  caseActivities.sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || new Date(a.createdAt) - new Date(b.createdAt));
-  caseEvents.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  caseActivities.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || new Date(a.createdAt) - new Date(b.createdAt));
+  caseEvents.sort((a, b) => new Date(b.occurredAt || b.createdAt) - new Date(a.occurredAt || a.createdAt));
   candidates.sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.name.localeCompare(b.name, "sv"));
   renderAll();
 }
@@ -1358,8 +1689,8 @@ async function migrateDefaultHandlerRecords() {
     const requestedUserId = template?.userId || String(handler.userId || "").trim().toUpperCase();
     const userId = requestedUserId && !usedUserIds.has(requestedUserId) ? requestedUserId : allocateUserId();
     usedUserIds.add(userId);
-    if (name === handler.name && email === handler.email && userId === handler.userId) continue;
-    Object.assign(handler, { name, email, userId, updatedAt: new Date().toISOString() });
+    if (name === handler.name && email === handler.email && userId === handler.userId && handler.tenantId) continue;
+    Object.assign(handler, { tenantId: handler.tenantId || DEFAULT_TENANT_ID, name, email, userId, updatedAt: new Date().toISOString() });
     updates.push(saveHandler(handler));
   }
   await Promise.all(updates);
@@ -1483,6 +1814,8 @@ function normalizeCandidate(candidate, index = 0) {
   const identityVerified = Boolean(candidate.checks?.identityVerified && personalNumber && identityMethod);
   const normalized = {
     ...candidate,
+    tenantId: candidate.tenantId || DEFAULT_TENANT_ID,
+    active: candidate.active !== false,
     checks: {
       ...(candidate.checks || {}),
       identityVerified
@@ -1785,7 +2118,7 @@ function renderSeedButtonState() {
 
 function renderDashboard() {
   els.actionTableBody.innerHTML = "";
-  const openCases = cases.filter((caseRecord) => caseRecord.status !== "Avslutat");
+  const openCases = cases.filter((caseRecord) => caseRecord.status !== "closed");
   const nextActivities = openCases
     .map((caseRecord) => ({ caseRecord, activity: nextCaseActivity(caseRecord) }))
     .filter((item) => item.activity);
@@ -1800,7 +2133,7 @@ function renderDashboard() {
     const leftDue = left.activity.dueDate || "9999-12-31";
     const rightDue = right.activity.dueDate || "9999-12-31";
     if (leftDue !== rightDue) return leftDue.localeCompare(rightDue);
-    const priorityOrder = { Hög: 0, Normal: 1, Låg: 2 };
+    const priorityOrder = { high: 0, normal: 1, low: 2 };
     return (priorityOrder[left.caseRecord.priority] ?? 1) - (priorityOrder[right.caseRecord.priority] ?? 1)
       || new Date(right.caseRecord.updatedAt) - new Date(left.caseRecord.updatedAt);
   });
@@ -1847,7 +2180,7 @@ function renderDashboard() {
     row.innerHTML = `
       <td><strong>${escapeHtml(caseRecord.number)}</strong></td>
       <td>${escapeHtml(mentor?.name || caseRecord.title)}<small>${escapeHtml(activityHandlerLabel(activity, caseRecord))}</small></td>
-      <td>${escapeHtml(activity.title)}<small>${escapeHtml(activityHasBlockingResult(activity) ? "Kräver åtgärd" : activityStatusLabel(activity.status))}</small></td>
+      <td>${escapeHtml(activity.title)}<small>${escapeHtml(activityHasBlockingResult(activity) ? "Ställningstagande krävs" : activityStatusLabel(activity.status))}</small></td>
       <td class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityDueLabel(activity))}</td>
       <td><button type="button" class="btn btn-outline-primary btn-sm" data-open-activity="${activity.id}">Öppna</button></td>
     `;
@@ -1923,7 +2256,7 @@ function caseMentor(caseRecord) {
 }
 
 function assignmentsForCase(caseId) {
-  return caseAssignments.filter((assignment) => assignment.caseId === caseId);
+  return caseAssignments.filter((assignment) => assignment.caseId === caseId && !assignment.endedAt);
 }
 
 function handlerForAssignment(assignment) {
@@ -1931,13 +2264,13 @@ function handlerForAssignment(assignment) {
 }
 
 function responsibleHandler(caseRecord) {
-  const assignment = assignmentsForCase(caseRecord?.id).find((item) => item.role === "Ansvarig");
+  const assignment = assignmentsForCase(caseRecord?.id).find((item) => item.role === "responsible");
   return handlerForAssignment(assignment);
 }
 
 function coHandlers(caseRecord) {
   return assignmentsForCase(caseRecord?.id)
-    .filter((item) => item.role === "Medhandläggare")
+    .filter((item) => item.role === "co_handler")
     .map(handlerForAssignment)
     .filter(Boolean);
 }
@@ -1947,7 +2280,7 @@ function activitiesForCase(caseId) {
 }
 
 function activityResultOptions(activity) {
-  return ACTIVITY_RESULT_OPTIONS[activity?.templateKey] || ACTIVITY_RESULT_OPTIONS.default;
+  return ACTIVITY_RESULT_OPTIONS[activity?.templateId] || ACTIVITY_RESULT_OPTIONS.default;
 }
 
 function defaultCompletedResult(activity) {
@@ -1955,8 +2288,8 @@ function defaultCompletedResult(activity) {
 }
 
 function activityResultValue(activity) {
-  if (activity?.result) return activity.result;
-  return activity?.status === "Klar" ? defaultCompletedResult(activity) : "";
+  if (activity?.resultCode) return activity.resultCode;
+  return normalizeActivityStatus(activity?.status) === "completed" ? defaultCompletedResult(activity) : "";
 }
 
 function activityResultLabel(activity) {
@@ -1970,9 +2303,7 @@ function effectiveActivityHandler(activity, caseRecord) {
 }
 
 function activityOwnerOverrideId(activity, caseRecord) {
-  const caseOwnerId = responsibleHandler(caseRecord)?.id || "";
-  if (activity?.templateKey && activity.handlerId === caseOwnerId) return "";
-  return activity?.handlerId || "";
+  return activity?.handlerIdOverride || "";
 }
 
 function activityHandlerLabel(activity, caseRecord) {
@@ -1985,21 +2316,31 @@ function activityDocuments(activityId) {
   return caseDocuments.filter((document) => document.activityId === activityId);
 }
 
+function latestActivityNote(activityId) {
+  return activityDocuments(activityId)
+    .filter((document) => document.type === "service_note")
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0]?.description || "";
+}
+
+function documentTypeLabel(type) {
+  return ({ incoming: "Inkommen handling", created: "Upprättad handling", service_note: "Tjänsteanteckning" })[type] || type;
+}
+
 function activityStatusLabel(status) {
-  return status === "Klar" ? "Avslutad" : status;
+  return domainActivityStatusLabel(status);
 }
 
 function activityStatusClass(activity) {
   if (activityHasBlockingResult(activity)) return "text-bg-danger";
-  if (activity.status === "Klar") return "text-bg-success";
-  if (activity.status === "Pågår") return "text-bg-primary";
-  if (activity.status === "Väntar") return "text-bg-warning";
-  if (activity.status === "Ej aktuell") return "text-bg-light border text-secondary";
+  if (activity.status === "completed") return "text-bg-success";
+  if (activity.status === "in_progress") return "text-bg-primary";
+  if (activity.status === "waiting") return "text-bg-warning";
+  if (activity.status === "not_applicable") return "text-bg-light border text-secondary";
   return "text-bg-secondary";
 }
 
 function activityDueState(activity) {
-  if (!activity?.dueDate || ["Klar", "Ej aktuell"].includes(activity.status)) return "";
+  if (!activity?.dueDate || ["completed", "not_applicable"].includes(activity.status)) return "";
   const today = new Date().toISOString().slice(0, 10);
   if (activity.dueDate < today) return "overdue";
   const soon = new Date();
@@ -2018,20 +2359,20 @@ function activityDueLabel(activity) {
 }
 
 function activityHasBlockingResult(activity) {
-  return activity.status === "Klar" && BLOCKING_ACTIVITY_RESULTS.has(activityResultValue(activity));
+  return activityDeviations.some((deviation) => deviation.activityId === activity.id && deviation.status === "open" && !deviation.activeDecisionId);
 }
 
 function nextCaseActivity(caseRecord) {
   const activities = activitiesForCase(caseRecord?.id);
   return activities.find(activityHasBlockingResult)
-    || activities.find((activity) => activity.status !== "Klar" && activity.status !== "Ej aktuell");
+    || activities.find((activity) => !["completed", "not_applicable"].includes(activity.status));
 }
 
 function caseStatusBadge(status) {
-  if (status === "Avslutat") return "badge rounded-pill text-bg-success";
-  if (status === "Kräver åtgärd") return "badge rounded-pill text-bg-danger";
-  if (status === "Väntar") return "badge rounded-pill text-bg-warning";
-  if (status === "Redo för beslut") return "badge rounded-pill text-bg-primary";
+  if (status === "closed") return "badge rounded-pill text-bg-success";
+  if (status === "decision_required") return "badge rounded-pill text-bg-danger";
+  if (status === "waiting" || status === "paused") return "badge rounded-pill text-bg-warning";
+  if (status === "in_progress") return "badge rounded-pill text-bg-primary";
   return "badge rounded-pill text-bg-secondary";
 }
 
@@ -2084,7 +2425,7 @@ function renderCases() {
       <td>${escapeHtml(caseRecord.title)}</td>
       <td>${escapeHtml(caseRecord.type)}</td>
       <td>${mentor ? escapeHtml(mentor.name) : '<span class="text-secondary">Ej personanknutet</span>'}</td>
-      <td><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseRecord.status)}</span></td>
+      <td><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></td>
       <td>${escapeHtml(owner?.name || "Ej tilldelad")}</td>
       <td>${escapeHtml(nextActivity?.title || "Ingen återstående")}</td>
     `;
@@ -2130,6 +2471,7 @@ function renderCaseDetail() {
 
   els.caseCreateForm.hidden = !creating && !caseEditMode;
   els.caseReadView.hidden = creating || caseEditMode;
+  for (const element of document.querySelectorAll(".case-advanced-field")) element.hidden = creating && !caseEditMode;
   els.newCaseActivityButton.hidden = creating || caseEditMode || Boolean(selectedCaseActivityId);
   els.editCaseButton.hidden = creating || caseEditMode;
   els.saveCaseButton.textContent = creating ? "Skapa ärende" : "Spara ändringar";
@@ -2140,7 +2482,7 @@ function renderCaseDetail() {
     els.selectedCaseNumber.textContent = "Ärendenummer skapas när ärendet sparas";
     els.selectedCaseTitle.textContent = mentorId ? `Nytt ärende för ${candidates.find((candidate) => candidate.id === mentorId)?.name || "mentor"}` : "Nytt generellt ärende";
     els.selectedCaseStatus.textContent = "Nytt";
-    els.selectedCaseStatus.className = caseStatusBadge("Nytt");
+    els.selectedCaseStatus.className = caseStatusBadge("new");
     els.selectedCaseMentor.textContent = mentorId ? candidates.find((candidate) => candidate.id === mentorId)?.name || "Saknas" : "Ej personanknutet";
     els.selectedCaseOwner.textContent = currentUserName();
     els.selectedCaseUpdated.textContent = "Inte sparat";
@@ -2157,6 +2499,7 @@ function renderCaseDetail() {
   const caseCoHandlers = coHandlers(caseRecord);
   const activities = activitiesForCase(caseRecord.id);
   const documents = caseDocuments.filter((document) => document.caseId === caseRecord.id);
+  const meetingsForCase = caseMeetings.filter((meeting) => meeting.caseId === caseRecord.id);
   const events = caseEvents.filter((item) => item.caseId === caseRecord.id);
   if (selectedCaseActivityId && !activities.some((activity) => activity.id === selectedCaseActivityId)) {
     selectedCaseActivityId = null;
@@ -2166,25 +2509,27 @@ function renderCaseDetail() {
   els.selectedCaseType.textContent = caseRecord.type;
   els.selectedCaseNumber.textContent = caseRecord.number;
   els.selectedCaseTitle.textContent = caseRecord.title;
-  els.selectedCaseStatus.textContent = caseRecord.status;
+  els.selectedCaseStatus.textContent = caseStatusLabel(caseRecord.status);
   els.selectedCaseStatus.className = caseStatusBadge(caseRecord.status);
   els.selectedCaseMentor.innerHTML = mentor ? `<a href="#/mentor/${escapeHtml(mentor.id)}">${escapeHtml(mentor.name)}</a>` : "Ej personanknutet";
   els.selectedCaseOwner.textContent = owner?.name || "Ej tilldelad";
   els.selectedCaseUpdated.textContent = formatDateTime(caseRecord.updatedAt);
-  els.caseStatusFact.textContent = caseRecord.status;
-  els.casePriorityFact.textContent = caseRecord.priority || "Normal";
+  els.caseStatusFact.textContent = caseStatusLabel(caseRecord.status);
+  els.casePriorityFact.textContent = ({ high: "Hög", normal: "Normal", low: "Låg" })[caseRecord.priority] || "Normal";
   els.caseDueDateFact.textContent = caseRecord.dueDate ? formatDate(caseRecord.dueDate) : "Ej angivet";
   els.caseDescriptionFact.textContent = caseRecord.description || "Ingen beskrivning";
   els.caseOwnerFact.textContent = owner?.name || "Ej tilldelad";
   els.caseCoHandlersFact.textContent = caseCoHandlers.length ? caseCoHandlers.map((handler) => handler.name).join(", ") : "Inga";
   els.caseMentorFact.innerHTML = mentor ? `<a href="#/mentor/${escapeHtml(mentor.id)}">${escapeHtml(mentor.name)}</a>` : "Ej personanknutet";
-  els.caseCreatedFact.textContent = `${formatDateTime(caseRecord.createdAt)} av ${caseRecord.createdBy || "System"}`;
+  els.caseCreatedFact.textContent = `${formatDateTime(caseRecord.createdAt)} av ${handlerNameById(caseRecord.createdBy)}`;
   els.caseActivityCount.textContent = activities.length;
   els.caseDocumentCount.textContent = documents.length;
+  els.caseMeetingCount.textContent = meetingsForCase.filter((meeting) => !meeting.supersededByMeetingId).length;
   els.caseEventCount.textContent = events.length;
 
   renderCaseActivities(caseRecord, activities);
   renderCaseDocuments(documents);
+  renderCaseMeetings(caseRecord, meetingsForCase);
   renderCaseEvents(events);
   renderActivityDetail(caseRecord);
   if (selectedCaseActivityId) {
@@ -2194,20 +2539,25 @@ function renderCaseDetail() {
   if (caseEditMode && els.caseCreateForm.dataset.route !== `edit-${caseRecord.id}-${caseRecord.updatedAt}`) {
     els.caseCreateForm.reset();
     populateCaseForm(caseRecord.mentorId, caseRecord);
-    els.caseTypeInput.value = caseRecord.type;
+    els.caseTypeInput.value = caseRecord.caseTypeId;
     els.caseTitleInput.value = caseRecord.title;
-    els.casePriorityInput.value = caseRecord.priority || "Normal";
+    els.casePriorityInput.value = caseRecord.priority || "normal";
     els.caseDueDateInput.value = caseRecord.dueDate || "";
     els.caseDescriptionInput.value = caseRecord.description || "";
     els.caseCreateForm.dataset.route = `edit-${caseRecord.id}-${caseRecord.updatedAt}`;
   }
+  els.pauseCaseButton.hidden = ["paused", "closed"].includes(caseRecord.status);
+  els.resumeCaseButton.hidden = caseRecord.status !== "paused";
+  els.closeCaseButton.hidden = caseRecord.status === "closed";
+  els.reopenCaseButton.hidden = caseRecord.status !== "closed";
+  els.completeCaseButton.hidden = caseRecord.status === "closed";
 }
 
 function renderCaseActivities(caseRecord, activities) {
   els.caseActivityTableBody.innerHTML = "";
-  const applicableActivities = activities.filter((activity) => activity.status !== "Ej aktuell");
-  const completedActivities = applicableActivities.filter((activity) => activity.status === "Klar");
-  const openActivities = applicableActivities.filter((activity) => activity.status !== "Klar");
+  const applicableActivities = activities.filter((activity) => activity.status !== "not_applicable");
+  const completedActivities = applicableActivities.filter((activity) => activity.status === "completed");
+  const openActivities = applicableActivities.filter((activity) => activity.status !== "completed");
   const attentionActivities = activities.filter(activityHasBlockingResult);
   const progress = applicableActivities.length
     ? Math.round((completedActivities.length / applicableActivities.length) * 100)
@@ -2227,9 +2577,9 @@ function renderCaseActivities(caseRecord, activities) {
   }
 
   const visibleActivities = activities.filter((activity) => {
-    if (activityListFilter === "open") return !["Klar", "Ej aktuell"].includes(activity.status);
+    if (activityListFilter === "open") return !["completed", "not_applicable"].includes(activity.status);
     if (activityListFilter === "attention") return activityHasBlockingResult(activity);
-    if (activityListFilter === "done") return ["Klar", "Ej aktuell"].includes(activity.status);
+    if (activityListFilter === "done") return ["completed", "not_applicable"].includes(activity.status);
     return true;
   });
   els.activityFilteredCount.textContent = activityListFilter === "all"
@@ -2259,8 +2609,8 @@ function renderCaseActivities(caseRecord, activities) {
     const ownerSource = handler
       ? activityOwnerOverrideId(activity, caseRecord) ? "Särskilt tilldelad" : "Ärendeansvarig"
       : "";
-    const result = activity.status === "Klar" ? activityResultLabel(activity) : "";
-    const stepNumber = Number.isFinite(activity.order) ? activity.order + 1 : activities.indexOf(activity) + 1;
+    const result = activity.status === "completed" ? activityResultLabel(activity) : "";
+    const stepNumber = Number.isFinite(activity.sortOrder) ? activity.sortOrder + 1 : activities.indexOf(activity) + 1;
     const row = document.createElement("tr");
     if (activityHasBlockingResult(activity)) row.classList.add("activity-row-attention");
     row.innerHTML = `
@@ -2273,7 +2623,7 @@ function renderCaseActivities(caseRecord, activities) {
           </div>
         </div>
       </td>
-      <td><span class="badge activity-status-badge ${activityStatusClass(activity)}">${escapeHtml(activityHasBlockingResult(activity) ? "Kräver åtgärd" : activityStatusLabel(activity.status))}</span></td>
+      <td><span class="badge activity-status-badge ${activityStatusClass(activity)}">${escapeHtml(activityHasBlockingResult(activity) ? "Ställningstagande krävs" : activityStatusLabel(activity.status))}</span></td>
       <td><span class="activity-owner-name">${escapeHtml(handler?.name || "Ej tilldelad")}</span>${ownerSource ? `<small>${ownerSource}</small>` : ""}</td>
       <td class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityDueLabel(activity))}</td>
       <td>${documents.length ? `${documents.length} st` : '<span class="text-secondary">0</span>'}</td>
@@ -2293,20 +2643,20 @@ function renderActivityDetail(caseRecord) {
   }
 
   const owner = responsibleHandler(caseRecord);
-  const availableHandlers = handlers.filter((handler) => handler.active || handler.id === activity.handlerId || handler.id === owner?.id);
+  const availableHandlers = handlers.filter((handler) => handler.active || handler.id === activity.handlerIdOverride || handler.id === owner?.id);
   els.activityDetailTitle.textContent = activity.title;
   els.activityDetailContext.textContent = `${caseRecord.number} · ${caseMentor(caseRecord)?.name || caseRecord.title}`;
-  const changedBy = activity.updatedBy || activity.completedBy || activity.createdBy || "Ej angivet";
+  const changedBy = handlerNameById(activity.updatedBy || activity.completedBy || activity.createdBy);
   const auditParts = [`Senast ändrad ${formatDateTime(activity.updatedAt || activity.createdAt)} av ${changedBy}`];
-  if (activity.completedAt) auditParts.push(`Avslutad ${formatDateTime(activity.completedAt)} av ${activity.completedBy || "Ej angivet"}`);
+  if (activity.completedAt) auditParts.push(`Avslutad ${formatDateTime(activity.completedAt)} av ${handlerNameById(activity.completedBy)}`);
   els.activityDetailAudit.textContent = auditParts.join(" · ");
   renderActivityGuidance(activity, caseRecord);
-  els.activityDetailStatus.textContent = activityHasBlockingResult(activity) ? "Kräver åtgärd" : activityStatusLabel(activity.status);
+  els.activityDetailStatus.textContent = activityHasBlockingResult(activity) ? "Ställningstagande krävs" : activityStatusLabel(activity.status);
   els.activityDetailStatus.className = activityHasBlockingResult(activity)
     ? "badge text-bg-danger"
-    : activity.status === "Klar"
+    : activity.status === "completed"
       ? "badge text-bg-success"
-    : activity.status === "Väntar"
+    : activity.status === "waiting"
       ? "badge text-bg-warning"
       : "badge text-bg-secondary";
   els.activityDetailStatusInput.value = activity.status;
@@ -2319,8 +2669,24 @@ function renderActivityDetail(caseRecord) {
   }
   els.activityDetailOwnerInput.value = activityOwnerOverrideId(activity, caseRecord);
   els.activityDetailDueDateInput.value = activity.dueDate || "";
-  els.activityDetailNoteInput.value = activity.note || "";
+  els.activityDetailNoteInput.value = latestActivityNote(activity.id);
   renderActivityResultInput(activity);
+  const locked = ["completed", "not_applicable"].includes(activity.status);
+  els.activityDetailStatusInput.disabled = locked;
+  els.activityDetailResultInput.disabled = locked || activity.status !== "completed";
+  els.activityDetailOwnerInput.disabled = locked;
+  els.activityDetailDueDateInput.disabled = locked;
+  els.activityDetailNoteInput.disabled = locked;
+  els.reopenActivityButton.hidden = !locked;
+  const deviation = activityDeviations.find((item) => item.activityId === activity.id && item.status === "open" && !item.activeDecisionId);
+  els.activityDeviationPanel.hidden = !deviation;
+  els.activityDeviationPanel.dataset.deviationId = deviation?.id || "";
+  if (deviation) {
+    els.deviationOutcomeInput.value = "continue";
+    els.deviationReasonInput.value = "";
+    els.deviationResumeDateInput.value = "";
+    els.deviationNoteInput.value = "";
+  }
   renderActivityDocuments(activity);
   activityDetailBaseline = activityDetailFormSnapshot();
   updateActivityDetailDirtyState();
@@ -2328,7 +2694,7 @@ function renderActivityDetail(caseRecord) {
 
 function renderActivityGuidance(activity, caseRecord) {
   const mentor = caseMentor(caseRecord);
-  const identityDataMissing = activity.templateKey === "identityVerified"
+  const identityDataMissing = activity.templateId === "identityVerified"
     && mentor
     && (!mentor.personalNumber || !mentor.identityMethod);
   els.activityDetailGuidance.hidden = !identityDataMissing;
@@ -2343,7 +2709,7 @@ function activityDetailFormSnapshot() {
   const status = els.activityDetailStatusInput.value;
   return {
     status,
-    result: status === "Klar" ? els.activityDetailResultInput.value : "",
+    result: status === "completed" ? els.activityDetailResultInput.value : "",
     handlerId: els.activityDetailOwnerInput.value,
     dueDate: els.activityDetailDueDateInput.value,
     note: els.activityDetailNoteInput.value.trim()
@@ -2364,7 +2730,7 @@ function updateActivityDetailDirtyState() {
 }
 
 function renderActivityResultInput(activity) {
-  const completed = els.activityDetailStatusInput.value === "Klar";
+  const completed = els.activityDetailStatusInput.value === "completed";
   const selectedResult = activityResultValue(activity);
   els.activityDetailResultInput.innerHTML = '<option value="">Välj resultat</option>';
   for (const [value, label] of activityResultOptions(activity)) {
@@ -2376,7 +2742,7 @@ function renderActivityResultInput(activity) {
   els.activityDetailResultInput.value = completed ? selectedResult : "";
   els.activityDetailResultInput.disabled = !completed;
   els.activityDetailResultInput.required = completed;
-  els.activityResultHelp.textContent = activity.templateKey === "registryChecked"
+  els.activityResultHelp.textContent = activity.templateId === "registryChecked"
     ? "Registrera endast att utdraget har visats och kontrollerats. Dokumentera inte innehållet."
     : completed
       ? "Resultat krävs när aktiviteten avslutas."
@@ -2393,9 +2759,9 @@ function renderActivityDocuments(activity) {
     const article = document.createElement("article");
     article.className = "document-row border rounded";
     article.innerHTML = `
-      <div><strong>${escapeHtml(caseDocument.title)}</strong><small>${escapeHtml(caseDocument.type)} · ${escapeHtml(formatDate(caseDocument.documentDate))}</small></div>
+      <div><strong>${escapeHtml(caseDocument.title)}</strong><small>${escapeHtml(documentTypeLabel(caseDocument.type))} · ${escapeHtml(formatDate(caseDocument.documentDate))}${caseDocument.fileName ? ` · ${escapeHtml(caseDocument.fileName)}` : ""}</small></div>
       <div class="text-secondary small">${escapeHtml(caseDocument.description || "Ingen beskrivning")}</div>
-      <div class="text-secondary small">Registrerad av ${escapeHtml(caseDocument.createdBy)}</div>
+      <div class="text-secondary small">Registrerad av ${escapeHtml(handlerNameById(caseDocument.createdBy))}</div>
     `;
     els.activityDocumentsList.append(article);
   }
@@ -2423,11 +2789,36 @@ function renderCaseDocuments(caseDocumentRows) {
     const article = document.createElement("article");
     article.className = "document-row border rounded";
     article.innerHTML = `
-      <div><strong>${escapeHtml(caseDocument.title)}</strong><small>${escapeHtml(caseDocument.type)} · ${escapeHtml(formatDate(caseDocument.documentDate))}</small>${activity ? `<button type="button" class="document-activity-link" data-open-activity="${escapeHtml(activity.id)}">Kopplad till: ${escapeHtml(activity.title)}</button>` : '<small>Gäller hela ärendet</small>'}</div>
+      <div><strong>${escapeHtml(caseDocument.title)}</strong><small>${escapeHtml(documentTypeLabel(caseDocument.type))} · ${escapeHtml(formatDate(caseDocument.documentDate))}${caseDocument.fileName ? ` · ${escapeHtml(caseDocument.fileName)} (${escapeHtml(formatFileSize(caseDocument.sizeBytes))})` : ""} · ${caseDocument.informationClass === "restricted" ? "Begränsad" : "Normal"}</small>${activity ? `<button type="button" class="document-activity-link" data-open-activity="${escapeHtml(activity.id)}">Kopplad till: ${escapeHtml(activity.title)}</button>` : '<small>Gäller hela ärendet</small>'}</div>
       <div class="text-secondary small">${escapeHtml(caseDocument.description || "Ingen beskrivning")}</div>
-      <div class="text-secondary small">Registrerad av ${escapeHtml(caseDocument.createdBy)}</div>
+      <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center"><span class="text-secondary small">Registrerad av ${escapeHtml(handlerNameById(caseDocument.createdBy))}${caseDocument.supersedesDocumentId ? " · Rättelse" : ""}</span><button type="button" class="btn btn-outline-secondary btn-sm" data-correct-document="${escapeHtml(caseDocument.id)}">Registrera rättelse</button></div>
     `;
     els.caseDocumentsList.append(article);
+  }
+}
+
+function renderCaseMeetings(caseRecord, meetingRows) {
+  meetingRows = meetingRows.filter((meeting) => !meeting.supersededByMeetingId);
+  els.caseMeetingsEmpty.hidden = meetingRows.length > 0;
+  els.caseMeetingsList.innerHTML = "";
+  els.caseMeetingActivityInput.innerHTML = '<option value="">Ingen</option>';
+  for (const activity of activitiesForCase(caseRecord.id)) {
+    const option = document.createElement("option");
+    option.value = activity.id;
+    option.textContent = activity.title;
+    els.caseMeetingActivityInput.append(option);
+  }
+  if (!els.caseMeetingDateInput.value) els.caseMeetingDateInput.value = localDateTimeValue();
+  for (const meeting of [...meetingRows].sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt))) {
+    const activity = caseActivities.find((item) => item.id === meeting.activityId);
+    const article = document.createElement("article");
+    article.className = "document-row border rounded";
+    article.innerHTML = `
+      <div><strong>${escapeHtml(({ certification_interview: "Certifieringsintervju", follow_up: "Uppföljning", other: "Annat möte" })[meeting.meetingType])}</strong><small>${escapeHtml(formatDateTime(meeting.occurredAt))} · ${escapeHtml(({ physical: "Fysiskt", digital: "Digitalt", phone: "Telefon" })[meeting.mode] || "Ej angivet")}</small>${activity ? `<button type="button" class="document-activity-link" data-open-activity="${escapeHtml(activity.id)}">Kopplad till: ${escapeHtml(activity.title)}</button>` : ""}</div>
+      <div class="text-secondary small">${escapeHtml(meeting.summary)}</div>
+      <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center"><span class="text-secondary small">Registrerat av ${escapeHtml(handlerNameById(meeting.createdBy))}${meeting.supersedesMeetingId ? " · Rättad version" : ""}</span><button type="button" class="btn btn-outline-secondary btn-sm" data-edit-case-meeting="${escapeHtml(meeting.id)}">Öppna</button></div>
+    `;
+    els.caseMeetingsList.append(article);
   }
 }
 
@@ -2435,7 +2826,7 @@ function renderCaseEvents(events) {
   els.caseEventTableBody.innerHTML = "";
   for (const item of events) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.text)}</td><td>${escapeHtml(item.actor || "System")}</td>`;
+    row.innerHTML = `<td>${escapeHtml(formatDateTime(item.occurredAt || item.createdAt))}</td><td>${escapeHtml(item.payload?.message || item.text || item.eventType)}</td><td>${escapeHtml(handlerNameById(item.actorId))}</td>`;
     els.caseEventTableBody.append(row);
   }
   if (!events.length) {
@@ -2628,6 +3019,7 @@ function renderDetail() {
   els.detailEmpty.hidden = true;
   els.candidateDetail.hidden = false;
   els.recordMoreActions.hidden = false;
+  els.deleteButton.textContent = candidate.active === false ? "Aktivera mentor" : "Inaktivera mentor";
   els.nextActionBar.hidden = false;
   document.querySelectorAll(".detail-tabs .nav-item").forEach((item) => {
     item.hidden = false;
@@ -2690,7 +3082,7 @@ function renderDetail() {
   populateCoordinatorSelect(candidate);
   els.coordinatorFieldRow.classList.toggle("next-required", nextAction.key === "coordinatorAssigned");
   els.interviewDateInput.value = candidate.interviewDate || "";
-  els.interviewModeInput.value = candidate.interviewMode || "";
+  els.interviewModeInput.value = ({ physical: "Fysiskt möte", digital: "Digitalt möte", phone: "Telefon" })[candidate.interviewMode] || candidate.interviewMode || "";
   els.interviewDoneInput.checked = Boolean(candidate.checks?.interviewDone);
   const interviewDoneMeta = candidate.checkMeta?.interviewDone || {};
   els.interviewDoneMeta.textContent = candidate.checks?.interviewDone
@@ -2705,7 +3097,7 @@ function renderDetail() {
   els.identityMethodSelect.value = candidate.identityMethod || "";
   els.identityVerificationMeta.hidden = !identityVerified;
   els.identityVerifiedAtFact.textContent = identityVerified ? formatDateTime(candidate.identityVerifiedAt) : "";
-  els.identityVerifiedByFact.textContent = identityVerified ? candidate.identityVerifiedBy || "Ej angivet" : "";
+  els.identityVerifiedByFact.textContent = identityVerified ? handlerNameById(candidate.identityVerifiedBy) : "";
   els.identityNoteFact.textContent = identityVerified ? candidate.checkMeta?.identityVerified?.note || "Ingen notering" : "";
   setIdentityEditMode(!identityVerified || identityEditMode);
   els.identityVerificationPanel.classList.toggle("next-required", nextAction.key === "identityVerified");
@@ -2806,23 +3198,24 @@ function renderNewCandidateDetail() {
 }
 
 function renderMeetings(candidate) {
-  const candidateMeetings = meetings.filter((meeting) => meeting.mentorId === candidate.id);
+  const mentorCaseIds = new Set(cases.filter((caseRecord) => caseRecord.mentorId === candidate.id).map((caseRecord) => caseRecord.id));
+  const candidateMeetings = caseMeetings.filter((meeting) => mentorCaseIds.has(meeting.caseId) && !meeting.supersededByMeetingId);
   els.meetingsTabCount.textContent = candidateMeetings.length;
   els.meetingsEmpty.hidden = candidateMeetings.length > 0;
   els.meetingsTableWrap.hidden = candidateMeetings.length === 0;
   els.meetingsTableBody.innerHTML = "";
 
   for (const meeting of candidateMeetings) {
-    const meetingType = meeting.type === "Intervju" ? "Certifieringsintervju" : meeting.type;
+    const meetingType = ({ certification_interview: "Certifieringsintervju", follow_up: "Uppföljning", other: "Annat möte" })[meeting.meetingType] || meeting.meetingType;
     const row = document.createElement("tr");
     const nextStep = meeting.nextStep
       ? `<small class="d-block text-secondary mt-1">Nästa steg: ${escapeHtml(meeting.nextStep)}</small>`
       : "";
     row.innerHTML = `
       <td><time datetime="${escapeHtml(meeting.occurredAt)}">${escapeHtml(formatDateTime(meeting.occurredAt))}</time></td>
-      <td>${escapeHtml(meetingType)}<small class="d-block text-secondary">${escapeHtml(meeting.mode || "Ej angivet")}</small></td>
+      <td>${escapeHtml(meetingType)}<small class="d-block text-secondary">${escapeHtml(({ physical: "Fysiskt möte", digital: "Digitalt möte", phone: "Telefon" })[meeting.mode] || "Ej angivet")}</small></td>
       <td class="meeting-summary">${escapeHtml(meeting.summary)}${nextStep}</td>
-      <td>${escapeHtml(meeting.createdBy || "Ej angivet")}</td>
+      <td>${escapeHtml(handlerNameById(meeting.createdBy))}</td>
       <td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-edit-meeting="${escapeHtml(meeting.id)}">Öppna</button></td>
     `;
     els.meetingsTableBody.append(row);
@@ -2839,19 +3232,17 @@ function closeMeetingForm() {
   selectedMeetingId = null;
   els.meetingForm.reset();
   els.meetingForm.hidden = true;
-  els.deleteMeetingButton.hidden = true;
 }
 
 function openMeetingForm(meeting = null) {
   selectedMeetingId = meeting?.id || null;
   els.meetingForm.reset();
   els.meetingFormTitle.textContent = meeting ? "Redigera möte" : "Nytt möte";
-  els.meetingTypeInput.value = meeting?.type === "Intervju" ? "Certifieringsintervju" : meeting?.type || "";
+  els.meetingTypeInput.value = ({ certification_interview: "Certifieringsintervju", follow_up: "Uppföljning", other: "Annat möte" })[meeting?.meetingType] || "";
   els.meetingDateInput.value = meeting?.occurredAt ? localDateTimeValue(meeting.occurredAt) : localDateTimeValue();
-  els.meetingModeInput.value = meeting?.mode === "Ej angivet" ? "" : meeting?.mode || "";
+  els.meetingModeInput.value = ({ physical: "Fysiskt möte", digital: "Digitalt möte", phone: "Telefon" })[meeting?.mode] || "";
   els.meetingSummaryInput.value = meeting?.summary || "";
   els.meetingNextStepInput.value = meeting?.nextStep || "";
-  els.deleteMeetingButton.hidden = !meeting;
   els.meetingForm.hidden = false;
   els.meetingTypeInput.focus({ preventScroll: true });
   els.meetingForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -2949,99 +3340,668 @@ async function updateSelected(patch, logText) {
   await refresh();
 }
 
-async function addCaseEvent(caseId, text, type = "case_updated") {
-  return saveCaseEvent({
+function caseEventRecord({ caseId, eventType, entityType = "case", entityId = caseId, message, idempotencyKey, correlationId, now }) {
+  return {
     id: crypto.randomUUID(),
+    tenantId: DEFAULT_TENANT_ID,
     caseId,
-    type,
-    text,
-    actor: currentUserName(),
-    createdAt: new Date().toISOString()
+    eventType,
+    schemaVersion: 1,
+    entityType,
+    entityId,
+    actorId: CURRENT_USER_ID,
+    occurredAt: now,
+    correlationId,
+    idempotencyKey,
+    payload: { message }
+  };
+}
+
+function executeCaseCommand({
+  commandType,
+  caseId,
+  expectedVersion = null,
+  idempotencyKey = crypto.randomUUID(),
+  payload = {},
+  additionalStores = [],
+  allowMissingCase = false,
+  mutate
+}) {
+  const requestHash = stableHash({ commandType, caseId, payload });
+  const storeNames = [...new Set([
+    CASES_STORE,
+    CASE_EVENTS_STORE,
+    PROCESSED_COMMANDS_STORE,
+    ...additionalStores
+  ])];
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeNames, "readwrite");
+    const processedStore = transaction.objectStore(PROCESSED_COMMANDS_STORE);
+    let response;
+    let failure;
+    const processedRequest = processedStore.get([DEFAULT_TENANT_ID, idempotencyKey]);
+
+    const fail = (code, message) => {
+      failure = Object.assign(new Error(message), { code });
+      transaction.abort();
+    };
+
+    processedRequest.onsuccess = () => {
+      const processed = processedRequest.result;
+      if (processed) {
+        if (processed.requestHash !== requestHash) {
+          fail("IDEMPOTENCY_CONFLICT", "Idempotensnyckeln har redan använts för ett annat kommando.");
+          return;
+        }
+        response = processed.response;
+        return;
+      }
+
+      const caseRequest = transaction.objectStore(CASES_STORE).get(caseId);
+      caseRequest.onsuccess = () => {
+        const currentCase = caseRequest.result || null;
+        if (!currentCase && !allowMissingCase) {
+          fail("CASE_NOT_FOUND", "Ärendet finns inte.");
+          return;
+        }
+        if (currentCase && currentCase.tenantId !== DEFAULT_TENANT_ID) {
+          fail("CASE_NOT_FOUND", "Ärendet finns inte.");
+          return;
+        }
+        if (expectedVersion !== null && currentCase?.version !== expectedVersion) {
+          fail("VERSION_CONFLICT", "Ärendet har ändrats av någon annan. Läs in den senaste versionen.");
+          return;
+        }
+
+        const now = new Date().toISOString();
+        const correlationId = crypto.randomUUID();
+        response = mutate({
+          currentCase,
+          now,
+          correlationId,
+          idempotencyKey,
+          store: (name) => transaction.objectStore(name),
+          put: (name, value) => transaction.objectStore(name).put(value),
+          event: (eventType, entityType, entityId, message) => {
+            const record = caseEventRecord({
+              caseId,
+              eventType,
+              entityType,
+              entityId,
+              message,
+              idempotencyKey,
+              correlationId,
+              now
+            });
+            transaction.objectStore(CASE_EVENTS_STORE).put(record);
+            return record;
+          }
+        });
+        processedStore.put({
+          tenantId: DEFAULT_TENANT_ID,
+          idempotencyKey,
+          commandType,
+          requestHash,
+          response,
+          processedAt: now
+        });
+      };
+    };
+
+    transaction.oncomplete = () => resolve(response);
+    transaction.onerror = () => reject(failure || transaction.error);
+    transaction.onabort = () => reject(failure || transaction.error || new Error("Kommandot avbröts."));
   });
+}
+
+function saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nextHandlerId, nextDueDate, note, reopen = false, meeting = null }) {
+  const sourceStatus = normalizeActivityStatus(activity.status);
+  const targetStatus = normalizeActivityStatus(nextStatus);
+  if (!canTransitionActivity(sourceStatus, targetStatus, { reopen })) {
+    return Promise.reject(Object.assign(new Error("Den valda statusövergången är inte tillåten."), { code: "INVALID_TRANSITION" }));
+  }
+  if (caseRecord.status === "closed") {
+    return Promise.reject(Object.assign(new Error("Ärendet måste återöppnas innan aktiviteter kan ändras."), { code: "CASE_CLOSED" }));
+  }
+  const classification = targetStatus === "completed" ? resultClassification(activity.templateId, nextResult) : null;
+  if (targetStatus === "completed" && !classification) {
+    return Promise.reject(Object.assign(new Error("Välj ett giltigt resultat innan aktiviteten avslutas."), { code: "RESULT_REQUIRED" }));
+  }
+  if (classification === "deviation" && !note.trim()) {
+    return Promise.reject(Object.assign(new Error("En kort tjänsteanteckning krävs för ett avvikande resultat."), { code: "NOTE_REQUIRED" }));
+  }
+
+  return executeCaseCommand({
+    commandType: reopen ? "reopen_activity" : "update_activity",
+    caseId: caseRecord.id,
+    expectedVersion: caseRecord.version,
+    payload: { activityId: activity.id, nextStatus: targetStatus, nextResult, nextHandlerId, nextDueDate, note, meeting },
+    additionalStores: [CASE_ACTIVITIES_STORE, CASE_DOCUMENTS_STORE, ACTIVITY_DEVIATIONS_STORE, ...(meeting ? [CASE_MEETINGS_STORE] : [])],
+    mutate: ({ currentCase, now, put, event }) => {
+      const resultChanged = nextResult !== (activity.resultCode || null);
+      const completionEvent = targetStatus === "completed" && (sourceStatus !== "completed" || resultChanged)
+        ? event("activity_updated", "activity", activity.id, `${activity.title} avslutades med resultatet ${activityResultOptions(activity).find(([code]) => code === nextResult)?.[1] || nextResult}`)
+        : null;
+      if (!completionEvent) {
+        event(reopen ? "activity_updated" : "activity_updated", "activity", activity.id, reopen
+          ? `${activity.title} återöppnades`
+          : `${activity.title} uppdaterades`);
+      }
+
+      const updatedActivity = {
+        ...activity,
+        status: targetStatus,
+        resultCode: targetStatus === "completed" ? nextResult : null,
+        resultClassification: classification,
+        handlerIdOverride: nextHandlerId || null,
+        waitingForParty: targetStatus === "waiting" ? activity.waitingForParty || "external" : null,
+        dueDate: nextDueDate || null,
+        version: Number(activity.version || 1) + 1,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_ID,
+        completedAt: targetStatus === "completed" ? now : null,
+        completedBy: targetStatus === "completed" ? CURRENT_USER_ID : null
+      };
+      put(CASE_ACTIVITIES_STORE, updatedActivity);
+
+      if (meeting) {
+        const meetingId = crypto.randomUUID();
+        put(CASE_MEETINGS_STORE, {
+          id: meetingId, tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id, activityId: activity.id,
+          meetingType: meeting.meetingType, occurredAt: meeting.occurredAt, mode: meeting.mode,
+          summary: meeting.summary, nextStep: meeting.nextStep || "", participantHandlerIds: [CURRENT_USER_ID],
+          externalParticipantNames: [],
+          supersedesMeetingId: null, supersededByMeetingId: null, version: 1,
+          createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID
+        });
+        event("meeting_registered", "meeting", meetingId, `Mötet registrerades: ${meeting.summary}`);
+      }
+
+      if (note.trim() && note.trim() !== latestActivityNote(activity.id)) {
+        const serviceNote = {
+          id: crypto.randomUUID(),
+          tenantId: DEFAULT_TENANT_ID,
+          caseId: currentCase.id,
+          activityId: activity.id,
+          meetingId: null,
+          type: "service_note",
+          title: `Tjänsteanteckning: ${activity.title}`,
+          description: note.trim(),
+          documentDate: now.slice(0, 10),
+          storageObjectId: null,
+          mimeType: null,
+          sizeBytes: null,
+          checksum: null,
+          informationClass: "normal",
+          supersedesDocumentId: null,
+          createdAt: now,
+          createdBy: CURRENT_USER_ID
+        };
+        put(CASE_DOCUMENTS_STORE, serviceNote);
+        event("document_registered", "document", serviceNote.id, `Tjänsteanteckning registrerades för ${activity.title}`);
+      }
+
+      const openDeviation = activityDeviations.find((deviation) => deviation.activityId === activity.id && deviation.status === "open");
+      let newDeviation = null;
+      if (reopen && openDeviation) {
+        put(ACTIVITY_DEVIATIONS_STORE, {
+          ...openDeviation,
+          status: "superseded",
+          version: openDeviation.version + 1,
+          resolvedAt: now,
+          resolvedBy: CURRENT_USER_ID
+        });
+      } else if (classification === "deviation" && completionEvent) {
+        newDeviation = {
+          id: crypto.randomUUID(),
+          tenantId: DEFAULT_TENANT_ID,
+          caseId: currentCase.id,
+          activityId: activity.id,
+          activityCompletionEventId: completionEvent.id,
+          resultCode: nextResult,
+          status: "open",
+          version: 1,
+          openedAt: now,
+          openedBy: CURRENT_USER_ID,
+          resolvedAt: null,
+          resolvedBy: null,
+          activeDecisionId: null
+        };
+        put(ACTIVITY_DEVIATIONS_STORE, newDeviation);
+        event("deviation_opened", "deviation", newDeviation.id, `Avvikelse registrerades för ${activity.title}`);
+      }
+
+      const allActivities = activitiesForCase(currentCase.id).map((item) => item.id === activity.id ? updatedActivity : item);
+      let nextCaseStatus = newDeviation ? "decision_required" : deriveDomainCaseStatus(
+        { ...currentCase, status: currentCase.status === "decision_required" ? "in_progress" : currentCase.status },
+        allActivities,
+        activityDeviations.filter((deviation) => deviation.caseId === currentCase.id && deviation.id !== openDeviation?.id)
+      );
+      let closePatch = {};
+      if (activity.templateId === "decision" && targetStatus === "completed" && nextResult === "approved") {
+        nextCaseStatus = "closed";
+        closePatch = { closeReasonCode: "mentor_approved", closeNote: note.trim() || "Mentorn godkänd", closedAt: now, closedBy: CURRENT_USER_ID };
+        for (const otherActivity of allActivities) {
+          if (otherActivity.id === activity.id || ["completed", "not_applicable"].includes(otherActivity.status)) continue;
+          put(CASE_ACTIVITIES_STORE, {
+            ...otherActivity,
+            status: "not_applicable",
+            resultCode: null,
+            resultClassification: null,
+            version: Number(otherActivity.version || 1) + 1,
+            updatedAt: now,
+            updatedBy: CURRENT_USER_ID
+          });
+        }
+        event("case_closed", "case", currentCase.id, "Ärendet avslutades: mentorn godkänd");
+      }
+      const updatedCase = {
+        ...currentCase,
+        ...closePatch,
+        status: nextCaseStatus,
+        version: currentCase.version + 1,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_ID
+      };
+      put(CASES_STORE, updatedCase);
+      return { caseId: currentCase.id, activityId: activity.id, status: nextCaseStatus, version: updatedCase.version, deviationId: newDeviation?.id || null };
+    }
+  });
+}
+
+function decideDeviationCommand({ deviation, caseRecord, outcome, reasonCode, note, resumeAt = null }) {
+  if (!reasonCode || !note.trim()) return Promise.reject(new Error("Orsak och motivering måste anges."));
+  return executeCaseCommand({
+    commandType: "decide_deviation",
+    caseId: caseRecord.id,
+    expectedVersion: caseRecord.version,
+    payload: { deviationId: deviation.id, outcome, reasonCode, note, resumeAt },
+    additionalStores: [ACTIVITY_DEVIATIONS_STORE, DEVIATION_DECISIONS_STORE, CASE_ACTIVITIES_STORE, CASE_ASSIGNMENTS_STORE],
+    mutate: ({ currentCase, now, put, event }) => {
+      const decision = {
+        id: crypto.randomUUID(),
+        tenantId: DEFAULT_TENANT_ID,
+        deviationId: deviation.id,
+        outcome,
+        reasonCode,
+        note: note.trim(),
+        resumeAt: resumeAt || null,
+        supersedesDecisionId: deviation.activeDecisionId || null,
+        decidedAt: now,
+        decidedBy: CURRENT_USER_ID
+      };
+      put(DEVIATION_DECISIONS_STORE, decision);
+      put(ACTIVITY_DEVIATIONS_STORE, {
+        ...deviation,
+        status: "resolved",
+        version: deviation.version + 1,
+        resolvedAt: now,
+        resolvedBy: CURRENT_USER_ID,
+        activeDecisionId: decision.id
+      });
+      event("deviation_decided", "decision", decision.id, `Ställningstagande registrerades: ${{
+        continue: "fortsätt handläggningen",
+        request_supplement: "begär komplettering",
+        pause_case: "pausa ärendet",
+        close_case: "avsluta ärendet"
+      }[outcome]}`);
+
+      const casePatch = {};
+      let nextStatus = "in_progress";
+      if (outcome === "request_supplement") {
+        if (!responsibleHandler(currentCase)) {
+          const assignment = {
+            id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id, handlerId: CURRENT_USER_ID,
+            role: "responsible", assignedAt: now, assignedBy: CURRENT_USER_ID, endedAt: null, endedBy: null, version: 1
+          };
+          put(CASE_ASSIGNMENTS_STORE, assignment);
+          event("assignment_changed", "assignment", assignment.id, `${currentUserName()} blev ansvarig handläggare`);
+        }
+        const activity = {
+          id: crypto.randomUUID(),
+          tenantId: DEFAULT_TENANT_ID,
+          caseId: currentCase.id,
+          templateId: AD_HOC_ACTIVITY_TEMPLATE_ID,
+          templateVersion: 1,
+          title: "Begär komplettering från mentorn",
+          status: "waiting",
+          resultCode: null,
+          resultClassification: null,
+          handlerIdOverride: null,
+          waitingForParty: "mentor",
+          dueDate: resumeAt || null,
+          sortOrder: activitiesForCase(currentCase.id).length,
+          version: 1,
+          createdAt: now,
+          createdBy: CURRENT_USER_ID,
+          updatedAt: now,
+          updatedBy: CURRENT_USER_ID,
+          completedAt: null,
+          completedBy: null
+        };
+        put(CASE_ACTIVITIES_STORE, activity);
+        event("activity_updated", "activity", activity.id, "Uppföljningsaktivitet skapades: begär komplettering från mentorn");
+        nextStatus = "waiting";
+      } else if (outcome === "pause_case") {
+        nextStatus = "paused";
+        Object.assign(casePatch, { pauseReasonCode: reasonCode, pauseNote: note.trim(), resumeAt: resumeAt || null });
+        event("case_paused", "case", currentCase.id, "Ärendet pausades efter ställningstagande");
+      } else if (outcome === "close_case") {
+        nextStatus = "closed";
+        Object.assign(casePatch, { closeReasonCode: reasonCode, closeNote: note.trim(), closedAt: now, closedBy: CURRENT_USER_ID });
+        for (const activity of activitiesForCase(currentCase.id)) {
+          if (["completed", "not_applicable"].includes(activity.status)) continue;
+          put(CASE_ACTIVITIES_STORE, {
+            ...activity,
+            status: "not_applicable",
+            resultCode: null,
+            resultClassification: null,
+            version: activity.version + 1,
+            updatedAt: now,
+            updatedBy: CURRENT_USER_ID
+          });
+        }
+        event("case_closed", "case", currentCase.id, "Ärendet avslutades efter ställningstagande");
+      }
+      const updatedCase = {
+        ...currentCase,
+        ...casePatch,
+        status: nextStatus,
+        version: currentCase.version + 1,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_ID
+      };
+      put(CASES_STORE, updatedCase);
+      return { caseId: currentCase.id, deviationId: deviation.id, decisionId: decision.id, status: nextStatus, version: updatedCase.version };
+    }
+  });
+}
+
+function verifyIdentityCommand({ candidate, caseRecord, activity, personalNumber, method, note }) {
+  return executeCaseCommand({
+    commandType: "verify_identity",
+    caseId: caseRecord.id,
+    expectedVersion: caseRecord.version,
+    payload: { candidateId: candidate.id, method, hasNote: Boolean(note) },
+    additionalStores: [STORE, CASE_ACTIVITIES_STORE, CASE_DOCUMENTS_STORE],
+    mutate: ({ currentCase, now, put, event }) => {
+      put(STORE, {
+        ...candidate,
+        personalNumber,
+        identityMethod: method,
+        identityVerifiedAt: now,
+        identityVerifiedBy: CURRENT_USER_ID,
+        updatedAt: now
+      });
+      const updatedActivity = {
+        ...activity,
+        status: "completed",
+        resultCode: "verified",
+        resultClassification: "acceptable",
+        version: activity.version + 1,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_ID,
+        completedAt: now,
+        completedBy: CURRENT_USER_ID
+      };
+      put(CASE_ACTIVITIES_STORE, updatedActivity);
+      if (note) {
+        put(CASE_DOCUMENTS_STORE, {
+          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id, activityId: activity.id, meetingId: null,
+          type: "service_note", title: "Tjänsteanteckning: identitetsverifiering", description: note,
+          documentDate: now.slice(0, 10), storageObjectId: null, mimeType: null, sizeBytes: null, checksum: null,
+          informationClass: "restricted", supersedesDocumentId: null, createdAt: now, createdBy: CURRENT_USER_ID
+        });
+      }
+      const updatedActivities = activitiesForCase(currentCase.id).map((item) => item.id === activity.id ? updatedActivity : item);
+      const updatedCase = {
+        ...currentCase,
+        status: deriveDomainCaseStatus(currentCase, updatedActivities, activityDeviations.filter((item) => item.caseId === currentCase.id)),
+        version: currentCase.version + 1,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_ID
+      };
+      put(CASES_STORE, updatedCase);
+      event("activity_updated", "activity", activity.id, `Identiteten verifierades med ${identityMethodLabel(method)}`);
+      return { caseId: currentCase.id, activityId: activity.id, version: updatedCase.version };
+    }
+  });
+}
+
+async function sha256Hex(file) {
+  if (!file) return null;
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+async function registerDocumentCommand({ caseRecord, activityId, type, title, documentDate, description, informationClass, file, supersedesDocumentId = null }) {
+  if (["incoming", "created"].includes(type) && !file) {
+    throw new Error("Välj en fil för en inkommen eller upprättad handling.");
+  }
+  const now = new Date().toISOString();
+  const documentId = crypto.randomUUID();
+  const storageObjectId = file ? crypto.randomUUID() : null;
+  const checksum = await sha256Hex(file);
+  return executeCaseCommand({
+    commandType: supersedesDocumentId ? "correct_document" : "register_document",
+    caseId: caseRecord.id,
+    expectedVersion: caseRecord.version,
+    payload: { activityId, type, title, documentDate, description, informationClass, checksum, supersedesDocumentId },
+    additionalStores: [CASE_DOCUMENTS_STORE, CASE_DOCUMENT_BLOBS_STORE],
+    mutate: ({ currentCase, put, event }) => {
+      const record = {
+        id: documentId,
+        tenantId: DEFAULT_TENANT_ID,
+        caseId: currentCase.id,
+        activityId: activityId || null,
+        meetingId: null,
+        type,
+        title,
+        description,
+        documentDate,
+        storageObjectId,
+        fileName: file?.name || null,
+        mimeType: file?.type || null,
+        sizeBytes: file?.size || null,
+        checksum,
+        informationClass,
+        supersedesDocumentId,
+        createdAt: now,
+        createdBy: CURRENT_USER_ID
+      };
+      put(CASE_DOCUMENTS_STORE, record);
+      if (file) {
+        put(CASE_DOCUMENT_BLOBS_STORE, {
+          id: storageObjectId,
+          tenantId: DEFAULT_TENANT_ID,
+          documentId,
+          blob: file,
+          createdAt: now
+        });
+      }
+      const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
+      put(CASES_STORE, updatedCase);
+      event(supersedesDocumentId ? "document_corrected" : "document_registered", "document", documentId,
+        `${supersedesDocumentId ? "Rättelse registrerades" : "Handlingen registrerades"}: ${title}`);
+      return { caseId: currentCase.id, documentId, version: updatedCase.version };
+    }
+  });
+}
+
+function registerCaseMeetingCommand({ caseRecord, existing = null, meetingType, occurredAt, mode, activityId, summary, nextStep = "" }) {
+  const now = new Date().toISOString();
+  const meetingId = crypto.randomUUID();
+  return executeCaseCommand({
+    commandType: existing ? "revise_meeting" : "register_meeting",
+    caseId: caseRecord.id,
+    expectedVersion: caseRecord.version,
+    payload: { existingId: existing?.id || null, meetingType, occurredAt, mode, activityId, summary, nextStep },
+    additionalStores: [CASE_MEETINGS_STORE],
+    mutate: ({ currentCase, put, event }) => {
+      if (existing) put(CASE_MEETINGS_STORE, { ...existing, supersededByMeetingId: meetingId, updatedAt: now, updatedBy: CURRENT_USER_ID });
+      put(CASE_MEETINGS_STORE, {
+        id: meetingId,
+        tenantId: DEFAULT_TENANT_ID,
+        caseId: currentCase.id,
+        activityId: activityId || null,
+        meetingType,
+        occurredAt,
+        mode,
+        summary,
+        nextStep,
+        participantHandlerIds: [CURRENT_USER_ID],
+        externalParticipantNames: [],
+        supersedesMeetingId: existing?.id || null,
+        supersededByMeetingId: null,
+        version: Number(existing?.version || 0) + 1,
+        createdAt: now,
+        createdBy: CURRENT_USER_ID,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_ID
+      });
+      const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
+      put(CASES_STORE, updatedCase);
+      event(existing ? "meeting_revised" : "meeting_registered", "meeting", meetingId,
+        `${existing ? "Mötesanteckningen rättades" : "Mötet registrerades"}: ${summary}`);
+      return { caseId: currentCase.id, meetingId, version: updatedCase.version };
+    }
+  });
+}
+
+function updateMentorProfileCommand({ candidate, caseRecord, profilePatch, coordinatorId }) {
+  if (!caseRecord) return saveCandidate({ ...candidate, ...profilePatch, updatedAt: new Date().toISOString() });
+  const currentResponsible = assignmentsForCase(caseRecord.id).find((assignment) => assignment.role === "responsible" && !assignment.endedAt);
+  return executeCaseCommand({
+    commandType: "update_mentor_profile",
+    caseId: caseRecord.id,
+    expectedVersion: caseRecord.version,
+    payload: { candidateId: candidate.id, profilePatch, coordinatorId },
+    additionalStores: [STORE, CASE_ASSIGNMENTS_STORE],
+    mutate: ({ currentCase, now, put, event }) => {
+      put(STORE, { ...candidate, ...profilePatch, updatedAt: now });
+      if ((currentResponsible?.handlerId || "") !== (coordinatorId || "")) {
+        if (currentResponsible) {
+          put(CASE_ASSIGNMENTS_STORE, { ...currentResponsible, endedAt: now, endedBy: CURRENT_USER_ID, version: Number(currentResponsible.version || 1) + 1 });
+        }
+        if (coordinatorId) {
+          put(CASE_ASSIGNMENTS_STORE, {
+            id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id, handlerId: coordinatorId,
+            role: "responsible", assignedAt: now, assignedBy: CURRENT_USER_ID, endedAt: null, endedBy: null, version: 1
+          });
+        }
+        event("assignment_changed", "assignment", currentResponsible?.id || currentCase.id, coordinatorId
+          ? `Ansvarig handläggare ändrades till ${handlerNameById(coordinatorId)}`
+          : "Ansvarig handläggare togs bort");
+      }
+      const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
+      put(CASES_STORE, updatedCase);
+      event("mentor_profile_updated", "mentor", candidate.id, "Mentorns grunduppgifter uppdaterades");
+      return { caseId: currentCase.id, candidateId: candidate.id, version: updatedCase.version };
+    }
+  });
+}
+
+function changeCaseLifecycleCommand({ caseRecord, action, reasonCode, note, resumeAt = null }) {
+  if (!reasonCode || !note.trim()) return Promise.reject(new Error("Orsak och motivering måste anges."));
+  const statusByAction = { pause: "paused", resume: "in_progress", close: "closed", reopen: "in_progress" };
+  const eventByAction = { pause: "case_paused", resume: "case_resumed", close: "case_closed", reopen: "case_reopened" };
+  const labelByAction = { pause: "pausades", resume: "återupptogs", close: "avslutades", reopen: "återöppnades" };
+  return executeCaseCommand({
+    commandType: `${action}_case`,
+    caseId: caseRecord.id,
+    expectedVersion: caseRecord.version,
+    payload: { action, reasonCode, note, resumeAt },
+    additionalStores: [CASE_ACTIVITIES_STORE],
+    mutate: ({ currentCase, now, put, event }) => {
+      if (action === "reopen" && currentUser().role !== "Samordnare") throw new Error("Endast samordnare kan återöppna ärenden.");
+      if (action === "close") {
+        for (const activity of activitiesForCase(currentCase.id)) {
+          if (["completed", "not_applicable"].includes(activity.status)) continue;
+          put(CASE_ACTIVITIES_STORE, { ...activity, status: "not_applicable", version: activity.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID });
+        }
+      }
+      const lifecyclePatch = action === "pause"
+        ? { pauseReasonCode: reasonCode, pauseNote: note.trim(), resumeAt: resumeAt || null }
+        : action === "close"
+          ? { closeReasonCode: reasonCode, closeNote: note.trim(), closedAt: now, closedBy: CURRENT_USER_ID }
+          : action === "reopen"
+            ? { closeReasonCode: null, closeNote: null, closedAt: null, closedBy: null }
+            : { pauseReasonCode: null, pauseNote: null, resumeAt: null };
+      const updatedCase = {
+        ...currentCase,
+        ...lifecyclePatch,
+        status: statusByAction[action],
+        version: currentCase.version + 1,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_ID
+      };
+      put(CASES_STORE, updatedCase);
+      event(eventByAction[action], "case", currentCase.id, `Ärendet ${labelByAction[action]}: ${note.trim()}`);
+      return { caseId: currentCase.id, status: updatedCase.status, version: updatedCase.version };
+    }
+  });
+}
+
+function openCaseLifecycle(action) {
+  const caseRecord = selectedCaseRecord();
+  if (!caseRecord) return;
+  pendingCaseLifecycleAction = action;
+  const content = {
+    pause: ["Pausa ärendet", "Öppna aktiviteter ligger kvar. Ange varför handläggningen pausas och vid behov ett bevakningsdatum.", "Pausa ärendet"],
+    resume: ["Återuppta ärendet", "Ärendet blir aktivt igen. Tidigare paus och motivering ligger kvar i loggen.", "Återuppta ärendet"],
+    close: ["Avsluta ärendet", "Öppna aktiviteter markeras som ej aktuella. Ärendet och all historik bevaras.", "Avsluta ärendet"],
+    reopen: ["Återöppna ärendet", "Ärendet blir aktivt igen. Åtgärden kräver samordnarbehörighet och registreras i loggen.", "Återöppna ärendet"]
+  }[action];
+  els.caseLifecycleForm.reset();
+  els.caseLifecycleTitle.textContent = content[0];
+  els.caseLifecycleDescription.textContent = content[1];
+  els.caseLifecycleSubmitButton.textContent = content[2];
+  els.caseLifecycleSubmitButton.classList.toggle("btn-danger", action === "close");
+  els.caseLifecycleSubmitButton.classList.toggle("btn-primary", action !== "close");
+  els.caseLifecycleResumeRow.hidden = action !== "pause";
+  caseLifecycleModal.show();
 }
 
 function derivedCaseStatus(caseRecord, updatedActivities) {
-  if (caseRecord.status === "Avslutat") return "Avslutat";
-  if (updatedActivities.some(activityHasBlockingResult)) return "Kräver åtgärd";
-  if (updatedActivities.some((activity) => activity.status === "Väntar")) return "Väntar";
-  const openActivities = updatedActivities.filter((activity) => !["Klar", "Ej aktuell"].includes(activity.status));
-  if (!openActivities.length && updatedActivities.length) return "Redo för beslut";
-  if (openActivities.length === 1 && openActivities[0].templateKey === "decision") return "Redo för beslut";
-  if (updatedActivities.some((activity) => activity.status !== "Ej påbörjad")) return "Pågår";
-  return "Nytt";
+  const deviations = activityDeviations.filter((deviation) => deviation.caseId === caseRecord.id);
+  return deriveDomainCaseStatus(caseRecord, updatedActivities, deviations);
 }
 
 async function syncCandidateFromActivity(activity, status, note, now, result = "") {
-  if (!activity.templateKey) return true;
   const caseRecord = cases.find((item) => item.id === activity.caseId);
   const candidate = candidates.find((item) => item.id === caseRecord?.mentorId);
   if (!candidate) return true;
-  const completed = status === "Klar" && !BLOCKING_ACTIVITY_RESULTS.has(result);
+  const completed = status === "completed" && resultClassification(activity.templateId, result) === "acceptable";
 
-  if (activity.templateKey === "identityVerified" && completed && (!candidate.personalNumber || !candidate.identityMethod)) {
+  if (activity.templateId === "identityVerified" && completed && (!candidate.personalNumber || !candidate.identityMethod)) {
     showFeedback("Registrera personnummer och verifieringssätt på mentorkortet innan identitetsaktiviteten slutförs.");
     return false;
   }
-  if (activity.templateKey === "decision") {
-    if (completed && !isComplete(candidate)) {
+  if (activity.templateId === "decision" && completed) {
+    const prerequisites = activitiesForCase(caseRecord.id).filter((item) => item.id !== activity.id && item.templateId !== "decision");
+    if (prerequisites.some((item) => item.status !== "completed" || item.resultClassification === "deviation")) {
       showFeedback("Samtliga kontroller och intervjun måste vara klara innan beslutet kan registreras.");
       return false;
     }
-    await saveCandidate({
-      ...candidate,
-      status: completed ? "Godkänd/Certifierad" : statusFromChecks(candidate.checks),
-      updatedAt: now,
-      history: [...(candidate.history || []), {
-        at: now,
-        text: completed ? "Mentor godkänd och certifierad via ärendet" : "Beslut om godkännande återöppnat",
-        actor: currentUserName()
-      }]
-    });
-    return true;
   }
-  if (activity.templateKey === "inviteInterview") return true;
-  if (!CHECK_LABELS[activity.templateKey]) return true;
-
-  const checks = { ...candidate.checks, [activity.templateKey]: completed };
-  const checkMeta = {
-    ...candidate.checkMeta,
-    [activity.templateKey]: completed
-      ? { checkedAt: now, checkedBy: currentUserName(), note }
-      : { checkedAt: "", checkedBy: "", note: "" }
-  };
-  await saveCandidate({
-    ...candidate,
-    checks,
-    checkMeta,
-    status: candidate.status === "Godkänd/Certifierad" && !completed ? statusFromChecks(checks) : candidate.status,
-    updatedAt: now,
-    history: [...(candidate.history || []), {
-      at: now,
-      text: `${CHECK_LABELS[activity.templateKey]}: ${completed ? "klar" : status.toLowerCase()}${note ? `: ${note}` : ""}`,
-      actor: currentUserName()
-    }]
-  });
   return true;
 }
 
-async function syncActivityFromCandidate(candidate, templateKey, completed, note = "") {
-  const caseRecord = cases.find((item) => item.mentorId === candidate.id && item.type === "Certifiering av mentor");
-  const activity = caseActivities.find((item) => item.caseId === caseRecord?.id && item.templateKey === templateKey);
+async function syncActivityFromCandidate(candidate, templateKey, completed, note = "", context = {}) {
+  const caseRecord = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
+  const activity = caseActivities.find((item) => item.caseId === caseRecord?.id && item.templateId === templateKey);
   if (!caseRecord || !activity) return;
-  const now = new Date().toISOString();
-  await Promise.all([
-    saveCaseActivity({
-      ...activity,
-      status: completed ? "Klar" : "Ej påbörjad",
-      result: completed ? defaultCompletedResult(activity) : "",
-      note: completed ? note : "",
-      updatedAt: now,
-      completedAt: completed ? now : "",
-      completedBy: completed ? currentUserName() : ""
-    }),
-    saveCase({ ...caseRecord, status: certificationCaseStatus({ ...candidate, checks: { ...candidate.checks, [templateKey]: completed } }), updatedAt: now }),
-    addCaseEvent(caseRecord.id, `${activity.title}: ${completed ? "klar" : "återöppnad"}${note ? ` – ${note}` : ""}`, "activity_updated")
-  ]);
+  await saveActivityCommand({
+    activity,
+    caseRecord,
+    nextStatus: completed ? "completed" : "in_progress",
+    nextResult: completed ? defaultCompletedResult(activity) : "",
+    nextHandlerId: activity.handlerIdOverride || "",
+    nextDueDate: activity.dueDate || "",
+    note,
+    reopen: !completed && ["completed", "not_applicable"].includes(activity.status),
+    meeting: context.meeting || null
+  });
 }
 
 function activityTemplatesForCaseType(type) {
@@ -3058,6 +4018,7 @@ function newCandidate(formData) {
   const id = crypto.randomUUID();
   return {
     id,
+    tenantId: DEFAULT_TENANT_ID,
     caseNumber: makeCaseNumber(id),
     name: formData.get("name").trim(),
     personalNumber: formData.get("personalNumber").trim(),
@@ -3087,6 +4048,7 @@ function newCandidateFromEditor() {
   const coordinator = handlers.find((handler) => handler.id === els.coordinatorInput.value);
   return {
     id,
+    tenantId: DEFAULT_TENANT_ID,
     caseNumber: makeCaseNumber(id),
     name: els.editNameInput.value.trim(),
     personalNumber: els.editPersonalNumberInput.value.trim(),
@@ -3191,6 +4153,13 @@ function formatDateTime(value) {
   }).format(new Date(value));
 }
 
+function formatFileSize(value) {
+  const bytes = Number(value || 0);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function daysSinceText(value) {
   if (!value) return "Skapat datum saknas";
   const days = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86400000));
@@ -3279,6 +4248,67 @@ els.caseStatusFilter.addEventListener("change", () => {
   renderCases();
 });
 
+els.completeCaseButton.addEventListener("click", () => {
+  caseEditMode = true;
+  renderCaseDetail();
+  requestAnimationFrame(() => els.caseDescriptionInput.focus());
+});
+els.pauseCaseButton.addEventListener("click", () => openCaseLifecycle("pause"));
+els.resumeCaseButton.addEventListener("click", () => openCaseLifecycle("resume"));
+els.closeCaseButton.addEventListener("click", () => openCaseLifecycle("close"));
+els.reopenCaseButton.addEventListener("click", () => openCaseLifecycle("reopen"));
+
+els.caseLifecycleForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const caseRecord = selectedCaseRecord();
+  if (!caseRecord || !pendingCaseLifecycleAction) return;
+  try {
+    await changeCaseLifecycleCommand({
+      caseRecord,
+      action: pendingCaseLifecycleAction,
+      reasonCode: els.caseLifecycleReasonInput.value,
+      note: els.caseLifecycleNoteInput.value,
+      resumeAt: els.caseLifecycleResumeInput.value || null
+    });
+    caseLifecycleModal.hide();
+    pendingCaseLifecycleAction = null;
+    markSaved();
+    showFeedback("Ärendets status har uppdaterats.");
+    await refresh();
+  } catch (error) {
+    showFeedback(error.message);
+  }
+});
+
+function compatibleRegistrationTargets(mentorId, caseTypeId, excludeCaseId = null) {
+  if (!mentorId) return [];
+  return cases.filter((caseRecord) => caseRecord.id !== excludeCaseId
+    && caseRecord.tenantId === DEFAULT_TENANT_ID
+    && caseRecord.organizationUnitId === DEFAULT_ORGANIZATION_UNIT_ID
+    && caseRecord.mentorId === mentorId
+    && caseRecord.caseTypeId === caseTypeId
+    && caseRecord.status !== "closed");
+}
+
+function renderRegistrationTargets() {
+  if (caseEditMode || !selectedCaseRecordId?.startsWith("new")) {
+    els.caseDuplicatePanel.hidden = true;
+    return;
+  }
+  const targets = compatibleRegistrationTargets(els.caseMentorIdInput.value, els.caseTypeInput.value);
+  els.caseDuplicatePanel.hidden = targets.length === 0;
+  els.caseDuplicatePanel.dataset.choice = "";
+  if (!targets.length) return;
+  const target = targets[0];
+  els.caseDuplicatePanel.innerHTML = `
+    <strong>Ett kompatibelt öppet ärende finns.</strong>
+    <span class="d-block mb-2">${escapeHtml(target.number)} · ${escapeHtml(target.title)}</span>
+    <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-warning btn-sm" data-registration-target="${escapeHtml(target.id)}">Registrera i befintligt ärende</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-registration-new>Skapa separat ärende</button>
+    </div>`;
+}
+
 els.caseMentorInput.addEventListener("input", () => {
   const value = els.caseMentorInput.value.trim();
   const mentor = candidates.find((candidate) => candidate.name.localeCompare(value, "sv", { sensitivity: "base" }) === 0);
@@ -3300,7 +4330,10 @@ els.caseMentorInput.addEventListener("input", () => {
     button.textContent = candidate.name;
     els.caseMentorSuggestions.append(button);
   }
+  renderRegistrationTargets();
 });
+
+els.caseTypeInput.addEventListener("change", renderRegistrationTargets);
 
 els.caseMentorSuggestions.addEventListener("click", (event) => {
   const button = event.target.closest("[data-select-case-mentor]");
@@ -3311,6 +4344,16 @@ els.caseMentorSuggestions.addEventListener("click", (event) => {
   els.caseMentorIdInput.value = mentor.id;
   els.caseMentorSuggestions.hidden = true;
   els.caseMentorSuggestions.innerHTML = "";
+  renderRegistrationTargets();
+});
+
+els.caseDuplicatePanel.addEventListener("click", (event) => {
+  const targetButton = event.target.closest("[data-registration-target]");
+  const newButton = event.target.closest("[data-registration-new]");
+  if (!targetButton && !newButton) return;
+  els.caseDuplicatePanel.dataset.choice = targetButton ? targetButton.dataset.registrationTarget : "new";
+  for (const button of els.caseDuplicatePanel.querySelectorAll("button")) button.classList.remove("active");
+  (targetButton || newButton).classList.add("active");
 });
 
 els.previousCasePageButton.addEventListener("click", () => {
@@ -3346,7 +4389,6 @@ els.cancelCaseCreateButton.addEventListener("click", () => {
 
 els.caseCreateForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const now = new Date().toISOString();
   const existingCase = caseEditMode ? selectedCaseRecord() : null;
   const id = existingCase?.id || crypto.randomUUID();
   const requestedMentorName = els.caseMentorInput.value.trim();
@@ -3357,85 +4399,126 @@ els.caseCreateForm.addEventListener("submit", async (event) => {
     return;
   }
   els.caseMentorInput.setCustomValidity("");
-  const mentorId = matchedMentor?.id || "";
-  els.caseMentorIdInput.value = mentorId;
-  const ownerId = els.caseOwnerInput.value;
-  const caseRecord = {
-    id,
-    number: existingCase?.number || makeCaseNumber(id, new Set(cases.map((item) => item.number))),
-    type: els.caseTypeInput.value,
-    title: els.caseTitleInput.value.trim(),
-    mentorId,
-    status: existingCase?.status || "Nytt",
-    priority: els.casePriorityInput.value,
-    dueDate: els.caseDueDateInput.value,
-    description: els.caseDescriptionInput.value.trim(),
-    createdAt: existingCase?.createdAt || now,
-    createdBy: existingCase?.createdBy || currentUserName(),
-    updatedAt: now,
-    closedAt: existingCase?.closedAt || ""
-  };
-  const assignments = [{
-    id: `${id}-${ownerId}`,
-    caseId: id,
-    handlerId: "",
-    role: "Ansvarig",
-    assignedAt: now
-  }];
-  for (const input of els.caseCoHandlerInputs.querySelectorAll('input[name="coHandler"]:checked')) {
-    if (input.value === ownerId) continue;
-    assignments.push({
-      id: `${id}-${input.value}`,
-      caseId: id,
-      handlerId: input.value,
-      role: "Medhandläggare",
-      assignedAt: now
-    });
+  const mentorId = matchedMentor?.id || null;
+  els.caseMentorIdInput.value = mentorId || "";
+  const caseType = caseTypeById(els.caseTypeInput.value);
+  if (!caseType) return;
+
+  if (!existingCase) {
+    const targets = compatibleRegistrationTargets(mentorId, caseType.id);
+    const choice = els.caseDuplicatePanel.dataset.choice;
+    if (targets.length && !choice) {
+      renderRegistrationTargets();
+      els.caseDuplicatePanel.scrollIntoView({ block: "center" });
+      showFeedback("Välj om registreringen ska kopplas till det befintliga ärendet eller skapa ett separat ärende.");
+      return;
+    }
+    if (choice && choice !== "new") {
+      const targetCase = targets.find((item) => item.id === choice);
+      const description = els.caseDescriptionInput.value.trim();
+      if (!targetCase || !description) {
+        els.caseDescriptionInput.setCustomValidity("Ange en kort beskrivning för registreringen i det befintliga ärendet.");
+        els.caseDescriptionInput.reportValidity();
+        return;
+      }
+      els.caseDescriptionInput.setCustomValidity("");
+      await executeCaseCommand({
+        commandType: "quick_register_existing",
+        caseId: targetCase.id,
+        expectedVersion: targetCase.version,
+        payload: { caseTypeId: caseType.id, mentorId, title: els.caseTitleInput.value.trim(), description },
+        additionalStores: [CASE_DOCUMENTS_STORE],
+        mutate: ({ currentCase, now, put, event }) => {
+          const note = {
+            id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id, activityId: null, meetingId: null,
+            type: "service_note", title: els.caseTitleInput.value.trim(), description, documentDate: now.slice(0, 10),
+            storageObjectId: null, mimeType: null, sizeBytes: null, checksum: null, informationClass: "normal", supersedesDocumentId: null,
+            createdAt: now, createdBy: CURRENT_USER_ID
+          };
+          put(CASE_DOCUMENTS_STORE, note);
+          const updated = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
+          put(CASES_STORE, updated);
+          event("registration_added_to_case", "document", note.id, `Registrering tillagd: ${note.title}`);
+          return { caseId: currentCase.id, version: updated.version };
+        }
+      });
+      markSaved();
+      await refresh();
+      navigateToCase(targetCase.id);
+      return;
+    }
   }
-  const activities = existingCase ? [] : activityTemplatesForCaseType(caseRecord.type).map((title, order) => ({
-    id: crypto.randomUUID(),
+
+  const ownerId = els.caseOwnerInput.value || (existingCase ? responsibleHandler(existingCase)?.id : CURRENT_USER_ID);
+  const coHandlerIds = [...els.caseCoHandlerInputs.querySelectorAll('input[name="coHandler"]:checked')]
+    .map((input) => input.value)
+    .filter((handlerId) => handlerId !== ownerId);
+  const selectedActivities = existingCase ? [] : (caseType.activityTemplateIds || []).map((templateId, sortOrder) => ({ templateId, title: activityTemplateById(templateId).title, sortOrder }));
+  await executeCaseCommand({
+    commandType: existingCase ? "update_case" : "quick_register_case",
     caseId: id,
-    templateKey: "",
-    title,
-    status: "Ej påbörjad",
-    handlerId: ownerId,
-    dueDate: "",
-    note: "",
-    order,
-    createdAt: now,
-    createdBy: currentUserName(),
-    updatedAt: now,
-    completedAt: "",
-    completedBy: "",
-    result: ""
-  }));
-  const linkedMentor = candidates.find((candidate) => candidate.id === mentorId);
-  const selectedOwner = handlers.find((handler) => handler.id === ownerId);
-  const mentorSync = existingCase?.type === "Certifiering av mentor" && linkedMentor
-    ? saveCandidate({
-      ...linkedMentor,
-      coordinatorId: ownerId,
-      coordinator: selectedOwner?.name || "",
-      updatedAt: now,
-      history: [...(linkedMentor.history || []), { at: now, text: "Ansvarig handläggare uppdaterad via ärendet", actor: currentUserName() }]
-    })
-    : Promise.resolve();
-  await Promise.all([
-    saveCase(caseRecord),
-    replaceCaseAssignments(id, assignments),
-    mentorSync,
-    ...activities.map(saveCaseActivity),
-    saveCaseEvent({
-      id: crypto.randomUUID(),
-      caseId: id,
-      type: existingCase ? "case_updated" : "case_created",
-      text: existingCase
+    expectedVersion: existingCase?.version ?? null,
+    allowMissingCase: !existingCase,
+    payload: { caseTypeId: caseType.id, mentorId, title: els.caseTitleInput.value.trim(), description: els.caseDescriptionInput.value.trim(), ownerId, coHandlerIds },
+    additionalStores: [CASE_ASSIGNMENTS_STORE, CASE_ACTIVITIES_STORE],
+    mutate: ({ currentCase, now, put, event: recordEvent }) => {
+      const caseRecord = {
+        ...(currentCase || {}),
+        id,
+        tenantId: DEFAULT_TENANT_ID,
+        number: currentCase?.number || makeCaseNumber(id, new Set(cases.map((item) => item.number))),
+        caseTypeId: caseType.id,
+        caseTypeVersion: caseType.version,
+        organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID,
+        type: caseType.name,
+        title: els.caseTitleInput.value.trim(),
+        description: els.caseDescriptionInput.value.trim(),
+        mentorId,
+        status: currentCase?.status || "new",
+        priority: els.casePriorityInput.value || caseType.defaultPriority,
+        dueDate: els.caseDueDateInput.value || null,
+        pauseReasonCode: currentCase?.pauseReasonCode || null,
+        pauseNote: currentCase?.pauseNote || null,
+        resumeAt: currentCase?.resumeAt || null,
+        closeReasonCode: currentCase?.closeReasonCode || null,
+        closeNote: currentCase?.closeNote || null,
+        version: Number(currentCase?.version || 0) + 1,
+        createdAt: currentCase?.createdAt || now,
+        createdBy: currentCase?.createdBy || CURRENT_USER_ID,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_ID,
+        closedAt: currentCase?.closedAt || null,
+        closedBy: currentCase?.closedBy || null
+      };
+      put(CASES_STORE, caseRecord);
+
+      if (currentCase) {
+        for (const assignment of assignmentsForCase(id)) {
+          put(CASE_ASSIGNMENTS_STORE, { ...assignment, version: assignment.version + 1, endedAt: now, endedBy: CURRENT_USER_ID });
+        }
+      }
+      for (const [role, handlerId] of [["responsible", ownerId], ...coHandlerIds.map((handlerId) => ["co_handler", handlerId])]) {
+        if (!handlerId) continue;
+        put(CASE_ASSIGNMENTS_STORE, {
+          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: id, handlerId, role, version: 1,
+          assignedAt: now, assignedBy: CURRENT_USER_ID, endedAt: null, endedBy: null
+        });
+      }
+      for (const template of selectedActivities) {
+        const activity = {
+          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: id, templateId: template.templateId, templateVersion: 1,
+          title: template.title, status: "not_started", resultCode: null, resultClassification: null, handlerIdOverride: null,
+          waitingForParty: null, dueDate: null, sortOrder: template.sortOrder, version: 1,
+          createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, completedAt: null, completedBy: null
+        };
+        put(CASE_ACTIVITIES_STORE, activity);
+      }
+      recordEvent(currentCase ? "case_updated" : "case_created", "case", id, currentCase
         ? "Ärendeuppgifter och handläggare uppdaterades"
-        : `Ärendet skapades${activities.length ? ` med ${activities.length} föreslagna aktiviteter` : ""}`,
-      actor: currentUserName(),
-      createdAt: now
-    })
-  ]);
+        : `Ärendet skapades${selectedActivities.length ? ` med ${selectedActivities.length} aktiviteter` : ""}`);
+      return { caseId: id, version: caseRecord.version };
+    }
+  });
   caseEditMode = false;
   els.caseCreateForm.dataset.route = "";
   markSaved();
@@ -3458,29 +4541,40 @@ els.caseActivityForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const caseRecord = selectedCaseRecord();
   if (!caseRecord) return;
-  const now = new Date().toISOString();
-  const activity = {
-    id: crypto.randomUUID(),
+  const activityId = crypto.randomUUID();
+  const title = els.activityTitleInput.value.trim();
+  const note = els.activityNoteInput.value.trim();
+  await executeCaseCommand({
+    commandType: "add_activity",
     caseId: caseRecord.id,
-    templateKey: "",
-    title: els.activityTitleInput.value.trim(),
-    status: "Ej påbörjad",
-    handlerId: els.activityOwnerInput.value,
-    dueDate: els.activityDueDateInput.value,
-    note: els.activityNoteInput.value.trim(),
-    order: activitiesForCase(caseRecord.id).length,
-    createdAt: now,
-    createdBy: currentUserName(),
-    updatedAt: now,
-    completedAt: "",
-    completedBy: "",
-    result: ""
-  };
-  await Promise.all([
-    saveCaseActivity(activity),
-    saveCase({ ...caseRecord, updatedAt: now }),
-    addCaseEvent(caseRecord.id, `Aktiviteten "${activity.title}" lades till`, "activity_created")
-  ]);
+    expectedVersion: caseRecord.version,
+    payload: { activityId, title, handlerId: els.activityOwnerInput.value, dueDate: els.activityDueDateInput.value, note },
+    additionalStores: [CASE_ACTIVITIES_STORE, CASE_DOCUMENTS_STORE],
+    mutate: ({ currentCase, now, put, event: recordEvent }) => {
+      const activity = {
+        id: activityId, tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id,
+        templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1, title, status: "not_started",
+        resultCode: null, resultClassification: null, handlerIdOverride: els.activityOwnerInput.value || null,
+        waitingForParty: null, dueDate: els.activityDueDateInput.value || null,
+        sortOrder: activitiesForCase(currentCase.id).length, version: 1,
+        createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID,
+        completedAt: null, completedBy: null
+      };
+      put(CASE_ACTIVITIES_STORE, activity);
+      if (note) {
+        put(CASE_DOCUMENTS_STORE, {
+          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id, activityId, meetingId: null,
+          type: "service_note", title: `Tjänsteanteckning: ${title}`, description: note, documentDate: now.slice(0, 10),
+          storageObjectId: null, mimeType: null, sizeBytes: null, checksum: null, informationClass: "normal", supersedesDocumentId: null,
+          createdAt: now, createdBy: CURRENT_USER_ID
+        });
+      }
+      const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
+      put(CASES_STORE, updatedCase);
+      recordEvent("activity_updated", "activity", activityId, `Aktiviteten "${title}" lades till`);
+      return { caseId: currentCase.id, activityId, version: updatedCase.version };
+    }
+  });
   els.caseActivityForm.reset();
   els.caseActivityForm.hidden = true;
   markSaved();
@@ -3532,18 +4626,18 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   if (!activityDetailHasChanges()) return;
 
   const nextStatus = els.activityDetailStatusInput.value;
-  const nextResult = nextStatus === "Klar" ? els.activityDetailResultInput.value : "";
+  const nextResult = nextStatus === "completed" ? els.activityDetailResultInput.value : "";
   const nextHandlerId = els.activityDetailOwnerInput.value;
   const currentHandlerOverrideId = activityOwnerOverrideId(activity, caseRecord);
   const nextDueDate = els.activityDetailDueDateInput.value;
   const nextNote = els.activityDetailNoteInput.value.trim();
-  if (nextStatus === "Klar" && !nextResult) {
+  if (nextStatus === "completed" && !nextResult) {
     els.activityDetailResultInput.setCustomValidity("Välj resultat innan aktiviteten avslutas.");
     els.activityDetailResultInput.reportValidity();
     return;
   }
   els.activityDetailResultInput.setCustomValidity("");
-  if (nextStatus === "Klar" && BLOCKING_ACTIVITY_RESULTS.has(nextResult) && !nextNote) {
+  if (nextStatus === "completed" && resultClassification(activity.templateId, nextResult) === "deviation" && !nextNote) {
     els.activityDetailNoteInput.setCustomValidity("Ange en kort notering när resultatet kräver uppföljning.");
     els.activityDetailNoteInput.reportValidity();
     return;
@@ -3556,49 +4650,79 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
     const resultLabel = activityResultOptions(activity).find(([value]) => value === nextResult)?.[1] || "";
     const confirmation = await confirmAction({
       eyebrow: "Aktivitet i ärendet",
-      title: nextStatus === "Klar" ? "Avsluta aktiviteten?" : "Spara ändrad status?",
-      body: nextStatus === "Klar"
+      title: nextStatus === "completed" ? "Avsluta aktiviteten?" : "Spara ändrad status?",
+      body: nextStatus === "completed"
         ? `Aktiviteten "${activity.title}" avslutas med resultatet "${resultLabel}". Ändringen registreras i ärendets logg.`
-        : `Aktiviteten "${activity.title}" får status ${nextStatus.toLowerCase()}. Ändringen registreras i ärendets logg.`,
+        : `Aktiviteten "${activity.title}" får status ${activityStatusLabel(nextStatus).toLowerCase()}. Ändringen registreras i ärendets logg.`,
       mentorName: caseMentor(caseRecord)?.name || "Ej personanknutet",
-      confirmLabel: nextStatus === "Klar" ? "Avsluta aktivitet" : "Spara status",
-      danger: activity.status === "Klar" && nextStatus !== "Klar"
+      confirmLabel: nextStatus === "completed" ? "Avsluta aktivitet" : "Spara status"
     });
     if (!confirmation.confirmed) return;
   }
 
-  const now = new Date().toISOString();
-  const candidateSynced = await syncCandidateFromActivity(activity, nextStatus, nextNote, now, nextResult);
+  const candidateSynced = await syncCandidateFromActivity(activity, nextStatus, nextNote, new Date().toISOString(), nextResult);
   if (!candidateSynced) return;
-  const updatedActivity = {
-    ...activity,
-    status: nextStatus,
-    result: nextResult,
-    handlerId: nextHandlerId,
-    dueDate: nextDueDate,
-    note: nextNote,
-    updatedAt: now,
-    updatedBy: currentUserName(),
-    completedAt: nextStatus === "Klar" ? (activity.completedAt || now) : "",
-    completedBy: nextStatus === "Klar" ? currentUserName() : ""
-  };
-  const updatedActivities = activitiesForCase(caseRecord.id).map((item) => item.id === activity.id ? updatedActivity : item);
-  const nextCaseStatus = activity.templateKey === "decision" && nextStatus === "Klar" && nextResult === "approved"
-    ? "Avslutat"
-    : derivedCaseStatus(caseRecord, updatedActivities);
-  const changes = [];
-  if (statusChanged) changes.push(`status ${activityStatusLabel(activity.status)} → ${activityStatusLabel(nextStatus)}`);
-  if (resultChanged && nextResult) changes.push(`resultat ${activityResultLabel(updatedActivity)}`);
-  if (nextHandlerId !== currentHandlerOverrideId) changes.push(`ansvarig ${activityHandlerLabel(updatedActivity, caseRecord)}`);
-  if (nextDueDate !== (activity.dueDate || "")) changes.push(`förfallodatum ${nextDueDate ? formatDate(nextDueDate) : "borttaget"}`);
-  if (nextNote !== (activity.note || "")) changes.push("tjänsteanteckning uppdaterad");
-  await Promise.all([
-    saveCaseActivity(updatedActivity),
-    saveCase({ ...caseRecord, status: nextCaseStatus, updatedAt: now, closedAt: nextCaseStatus === "Avslutat" ? now : "" }),
-    addCaseEvent(caseRecord.id, `${activity.title}: ${changes.join(", ") || "aktiviteten uppdaterades"}`, "activity_updated")
-  ]);
+  await saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nextHandlerId, nextDueDate, note: nextNote });
   markSaved();
   showFeedback("Aktiviteten har sparats.");
+  await refresh();
+});
+
+els.reopenActivityButton.addEventListener("click", async () => {
+  const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
+  const caseRecord = cases.find((item) => item.id === activity?.caseId);
+  if (!activity || !caseRecord) return;
+  const confirmation = await confirmAction({
+    eyebrow: "Återöppna aktivitet",
+    title: "Återöppna aktiviteten?",
+    body: "Det tidigare resultatet bevaras i loggen. Aktiviteten får status Pågår och måste avslutas på nytt.",
+    mentorName: caseMentor(caseRecord)?.name || "Ej personanknutet",
+    confirmLabel: "Återöppna aktivitet",
+    danger: true
+  });
+  if (!confirmation.confirmed) return;
+  if (!confirmation.note) {
+    showFeedback("Ange en motivering för återöppningen.");
+    return;
+  }
+  await saveActivityCommand({
+    activity,
+    caseRecord,
+    nextStatus: activity.status === "not_applicable" ? "not_started" : "in_progress",
+    nextResult: "",
+    nextHandlerId: activity.handlerIdOverride || "",
+    nextDueDate: activity.dueDate || "",
+    note: confirmation.note,
+    reopen: true
+  });
+  markSaved();
+  showFeedback("Aktiviteten har återöppnats.");
+  await refresh();
+});
+
+els.saveDeviationDecisionButton.addEventListener("click", async () => {
+  const deviation = activityDeviations.find((item) => item.id === els.activityDeviationPanel.dataset.deviationId);
+  const caseRecord = selectedCaseRecord();
+  if (!deviation || !caseRecord) return;
+  const reasonCode = els.deviationReasonInput.value;
+  const note = els.deviationNoteInput.value.trim();
+  if (!reasonCode || !note) {
+    showFeedback("Välj orsak och ange en motivering.");
+    return;
+  }
+  const outcome = els.deviationOutcomeInput.value;
+  const confirmation = await confirmAction({
+    eyebrow: "Ställningstagande",
+    title: "Registrera ställningstagandet?",
+    body: `Valet registreras som ett separat beslut och ändrar inte det ursprungliga aktivitetsresultatet.${outcome === "request_supplement" && !responsibleHandler(caseRecord) ? " Eftersom ärendet saknar ansvarig blir du ansvarig handläggare." : ""}`,
+    mentorName: caseMentor(caseRecord)?.name || "Ej personanknutet",
+    confirmLabel: "Registrera ställningstagande",
+    danger: ["pause_case", "close_case"].includes(outcome)
+  });
+  if (!confirmation.confirmed) return;
+  await decideDeviationCommand({ deviation, caseRecord, outcome, reasonCode, note, resumeAt: els.deviationResumeDateInput.value || null });
+  markSaved();
+  showFeedback("Ställningstagandet har registrerats.");
   await refresh();
 });
 
@@ -3635,8 +4759,21 @@ els.documentActivityInput.addEventListener("change", () => {
 });
 
 els.caseDocumentsList.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-open-activity]");
-  if (button) openCaseActivity(button.dataset.openActivity);
+  const activityButton = event.target.closest("[data-open-activity]");
+  if (activityButton) openCaseActivity(activityButton.dataset.openActivity);
+  const correctionButton = event.target.closest("[data-correct-document]");
+  if (!correctionButton) return;
+  const original = caseDocuments.find((item) => item.id === correctionButton.dataset.correctDocument);
+  if (!original) return;
+  els.caseDocumentForm.dataset.supersedesDocumentId = original.id;
+  els.caseDocumentForm.dataset.activityId = original.activityId || "";
+  els.documentTypeInput.value = original.type;
+  els.documentActivityInput.value = original.activityId || "";
+  els.documentTitleInput.value = original.title;
+  els.documentDateInput.value = new Date().toISOString().slice(0, 10);
+  els.documentDescriptionInput.value = `Rättelse av handling registrerad ${formatDate(original.documentDate)}. `;
+  els.documentInformationClassInput.value = original.informationClass || "normal";
+  els.documentTitleInput.focus();
 });
 
 els.documentActivityContext.addEventListener("click", (event) => {
@@ -3648,27 +4785,59 @@ els.caseDocumentForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const caseRecord = selectedCaseRecord();
   if (!caseRecord) return;
-  const now = new Date().toISOString();
-  const caseDocument = {
-    id: crypto.randomUUID(),
-    caseId: caseRecord.id,
-    activityId: els.documentActivityInput.value || "",
+  await registerDocumentCommand({
+    caseRecord,
+    activityId: els.documentActivityInput.value || null,
     type: els.documentTypeInput.value,
     title: els.documentTitleInput.value.trim(),
     documentDate: els.documentDateInput.value,
     description: els.documentDescriptionInput.value.trim(),
-    createdAt: now,
-    createdBy: currentUserName()
-  };
-  await Promise.all([
-    saveCaseDocument(caseDocument),
-    saveCase({ ...caseRecord, updatedAt: now }),
-    addCaseEvent(caseRecord.id, `Handlingen "${caseDocument.title}" registrerades`, "document_registered")
-  ]);
+    informationClass: els.documentInformationClassInput.value,
+    file: els.documentFileInput.files[0] || null,
+    supersedesDocumentId: els.caseDocumentForm.dataset.supersedesDocumentId || null
+  });
   els.caseDocumentForm.reset();
   els.caseDocumentForm.dataset.activityId = "";
+  els.caseDocumentForm.dataset.supersedesDocumentId = "";
   markSaved();
   showFeedback("Handlingen har registrerats.");
+  await refresh();
+});
+
+els.caseMeetingsList.addEventListener("click", (event) => {
+  const activityButton = event.target.closest("[data-open-activity]");
+  if (activityButton) openCaseActivity(activityButton.dataset.openActivity);
+  const meetingButton = event.target.closest("[data-edit-case-meeting]");
+  if (!meetingButton) return;
+  const meeting = caseMeetings.find((item) => item.id === meetingButton.dataset.editCaseMeeting);
+  if (!meeting) return;
+  els.caseMeetingForm.dataset.meetingId = meeting.id;
+  els.caseMeetingTypeInput.value = meeting.meetingType;
+  els.caseMeetingDateInput.value = localDateTimeValue(meeting.occurredAt);
+  els.caseMeetingModeInput.value = meeting.mode;
+  els.caseMeetingActivityInput.value = meeting.activityId || "";
+  els.caseMeetingSummaryInput.value = meeting.summary;
+  els.caseMeetingSummaryInput.focus();
+});
+
+els.caseMeetingForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const caseRecord = selectedCaseRecord();
+  if (!caseRecord) return;
+  const existing = caseMeetings.find((item) => item.id === els.caseMeetingForm.dataset.meetingId);
+  await registerCaseMeetingCommand({
+    caseRecord,
+    existing,
+    meetingType: els.caseMeetingTypeInput.value,
+    occurredAt: els.caseMeetingDateInput.value,
+    mode: els.caseMeetingModeInput.value,
+    activityId: els.caseMeetingActivityInput.value || null,
+    summary: els.caseMeetingSummaryInput.value.trim()
+  });
+  els.caseMeetingForm.reset();
+  els.caseMeetingForm.dataset.meetingId = "";
+  markSaved();
+  showFeedback(existing ? "En rättad version av mötesanteckningen har sparats." : "Mötet har registrerats.");
   await refresh();
 });
 
@@ -3788,15 +4957,6 @@ els.handlerEditForm.addEventListener("submit", async (event) => {
     active,
     updatedAt: now
   });
-  if (handler.name !== name) {
-    const assigned = candidates.filter((candidate) => candidate.coordinatorId === handler.id);
-    await Promise.all(assigned.map((candidate) => saveCandidate({
-      ...candidate,
-      coordinator: name,
-      updatedAt: now,
-      history: [...(candidate.history || []), { at: now, text: `Handläggarnamn uppdaterat till ${name}`, actor: currentUserName() }]
-    })));
-  }
   markSaved();
   showFeedback("Handläggaren har uppdaterats.");
   await refresh();
@@ -3827,6 +4987,7 @@ els.handlerForm.addEventListener("submit", async (event) => {
   const now = new Date().toISOString();
   await saveHandler({
     id,
+    tenantId: existing?.tenantId || DEFAULT_TENANT_ID,
     userId: existing?.userId || nextHandlerUserId(),
     name,
     email,
@@ -3835,15 +4996,6 @@ els.handlerForm.addEventListener("submit", async (event) => {
     createdAt: existing?.createdAt || now,
     updatedAt: now
   });
-  if (existing && existing.name !== name) {
-    const assigned = candidates.filter((candidate) => candidate.coordinatorId === id);
-    await Promise.all(assigned.map((candidate) => saveCandidate({
-      ...candidate,
-      coordinator: name,
-      updatedAt: now,
-      history: [...(candidate.history || []), { at: now, text: `Handläggarnamn uppdaterat till ${name}`, actor: currentUserName() }]
-    })));
-  }
   handlerModal.hide();
   markSaved();
   showFeedback(existing ? "Handläggaren har uppdaterats." : "Handläggaren har registrerats.");
@@ -3903,76 +5055,29 @@ els.personEditForm.addEventListener("submit", async (event) => {
   }
   const candidate = selectedCandidate();
   if (!candidate) return;
-  const personalNumber = els.editPersonalNumberInput.value.trim();
   const coordinator = handlers.find((handler) => handler.id === els.coordinatorInput.value);
-  const requestedStatus = els.statusSelect.value;
-  const status = candidate.status !== "Godkänd/Certifierad" && requestedStatus === "Godkänd/Certifierad"
-    ? candidate.status
-    : requestedStatus;
-  const identityInvalidated = candidate.checks?.identityVerified && personalNumber !== candidate.personalNumber;
-  const patch = {
+  const profilePatch = {
     name: els.editNameInput.value.trim(),
-    personalNumber,
     area: els.editAreaInput.value.trim(),
     languages: els.editLanguagesInput.value.trim(),
-    availability: els.editAvailabilityInput.value.trim(),
-    status,
-    coordinatorId: coordinator?.id || "",
-    coordinator: coordinator?.name || ""
+    availability: els.editAvailabilityInput.value.trim()
   };
-  if (identityInvalidated) {
-    patch.checks = { ...candidate.checks, identityVerified: false };
-    patch.checkMeta = {
-      ...candidate.checkMeta,
-      identityVerified: { checkedAt: "", checkedBy: "", note: "" }
-    };
-    patch.identityMethod = "";
-    patch.identityVerifiedAt = "";
-    patch.identityVerifiedBy = "";
-  }
-  if ((candidate.coordinatorId || "") !== (patch.coordinatorId || "")) {
-    const certificationCase = cases.find((item) => item.mentorId === candidate.id && item.type === "Certifiering av mentor");
-    if (certificationCase) {
-      const now = new Date().toISOString();
-      const retainedCoHandlers = assignmentsForCase(certificationCase.id).filter((assignment) => assignment.role === "Medhandläggare");
-      const responsibleAssignment = patch.coordinatorId
-        ? [{
-          id: `${certificationCase.id}-${patch.coordinatorId}`,
-          caseId: certificationCase.id,
-          handlerId: patch.coordinatorId,
-          role: "Ansvarig",
-          assignedAt: now
-        }]
-        : [];
-      await Promise.all([
-        replaceCaseAssignments(certificationCase.id, [...responsibleAssignment, ...retainedCoHandlers]),
-        saveCase({ ...certificationCase, updatedAt: now }),
-        addCaseEvent(
-          certificationCase.id,
-          patch.coordinatorId ? `Ansvarig handläggare ändrades till ${coordinator.name}` : "Ansvarig handläggare togs bort",
-          "assignment_updated"
-        )
-      ]);
-    }
-  }
-  await updateSelected(
-    patch,
-    identityInvalidated
-      ? "Personnummer ändrat; identitetsverifiering måste göras om"
-      : "Grund- och ärendeuppgifter uppdaterade"
-  );
+  const certificationCase = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
+  await updateMentorProfileCommand({ candidate, caseRecord: certificationCase, profilePatch, coordinatorId: coordinator?.id || "" });
+  markSaved();
+  await refresh();
   setPersonEditMode(false);
   showFeedback("Grunduppgifterna har sparats.");
 });
-els.interviewDateInput.addEventListener("change", () => updateSelected({ interviewDate: els.interviewDateInput.value }, "Intervjutid uppdaterad"));
-els.interviewModeInput.addEventListener("change", () => updateSelected({ interviewMode: els.interviewModeInput.value }, "Intervjuform uppdaterad"));
+els.interviewDateInput.addEventListener("change", () => { els.saveStatus.textContent = "Intervjuuppgifter ej registrerade"; });
+els.interviewModeInput.addEventListener("change", () => { els.saveStatus.textContent = "Intervjuuppgifter ej registrerade"; });
 
 els.newMeetingButton.addEventListener("click", () => openMeetingForm());
 els.cancelMeetingButton.addEventListener("click", closeMeetingForm);
 els.meetingsTableBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-edit-meeting]");
   if (!button) return;
-  const meeting = meetings.find((item) => item.id === button.dataset.editMeeting);
+  const meeting = caseMeetings.find((item) => item.id === button.dataset.editMeeting);
   if (meeting) openMeetingForm(meeting);
 });
 
@@ -3980,60 +5085,27 @@ els.meetingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const candidate = selectedCandidate();
   if (!candidate) return;
-  const existing = meetings.find((meeting) => meeting.id === selectedMeetingId);
-  const now = new Date().toISOString();
-  const type = els.meetingTypeInput.value;
-  const occurredAt = els.meetingDateInput.value;
-  const mode = els.meetingModeInput.value;
-  await saveMeeting({
-    id: existing?.id || crypto.randomUUID(),
-    mentorId: candidate.id,
-    type,
-    occurredAt,
+  const existing = caseMeetings.find((meeting) => meeting.id === selectedMeetingId);
+  const caseRecord = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification")
+    || cases.find((item) => item.mentorId === candidate.id && item.status !== "closed");
+  if (!caseRecord) throw new Error("Skapa ett ärende för mentorn innan mötet registreras.");
+  const meetingType = ({ "Certifieringsintervju": "certification_interview", "Uppföljning": "follow_up" })[els.meetingTypeInput.value] || "other";
+  const mode = ({ "Fysiskt möte": "physical", "Digitalt möte": "digital", "Telefon": "phone" })[els.meetingModeInput.value];
+  await registerCaseMeetingCommand({
+    caseRecord,
+    existing,
+    meetingType,
+    occurredAt: els.meetingDateInput.value,
     mode,
+    activityId: meetingType === "certification_interview"
+      ? activitiesForCase(caseRecord.id).find((item) => item.templateId === "interviewDone")?.id || null
+      : null,
     summary: els.meetingSummaryInput.value.trim(),
-    nextStep: els.meetingNextStepInput.value.trim(),
-    createdBy: existing?.createdBy || currentUserName(),
-    createdAt: existing?.createdAt || now,
-    updatedAt: now
-  });
-
-  const patch = type === "Certifieringsintervju"
-    ? { interviewDate: occurredAt, interviewMode: mode }
-    : {};
-  await saveCandidate({
-    ...candidate,
-    ...patch,
-    updatedAt: now,
-    history: [
-      ...(candidate.history || []),
-      { at: now, text: `${type} ${existing ? "uppdaterat" : "registrerat"}`, actor: currentUserName() }
-    ]
+    nextStep: els.meetingNextStepInput.value.trim()
   });
   closeMeetingForm();
   markSaved();
   showFeedback(existing ? "Mötet har uppdaterats." : "Mötet har registrerats.");
-  await refresh();
-});
-
-els.deleteMeetingButton.addEventListener("click", async () => {
-  const meeting = meetings.find((item) => item.id === selectedMeetingId);
-  const candidate = selectedCandidate();
-  if (!meeting || !candidate) return;
-  if (!window.confirm(`Ta bort mötesanteckningen från ${formatDateTime(meeting.occurredAt)}?`)) return;
-  await deleteMeeting(meeting.id);
-  const now = new Date().toISOString();
-  await saveCandidate({
-    ...candidate,
-    updatedAt: now,
-    history: [
-      ...(candidate.history || []),
-      { at: now, text: `${meeting.type} borttaget`, actor: currentUserName() }
-    ]
-  });
-  closeMeetingForm();
-  markSaved();
-  showFeedback("Mötet har tagits bort.");
   await refresh();
 });
 
@@ -4054,7 +5126,6 @@ els.saveIdentityVerificationButton.addEventListener("click", async () => {
   const methodValid = els.identityMethodSelect.reportValidity();
   if (!personalNumberValid || !methodValid) return;
 
-  const verifiedAt = new Date().toISOString();
   const method = els.identityMethodSelect.value;
   const alreadyVerified = Boolean(candidate.checks?.identityVerified);
   const confirmation = await confirmAction({
@@ -4065,23 +5136,24 @@ els.saveIdentityVerificationButton.addEventListener("click", async () => {
     confirmLabel: alreadyVerified ? "Spara identitet" : "Registrera identitet"
   });
   if (!confirmation.confirmed) return;
+  const caseRecord = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
+  const activity = activitiesForCase(caseRecord?.id).find((item) => item.templateId === "identityVerified");
+  if (!caseRecord || !activity) throw new Error("Mentorns certifieringsärende saknas.");
   identityEditMode = false;
-  await syncActivityFromCandidate(candidate, "identityVerified", true, confirmation.note);
-  await updateSelected({
+  await verifyIdentityCommand({
+    candidate,
+    caseRecord,
+    activity,
     personalNumber: els.identityPersonalNumberInput.value.trim(),
-    identityMethod: method,
-    identityVerifiedAt: verifiedAt,
-    identityVerifiedBy: currentUserName(),
-    checks: { ...candidate.checks, identityVerified: true },
-    checkMeta: {
-      ...candidate.checkMeta,
-      identityVerified: { checkedAt: verifiedAt, checkedBy: currentUserName(), note: confirmation.note }
-    }
-  }, `Identitet registrerad med ${identityMethodLabel(method)}${confirmation.note ? `: ${confirmation.note}` : ""}`);
+    method,
+    note: confirmation.note
+  });
+  markSaved();
+  await refresh();
   showFeedback(`Identiteten har verifierats med ${identityMethodLabel(method)}.`);
 });
 
-async function updateCandidateCheck(key, checked) {
+async function updateCandidateCheck(key, checked, context = {}) {
   const candidate = selectedCandidate();
   if (!candidate) return false;
   const previousChecked = Boolean(candidate.checks?.[key]);
@@ -4098,23 +5170,13 @@ async function updateCandidateCheck(key, checked) {
     danger: !checked
   });
   if (!confirmation.confirmed) return false;
-  const now = new Date().toISOString();
-  const checks = { ...candidate.checks, [key]: checked };
-  const checkMeta = {
-    ...candidate.checkMeta,
-    [key]: checked
-      ? { checkedAt: now, checkedBy: currentUserName(), note: confirmation.note }
-      : { checkedAt: "", checkedBy: "", note: "" }
-  };
-  let status = candidate.status;
-  if (isComplete({ ...candidate, checks }) && status !== "Godkänd/Certifierad") {
-    status = "Redo för intervju";
-  } else if (!isComplete({ ...candidate, checks }) && status === "Godkänd/Certifierad") {
-    status = statusFromChecks(checks);
+  if (!checked && !confirmation.note) {
+    showFeedback("Ange en motivering när en genomförd kontroll återöppnas.");
+    return false;
   }
-  const noteSuffix = confirmation.note ? `: ${confirmation.note}` : "";
-  await syncActivityFromCandidate(candidate, key, checked, confirmation.note);
-  await updateSelected({ checks, checkMeta, status }, `${label}: ${checked ? "klar" : "ej klar"}${noteSuffix}`);
+  await syncActivityFromCandidate(candidate, key, checked, confirmation.note, context);
+  markSaved();
+  await refresh();
   return true;
 }
 
@@ -4133,36 +5195,47 @@ els.interviewDoneInput.addEventListener("change", async () => {
     missingField.focus();
     return;
   }
-  const changed = await updateCandidateCheck("interviewDone", els.interviewDoneInput.checked);
+  const mode = ({ "Fysiskt möte": "physical", "Digitalt möte": "digital", "Telefon": "phone" })[els.interviewModeInput.value];
+  const context = els.interviewDoneInput.checked ? {
+    meeting: {
+      meetingType: "certification_interview",
+      occurredAt: els.interviewDateInput.value,
+      mode,
+      summary: "Certifieringsintervju genomförd"
+    }
+  } : {};
+  const changed = await updateCandidateCheck("interviewDone", els.interviewDoneInput.checked, context);
   if (!changed) els.interviewDoneInput.checked = !els.interviewDoneInput.checked;
 });
 
 els.approveButton.addEventListener("click", async () => {
   const candidate = selectedCandidate();
   if (!candidate || !isComplete(candidate)) return;
-  await syncActivityFromCandidate(candidate, "decision", true, "Mentorn godkänd och certifierad");
-  const caseRecord = cases.find((item) => item.mentorId === candidate.id && item.type === "Certifiering av mentor");
-  if (caseRecord) {
-    const now = new Date().toISOString();
-    await saveCase({ ...caseRecord, status: "Avslutat", updatedAt: now, closedAt: now });
-  }
-  await updateSelected({ status: "Godkänd/Certifierad" }, "Mentor godkänd och certifierad");
+  const caseRecord = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
+  const activity = activitiesForCase(caseRecord?.id).find((item) => item.templateId === "decision");
+  if (!caseRecord || !activity) return;
+  await saveActivityCommand({ activity, caseRecord, nextStatus: "completed", nextResult: "approved", nextHandlerId: activity.handlerIdOverride || "", nextDueDate: activity.dueDate || "", note: "Mentorn godkänd och certifierad" });
+  markSaved();
+  await refresh();
   showFeedback("Mentorn är godkänd och certifierad.");
 });
 
 els.deleteButton.addEventListener("click", async () => {
   const candidate = selectedCandidate();
   if (!candidate) return;
-  const mentorCases = cases.filter((caseRecord) => caseRecord.mentorId === candidate.id);
-  const confirmed = window.confirm(`Ta bort ${candidate.name} och personens ${mentorCases.length} ${mentorCases.length === 1 ? "ärende" : "ärenden"}? Åtgärden kan inte ångras.`);
-  if (!confirmed) return;
-  await Promise.all(mentorCases.map((caseRecord) => deleteCaseBundle(caseRecord.id)));
-  await deleteCandidate(candidate.id);
-  selectedId = null;
+  const activating = candidate.active === false;
+  const confirmation = await confirmAction({ eyebrow: activating ? "Aktivera mentor" : "Inaktivera mentor", title: `${activating ? "Aktivera" : "Inaktivera"} ${candidate.name}?`, body: activating ? "Mentorn blir aktiv i registret igen." : "Mentorposten och ärendehistoriken bevaras. Personen visas som inaktiv och kan aktiveras igen senare.", mentorName: candidate.name, confirmLabel: activating ? "Aktivera mentor" : "Inaktivera mentor", danger: !activating });
+  if (!confirmation.confirmed) return;
+  const caseRecord = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
+  await updateMentorProfileCommand({
+    candidate,
+    caseRecord,
+    profilePatch: { active: activating },
+    coordinatorId: responsibleHandler(caseRecord)?.id || ""
+  });
   markSaved();
-  showFeedback("Mentorn och ärendet har tagits bort.");
+  showFeedback(activating ? "Mentorn har aktiverats." : "Mentorn har inaktiverats. Ärendehistoriken är bevarad.");
   await refresh();
-  window.location.hash = "#/mentors";
 });
 
 els.exampleDataMenu.addEventListener("click", async (event) => {
@@ -4212,6 +5285,7 @@ openDatabase()
     candidateModal = new bootstrap.Modal(modalElement);
     const handlerModalElement = document.querySelector("#handlerModal");
     handlerModal = new bootstrap.Modal(handlerModalElement);
+    caseLifecycleModal = new bootstrap.Modal(els.caseLifecycleModal);
     confirmActionModal = new bootstrap.Modal(els.confirmActionModal);
     modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());
     handlerModalElement.addEventListener("shown.bs.modal", () => els.handlerNameInput.focus());

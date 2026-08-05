@@ -1,0 +1,791 @@
+# Teknisk specifikation: progressiv ärendehantering
+
+Status: Utkast 1.1  
+Produkt: FöräldraMentorer – Kommunportal  
+Målmiljö: Webbaserad SaaS  
+Prototyplagring: IndexedDB
+
+## 1. Syfte
+
+Systemet ska göra det möjligt att registrera ett ärende med mycket få uppgifter och därefter komplettera samma ärende med aktiviteter, handlingar, ansvar, tidsfrister, avvikelser och beslut.
+
+Den enkla vägen är standard. Den utökade strukturen visas eller efterfrågas först när användaren behöver den eller när en verksamhetsregel kräver den.
+
+Det får inte finnas separata datamodeller för enkla och avancerade registreringar. En snabbregistrering ska från början skapa ett fullvärdigt ärende med stabil identitet, ägarskap och revisionsinformation.
+
+## 2. Grundprinciper
+
+1. **En gemensam ärendemodell.** Alla registreringar som kräver fortsatt spårbarhet lagras som ärenden.
+2. **Progressiv visning.** Gränssnittet visar endast de fält och komponenter som behövs för den aktuella uppgiften.
+3. **Progressiv validering.** Fler uppgifter blir obligatoriska först när användaren aktiverar en funktion som behöver dem.
+4. **Ingen konvertering.** Ett enkelt ärende kompletteras på plats och byter inte identitet när det får mer struktur.
+5. **Strukturerade relationer.** Mentorer, handläggare, aktiviteter och handlingar kopplas med ID, aldrig genom namn i fritext.
+6. **Spårbara förändringar.** Betydelsefulla ändringar skapar oföränderliga händelser med tidpunkt och aktör.
+7. **Separera observation och beslut.** Ett avvikande aktivitetsresultat ska inte automatiskt innebära att ärendet avslutas.
+
+## 3. Begreppsmodell
+
+### 3.1 Ärende
+
+Ärendet är den sammanhållande datanoden för en handläggningsprocess.
+
+- Ett ärende kan vara kopplat till högst en mentor.
+- En mentor kan ha flera ärenden över tid.
+- Ett generellt verksamhetsärende kan sakna mentor.
+- Ett ärende kan ha en ansvarig handläggare och flera medhandläggare.
+- Ett ärende kan existera utan aktiviteter eller handlingar.
+
+### 3.2 Aktivitet
+
+En aktivitet beskriver något som ska utföras eller följas upp inom ärendet.
+
+- Aktiviteten tillhör exakt ett ärende.
+- Aktiviteten ärver normalt ärendets ansvariga handläggare.
+- Aktiviteten kan uttryckligen tilldelas en annan handläggare.
+- En avslutad aktivitet har ett strukturerat resultat.
+- Ett avvikande resultat kan skapa behov av ett separat ställningstagande.
+
+### 3.3 Handling
+
+En handling är ett registrerat underlag, dokument eller en tjänsteanteckning.
+
+- Handlingen tillhör exakt ett ärende.
+- Handlingen kan valfritt kopplas till en aktivitet.
+- Filinnehåll och metadata ska hållas åtskilda i den framtida SaaS-lösningen.
+
+### 3.4 Händelse
+
+En händelse är en automatiskt skapad och oföränderlig post i ärendets historik.
+
+Exempel:
+
+- Ärendet skapades.
+- Ansvarig handläggare ändrades.
+- En aktivitet avslutades.
+- En handling registrerades.
+- Ärendet pausades eller avslutades.
+
+Händelsen är inte en aktivitet och ska inte kunna redigeras i efterhand.
+
+### 3.5 Avvikelse och ställningstagande
+
+Ett aktivitetsresultat kan markeras som avvikande. Avvikelsen beskriver att resultatet behöver bedömas, inte vem som ska utföra nästa steg.
+
+En avvikelse ska ha ett separat ställningstagande med något av följande utfall:
+
+- Fortsätt handläggningen.
+- Begär komplettering.
+- Pausa ärendet.
+- Avsluta ärendet.
+
+Om mentorn behöver göra något ska handläggaren skapa en aktivitet som beskriver den egna åtgärden, exempelvis `Begär nytt registerutdrag från mentorn`. Aktiviteten ansvaras fortfarande av en handläggare, medan det kan anges att den inväntar mentorn.
+
+## 4. Datamodell
+
+Fältnamnen nedan är logiska kontrakt. Prototypen kan använda JavaScript-objekt, medan SaaS-versionen bör använda motsvarande databastabeller och validerade API-kontrakt.
+
+Alla verksamhetsposter ska bära `tenantId`. Referenser mellan poster får endast skapas inom samma tenant. Alla tidsstämplar lagras som UTC i ISO 8601-format och konverteras till användarens tidszon vid visning.
+
+```ts
+type CaseStatus =
+  | "new"
+  | "in_progress"
+  | "waiting"
+  | "paused"
+  | "decision_required"
+  | "closed";
+
+interface CaseRecord {
+  id: string;
+  tenantId: string;
+  number: string;
+  caseTypeId: string;
+  caseTypeVersion: number;
+  organizationUnitId: string;
+  title: string;
+  description: string;
+  mentorId: string | null;
+  status: CaseStatus;
+  priority: "low" | "normal" | "high";
+  dueDate: string | null;
+  pauseReasonCode: string | null;
+  pauseNote: string | null;
+  resumeAt: string | null;
+  closeReasonCode: string | null;
+  closeNote: string | null;
+  version: number;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  closedAt: string | null;
+  closedBy: string | null;
+}
+```
+
+Ansvarig handläggare lagras endast som en assignment. `CaseRecord` får inte innehålla ett duplicerat fält för ansvarig.
+
+```ts
+interface CaseHandlerAssignment {
+  id: string;
+  tenantId: string;
+  caseId: string;
+  handlerId: string;
+  role: "responsible" | "co_handler";
+  version: number;
+  assignedAt: string;
+  assignedBy: string;
+  endedAt: string | null;
+  endedBy: string | null;
+}
+```
+
+Databasen ska garantera högst en aktiv assignment med rollen `responsible` per ärende.
+
+### 4.1 Versionsstyrda definitioner
+
+Ärende- och aktivitetsmallar är versionsstyrda och immutabla efter publicering. Endast livscykelstatus får ändras på en publicerad version. Ett befintligt ärende fortsätter använda den version som gällde när ärendet skapades.
+
+```ts
+interface CaseTypeDefinition {
+  id: string;
+  tenantId: string;
+  version: number;
+  name: string;
+  status: "draft" | "published" | "retired";
+  defaultPriority: "low" | "normal" | "high";
+  activityTemplateRefs: Array<{ templateId: string; version: number }>;
+}
+
+interface ActivityTemplateDefinition {
+  id: string;
+  tenantId: string;
+  version: number;
+  status: "draft" | "published" | "retired";
+  title: string;
+  sortOrder: number;
+  resultDefinitions: ResultDefinition[];
+}
+
+interface ResultDefinition {
+  code: string;
+  label: string;
+  classification: "acceptable" | "deviation";
+  requiresNote: boolean;
+}
+```
+
+### 4.2 Aktiviteter
+
+```ts
+type ActivityStatus =
+  | "not_started"
+  | "in_progress"
+  | "waiting"
+  | "completed"
+  | "not_applicable";
+
+interface CaseActivity {
+  id: string;
+  tenantId: string;
+  caseId: string;
+  templateId: string;
+  templateVersion: number;
+  title: string;
+  status: ActivityStatus;
+  resultCode: string | null;
+  resultClassification: "acceptable" | "deviation" | null;
+  handlerIdOverride: string | null;
+  waitingForParty: "mentor" | "handler" | "external" | null;
+  dueDate: string | null;
+  sortOrder: number;
+  version: number;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  completedAt: string | null;
+  completedBy: string | null;
+}
+```
+
+`resultClassification` är en snapshot av den versionsstyrda resultatdefinitionen. Systemet ska inte räkna om historiska aktivitetsresultat mot en senare mallversion. Kombinationen `tenantId`, definitions-ID och version identifierar alltid exakt en definition. Högst en version per definitions-ID får vara `published` samtidigt.
+
+Även en manuellt tillagd aktivitet ska referera till en versionsstyrd standardmall för ad hoc-aktiviteter. Rubriken kan vara fri, men status- och resultatreglerna är därmed alltid definierade.
+
+Aktivitetens effektiva ansvariga är `handlerIdOverride` när det är satt, annars ärendets aktiva ansvariga assignment. Om båda saknas visas `Ej tilldelad`. Ett byte av ärendets ansvariga slår därför igenom på alla aktiviteter som inte är särskilt tilldelade, utan att aktivitetsraderna behöver skrivas om.
+
+### 4.3 Avvikelser och ställningstaganden
+
+En avvikelse är en egen post med tydlig livscykel. Ett nytt ställningstagande ersätter aldrig ett tidigare genom uppdatering; det skapas som en ny post som refererar till det ställningstagande som ersätts.
+
+```ts
+interface ActivityDeviation {
+  id: string;
+  tenantId: string;
+  caseId: string;
+  activityId: string;
+  activityCompletionEventId: string;
+  resultCode: string;
+  status: "open" | "resolved" | "superseded";
+  version: number;
+  openedAt: string;
+  openedBy: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  activeDecisionId: string | null;
+}
+
+interface DeviationDecision {
+  id: string;
+  tenantId: string;
+  deviationId: string;
+  outcome: "continue" | "request_supplement" | "pause_case" | "close_case";
+  reasonCode: string;
+  note: string;
+  resumeAt: string | null;
+  supersedesDecisionId: string | null;
+  decidedAt: string;
+  decidedBy: string;
+}
+```
+
+Det får finnas högst en avvikelse per avslutningstillfälle, identifierat av `activityCompletionEventId`, och högst en öppen avvikelse per aktivitet. Ett ställningstagande som ändras kräver särskild behörighet, motivering och en ny `DeviationDecision`.
+
+### 4.4 Handlingar och möten
+
+```ts
+interface CaseDocument {
+  id: string;
+  tenantId: string;
+  caseId: string;
+  activityId: string | null;
+  meetingId: string | null;
+  type: "incoming" | "created" | "service_note";
+  title: string;
+  description: string;
+  documentDate: string;
+  storageObjectId: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  checksum: string | null;
+  informationClass: "normal" | "restricted";
+  supersedesDocumentId: string | null;
+  createdAt: string;
+  createdBy: string;
+}
+
+interface CaseMeeting {
+  id: string;
+  tenantId: string;
+  caseId: string;
+  activityId: string | null;
+  meetingType: "certification_interview" | "follow_up" | "other";
+  occurredAt: string;
+  participantHandlerIds: string[];
+  externalParticipantNames: string[];
+  summary: string;
+  version: number;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+```
+
+En rättelse av en handling skapar en ny version via `supersedesDocumentId`; den tidigare versionen skrivs inte över. När en handling registreras från en aktivitet sätts både `caseId` och `activityId`. Den visas då både i ärendets handlingslista och som underlag på aktiviteten. En tjänsteanteckning saknar filobjekt, medan en uppladdad fil ska få metadata, kontrollsumma och filinnehåll registrerade som en sammanhållen operation utan tomma platshållarposter.
+
+### 4.5 Händelser och kommandospårning
+
+```ts
+type CaseEventType =
+  | "case_created"
+  | "case_updated"
+  | "assignment_changed"
+  | "activity_updated"
+  | "deviation_opened"
+  | "deviation_decided"
+  | "document_registered"
+  | "registration_added_to_case"
+  | "meeting_registered"
+  | "case_paused"
+  | "case_resumed"
+  | "case_closed"
+  | "case_reopened";
+
+interface CaseEvent {
+  id: string;
+  tenantId: string;
+  caseId: string;
+  eventType: CaseEventType;
+  schemaVersion: number;
+  entityType: "case" | "activity" | "deviation" | "document" | "meeting" | "assignment" | "decision";
+  entityId: string;
+  actorId: string;
+  occurredAt: string;
+  correlationId: string;
+  idempotencyKey: string;
+  payload: Record<string, string | number | boolean | null>;
+}
+
+interface ProcessedCommand {
+  tenantId: string;
+  idempotencyKey: string;
+  commandType: string;
+  requestHash: string;
+  response: Record<string, unknown>;
+  processedAt: string;
+}
+```
+
+Varje händelsetyp ska ha ett validerat payload-schema. Visningstext genereras från händelsetyp och payload. Personnummer, registerinnehåll och annan känslig fritext får inte kopieras till händelseloggen. Det sparade kommandosvaret ska begränsas till de ID:n och statusvärden som krävs för säker återuppspelning. Om samma idempotensnyckel återanvänds med ett annat `requestHash` ska kommandot avvisas som konflikt.
+
+## 5. Obligatoriska invarianter
+
+Följande regler ska gälla oavsett gränssnitt eller lagringsteknik:
+
+1. Varje post tillhör exakt en tenant och får endast referera till poster inom samma tenant.
+2. Ett ärende har alltid `id`, `tenantId`, `number`, `caseTypeId`, `caseTypeVersion`, `organizationUnitId`, `title`, `status`, `version`, `createdAt` och `createdBy`.
+3. Kombinationen `tenantId` och `number` är unik.
+4. Ärendenummer allokeras atomärt inom en tenant och återanvänds aldrig.
+5. Ett ärende har högst en aktiv assignment med rollen `responsible`.
+6. Ett ärende har högst en mentor.
+7. Alla aktiviteter, avvikelser, handlingar, möten och händelser refererar till ett befintligt ärende.
+8. En aktivitet med status `completed` måste ha ett resultat som är giltigt för aktivitetens sparade mallversion.
+9. Ett avvikande resultat måste ha en tjänsteanteckning och skapa en `ActivityDeviation` i samma transaktion.
+10. En öppen avvikelse sätter ärendet i `decision_required` om ärendet inte redan är pausat eller avslutat.
+11. Paus kräver orsak och den handläggare som fattat ställningstagandet.
+12. Avslut kräver avslutsorsak, tidpunkt och beslutsfattare.
+13. När ett ärende avslutas markeras återstående aktiviteter som `not_applicable` i samma transaktion.
+14. En betydelsefull förändring av ärende, aktivitet, ansvar, handling, möte eller beslut skapar en händelse i samma transaktion.
+15. Händelser och publicerade mallversioner får inte uppdateras eller tas bort genom det vanliga användargränssnittet.
+16. Ett kommando med samma `tenantId` och `idempotencyKey` får bara ge en verksamhetsmässig effekt.
+17. Ärenden och relaterade poster tas inte bort genom normal handläggning. Rättelse, avslut och gallring är separata, behörighetsstyrda processer.
+
+## 6. Snabbregistrering
+
+### 6.1 Användarflöde
+
+Standardkommandot ska vara `Snabbregistrera` eller ett verksamhetsnära kommando, exempelvis `Registrera kontakt` eller `Starta uppföljning`.
+
+Minsta formulär:
+
+- Registreringstyp.
+- Mentor, om registreringen gäller en person.
+- Rubrik eller sammanfattning.
+- Kort beskrivning.
+
+Följande sätts automatiskt:
+
+- Ärende-ID och ärendenummer.
+- Status `new`.
+- Normal prioritet.
+- Skapad av och skapad tidpunkt.
+- Ansvarig handläggare när typen eller användarkontexten ger ett säkert standardvärde.
+
+### 6.2 Applikationskommando
+
+```ts
+interface QuickRegisterCaseCommand {
+  idempotencyKey: string;
+  caseTypeId: string;
+  mentorId?: string;
+  title: string;
+  description?: string;
+  caseSelection:
+    | { mode: "new" }
+    | { mode: "existing"; caseId: string };
+}
+
+interface QuickRegisterCaseResult {
+  outcome: "case_created" | "attached_to_case" | "selection_required";
+  caseId: string | null;
+  caseNumber: string | null;
+  candidateCases: Array<{ id: string; number: string; title: string }>;
+  suggestedNextActions: string[];
+}
+```
+
+Innan formuläret bekräftas gör klienten ett läsanrop som söker kompatibla öppna ärenden för samma tenant, mentor och ärendetyp. Användaren får välja ett föreslaget ärende eller `Skapa nytt ärende`. Skrivkommandot ska i en transaktion:
+
+1. Validera tenant, idempotensnyckel, ärendetyp och eventuell mentor.
+2. Slå upp `caseTypeId` mot den publicerade `CaseTypeDefinition` som ska användas och låsa dess version.
+3. Upprepa sökningen efter kompatibla öppna ärenden för att undvika att klientens förhandsvisning hunnit bli inaktuell.
+4. Vid `new`, returnera `selection_required` utan skrivning om nya relevanta kandidater har tillkommit sedan förhandsvisningen; annars skapa ärendet med vald mallversion.
+5. Vid `existing`, kontrollera att målärendet fortfarande är öppet, kompatibelt och tillåtet. Beskrivning krävs och registreras som en tjänsteanteckning utan att ärendets ursprungliga beskrivning skrivs över.
+6. Skapa standardaktiviteter endast när ett nytt ärende skapas och ärendetypens mall kräver dem.
+7. Skapa händelsen `case_created` eller `registration_added_to_case` i samma transaktion.
+8. Returnera ärendets identitet och föreslagna nästa steg.
+
+En snabbregistrering får inte skapa tomma aktivitets- eller handlingsposter som platshållare.
+
+Dublettkontrollen ska vara rådgivande när verksamhetsreglerna tillåter parallella ärenden. Användaren ska alltid se vilket befintligt ärende en registrering kopplas till innan kommandot bekräftas. API:t ska därför erbjuda ett separat läsanrop för möjliga målärenden och får inte göra en dold automatisk koppling i skrivkommandot. För mentorärenden används mentor, ärendetyp och organisationsenhet som grund. För generella ärenden utan mentor måste ärendetypen ange en uttrycklig grupperingsnyckel; annars föreslår systemet inte automatiskt befintliga ärenden.
+
+## 7. Komplettering av ett ärende
+
+Efter sparandet visas ärendets sammanfattning och kommandot `Komplettera ärendet`.
+
+Komplettering kan ske stegvis genom separata kommandon:
+
+- Tilldela ansvarig.
+- Lägg till aktivitet.
+- Lägg till medhandläggare.
+- Registrera handling.
+- Ange prioritet eller förfallodatum.
+- Registrera möte.
+- Hantera avvikelse.
+- Pausa eller avsluta ärendet.
+
+Det ska inte finnas ett globalt fält som heter `Avancerat läge`. Användaren aktiverar i stället den komponent som behövs. När strukturerad information finns ska den fortsätta visas på ärendekortet.
+
+## 8. Validering efter användarens avsikt
+
+Validering ska ske när informationen behövs, inte vid första registreringen.
+
+| Åtgärd | Ytterligare obligatoriska uppgifter |
+| --- | --- |
+| Snabbregistrera | Typ och rubrik. Tenant, aktör, tidpunkt och idempotensnyckel sätts eller valideras av systemet. |
+| Tilldela aktivitet | Giltig handläggare |
+| Ange förfallodatum | Giltigt datum |
+| Avsluta aktivitet | Resultatkod |
+| Registrera avvikelse | Notering |
+| Begära komplettering | Ansvarig och beskrivning av nästa steg |
+| Pausa ärende | Orsak, beslutsfattare och valfritt bevakningsdatum |
+| Avsluta ärende | Avslutsorsak, motivering och beslutsfattare |
+| Återöppna aktivitet | Motivering och behörig aktör |
+| Återöppna ärende | Motivering och behörig samordnare |
+
+## 9. Tillstånd och övergångar
+
+### 9.1 Ärendestatus
+
+Ärendestatus lagras för effektiva sökningar men får endast uppdateras av domänlogiken. Efter varje transaktion beräknas nästa status enligt följande prioritet:
+
+1. `closed` när ett giltigt avslut finns.
+2. `paused` när ärendet uttryckligen har pausats.
+3. `decision_required` när minst en öppen avvikelse saknar aktivt ställningstagande.
+4. `in_progress` när minst en aktivitet eller annan handläggningsåtgärd kan utföras nu.
+5. `waiting` när inget steg kan utföras nu och minst en öppen aktivitet inväntar mentor eller extern part.
+6. `new` i övriga fall.
+
+```text
+new -> in_progress
+new -> closed
+in_progress -> waiting
+in_progress -> decision_required
+in_progress -> paused
+in_progress -> closed
+waiting -> in_progress
+waiting -> paused
+waiting -> closed
+decision_required -> in_progress
+decision_required -> waiting
+decision_required -> paused
+decision_required -> closed
+paused -> in_progress
+paused -> decision_required
+paused -> closed
+closed -> in_progress  (endast särskilt återöppningskommando)
+```
+
+Status ska ändras genom domänkommandon, inte genom fri direktredigering av statusfältet. Ett avslutat ärende kan bara återöppnas av behörig samordnare, med obligatorisk motivering. Återöppning återställer inte automatiskt aktiviteter som markerats `not_applicable`; nya eller uttryckligen återöppnade aktiviteter krävs.
+
+### 9.2 Aktivitetsstatus
+
+```text
+not_started -> in_progress
+not_started -> waiting
+not_started -> completed
+not_started -> not_applicable
+in_progress -> waiting
+in_progress -> completed
+in_progress -> not_applicable
+waiting -> in_progress
+waiting -> completed
+waiting -> not_applicable
+completed -> in_progress       (endast återöppningskommando)
+not_applicable -> not_started  (endast återöppningskommando)
+```
+
+En avslutad aktivitet får endast återöppnas med motivering och behörighetskontroll. Resultat och avslutningstid bevaras i händelseloggen, medan aktivitetens aktuella resultat nollställs. En eventuell öppen avvikelse markeras `superseded` i samma transaktion.
+
+### 9.3 Aktivitet och avvikelse
+
+1. Handläggaren avslutar aktiviteten med ett resultat.
+2. Systemet bedömer resultatkoden enligt aktivitetens mall.
+3. Ett godtagbart resultat lämnar ärendets flöde öppet.
+4. Ett avvikande resultat skapar en `ActivityDeviation` med status `open` och sätter ärendet i `decision_required`.
+5. Handläggaren gör ett separat ställningstagande.
+6. Ställningstagandet skapar en `DeviationDecision`, avslutar eller behåller avvikelsen enligt utfallet och skapar en händelse.
+7. Om utfallet är `request_supplement` skapas en ny uppföljningsaktivitet eller väljs en befintlig aktivitet som nästa steg.
+
+Exempel för belastningsregister:
+
+- `shown_and_checked`: kontroll genomförd utan öppen avvikelse.
+- `not_shown`: komplettering eller vänteläge behövs.
+- `authenticity_unconfirmed`: ställningstagande krävs.
+- `deviation_for_assessment`: lämplighetsbedömning krävs.
+
+Känsligt innehåll ur belastningsregistret ska inte registreras i resultat eller fritext. Själva beslutet och den verksamhetsmässiga motiveringen registreras separat enligt organisationens behörighets- och informationshanteringsregler.
+
+## 10. Användargränssnitt
+
+### 10.1 Standardvy
+
+Första vyn för en registrering ska vara ett kort formulär. Efter sparandet visas:
+
+- Ärendenummer och rubrik.
+- Status.
+- Mentor och ansvarig, om de finns.
+- Senaste registrering.
+- Ett primärt rekommenderat nästa steg.
+- Kommandot `Komplettera ärendet`.
+
+Tomma sektioner för aktiviteter, handlingar och medhandläggare ska inte dominera standardvyn.
+
+### 10.2 Utökad ärendevy
+
+När användaren kompletterar ärendet används befintlig uppdelning:
+
+- Översikt.
+- Aktiviteter.
+- Handlingar.
+- Möten.
+- Logg.
+
+Flikarna använder samma ärende-ID och laddar relaterade poster separat.
+
+### 10.3 Systemförslag
+
+Systemet kan föreslå struktur utan att fatta verksamhetsbeslut åt användaren.
+
+Exempel:
+
+- `Registreringen innehåller en avvikelse. Hantera avvikelsen?`
+- `Mentorn saknar ansvarig handläggare. Tilldela nu?`
+- `Ett återkopplingsdatum har angetts. Skapa bevakning?`
+- `Ärendet har flera steg. Lägg till föreslagna aktiviteter?`
+
+Förslag ska kunna avböjas när ingen verksamhetsregel kräver uppgiften.
+
+## 11. API och transaktioner i SaaS-versionen
+
+API:t bör exponera domänkommandon och läsmodeller, inte enbart generell CRUD.
+
+Förhandsvisningen inför snabbregistrering använder `GET /cases/registration-targets?mentorId={mentorId}&caseTypeId={caseTypeId}`. Svaret innehåller endast öppna, behörighetsfiltrerade och kompatibla ärenden.
+
+Exempel på skrivkommandon:
+
+```text
+POST /cases/quick-register
+POST /cases/{caseId}/activities
+POST /cases/{caseId}/documents
+POST /cases/{caseId}/meetings
+POST /cases/{caseId}/assignments
+POST /activities/{activityId}/assign
+POST /activities/{activityId}/schedule
+POST /activities/{activityId}/complete
+POST /activities/{activityId}/reopen
+POST /deviations/{deviationId}/decisions
+POST /documents/{documentId}/supersede
+POST /meetings/{meetingId}/revise
+POST /cases/{caseId}/pause
+POST /cases/{caseId}/resume
+POST /cases/{caseId}/close
+POST /cases/{caseId}/reopen
+```
+
+Varje skrivkommando ska:
+
+1. Härleda tenant och aktör från den autentiserade sessionen, aldrig från redigerbara formulärfält.
+2. Kontrollera tenantgräns, resursbehörighet och kommandospecifik roll.
+3. Kräva `Idempotency-Key` och för ändringar av befintlig data även `expectedVersion`.
+4. Validera aktuell version, referenser och tillståndsövergång.
+5. Uppdatera domändata och eventuella relaterade poster.
+6. Skriva händelsepost.
+7. Genomföras atomärt.
+
+Optimistisk låsning ska användas genom versionsfält på ärende och andra samtidigt redigerbara poster. Vid konflikt returneras `409 VERSION_CONFLICT` med aktuell version, och användaren måste läsa in den senaste informationen innan en ny ändring sparas. Ett lyckat kommando med samma idempotensnyckel ska returnera det tidigare resultatet utan att skapa nya poster eller händelser. `selection_required` från snabbregistrering är ett verksamhetsutfall, inte ett tekniskt fel.
+
+Läsanrop ska alltid filtreras på sessionens tenant före övrig filtrering. Ett resurs-ID från en annan tenant ska ge samma externa svar som ett okänt resurs-ID.
+
+Filuppladdning är inte atomär över databas och objektlagring och hanteras därför i tre steg: servern skapar en kortlivad uppladdningsreservation, klienten laddar upp filen till ett tillfälligt objekt och ett slutkommando verifierar kontrollsumma samt skapar `CaseDocument` och `CaseEvent` i en databastransaktion. Misslyckade eller övergivna reservationer rensas automatiskt. En handling blir synlig först efter lyckad slutregistrering.
+
+## 12. Lagring i prototypen
+
+IndexedDB behålls tills en serverbaserad databas införs.
+
+Rekommenderade object stores:
+
+```text
+cases
+caseAssignments
+caseActivities
+activityDeviations
+deviationDecisions
+caseDocuments
+caseDocumentBlobs
+caseMeetings
+caseEvents
+caseTypeDefinitions
+activityTemplateDefinitions
+processedCommands
+mentors
+handlers
+```
+
+Rekommenderade index:
+
+```text
+cases.[tenantId+number] (unik)
+cases.[tenantId+status]
+cases.[tenantId+mentorId]
+cases.[tenantId+organizationUnitId]
+cases.[tenantId+updatedAt]
+caseAssignments.[tenantId+caseId]
+caseAssignments.[tenantId+handlerId]
+caseActivities.[tenantId+caseId]
+caseActivities.[tenantId+status]
+caseActivities.[tenantId+handlerIdOverride]
+caseActivities.[tenantId+dueDate]
+activityDeviations.[tenantId+activityId]
+activityDeviations.[tenantId+status]
+deviationDecisions.[tenantId+deviationId]
+caseDocuments.[tenantId+caseId]
+caseDocuments.[tenantId+activityId]
+caseDocuments.[tenantId+meetingId]
+caseDocumentBlobs.[tenantId+documentId]
+caseMeetings.[tenantId+caseId]
+caseMeetings.[tenantId+occurredAt]
+caseEvents.[tenantId+caseId]
+caseEvents.[tenantId+occurredAt]
+processedCommands.[tenantId+idempotencyKey] (unik)
+```
+
+Ändringar av schema ska göras genom versionsstyrda IndexedDB-migreringar. I prototypen pekar `storageObjectId` på en post i `caseDocumentBlobs`; i SaaS-versionen pekar det på behörighetsskyddad objektlagring. Ett kommando som berör flera stores ska köras i en enda `readwrite`-transaktion. Domänlagret ska upprätthålla invarianter som IndexedDB inte kan uttrycka som unika villkor, exempelvis högst en aktiv ansvarig assignment. Exempeldata ska använda samma kommandon, validering och relationer som användarskapad data.
+
+## 13. Behörighet och spårbarhet
+
+Minsta framtida roller:
+
+- **Handläggare:** registrera och handlägga egna eller tilldelade ärenden.
+- **Samordnare:** tilldela ansvar, se arbetsköer och fatta definierade beslut.
+- **Administratör:** administrera användare, mallar och behörigheter.
+- **Läsbehörig:** läsa tillåtna ärenden utan att ändra dem.
+
+Roll ger inte automatiskt åtkomst till alla poster. Varje läsning och ändring ska först avgränsas till användarens tenant och därefter till de organisatoriska enheter och ärenden som användaren får hantera.
+
+| Kommando | Handläggare | Samordnare | Administratör |
+| --- | --- | --- | --- |
+| Snabbregistrera och komplettera tillåtet ärende | Ja | Ja | Enligt särskild verksamhetsroll |
+| Ändra eget eller särskilt tilldelat ansvar | Begränsat | Ja | Nej som standard |
+| Göra ställningstagande vid avvikelse | Om tilldelad och delegerad | Ja | Nej som standard |
+| Pausa eller avsluta ärende | Om delegerad | Ja | Nej som standard |
+| Återöppna aktivitet eller ärende | Nej | Ja | Nej som standard |
+| Publicera ny mallversion | Nej | Enligt särskild mallroll | Ja |
+
+Systemet ska lagra stabilt användar-ID i revisionsfält. Visningsnamn kan visas i gränssnittet men får inte vara den tekniska identiteten. Aktör, tenant och tidpunkt ska sättas av systemet. Behörighetsavslag och försök till åtkomst över tenantgräns ska säkerhetsloggas utan att röja om posten finns.
+
+Personnummer, registeruppgifter och andra skyddsvärda uppgifter ska ha fältspecifik åtkomstkontroll. Sökindex, händelsepayload och felmeddelanden får inte oavsiktligt exponera sådana uppgifter. Handlingar ska märkas med informationsklass och omfattas av organisationens regler för bevarande och gallring.
+
+## 14. Läsmodeller och arbetsköer
+
+Dashboard och register ska byggas från samma ärendedata genom tenantavgränsade läsmodeller.
+
+Exempel:
+
+- Mina öppna aktiviteter.
+- Otilldelade ärenden.
+- Försenade aktiviteter.
+- Ärenden som inväntar mentor.
+- Avvikelser där ställningstagande saknas.
+- Pausade ärenden med passerat bevakningsdatum.
+
+Läsmodellerna får inte skapa egna kopior av domändata som kan redigeras separat. De får vara fördröjda men ska visa när de senast uppdaterades och får aldrig användas för behörighetsbeslut.
+
+## 15. Migrering till serverbaserad SaaS
+
+Övergången bör ske i följande ordning:
+
+1. Inför validerade, tenantmedvetna domänfunktioner ovanpå IndexedDB.
+2. Separera lagringsanrop bakom repository-gränssnitt.
+3. Inför autentisering, tenantkontext och behörighetskontroll innan server-API:t öppnas för verksamhetsdata.
+4. Inför server-API med samma kommandokontrakt och servergenererade revisionsfält.
+5. Flytta persistens till relationsdatabas och filinnehåll till behörighetsskyddad objektlagring.
+6. Migrera IndexedDB-data endast för uttryckligen valda prototypmiljöer; produktionsdata ska inte förlita sig på webbläsarlagring.
+
+Exempel på repository-gränssnitt:
+
+```ts
+interface CaseRepository {
+  getById(tenantId: string, id: string): Promise<CaseRecord | null>;
+  save(tenantId: string, record: CaseRecord, expectedVersion: number): Promise<void>;
+  list(tenantId: string, query: CaseQuery): Promise<CasePage>;
+}
+```
+
+## 16. Acceptanskriterier
+
+### Enkel registrering
+
+- En handläggare kan skapa ett ärende med högst fyra manuella inmatningar.
+- Ärendet får direkt ett stabilt ID, ärendenummer, aktör och tidpunkt.
+- Inga aktiviteter eller handlingar behöver skapas för att ärendet ska vara giltigt.
+- Efter sparande kan ärendet öppnas i den fullständiga ärendevyn.
+- Om exakt ett kompatibelt öppet ärende finns kan registreringen kopplas dit efter att valet visats för användaren.
+- Om flera kompatibla ärenden finns sparas inget förrän användaren har valt ärende eller uttryckligen valt att skapa ett nytt.
+- Samma idempotensnyckel skapar aldrig dubbla ärenden eller registreringar.
+- Två användare som samtidigt försöker skapa samma typ av ärende får en ny målärendekontroll innan någon möjlig dubblett skapas.
+
+### Komplettering
+
+- Ansvar, aktivitet, handling, möte och tidsfrist kan läggas till oberoende av varandra.
+- Komplettering ändrar inte ärendets ID eller skapar en kopia.
+- Befintliga värden flyttar inte position oförutsägbart mellan läs- och redigeringsläge.
+- Varje betydelsefull ändring visas i loggen med användare och tidpunkt.
+- En handling som läggs till från en aktivitet kopplas både till ärendet och aktiviteten och visas från båda sammanhangen.
+- Ett möte kan registreras utan handling och kan senare kompletteras med tjänsteanteckning eller handling.
+
+### Avvikelse
+
+- Ett avvikande resultat visas som `Ställningstagande krävs`, inte som det otydliga `Kräver åtgärd`.
+- Gränssnittet visar att ställningstagandet tillhör ansvarig handläggare.
+- Handläggaren kan fortsätta, begära komplettering, pausa eller avsluta.
+- Paus och avslut kräver strukturerad orsak och loggas.
+- Återstående aktiviteter blir `Ej aktuella` när ärendet avslutas.
+- En avvikelse kan inte försvinna genom att aktivitetens status ändras direkt.
+- Ett nytt ställningstagande ersätter inte historiken utan länkas till föregående beslut.
+
+### Datakvalitet
+
+- Inga person- eller handläggarkopplingar lagras enbart som namntext.
+- Inga föräldralösa aktiviteter, handlingar eller händelser kan skapas.
+- Exempeldata klarar samma regler som manuellt registrerad data.
+- Upprepade sparkommandon utan ändringar skapar inte nya händelser.
+- Två samtidiga ändringar med samma förväntade version kan inte båda lyckas.
+- Data från en tenant kan inte läsas, sökas eller refereras från en annan tenant.
+- Händelseloggen använder definierade händelsetyper och innehåller inte personnummer eller registerinnehåll.
+- Ett ärende kan inte ha mer än en aktiv ansvarig assignment.
+- En aktivitets effektiva ansvariga följer ärendets ansvariga om aktiviteten saknar särskild tilldelning.
+
+## 17. Rekommenderad första implementation
+
+1. Inför tenantavgränsning, versionsfält, gemensamma domänkommandon och repository-gränssnitt ovanpå IndexedDB.
+2. Inför versionsstyrda ärende-, aktivitets- och resultatdefinitioner samt migrera befintlig exempeldata.
+3. Inför `Snabbregistrera` med idempotens, kontroll av kompatibla öppna ärenden och ett minimalt giltigt ärende utan tomma underposter.
+4. Lägg till `Komplettera ärendet` på ärendekortets översikt samt separata kommandon för ansvar, aktivitet, handling och möte.
+5. Ersätt `Kräver åtgärd` med `Ställningstagande krävs` och inför `ActivityDeviation` samt versionsbevarande `DeviationDecision`.
+6. Inför fullständiga kommandon för paus, avslut och behörighetsstyrd återöppning.
+7. Lägg till IndexedDB-migreringar, atomära transaktioner och automatiska integritetskontroller.
+8. Testa tenantisolering, samtidiga ändringar, idempotens, snabbregistrering och successiv komplettering med 1, 10 och 250 mentorer.
+
+## 18. Avgränsningar
+
+Denna specifikation definierar inte:
+
+- Kommunens formella diarieförings- eller arkiveringsregler.
+- Slutlig informationsklassning och gallringsplan; värdena `normal` och `restricted` är tekniska platshållare tills organisationens klassningsmodell har fastställts.
+- Integration med e-arkiv, BankID, e-post eller externa register.
+- Exakt beslutsdelegation mellan kommunala roller.
+
+Dessa delar måste fastställas tillsammans med verksamhetsansvarig, informationssäkerhetsansvarig och kommunens jurist innan produktionssättning.

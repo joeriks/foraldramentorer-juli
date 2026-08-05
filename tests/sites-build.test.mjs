@@ -25,6 +25,10 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(script.headers.get("content-type"), /^text\/javascript/);
   assert.match(await script.text(), /CASE_ACTIVITIES_STORE/);
 
+  const domain = await worker.fetch(new Request("https://example.test/case-domain.js"), {}, context);
+  assert.equal(domain.status, 200);
+  assert.match(await domain.text(), /deriveCaseStatus/);
+
   const missing = await worker.fetch(new Request("https://example.test/missing.png", {
     headers: { accept: "image/png" }
   }), {}, context);

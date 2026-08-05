@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-sites.mjs",
-    "test": "npm run build && node --test tests/sites-build.test.mjs"
+    "test": "npm run build && node --test tests/sites-build.test.mjs tests/case-domain.test.mjs"
   }
 }
