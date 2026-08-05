@@ -2105,7 +2105,7 @@ async function loadRoutinesDocument(sectionKey = "") {
   els.routinesContent.innerHTML = '<p class="text-secondary">Läser in rutindokumentet...</p>';
 
   try {
-    const response = await fetch("./docs/verksamhetsfloden-och-handlaggningsrutiner.md");
+    const response = await fetch("./docs/verksamhetsfloden-och-handlaggningsrutiner.md?v=20260805-feature-links-v1");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const markdown = await response.text();
     els.routinesContent.innerHTML = marked.parse(markdown, { gfm: true });
