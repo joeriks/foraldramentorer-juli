@@ -23,6 +23,7 @@ import {
 } from "./case-domain.js";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js";
+import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js";
 
 const DB_NAME = "foraldramentorer";
 const DB_VERSION = 6;
@@ -2028,6 +2029,85 @@ function navigateToRoutineSection(sectionKey) {
   window.location.hash = route;
 }
 
+function routineIllustrationElement(tagName, className = "", textContent = "") {
+  const element = document.createElement(tagName);
+  if (className) element.className = className;
+  if (textContent) element.textContent = textContent;
+  return element;
+}
+
+function renderRoutineIllustrations() {
+  els.routinesContent.querySelectorAll("[data-routine-illustration]").forEach((placeholder) => {
+    const illustrationId = placeholder.dataset.routineIllustration;
+    const illustration = ROUTINE_ILLUSTRATIONS[illustrationId];
+    if (!illustration) {
+      placeholder.textContent = "Illustrationen är inte tillgänglig i denna version.";
+      placeholder.className = "alert alert-warning";
+      return;
+    }
+
+    const figure = routineIllustrationElement("figure", "routine-illustration");
+    figure.setAttribute("aria-label", `Illustration: ${illustration.title}. Ej interaktiv.`);
+
+    const notice = routineIllustrationElement("div", "routine-illustration-notice", "Illustration – ej interaktiv");
+    const canvas = routineIllustrationElement("div", "routine-illustration-canvas");
+    canvas.setAttribute("aria-hidden", "true");
+    const watermark = routineIllustrationElement("div", "routine-illustration-watermark", "ILLUSTRATION");
+    const chrome = routineIllustrationElement("div", "routine-illustration-chrome");
+    chrome.append(
+      routineIllustrationElement("span", "routine-illustration-kind", illustration.kind),
+      routineIllustrationElement("strong", "routine-illustration-title", illustration.title),
+      routineIllustrationElement("span", "routine-illustration-status", illustration.status)
+    );
+
+    const meta = routineIllustrationElement("div", "routine-illustration-meta");
+    illustration.meta.forEach(([label, value]) => {
+      const item = routineIllustrationElement("div", "routine-illustration-field");
+      item.append(
+        routineIllustrationElement("span", "routine-illustration-field-label", label),
+        routineIllustrationElement("strong", "routine-illustration-field-value", value)
+      );
+      meta.append(item);
+    });
+
+    const panels = routineIllustrationElement("div", "routine-illustration-panels");
+    illustration.panels.forEach((panel) => {
+      const panelElement = routineIllustrationElement("section", "routine-illustration-panel");
+      panelElement.append(routineIllustrationElement("h4", "routine-illustration-panel-title", panel.title));
+      const rows = routineIllustrationElement("div", "routine-illustration-rows");
+      panel.rows.forEach(([label, value, tone = ""]) => {
+        const row = routineIllustrationElement("div", "routine-illustration-row");
+        row.append(
+          routineIllustrationElement("span", "routine-illustration-row-label", label),
+          routineIllustrationElement("span", `routine-illustration-row-value ${tone ? `is-${tone}` : ""}`, value)
+        );
+        rows.append(row);
+      });
+      panelElement.append(rows);
+      panels.append(panelElement);
+    });
+
+    const callouts = routineIllustrationElement("ol", "routine-illustration-callouts");
+    illustration.callouts.forEach((text) => {
+      callouts.append(routineIllustrationElement("li", "", text));
+    });
+
+    canvas.append(watermark, chrome, meta, panels, callouts);
+    const caption = routineIllustrationElement("figcaption", "routine-illustration-caption");
+    caption.append(routineIllustrationElement("span", "", illustration.caption));
+    const feature = resolveFeatureLink(illustration.featureId);
+    if (feature) {
+      const link = routineIllustrationElement("a", "routine-illustration-link", "Öppna motsvarande funktion");
+      link.href = feature.href;
+      link.dataset.featureId = illustration.featureId;
+      caption.append(link);
+    }
+
+    figure.append(notice, canvas, caption);
+    placeholder.replaceWith(figure);
+  });
+}
+
 function buildRoutinesNavigation() {
   const headings = [...els.routinesContent.querySelectorAll("h2, h3")];
   let generatedHeadingIndex = headings.length;
@@ -2105,7 +2185,7 @@ async function loadRoutinesDocument(sectionKey = "") {
   els.routinesContent.innerHTML = '<p class="text-secondary">Läser in rutindokumentet...</p>';
 
   try {
-    const response = await fetch("./docs/verksamhetsfloden-och-handlaggningsrutiner.md?v=20260805-feature-links-v1");
+    const response = await fetch("./docs/verksamhetsfloden-och-handlaggningsrutiner.md?v=20260805-routine-illustrations-v1");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const markdown = await response.text();
     els.routinesContent.innerHTML = marked.parse(markdown, { gfm: true });
@@ -2131,6 +2211,7 @@ async function loadRoutinesDocument(sectionKey = "") {
         link.title = "Funktionen är inte tillgänglig i denna version";
       }
     });
+    renderRoutineIllustrations();
     buildRoutinesNavigation();
     routinesLoaded = true;
     if (sectionKey) requestAnimationFrame(() => scrollToRoutineSection(`rutin-${sectionKey}`));

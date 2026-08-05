@@ -193,6 +193,8 @@ Systemet registrerar automatiskt vem som gjorde ändringen och när den gjordes.
 
 **Möjliga kompletteringar:** målgrupp, geografiskt område, språkbehov, önskat antal mentorer, önskat datum, analysunderlag och medhandläggare.
 
+<div data-routine-illustration="needs-analysis"></div>
+
 **Avslut:** ansvarig registrerar slutsats och beslut om fortsatt åtgärd. Om rekrytering ska genomföras föreslår systemet `Skapa rekryteringsärende` och kopplar det nya ärendet till behovsanalysen som relaterat ärende.
 
 **I systemet:** [Skapa ett nytt ärende](feature:case.create)
@@ -225,6 +227,8 @@ Annons, beslut och sammanställning registreras som handlingar. En publicering r
 
 Systemet skapar mentorpost och certifieringsärende i samma sammanhängande operation. Dublettkontroll görs mot befintliga personer, men sammanslagning får aldrig ske automatiskt.
 
+<div data-routine-illustration="mentor-registration"></div>
+
 **I systemet:** [Registrera ny mentor](feature:mentor.create)
 
 ### 7.2 Fördela ärendet
@@ -250,6 +254,8 @@ Möjliga utfall:
 ## 8. Flöde C: certifiering av mentor
 
 Certifieringsärendet skapas från en versionsstyrd mall. Aktiviteterna visas i rekommenderad ordning, men kommunen kan tillåta parallellt arbete där det är lämpligt.
+
+<div data-routine-illustration="certification-case"></div>
 
 ### 8.1 Verifiera identitet
 
@@ -377,6 +383,8 @@ flowchart TD
 
 Ställningstagandet ska ligga kvar i arbetskön tills det har hanterats. Det får inte försvinna genom att någon ändrar aktivitetens status. En ändring av ett redan fattat ställningstagande kräver nytt beslut, motivering och behörighet; historiken bevaras.
 
+<div data-routine-illustration="deviation-assessment"></div>
+
 ## 10. Flöde E: matchning
 
 Matchning är ett eget ärende och ska inte döljas som en status på mentorn.
@@ -388,6 +396,8 @@ Matchning är ett eget ärende och ska inte döljas som en status på mentorn.
 5. Första mötet bokas och registreras.
 6. Båda parters återkoppling dokumenteras utan onödiga samtalsdetaljer.
 7. Matchningen accepteras eller avslutas utan match.
+
+<div data-routine-illustration="matching-case"></div>
 
 En misslyckad matchning ändrar inte automatiskt mentorns certifieringsstatus. Om något framkommer som påverkar lämpligheten skapas ett separat uppföljningsärende och mentorns tillgänglighet kan pausas genom ett uttryckligt beslut.
 
@@ -407,6 +417,8 @@ Normala aktiviteter:
 6. Utvärdera och avsluta uppdraget.
 
 Varje uppföljning registreras som ett eget möte. En kort kontakt kan snabbregistreras med typ, datum och sammanfattning. Om kontakten leder till fortsatt arbete kompletteras ärendet med aktivitet, ansvarig och förfallodatum.
+
+<div data-routine-illustration="assignment-follow-up"></div>
 
 Vid oro, konflikt, gränsöverskridande eller annan betydande avvikelse ska användaren kunna:
 
@@ -437,6 +449,8 @@ Systemet söker efter kompatibla öppna ärenden och visar alternativen innan n�
 - Om inget mer behövs kan ärendet avslutas direkt med orsak.
 
 Det finns inget separat avancerat ärende. Samma ärende kompletteras stegvis och behåller alltid ID, nummer och historik.
+
+<div data-routine-illustration="progressive-registration"></div>
 
 ## 13. Paus, vänteläge, avslut och återöppning
 
@@ -470,6 +484,8 @@ En handling används för inkommet eller upprättat underlag som behöver hålla
 
 Mötet beskriver ett faktiskt intervjutillfälle, en uppföljning eller annan avstämning. Flera möten registreras som separata poster. Ett möte kan ha en kort sammanfattning och valfria handlingar.
 
+<div data-routine-illustration="documents-and-meetings"></div>
+
 ### Rättelse
 
 En felaktig handling skrivs inte över utan rättas genom en ny version eller kompletterande anteckning. En felaktig verksamhetsuppgift korrigeras genom ett särskilt kommando som lämnar revisionsspår.
@@ -485,6 +501,8 @@ När ansvarig handläggare byts ska samordnaren:
 5. bekräfta överlämningen.
 
 Aktiviteter som ärver ärendeansvaret följer automatiskt med. Särskilt tilldelade aktiviteter ligger kvar på sin handläggare och visas i överlämningsdialogen. Händelsen loggas med tidigare och ny ansvarig.
+
+<div data-routine-illustration="handler-handover"></div>
 
 **I systemet:** [Administrera handläggare](feature:admin.handlers)
 

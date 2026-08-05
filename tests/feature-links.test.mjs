@@ -8,6 +8,7 @@ import {
   routineSectionKey,
   routineSectionRoute
 } from "../feature-links.js";
+import { extractRoutineIllustrationIds, ROUTINE_ILLUSTRATIONS } from "../routine-illustrations.js";
 
 const routines = await readFile(
   new URL("../docs/verksamhetsfloden-och-handlaggningsrutiner.md", import.meta.url),
@@ -36,4 +37,15 @@ test("numbered routine headings keep stable deep-link keys when titles change", 
   assert.equal(routineSectionKey("A.3 Kontakt och medverkan"), "a-3");
   assert.equal(routineSectionKey("Bilaga A: situationskatalog"), "bilaga-a");
   assert.equal(routineSectionRoute("5-2"), "#/routines/5-2");
+});
+
+test("every routine illustration is defined and links to a known feature", () => {
+  const illustrationIds = extractRoutineIllustrationIds(routines);
+  assert.equal(illustrationIds.length, 9);
+
+  for (const illustrationId of illustrationIds) {
+    const illustration = ROUTINE_ILLUSTRATIONS[illustrationId];
+    assert.ok(illustration, `unknown routine illustration: ${illustrationId}`);
+    assert.ok(resolveFeatureLink(illustration.featureId), `unknown illustration feature: ${illustration.featureId}`);
+  }
 });
