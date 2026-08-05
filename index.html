@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260805-routines-v1">
+    <link rel="stylesheet" href="styles.css?v=20260805-routines-v2">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -717,10 +717,10 @@
                 <div id="routinesSearchResults" class="routines-search-results mt-2" hidden></div>
               </div>
               <div class="routines-layout">
-                <aside class="routines-toc" aria-label="Innehållsförteckning">
-                  <h3 class="h6">Innehåll</h3>
+                <details class="routines-toc">
+                  <summary>Innehåll</summary>
                   <nav id="routinesToc"></nav>
-                </aside>
+                </details>
                 <article id="routinesContent" class="routines-content">
                   <p class="text-secondary">Läser in rutindokumentet…</p>
                 </article>

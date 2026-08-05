@@ -1117,6 +1117,7 @@
 }
 
 .routines-shell {
+  container-type: inline-size;
   overflow: hidden;
   background: #fff;
   border: 1px solid var(--app-border);
@@ -1202,6 +1203,16 @@
   gap: 0.125rem;
 }
 
+.routines-toc summary {
+  display: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.routines-toc:not([open]) > nav {
+  display: grid;
+}
+
 .routines-toc-link {
   padding: 0.35rem 0;
   color: var(--app-primary);
@@ -1228,6 +1239,7 @@
   max-width: 78rem;
   padding: var(--app-space-4);
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .routines-content h2,
@@ -1289,6 +1301,38 @@
 .routines-content code {
   color: var(--app-text);
   background: var(--app-surface-muted);
+}
+
+@container (max-width: 56rem) {
+  .routines-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .routines-toc {
+    position: static;
+    max-height: none;
+    padding: var(--app-space-3) var(--app-space-4);
+    border-right: 0;
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .routines-toc summary {
+    display: list-item;
+  }
+
+  .routines-toc:not([open]) > nav {
+    display: none;
+  }
+
+  .routines-toc nav {
+    max-height: 22rem;
+    margin-top: var(--app-space-2);
+    overflow-y: auto;
+  }
+
+  .routines-content {
+    max-width: none;
+  }
 }
 
 .activity-title-button:hover,
