@@ -1330,7 +1330,7 @@
 
 .routine-illustration {
   position: relative;
-  width: 66.666%;
+  width: 58%;
   margin: 1.75rem auto;
   overflow: hidden;
   background: #f8fafb;
@@ -1366,8 +1366,8 @@
 .routine-illustration-canvas {
   position: relative;
   display: grid;
-  gap: var(--app-space-3);
-  padding: var(--app-space-3);
+  gap: 0.75rem;
+  padding: 0.75rem;
   overflow: hidden;
   color: #344650;
   background: #fbfcfc;
@@ -1399,9 +1399,9 @@
 .routine-illustration-chrome {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--app-space-2);
+  gap: 0.5rem;
   align-items: center;
-  padding-bottom: var(--app-space-2);
+  padding-bottom: 0.5rem;
   border-bottom: 2px solid #b9c5cc;
 }
 
@@ -1413,7 +1413,7 @@
 }
 
 .routine-illustration-title {
-  font-size: 1rem;
+  font-size: 0.9375rem;
 }
 
 .routine-illustration-status,
@@ -1457,14 +1457,14 @@
 .routine-illustration-meta {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--app-space-2);
+  gap: 0.5rem;
 }
 
 .routine-illustration-field {
   display: grid;
   gap: 0.125rem;
   min-width: 0;
-  padding: var(--app-space-2);
+  padding: 0.5rem;
   background: rgba(255, 255, 255, 0.72);
   border: 1px dashed #a9b6be;
 }
@@ -1477,13 +1477,13 @@
 
 .routine-illustration-field-value {
   overflow-wrap: anywhere;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
 .routine-illustration-panels {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--app-space-3);
+  gap: 0.75rem;
 }
 
 .routine-illustration-panel {
@@ -1494,19 +1494,19 @@
 
 .routine-illustration-panel-title {
   margin: 0;
-  padding: 0.55rem var(--app-space-2);
-  font-size: 0.8125rem;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
   background: #e9eff2;
   border-bottom: 1px solid #c8d2d8;
 }
 
 .routine-illustration-row {
   display: grid;
-  grid-template-columns: minmax(7rem, 0.9fr) minmax(0, 1.4fr);
-  gap: var(--app-space-2);
+  grid-template-columns: minmax(5.5rem, 0.9fr) minmax(0, 1.4fr);
+  gap: 0.5rem;
   align-items: center;
-  min-height: 2.25rem;
-  padding: 0.45rem var(--app-space-2);
+  min-height: 2rem;
+  padding: 0.35rem 0.5rem;
   border-bottom: 1px dotted #c8d2d8;
 }
 
@@ -1516,23 +1516,23 @@
 
 .routine-illustration-row-label {
   color: #53616a;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
 }
 
 .routine-illustration-row-value {
   justify-self: start;
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .routine-illustration-callouts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--app-space-2) var(--app-space-4);
+  gap: 0.5rem 1rem;
   margin: 0;
-  padding: var(--app-space-2) var(--app-space-3) var(--app-space-2) 2.25rem;
+  padding: 0.5rem 0.75rem 0.5rem 2rem;
   color: #43545e;
   background: rgba(220, 232, 238, 0.62);
   border-left: 0.2rem solid #6b8798;
@@ -1540,7 +1540,7 @@
 
 .routine-illustration-callouts li {
   padding-left: 0.2rem;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
 .routine-illustration-caption {
@@ -1548,10 +1548,10 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--app-space-2) var(--app-space-3);
-  padding: var(--app-space-2) var(--app-space-3);
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   color: var(--app-text-muted);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   background: #fff;
   border-top: 1px solid var(--app-border);
 }
