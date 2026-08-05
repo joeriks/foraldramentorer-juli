@@ -1330,7 +1330,8 @@
 
 .routine-illustration {
   position: relative;
-  margin: 1.75rem 0;
+  width: 66.666%;
+  margin: 1.75rem auto;
   overflow: hidden;
   background: #f8fafb;
   border: 2px dashed #8a9aa4;
@@ -1595,6 +1596,10 @@
   .routine-illustration-panels,
   .routine-illustration-callouts {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .routine-illustration {
+    width: calc(100% - 0.35rem);
   }
 
   .routine-illustration-chrome {
