@@ -29,6 +29,15 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.equal(domain.status, 200);
   assert.match(await domain.text(), /deriveCaseStatus/);
 
+  const markdownParser = await worker.fetch(new Request("https://example.test/vendor/marked/marked.esm.js"), {}, context);
+  assert.equal(markdownParser.status, 200);
+  assert.match(markdownParser.headers.get("content-type"), /^text\/javascript/);
+
+  const routines = await worker.fetch(new Request("https://example.test/docs/verksamhetsfloden-och-handlaggningsrutiner.md"), {}, context);
+  assert.equal(routines.status, 200);
+  assert.match(routines.headers.get("content-type"), /^text\/markdown/);
+  assert.match(await routines.text(), /Verksamhetsflöden och handläggningsrutiner/);
+
   const missing = await worker.fetch(new Request("https://example.test/missing.png", {
     headers: { accept: "image/png" }
   }), {}, context);

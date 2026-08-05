@@ -55,6 +55,7 @@ export const ACTIVITY_TEMPLATES = [
     results: [
       ["shown_checked", "Visat och kontrollerat", "acceptable"],
       ["not_shown", "Inte visat", "deviation"],
+      ["wrong_type_or_expired", "Fel typ eller för gammalt", "deviation"],
       ["authenticity_unconfirmed", "Äkthet inte bekräftad", "deviation"]
     ]
   },
@@ -64,6 +65,8 @@ export const ACTIVITY_TEMPLATES = [
     title: "Kontrollera referenser",
     results: [
       ["acceptable", "Godtagbara", "acceptable"],
+      ["unreachable", "Referens kunde inte nås", "deviation"],
+      ["assessment_required", "Uppgifter behöver bedömas", "deviation"],
       ["not_acceptable", "Inte godtagbara", "deviation"],
       ["incomplete", "Ofullständiga", "deviation"]
     ]
@@ -74,6 +77,7 @@ export const ACTIVITY_TEMPLATES = [
     title: "Kontrollera e-learning",
     results: [
       ["completed", "Genomförd", "acceptable"],
+      ["partially_completed", "Delvis genomförd", "deviation"],
       ["not_completed", "Inte genomförd", "deviation"]
     ]
   },
@@ -140,6 +144,20 @@ export const CASE_TYPE_DEFINITIONS = [
     name: "Uppföljning",
     defaultPriority: "normal",
     suggestedActivities: ["Kontakta mentorn", "Dokumentera uppföljningen", "Bedöm fortsatt behov"]
+  },
+  {
+    id: "matching",
+    version: 1,
+    name: "Matchning",
+    defaultPriority: "normal",
+    suggestedActivities: ["Kontrollera tillgänglighet och grundkriterier", "Dokumentera matchningsförslag", "Kontakta mentorn", "Boka första mötet", "Registrera parternas återkoppling", "Fatta beslut om matchning"]
+  },
+  {
+    id: "mentor-assignment",
+    version: 1,
+    name: "Mentoruppdrag",
+    defaultPriority: "normal",
+    suggestedActivities: ["Bekräfta uppdragets ramar", "Genomför första avstämning", "Följ upp efter fyra veckor", "Sammanställ mötes- och ersättningsunderlag", "Utvärdera och avsluta uppdraget"]
   },
   {
     id: "recruitment",
@@ -238,6 +256,55 @@ export function canTransitionActivity(from, to, { reopen = false } = {}) {
   if (reopen && source === "completed" && target === "in_progress") return true;
   if (reopen && source === "not_applicable" && target === "not_started") return true;
   return ACTIVITY_TRANSITIONS[source]?.has(target) || false;
+}
+
+export function assessCertificationApproval({ caseRecord, activities = [], deviations = [], hasResponsible = false, identityComplete = false }) {
+  const reasons = [];
+  if (!caseRecord || caseRecord.caseTypeId !== "mentor-certification") reasons.push("Ärendet är inte ett certifieringsärende.");
+  if (caseRecord?.status === "paused") reasons.push("Ärendet är pausat.");
+  if (caseRecord?.status === "closed") reasons.push("Ärendet är redan avslutat.");
+  if (!hasResponsible) reasons.push("Ärendet saknar ansvarig handläggare.");
+  if (!identityComplete) reasons.push("Personnummer och verifieringssätt saknas.");
+
+  const unresolvedDeviations = deviations.filter((deviation) => deviation.status === "open" && !deviation.activeDecisionId);
+  if (unresolvedDeviations.length) reasons.push("Minst ett ställningstagande återstår.");
+
+  const decisionTemplateId = "decision";
+  const requiredTemplateIds = ACTIVITY_TEMPLATES
+    .map((template) => template.id)
+    .filter((id) => ![decisionTemplateId, AD_HOC_ACTIVITY_TEMPLATE_ID].includes(id));
+  for (const templateId of requiredTemplateIds) {
+    const activity = activities.find((item) => item.templateId === templateId);
+    if (!activity) {
+      reasons.push(`Obligatorisk aktivitet saknas: ${activityTemplateById(templateId).title}.`);
+      continue;
+    }
+    if (normalizeActivityStatus(activity.status) !== "completed" || activity.resultClassification !== "acceptable") {
+      reasons.push(`Aktiviteten är inte godkänd: ${activity.title}.`);
+    }
+  }
+
+  const unfinishedAdditionalActivities = activities.filter((activity) =>
+    ![decisionTemplateId].includes(activity.templateId)
+    && !requiredTemplateIds.includes(activity.templateId)
+    && !["completed", "not_applicable"].includes(normalizeActivityStatus(activity.status))
+  );
+  if (unfinishedAdditionalActivities.length) reasons.push("Minst en tillagd aktivitet återstår.");
+
+  return { allowed: reasons.length === 0, reasons };
+}
+
+export function findMentorDuplicates(candidates, { personalNumber = "", name = "" }) {
+  const normalizedNumber = String(personalNumber).replace(/\D/g, "");
+  const normalizedName = String(name).trim().toLocaleLowerCase("sv-SE").replace(/\s+/g, " ");
+  return {
+    exactPersonalNumber: normalizedNumber.length === 12
+      ? candidates.find((candidate) => String(candidate.personalNumber || "").replace(/\D/g, "") === normalizedNumber) || null
+      : null,
+    sameName: normalizedName.length > 2
+      ? candidates.filter((candidate) => String(candidate.name || "").trim().toLocaleLowerCase("sv-SE").replace(/\s+/g, " ") === normalizedName)
+      : []
+  };
 }
 
 export function stableHash(value) {

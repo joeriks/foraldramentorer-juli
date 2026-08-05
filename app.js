@@ -8,17 +8,20 @@ import {
   DEFAULT_TENANT_ID,
   activityStatusLabel as domainActivityStatusLabel,
   activityTemplateById,
+  assessCertificationApproval,
   canTransitionActivity,
   caseStatusLabel,
   caseTypeById,
   caseTypeByName,
   deriveCaseStatus as deriveDomainCaseStatus,
+  findMentorDuplicates,
   normalizeActivityStatus,
   normalizeCaseStatus,
   resultClassification,
   resultOptions,
   stableHash
 } from "./case-domain.js";
+import { marked } from "./vendor/marked/marked.esm.js";
 
 const DB_NAME = "foraldramentorer";
 const DB_VERSION = 6;
@@ -54,6 +57,7 @@ const CHECKS = [
   ["referencesDone", "Referenser klara"],
   ["trainingDone", "E-learning klar"],
   ["quizDone", "Kunskapsavstämning klar"],
+  ["inviteInterview", "Kallelse till intervju skickad"],
   ["interviewDone", "Intervju genomförd"]
 ];
 
@@ -116,6 +120,13 @@ const NEXT_ACTIONS = [
     description: "Genomför avstämningen och markera momentet som klart.",
     tabId: "mentor-checks-tab",
     buttonLabel: "Öppna kontroller"
+  },
+  {
+    key: "inviteInterview",
+    label: "Kalla till intervju",
+    description: "Skicka kallelsen och registrera att intervjun är bokad.",
+    tabId: "mentor-interview-tab",
+    buttonLabel: "Öppna intervju"
   },
   {
     key: "interviewDone",
@@ -382,6 +393,8 @@ let searchTerm = "";
 let statusFilter = "";
 let caseSearchTerm = "";
 let caseStatusFilter = "";
+let caseTypeFilter = "";
+let newCaseTypePreset = "";
 let casePage = 1;
 let dashboardQueueMode = "mine";
 let candidateModal;
@@ -403,6 +416,7 @@ let caseEditMode = false;
 let selectedCaseActivityId = null;
 let activityListFilter = "all";
 let activityDetailBaseline = null;
+let routinesLoaded = false;
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
@@ -413,8 +427,12 @@ const els = {
   navDashboard: document.querySelector("#navDashboard"),
   navPresentation: document.querySelector("#navPresentation"),
   navCases: document.querySelector("#navCases"),
+  navMatchings: document.querySelector("#navMatchings"),
+  navAssignments: document.querySelector("#navAssignments"),
   navCandidates: document.querySelector("#navCandidates"),
   navAdministration: document.querySelector("#navAdministration"),
+  navHandlers: document.querySelector("#navHandlers"),
+  navRoutines: document.querySelector("#navRoutines"),
   dashboardView: document.querySelector("#dashboardView"),
   presentationView: document.querySelector("#presentationView"),
   casesView: document.querySelector("#casesView"),
@@ -422,6 +440,12 @@ const els = {
   candidatesView: document.querySelector("#candidatesView"),
   detailView: document.querySelector("#detailView"),
   administrationView: document.querySelector("#administrationView"),
+  routinesView: document.querySelector("#routinesView"),
+  routinesSearchInput: document.querySelector("#routinesSearchInput"),
+  clearRoutinesSearchButton: document.querySelector("#clearRoutinesSearchButton"),
+  routinesSearchResults: document.querySelector("#routinesSearchResults"),
+  routinesToc: document.querySelector("#routinesToc"),
+  routinesContent: document.querySelector("#routinesContent"),
   handlerDetailView: document.querySelector("#handlerDetailView"),
   handlerDetailEmpty: document.querySelector("#handlerDetailEmpty"),
   handlerDetail: document.querySelector("#handlerDetail"),
@@ -444,6 +468,7 @@ const els = {
   presentationCommentsEmpty: document.querySelector("#presentationCommentsEmpty"),
   presentationCommentsList: document.querySelector("#presentationCommentsList"),
   caseListCount: document.querySelector("#caseListCount"),
+  caseRegisterTitle: document.querySelector("#caseRegisterTitle"),
   caseSearchInput: document.querySelector("#caseSearchInput"),
   caseStatusFilter: document.querySelector("#caseStatusFilter"),
   caseTableBody: document.querySelector("#caseTableBody"),
@@ -524,6 +549,8 @@ const els = {
   activityResultHelp: document.querySelector("#activityResultHelp"),
   activityDetailOwnerInput: document.querySelector("#activityDetailOwnerInput"),
   activityDetailDueDateInput: document.querySelector("#activityDetailDueDateInput"),
+  activityWaitingForRow: document.querySelector("#activityWaitingForRow"),
+  activityDetailWaitingForInput: document.querySelector("#activityDetailWaitingForInput"),
   activityDetailNoteInput: document.querySelector("#activityDetailNoteInput"),
   activityDetailSaveState: document.querySelector("#activityDetailSaveState"),
   activityDetailSaveButton: document.querySelector("#activityDetailSaveButton"),
@@ -564,6 +591,9 @@ const els = {
   dashboardNewCaseButton: document.querySelector("#dashboardNewCaseButton"),
   cancelNewCaseButton: document.querySelector("#cancelNewCaseButton"),
   candidateForm: document.querySelector("#candidateForm"),
+  candidateDuplicatePanel: document.querySelector("#candidateDuplicatePanel"),
+  candidateNameInput: document.querySelector("#nameInput"),
+  candidatePersonalNumberInput: document.querySelector("#personalNumberInput"),
   candidateTableBody: document.querySelector("#candidateTableBody"),
   mentorListTitle: document.querySelector("#mentorListTitle"),
   mentorListCount: document.querySelector("#mentorListCount"),
@@ -623,6 +653,7 @@ const els = {
   savePersonEditButton: document.querySelector("#savePersonEditButton"),
   cancelPersonEditButton: document.querySelector("#cancelPersonEditButton"),
   editNameInput: document.querySelector("#editNameInput"),
+  mentorEditorDuplicatePanel: document.querySelector("#mentorEditorDuplicatePanel"),
   editPersonalNumberInput: document.querySelector("#editPersonalNumberInput"),
   editAreaInput: document.querySelector("#editAreaInput"),
   editLanguagesInput: document.querySelector("#editLanguagesInput"),
@@ -1186,7 +1217,7 @@ function normalizedActivity(activity, normalizedCases) {
   const caseRecord = normalizedCases.find((item) => item.id === activity.caseId);
   const templateId = activity.templateId || activity.templateKey || AD_HOC_ACTIVITY_TEMPLATE_ID;
   const status = normalizeActivityStatus(activity.status);
-  const resultCode = activity.resultCode || activity.result || null;
+  const resultCode = activity.resultCode || activity.result || (status === "completed" ? defaultCompletedResult({ templateId }) : null);
   const caseOwnerId = caseAssignments.find((assignment) => assignment.caseId === activity.caseId && ["Ansvarig", "responsible"].includes(assignment.role) && !assignment.endedAt)?.handlerId || null;
   const legacyHandlerId = activity.handlerId || null;
   return {
@@ -1909,6 +1940,18 @@ function isComplete(candidate) {
   );
 }
 
+function certificationApprovalAssessment(candidate) {
+  const caseRecord = cases.find((item) => item.mentorId === candidate?.id && item.caseTypeId === "mentor-certification");
+  if (!caseRecord) return { allowed: false, reasons: ["Certifieringsärendet saknas."] };
+  return assessCertificationApproval({
+    caseRecord,
+    activities: activitiesForCase(caseRecord.id),
+    deviations: activityDeviations.filter((deviation) => deviation.caseId === caseRecord.id),
+    hasResponsible: Boolean(responsibleHandler(caseRecord)),
+    identityComplete: Boolean(candidate?.personalNumber && candidate?.identityMethod)
+  });
+}
+
 function isBlocked(candidate) {
   return !candidate.checks?.identityVerified || !candidate.checks?.registryChecked || !candidate.checks?.referencesDone;
 }
@@ -1970,10 +2013,116 @@ function normalizeRouteView(view) {
   return view;
 }
 
+function routineHeadingId(text, index) {
+  const slug = text
+    .toLocaleLowerCase("sv-SE")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `rutin-${slug || "avsnitt"}-${index + 1}`;
+}
+
+function scrollToRoutineSection(targetId) {
+  document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function buildRoutinesNavigation() {
+  const headings = [...els.routinesContent.querySelectorAll("h2, h3")];
+  let generatedHeadingIndex = headings.length;
+  els.routinesToc.innerHTML = "";
+
+  headings.forEach((heading, index) => {
+    heading.id = routineHeadingId(heading.textContent, index);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `routines-toc-link routines-toc-${heading.tagName.toLowerCase()}`;
+    button.textContent = heading.textContent;
+    button.addEventListener("click", () => scrollToRoutineSection(heading.id));
+    els.routinesToc.append(button);
+  });
+
+  let currentHeading = headings[0]?.id || "";
+  els.routinesContent.querySelectorAll("h2, h3, h4, p, li, td").forEach((node) => {
+    if (/^H[2-4]$/.test(node.tagName)) {
+      if (!node.id) node.id = routineHeadingId(node.textContent, generatedHeadingIndex++);
+      currentHeading = node.id;
+    }
+    node.dataset.routineSection = currentHeading;
+  });
+}
+
+function searchRoutines() {
+  const term = els.routinesSearchInput.value.trim().toLocaleLowerCase("sv-SE");
+  els.clearRoutinesSearchButton.hidden = !term;
+  els.routinesSearchResults.innerHTML = "";
+  els.routinesSearchResults.hidden = !term;
+  if (!term) return;
+
+  const matches = [...els.routinesContent.querySelectorAll("h2, h3, h4, p, li, td")]
+    .filter((node) => node.textContent.toLocaleLowerCase("sv-SE").includes(term))
+    .slice(0, 20);
+
+  if (!matches.length) {
+    const empty = document.createElement("p");
+    empty.className = "routines-search-empty";
+    empty.textContent = "Inga avsnitt matchar sökningen.";
+    els.routinesSearchResults.append(empty);
+    return;
+  }
+
+  matches.forEach((node) => {
+    const sectionId = node.dataset.routineSection || node.id;
+    const section = document.getElementById(sectionId);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "routines-search-result";
+
+    const title = document.createElement("strong");
+    title.textContent = section?.textContent || "Träff i rutindokumentet";
+    const excerpt = document.createElement("span");
+    const text = node.textContent.trim();
+    excerpt.textContent = text.length > 150 ? `${text.slice(0, 147)}...` : text;
+    button.append(title, excerpt);
+    button.addEventListener("click", () => scrollToRoutineSection(sectionId));
+    els.routinesSearchResults.append(button);
+  });
+}
+
+async function loadRoutinesDocument() {
+  if (routinesLoaded) return;
+  els.routinesContent.innerHTML = '<p class="text-secondary">Läser in rutindokumentet...</p>';
+
+  try {
+    const response = await fetch("./docs/verksamhetsfloden-och-handlaggningsrutiner.md");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const markdown = await response.text();
+    els.routinesContent.innerHTML = marked.parse(markdown, { gfm: true });
+    els.routinesContent.querySelector(":scope > h1")?.remove();
+    els.routinesContent.querySelectorAll("a[href^='http']").forEach((link) => {
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    });
+    els.routinesContent.querySelectorAll("a[href$='.md']").forEach((link) => {
+      const filename = link.getAttribute("href").split("/").pop();
+      link.href = `./docs/${filename}`;
+    });
+    buildRoutinesNavigation();
+    routinesLoaded = true;
+  } catch (error) {
+    els.routinesContent.innerHTML = `
+      <div class="alert alert-danger" role="alert">
+        Rutindokumentet kunde inte läsas in. Försök att ladda om sidan.
+      </div>
+    `;
+    console.error("Could not load routines document", error);
+  }
+}
+
 function applyRoute() {
   const route = parseRoute();
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "administration", "handler"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "administration", "routines", "handler"].includes(route.view) ? route.view : "dashboard";
   selectedId = currentView === "mentor" ? route.id : selectedId;
   selectedCaseRecordId = currentView === "case" ? route.id : selectedCaseRecordId;
   if (currentView !== "case") {
@@ -1985,6 +2134,7 @@ function applyRoute() {
   if (currentView !== "case" || route.id !== previousCaseRecordId) caseEditMode = false;
   selectedHandlerId = currentView === "handler" ? route.id : selectedHandlerId;
   workQueueOnly = currentView === "mentors" && route.id === "action";
+  caseTypeFilter = currentView === "cases" && ["matching", "mentor-assignment"].includes(route.id) ? route.id : "";
 
   els.dashboardView.hidden = currentView !== "dashboard";
   els.presentationView.hidden = currentView !== "presentation";
@@ -1993,13 +2143,18 @@ function applyRoute() {
   els.candidatesView.hidden = currentView !== "mentors";
   els.detailView.hidden = currentView !== "mentor";
   els.administrationView.hidden = currentView !== "administration";
+  els.routinesView.hidden = currentView !== "routines";
   els.handlerDetailView.hidden = currentView !== "handler";
 
   els.navDashboard.classList.toggle("active", currentView === "dashboard");
   els.navPresentation.classList.toggle("active", currentView === "presentation");
-  els.navCases.classList.toggle("active", currentView === "cases" || currentView === "case");
+  els.navCases.classList.toggle("active", (currentView === "cases" && !caseTypeFilter) || currentView === "case");
+  els.navMatchings.classList.toggle("active", currentView === "cases" && caseTypeFilter === "matching");
+  els.navAssignments.classList.toggle("active", currentView === "cases" && caseTypeFilter === "mentor-assignment");
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
-  els.navAdministration.classList.toggle("active", currentView === "administration" || currentView === "handler");
+  els.navAdministration.classList.toggle("active", ["administration", "routines", "handler"].includes(currentView));
+  els.navHandlers.classList.toggle("active", currentView === "administration" || currentView === "handler");
+  els.navRoutines.classList.toggle("active", currentView === "routines");
 
   if (currentView === "dashboard") {
     els.pageTitle.textContent = "Dashboard";
@@ -2008,8 +2163,9 @@ function applyRoute() {
     els.pageTitle.textContent = "Presentation";
     els.breadcrumb.textContent = "Start / Presentation";
   } else if (currentView === "cases") {
-    els.pageTitle.textContent = "Ärenderegister";
-    els.breadcrumb.textContent = "Start / Ärenden";
+    const sectionTitle = caseTypeFilter === "matching" ? "Matchningar" : caseTypeFilter === "mentor-assignment" ? "Uppdrag" : "Ärenderegister";
+    els.pageTitle.textContent = sectionTitle;
+    els.breadcrumb.textContent = `Start / ${sectionTitle}`;
   } else if (currentView === "case") {
     const isNewCase = route.id?.startsWith("new");
     els.pageTitle.textContent = isNewCase ? "Nytt ärende" : "Ärendekort";
@@ -2023,11 +2179,15 @@ function applyRoute() {
     els.pageTitle.textContent = isNewMentor ? "Registrera mentor" : "Mentorkort";
     els.breadcrumb.textContent = isNewMentor ? "Start / Onboarding / Registrera mentor" : "Start / Onboarding / Mentorkort";
   } else if (currentView === "administration") {
-    els.pageTitle.textContent = "Administration";
-    els.breadcrumb.textContent = "Start / Administration / Handläggare";
+    els.pageTitle.textContent = "Handläggare";
+    els.breadcrumb.textContent = "Start / Systemadministration / Handläggare";
+  } else if (currentView === "routines") {
+    els.pageTitle.textContent = "Rutiner";
+    els.breadcrumb.textContent = "Start / Systemadministration / Rutiner";
+    loadRoutinesDocument();
   } else {
     els.pageTitle.textContent = "Handläggarkort";
-    els.breadcrumb.textContent = "Start / Administration / Handläggarkort";
+    els.breadcrumb.textContent = "Start / Systemadministration / Handläggarkort";
   }
 }
 
@@ -2313,7 +2473,12 @@ function activityHandlerLabel(activity, caseRecord) {
 }
 
 function activityDocuments(activityId) {
-  return caseDocuments.filter((document) => document.activityId === activityId);
+  return currentCaseDocuments().filter((document) => document.activityId === activityId);
+}
+
+function currentCaseDocuments() {
+  const supersededIds = new Set(caseDocuments.map((document) => document.supersedesDocumentId).filter(Boolean));
+  return caseDocuments.filter((document) => !supersededIds.has(document.id));
 }
 
 function latestActivityNote(activityId) {
@@ -2328,6 +2493,16 @@ function documentTypeLabel(type) {
 
 function activityStatusLabel(status) {
   return domainActivityStatusLabel(status);
+}
+
+function waitingForPartyLabel(value) {
+  return ({ mentor: "mentorn", handler: "handläggaren", external: "extern part" })[value] || "";
+}
+
+function activityWorkStateLabel(activity) {
+  if (activityHasBlockingResult(activity)) return "Ställningstagande krävs";
+  if (activity.status === "waiting" && activity.waitingForParty) return `Väntar på ${waitingForPartyLabel(activity.waitingForParty)}`;
+  return activityStatusLabel(activity.status);
 }
 
 function activityStatusClass(activity) {
@@ -2385,19 +2560,24 @@ function filteredCases() {
       .filter(Boolean)
       .map((handler) => handler.name);
     const text = [caseRecord.number, caseRecord.title, caseRecord.type, mentor?.name, ...handlerNames].join(" ").toLowerCase();
-    return (!caseStatusFilter || caseRecord.status === caseStatusFilter) && (!term || text.includes(term));
+    return (!caseTypeFilter || caseRecord.caseTypeId === caseTypeFilter)
+      && (!caseStatusFilter || caseRecord.status === caseStatusFilter)
+      && (!term || text.includes(term));
   });
 }
 
 function renderCases() {
   const filteredRows = filteredCases();
+  const typeRows = caseTypeFilter ? cases.filter((caseRecord) => caseRecord.caseTypeId === caseTypeFilter) : cases;
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / CASE_PAGE_SIZE));
   casePage = Math.min(casePage, pageCount);
   const start = (casePage - 1) * CASE_PAGE_SIZE;
   const rows = filteredRows.slice(start, start + CASE_PAGE_SIZE);
-  els.caseListCount.textContent = filteredRows.length === cases.length
-    ? `${cases.length} ${cases.length === 1 ? "ärende" : "ärenden"} i registret.`
-    : `Visar ${filteredRows.length} av ${cases.length} ärenden.`;
+  els.caseRegisterTitle.textContent = caseTypeFilter === "matching" ? "Matchningsärenden" : caseTypeFilter === "mentor-assignment" ? "Mentoruppdrag" : "Ärenderegister";
+  els.newGeneralCaseButton.textContent = caseTypeFilter === "matching" ? "Ny matchning" : caseTypeFilter === "mentor-assignment" ? "Nytt uppdrag" : "Nytt ärende";
+  els.caseListCount.textContent = filteredRows.length === typeRows.length
+    ? `${typeRows.length} ${typeRows.length === 1 ? "ärende" : "ärenden"} i registret.`
+    : `Visar ${filteredRows.length} av ${typeRows.length} ärenden.`;
   els.casePageSummary.textContent = filteredRows.length
     ? `Visar ${start + 1}–${start + rows.length} av ${filteredRows.length}`
     : "Inga träffar";
@@ -2489,6 +2669,7 @@ function renderCaseDetail() {
     if (els.caseCreateForm.dataset.route !== selectedCaseRecordId) {
       els.caseCreateForm.reset();
       populateCaseForm(mentorId);
+      if (newCaseTypePreset) els.caseTypeInput.value = newCaseTypePreset;
       els.caseCreateForm.dataset.route = selectedCaseRecordId;
     }
     return;
@@ -2498,7 +2679,7 @@ function renderCaseDetail() {
   const owner = responsibleHandler(caseRecord);
   const caseCoHandlers = coHandlers(caseRecord);
   const activities = activitiesForCase(caseRecord.id);
-  const documents = caseDocuments.filter((document) => document.caseId === caseRecord.id);
+  const documents = currentCaseDocuments().filter((document) => document.caseId === caseRecord.id);
   const meetingsForCase = caseMeetings.filter((meeting) => meeting.caseId === caseRecord.id);
   const events = caseEvents.filter((item) => item.caseId === caseRecord.id);
   if (selectedCaseActivityId && !activities.some((activity) => activity.id === selectedCaseActivityId)) {
@@ -2623,7 +2804,7 @@ function renderCaseActivities(caseRecord, activities) {
           </div>
         </div>
       </td>
-      <td><span class="badge activity-status-badge ${activityStatusClass(activity)}">${escapeHtml(activityHasBlockingResult(activity) ? "Ställningstagande krävs" : activityStatusLabel(activity.status))}</span></td>
+      <td><span class="badge activity-status-badge ${activityStatusClass(activity)}">${escapeHtml(activityWorkStateLabel(activity))}</span></td>
       <td><span class="activity-owner-name">${escapeHtml(handler?.name || "Ej tilldelad")}</span>${ownerSource ? `<small>${ownerSource}</small>` : ""}</td>
       <td class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityDueLabel(activity))}</td>
       <td>${documents.length ? `${documents.length} st` : '<span class="text-secondary">0</span>'}</td>
@@ -2651,7 +2832,7 @@ function renderActivityDetail(caseRecord) {
   if (activity.completedAt) auditParts.push(`Avslutad ${formatDateTime(activity.completedAt)} av ${handlerNameById(activity.completedBy)}`);
   els.activityDetailAudit.textContent = auditParts.join(" · ");
   renderActivityGuidance(activity, caseRecord);
-  els.activityDetailStatus.textContent = activityHasBlockingResult(activity) ? "Ställningstagande krävs" : activityStatusLabel(activity.status);
+  els.activityDetailStatus.textContent = activityWorkStateLabel(activity);
   els.activityDetailStatus.className = activityHasBlockingResult(activity)
     ? "badge text-bg-danger"
     : activity.status === "completed"
@@ -2669,6 +2850,8 @@ function renderActivityDetail(caseRecord) {
   }
   els.activityDetailOwnerInput.value = activityOwnerOverrideId(activity, caseRecord);
   els.activityDetailDueDateInput.value = activity.dueDate || "";
+  els.activityDetailWaitingForInput.value = activity.waitingForParty || "";
+  els.activityWaitingForRow.hidden = activity.status !== "waiting";
   els.activityDetailNoteInput.value = latestActivityNote(activity.id);
   renderActivityResultInput(activity);
   const locked = ["completed", "not_applicable"].includes(activity.status);
@@ -2676,6 +2859,7 @@ function renderActivityDetail(caseRecord) {
   els.activityDetailResultInput.disabled = locked || activity.status !== "completed";
   els.activityDetailOwnerInput.disabled = locked;
   els.activityDetailDueDateInput.disabled = locked;
+  els.activityDetailWaitingForInput.disabled = locked || activity.status !== "waiting";
   els.activityDetailNoteInput.disabled = locked;
   els.reopenActivityButton.hidden = !locked;
   const deviation = activityDeviations.find((item) => item.activityId === activity.id && item.status === "open" && !item.activeDecisionId);
@@ -2712,6 +2896,7 @@ function activityDetailFormSnapshot() {
     result: status === "completed" ? els.activityDetailResultInput.value : "",
     handlerId: els.activityDetailOwnerInput.value,
     dueDate: els.activityDetailDueDateInput.value,
+    waitingForParty: status === "waiting" ? els.activityDetailWaitingForInput.value : "",
     note: els.activityDetailNoteInput.value.trim()
   };
 }
@@ -3130,11 +3315,11 @@ function renderDetail() {
     els.checklist.append(column);
   }
 
-  const complete = isComplete(candidate);
-  els.approveButton.disabled = !complete;
-  els.decisionHint.textContent = complete
+  const approval = certificationApprovalAssessment(candidate);
+  els.approveButton.disabled = !approval.allowed;
+  els.decisionHint.textContent = approval.allowed
     ? "Mentorn uppfyller samtliga krav och kan certifieras."
-    : "Handläggare, samtliga kontroller, intervjutid och intervjuform måste vara registrerade innan certifiering.";
+    : approval.reasons[0] || "Certifieringsärendet är inte redo för beslut.";
 
   els.auditLog.innerHTML = "";
   for (const item of [...candidate.history].reverse()) {
@@ -3454,7 +3639,7 @@ function executeCaseCommand({
   });
 }
 
-function saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nextHandlerId, nextDueDate, note, reopen = false, meeting = null }) {
+function saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nextHandlerId, nextDueDate, nextWaitingForParty = null, note, reopen = false, meeting = null }) {
   const sourceStatus = normalizeActivityStatus(activity.status);
   const targetStatus = normalizeActivityStatus(nextStatus);
   if (!canTransitionActivity(sourceStatus, targetStatus, { reopen })) {
@@ -3462,6 +3647,12 @@ function saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nex
   }
   if (caseRecord.status === "closed") {
     return Promise.reject(Object.assign(new Error("Ärendet måste återöppnas innan aktiviteter kan ändras."), { code: "CASE_CLOSED" }));
+  }
+  if (caseRecord.status === "paused") {
+    return Promise.reject(Object.assign(new Error("Ärendet måste återupptas innan aktiviteter kan ändras."), { code: "CASE_PAUSED" }));
+  }
+  if (targetStatus === "waiting" && !["mentor", "handler", "external"].includes(nextWaitingForParty)) {
+    return Promise.reject(Object.assign(new Error("Ange vem eller vad aktiviteten väntar på."), { code: "WAITING_PARTY_REQUIRED" }));
   }
   const classification = targetStatus === "completed" ? resultClassification(activity.templateId, nextResult) : null;
   if (targetStatus === "completed" && !classification) {
@@ -3475,7 +3666,7 @@ function saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nex
     commandType: reopen ? "reopen_activity" : "update_activity",
     caseId: caseRecord.id,
     expectedVersion: caseRecord.version,
-    payload: { activityId: activity.id, nextStatus: targetStatus, nextResult, nextHandlerId, nextDueDate, note, meeting },
+    payload: { activityId: activity.id, nextStatus: targetStatus, nextResult, nextHandlerId, nextDueDate, nextWaitingForParty, note, meeting },
     additionalStores: [CASE_ACTIVITIES_STORE, CASE_DOCUMENTS_STORE, ACTIVITY_DEVIATIONS_STORE, ...(meeting ? [CASE_MEETINGS_STORE] : [])],
     mutate: ({ currentCase, now, put, event }) => {
       const resultChanged = nextResult !== (activity.resultCode || null);
@@ -3494,7 +3685,7 @@ function saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nex
         resultCode: targetStatus === "completed" ? nextResult : null,
         resultClassification: classification,
         handlerIdOverride: nextHandlerId || null,
-        waitingForParty: targetStatus === "waiting" ? activity.waitingForParty || "external" : null,
+        waitingForParty: targetStatus === "waiting" ? nextWaitingForParty : null,
         dueDate: nextDueDate || null,
         version: Number(activity.version || 1) + 1,
         updatedAt: now,
@@ -4042,6 +4233,53 @@ function newCandidate(formData) {
   };
 }
 
+function candidateDuplicateMatches() {
+  return findMentorDuplicates(candidates, {
+    personalNumber: els.candidatePersonalNumberInput.value,
+    name: els.candidateNameInput.value
+  });
+}
+
+function renderCandidateDuplicateCheck() {
+  const { exactPersonalNumber, sameName } = candidateDuplicateMatches();
+  const panel = els.candidateDuplicatePanel;
+  if (!exactPersonalNumber && !sameName.length) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    panel.dataset.choice = "";
+    return { blocked: false };
+  }
+  panel.hidden = false;
+  if (exactPersonalNumber) {
+    panel.innerHTML = `<strong>Personnumret finns redan.</strong><p class="mb-2">Öppna den befintliga mentorposten i stället för att skapa en dubblett.</p><button type="button" class="btn btn-warning btn-sm" data-open-duplicate-mentor="${escapeHtml(exactPersonalNumber.id)}">Öppna ${escapeHtml(exactPersonalNumber.name)}</button>`;
+    return { blocked: true, candidate: exactPersonalNumber };
+  }
+  const match = sameName[0];
+  const accepted = panel.dataset.choice === "create-anyway";
+  panel.innerHTML = `<strong>En mentor med samma namn finns redan.</strong><p class="mb-2">Kontrollera att det är en annan person innan du fortsätter.</p><div class="d-flex flex-wrap gap-2"><button type="button" class="btn btn-warning btn-sm" data-open-duplicate-mentor="${escapeHtml(match.id)}">Öppna ${escapeHtml(match.name)}</button><button type="button" class="btn btn-outline-secondary btn-sm ${accepted ? "active" : ""}" data-create-duplicate-mentor>Det är en annan person</button></div>`;
+  return { blocked: !accepted, candidate: match };
+}
+
+function renderMentorEditorDuplicateCheck() {
+  const panel = els.mentorEditorDuplicatePanel;
+  if (!isCreatingMentor()) {
+    panel.hidden = true;
+    return { blocked: false };
+  }
+  const matches = findMentorDuplicates(candidates, { name: els.editNameInput.value }).sameName;
+  if (!matches.length) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    panel.dataset.choice = "";
+    return { blocked: false };
+  }
+  const match = matches[0];
+  const accepted = panel.dataset.choice === "create-anyway";
+  panel.hidden = false;
+  panel.innerHTML = `<strong>En mentor med samma namn finns redan.</strong><p class="mb-2">Kontrollera att det är en annan person innan du fortsätter.</p><div class="d-flex flex-wrap gap-2"><a class="btn btn-warning btn-sm" href="#/mentor/${escapeHtml(match.id)}">Öppna ${escapeHtml(match.name)}</a><button type="button" class="btn btn-outline-secondary btn-sm ${accepted ? "active" : ""}" data-create-editor-duplicate>Det är en annan person</button></div>`;
+  return { blocked: !accepted };
+}
+
 function newCandidateFromEditor() {
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -4214,6 +4452,16 @@ els.navCases.addEventListener("click", (event) => {
   navigateTo("#/cases");
 });
 
+els.navMatchings.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/cases/matching");
+});
+
+els.navAssignments.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/cases/mentor-assignment");
+});
+
 els.navCandidates.addEventListener("click", (event) => {
   event.preventDefault();
   resetMentorFilters();
@@ -4223,6 +4471,23 @@ els.navCandidates.addEventListener("click", (event) => {
 els.navAdministration.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/administration");
+});
+
+els.navHandlers.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/administration");
+});
+
+els.navRoutines.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/routines");
+});
+
+els.routinesSearchInput.addEventListener("input", searchRoutines);
+els.clearRoutinesSearchButton.addEventListener("click", () => {
+  els.routinesSearchInput.value = "";
+  searchRoutines();
+  els.routinesSearchInput.focus();
 });
 
 els.openActionQueueButton.addEventListener("click", (event) => {
@@ -4366,7 +4631,11 @@ els.nextCasePageButton.addEventListener("click", () => {
   renderCases();
 });
 
-els.newGeneralCaseButton.addEventListener("click", () => navigateToNewCase());
+els.newGeneralCaseButton.addEventListener("click", () => {
+  newCaseTypePreset = caseTypeFilter;
+  els.caseCreateForm.dataset.route = "";
+  navigateToNewCase();
+});
 els.newMentorCaseButton.addEventListener("click", () => {
   const candidate = selectedCandidate();
   if (candidate) navigateToNewCase(candidate.id);
@@ -4379,6 +4648,7 @@ els.editCaseButton.addEventListener("click", () => {
 });
 
 els.cancelCaseCreateButton.addEventListener("click", () => {
+  newCaseTypePreset = "";
   if (caseEditMode) {
     caseEditMode = false;
     renderCaseDetail();
@@ -4453,7 +4723,24 @@ els.caseCreateForm.addEventListener("submit", async (event) => {
   const coHandlerIds = [...els.caseCoHandlerInputs.querySelectorAll('input[name="coHandler"]:checked')]
     .map((input) => input.value)
     .filter((handlerId) => handlerId !== ownerId);
-  const selectedActivities = existingCase ? [] : (caseType.activityTemplateIds || []).map((templateId, sortOrder) => ({ templateId, title: activityTemplateById(templateId).title, sortOrder }));
+  const previousOwner = existingCase ? responsibleHandler(existingCase) : null;
+  if (existingCase && (previousOwner?.id || "") !== (ownerId || "")) {
+    const nextOwner = handlers.find((handler) => handler.id === ownerId);
+    const specialAssignments = activitiesForCase(existingCase.id).filter((activity) => activity.handlerIdOverride).length;
+    const dueSoon = activitiesForCase(existingCase.id).filter((activity) => ["overdue", "soon"].includes(activityDueState(activity))).length;
+    const confirmation = await confirmAction({
+      eyebrow: "Överlämning av ärende",
+      title: "Byt ansvarig handläggare?",
+      body: `${nextOwner?.name || "Ingen handläggare"} blir ansvarig. Aktiviteter med ärvt ansvar följer med. ${specialAssignments} särskilt tilldelade aktiviteter ligger kvar hos nuvarande handläggare och ${dueSoon} aktiviteter är försenade eller förfaller snart.`,
+      mentorName: caseMentor(existingCase)?.name || existingCase.title,
+      confirmLabel: "Bekräfta överlämning"
+    });
+    if (!confirmation.confirmed) return;
+  }
+  const selectedActivities = existingCase ? [] : [
+    ...(caseType.activityTemplateIds || []).map((templateId, sortOrder) => ({ templateId, title: activityTemplateById(templateId).title, sortOrder })),
+    ...(caseType.suggestedActivities || []).map((title, index) => ({ templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, title, sortOrder: (caseType.activityTemplateIds || []).length + index }))
+  ];
   await executeCaseCommand({
     commandType: existingCase ? "update_case" : "quick_register_case",
     caseId: id,
@@ -4504,6 +4791,9 @@ els.caseCreateForm.addEventListener("submit", async (event) => {
           assignedAt: now, assignedBy: CURRENT_USER_ID, endedAt: null, endedBy: null
         });
       }
+      if (currentCase && (previousOwner?.id || "") !== (ownerId || "")) {
+        recordEvent("assignment_changed", "assignment", id, `Ansvarig handläggare ändrades från ${previousOwner?.name || "ej tilldelad"} till ${handlerNameById(ownerId)}`);
+      }
       for (const template of selectedActivities) {
         const activity = {
           id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: id, templateId: template.templateId, templateVersion: 1,
@@ -4520,6 +4810,7 @@ els.caseCreateForm.addEventListener("submit", async (event) => {
     }
   });
   caseEditMode = false;
+  newCaseTypePreset = "";
   els.caseCreateForm.dataset.route = "";
   markSaved();
   showFeedback(existingCase ? "Ärendet har uppdaterats." : "Ärendet har skapats.");
@@ -4604,6 +4895,11 @@ els.activityDetailStatusInput.addEventListener("change", () => {
   const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
   if (activity) {
     renderActivityResultInput(activity);
+    const waiting = els.activityDetailStatusInput.value === "waiting";
+    els.activityWaitingForRow.hidden = !waiting;
+    els.activityDetailWaitingForInput.disabled = !waiting;
+    els.activityDetailWaitingForInput.required = waiting;
+    if (!waiting) els.activityDetailWaitingForInput.value = "";
     updateActivityDetailDirtyState();
   }
 });
@@ -4630,7 +4926,14 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   const nextHandlerId = els.activityDetailOwnerInput.value;
   const currentHandlerOverrideId = activityOwnerOverrideId(activity, caseRecord);
   const nextDueDate = els.activityDetailDueDateInput.value;
+  const nextWaitingForParty = nextStatus === "waiting" ? els.activityDetailWaitingForInput.value : null;
   const nextNote = els.activityDetailNoteInput.value.trim();
+  if (nextStatus === "waiting" && !nextWaitingForParty) {
+    els.activityDetailWaitingForInput.setCustomValidity("Ange vem eller vad aktiviteten väntar på.");
+    els.activityDetailWaitingForInput.reportValidity();
+    return;
+  }
+  els.activityDetailWaitingForInput.setCustomValidity("");
   if (nextStatus === "completed" && !nextResult) {
     els.activityDetailResultInput.setCustomValidity("Välj resultat innan aktiviteten avslutas.");
     els.activityDetailResultInput.reportValidity();
@@ -4662,7 +4965,7 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
 
   const candidateSynced = await syncCandidateFromActivity(activity, nextStatus, nextNote, new Date().toISOString(), nextResult);
   if (!candidateSynced) return;
-  await saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nextHandlerId, nextDueDate, note: nextNote });
+  await saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nextHandlerId, nextDueDate, nextWaitingForParty, note: nextNote });
   markSaved();
   showFeedback("Aktiviteten har sparats.");
   await refresh();
@@ -4879,6 +5182,11 @@ els.cancelNewCaseButton.addEventListener("click", () => {
 
 els.candidateForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const duplicateCheck = renderCandidateDuplicateCheck();
+  if (duplicateCheck.blocked) {
+    showFeedback("Kontrollera den möjliga dubbletten innan mentorn sparas.");
+    return;
+  }
   const candidate = newCandidate(new FormData(els.candidateForm));
   await saveCandidate(candidate);
   selectedId = candidate.id;
@@ -4888,6 +5196,26 @@ els.candidateForm.addEventListener("submit", async (event) => {
   showFeedback("Mentorn har registrerats.");
   await refresh();
   navigateToCandidate(candidate.id);
+});
+
+for (const input of [els.candidateNameInput, els.candidatePersonalNumberInput]) {
+  input.addEventListener("input", () => {
+    els.candidateDuplicatePanel.dataset.choice = "";
+    renderCandidateDuplicateCheck();
+  });
+}
+
+els.candidateDuplicatePanel.addEventListener("click", (event) => {
+  const openButton = event.target.closest("[data-open-duplicate-mentor]");
+  if (openButton) {
+    candidateModal.hide();
+    navigateToCandidate(openButton.dataset.openDuplicateMentor);
+    return;
+  }
+  if (event.target.closest("[data-create-duplicate-mentor]")) {
+    els.candidateDuplicatePanel.dataset.choice = "create-anyway";
+    renderCandidateDuplicateCheck();
+  }
 });
 
 els.searchInput.addEventListener("input", () => {
@@ -5044,6 +5372,10 @@ els.cancelPersonEditButton.addEventListener("click", () => {
 els.personEditForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (isCreatingMentor()) {
+    if (renderMentorEditorDuplicateCheck().blocked) {
+      showFeedback("Kontrollera den möjliga dubbletten innan mentorn sparas.");
+      return;
+    }
     const candidate = newCandidateFromEditor();
     await saveCandidate(candidate);
     selectedId = candidate.id;
@@ -5068,6 +5400,16 @@ els.personEditForm.addEventListener("submit", async (event) => {
   await refresh();
   setPersonEditMode(false);
   showFeedback("Grunduppgifterna har sparats.");
+});
+els.editNameInput.addEventListener("input", () => {
+  if (!isCreatingMentor()) return;
+  els.mentorEditorDuplicatePanel.dataset.choice = "";
+  renderMentorEditorDuplicateCheck();
+});
+els.mentorEditorDuplicatePanel.addEventListener("click", (event) => {
+  if (!event.target.closest("[data-create-editor-duplicate]")) return;
+  els.mentorEditorDuplicatePanel.dataset.choice = "create-anyway";
+  renderMentorEditorDuplicateCheck();
 });
 els.interviewDateInput.addEventListener("change", () => { els.saveStatus.textContent = "Intervjuuppgifter ej registrerade"; });
 els.interviewModeInput.addEventListener("change", () => { els.saveStatus.textContent = "Intervjuuppgifter ej registrerade"; });
@@ -5125,6 +5467,13 @@ els.saveIdentityVerificationButton.addEventListener("click", async () => {
   const personalNumberValid = els.identityPersonalNumberInput.reportValidity();
   const methodValid = els.identityMethodSelect.reportValidity();
   if (!personalNumberValid || !methodValid) return;
+  const duplicateIdentity = findMentorDuplicates(candidates.filter((item) => item.id !== candidate.id), {
+    personalNumber: els.identityPersonalNumberInput.value
+  }).exactPersonalNumber;
+  if (duplicateIdentity) {
+    showFeedback(`Personnumret är redan registrerat på ${duplicateIdentity.name}. Identiteten har inte sparats.`);
+    return;
+  }
 
   const method = els.identityMethodSelect.value;
   const alreadyVerified = Boolean(candidate.checks?.identityVerified);
@@ -5210,7 +5559,12 @@ els.interviewDoneInput.addEventListener("change", async () => {
 
 els.approveButton.addEventListener("click", async () => {
   const candidate = selectedCandidate();
-  if (!candidate || !isComplete(candidate)) return;
+  if (!candidate) return;
+  const approval = certificationApprovalAssessment(candidate);
+  if (!approval.allowed) {
+    showFeedback(approval.reasons[0] || "Ärendet är inte redo för certifiering.");
+    return;
+  }
   const caseRecord = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
   const activity = activitiesForCase(caseRecord?.id).find((item) => item.templateId === "decision");
   if (!caseRecord || !activity) return;

@@ -5,6 +5,8 @@ Produkt: FöräldraMentorer – Kommunportal
 Målmiljö: Webbaserad SaaS  
 Prototyplagring: IndexedDB
 
+Verksamhetsmässig tillämpning: [Verksamhetsflöden och handläggningsrutiner](verksamhetsfloden-och-handlaggningsrutiner.md)
+
 ## 1. Syfte
 
 Systemet ska göra det möjligt att registrera ett ärende med mycket få uppgifter och därefter komplettera samma ärende med aktiviteter, handlingar, ansvar, tidsfrister, avvikelser och beslut.

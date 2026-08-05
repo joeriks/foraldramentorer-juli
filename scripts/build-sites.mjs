@@ -10,8 +10,10 @@ const sourceFiles = [
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
   ["/case-domain.js", "case-domain.js", "text/javascript; charset=utf-8"],
   ["/styles.css", "styles.css", "text/css; charset=utf-8"],
+  ["/docs/verksamhetsfloden-och-handlaggningsrutiner.md", "docs/verksamhetsfloden-och-handlaggningsrutiner.md", "text/markdown; charset=utf-8"],
   ["/vendor/bootstrap/bootstrap.min.css", "vendor/bootstrap/bootstrap.min.css", "text/css; charset=utf-8"],
-  ["/vendor/bootstrap/bootstrap.bundle.min.js", "vendor/bootstrap/bootstrap.bundle.min.js", "text/javascript; charset=utf-8"]
+  ["/vendor/bootstrap/bootstrap.bundle.min.js", "vendor/bootstrap/bootstrap.bundle.min.js", "text/javascript; charset=utf-8"],
+  ["/vendor/marked/marked.esm.js", "vendor/marked/marked.esm.js", "text/javascript; charset=utf-8"]
 ];
 
 const assets = {};
