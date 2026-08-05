@@ -810,6 +810,7 @@ body {
 .check-row-body {
   display: grid;
   gap: 0.15rem;
+  flex: 1 1 auto;
   min-width: 0;
 }
 

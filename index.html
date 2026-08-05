@@ -238,7 +238,7 @@
                     <h2 id="caseRegisterTitle" class="h5 mb-1">Ärenderegister</h2>
                     <p id="caseListCount" class="text-secondary mb-0">0 ärenden i registret.</p>
                   </div>
-                  <button id="newGeneralCaseButton" type="button" class="btn btn-primary btn-sm">Nytt ärende</button>
+                  <button id="newGeneralCaseButton" type="button" class="btn btn-primary btn-sm">Ny registrering</button>
                 </div>
               </div>
               <div class="card-body border-bottom">
@@ -581,13 +581,19 @@
                     <div id="caseDocumentsList" class="document-list"></div>
                   </section>
                   <section class="tab-pane fade card-body" id="case-meetings-pane">
-                    <form id="caseMeetingForm" class="inline-editor border rounded mb-3">
+                    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+                      <div><h3 class="h6 mb-1">Möten i ärendet</h3><p class="small text-secondary mb-0">Möten registreras här och visas även i mentorns samlade historik.</p></div>
+                      <button id="newCaseMeetingButton" type="button" class="btn btn-primary btn-sm">Registrera möte</button>
+                    </div>
+                    <form id="caseMeetingForm" class="inline-editor border rounded mb-3" hidden>
+                      <div class="d-flex justify-content-between align-items-center mb-3"><h4 id="caseMeetingFormTitle" class="h6 mb-0">Nytt möte</h4><button id="cancelCaseMeetingButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button></div>
                       <div class="row g-3">
                         <div class="col-md-3"><label class="form-label" for="caseMeetingTypeInput">Mötestyp</label><select id="caseMeetingTypeInput" class="form-select form-select-sm"><option value="certification_interview">Certifieringsintervju</option><option value="follow_up">Uppföljning</option><option value="other">Annat möte</option></select></div>
                         <div class="col-md-3"><label class="form-label" for="caseMeetingDateInput">Tidpunkt</label><input id="caseMeetingDateInput" class="form-control form-control-sm" type="datetime-local" required></div>
                         <div class="col-md-3"><label class="form-label" for="caseMeetingModeInput">Mötesform</label><select id="caseMeetingModeInput" class="form-select form-select-sm"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option></select></div>
                         <div class="col-md-3"><label class="form-label" for="caseMeetingActivityInput">Kopplad aktivitet</label><select id="caseMeetingActivityInput" class="form-select form-select-sm"><option value="">Ingen</option></select></div>
                         <div class="col-12"><label class="form-label" for="caseMeetingSummaryInput">Sammanfattning</label><textarea id="caseMeetingSummaryInput" class="form-control form-control-sm" rows="3" required></textarea></div>
+                        <div class="col-12"><label class="form-label" for="caseMeetingNextStepInput">Nästa steg <span class="text-secondary fw-normal">(valfritt)</span></label><input id="caseMeetingNextStepInput" class="form-control form-control-sm" autocomplete="off"></div>
                       </div>
                       <div class="d-flex justify-content-end mt-3"><button type="submit" class="btn btn-primary btn-sm">Registrera möte</button></div>
                     </form>
@@ -898,6 +904,9 @@
                       <dl class="record-fields mb-0">
                         <div><dt>Namn</dt><dd id="nameFact"></dd></div>
                         <div><dt>Personnummer</dt><dd id="personalNumberFact"></dd></div>
+                        <div><dt>Kontaktuppgift</dt><dd id="contactDetailsFact"></dd></div>
+                        <div><dt>Informationsstatus</dt><dd id="informationStatusFact"></dd></div>
+                        <div><dt>Intresseanteckning</dt><dd id="interestNoteFact"></dd></div>
                         <div><dt>Område</dt><dd id="areaFact"></dd></div>
                         <div><dt>Språk</dt><dd id="languageFact"></dd></div>
                         <div><dt>Tillgänglighet</dt><dd id="availabilityFact"></dd></div>
@@ -919,6 +928,9 @@
                       <dl class="record-fields record-fields-edit mb-0">
                         <div><dt><label for="editNameInput">Namn</label></dt><dd><input id="editNameInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
                         <div><dt><label for="editPersonalNumberInput">Personnummer</label></dt><dd><input id="editPersonalNumberInput" class="form-control form-control-sm" disabled></dd></div>
+                        <div><dt><label for="editContactDetailsInput">Kontaktuppgift</label></dt><dd><input id="editContactDetailsInput" class="form-control form-control-sm" autocomplete="off" placeholder="Telefon eller e-post"></dd></div>
+                        <div><dt><label for="editInformationStatusInput">Informationsstatus</label></dt><dd><select id="editInformationStatusInput" class="form-select form-select-sm"><option value="">Välj status</option><option value="provided">Information lämnad</option><option value="pending">Information ska lämnas</option><option value="not_applicable">Ej aktuell</option></select></dd></div>
+                        <div><dt><label for="editInterestNoteInput">Intresseanteckning</label></dt><dd><textarea id="editInterestNoteInput" class="form-control form-control-sm" rows="2" placeholder="Kort notering om intresset"></textarea></dd></div>
                         <div><dt><label for="editAreaInput">Område <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="editAreaInput" class="form-control form-control-sm" autocomplete="off"></dd></div>
                         <div><dt><label for="editLanguagesInput">Språk <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="editLanguagesInput" class="form-control form-control-sm" autocomplete="off"></dd></div>
                         <div><dt><label for="editAvailabilityInput">Tillgänglighet <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="editAvailabilityInput" class="form-control form-control-sm" autocomplete="off"></dd></div>
@@ -1001,11 +1013,11 @@
                 <section class="tab-pane fade card-body" id="mentor-interview-pane" role="tabpanel" aria-labelledby="mentor-interview-tab" tabindex="0">
                   <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
                     <div>
-                      <h3 class="h6 mb-1">Certifieringsintervju</h3>
-                      <p class="small text-secondary mb-3">Den här delen styr kravet i certifieringsflödet. Protokoll och andra anteckningar registreras i mötesjournalen nedan.</p>
+                        <h3 class="h6 mb-1">Mentorns möten</h3>
+                        <p class="small text-secondary mb-3">Samlad historik från mentorns ärenden. Registrering och rättelser görs i det ärende som mötet tillhör.</p>
                     </div>
                   </div>
-                  <div class="row g-3 mb-3">
+                  <div class="row g-3 mb-3" hidden>
                     <div class="col-md-6">
                       <label class="form-label" for="interviewDateInput">Intervjutid</label>
                       <input id="interviewDateInput" class="form-control form-control-sm" type="datetime-local">
@@ -1020,7 +1032,7 @@
                       </select>
                     </div>
                   </div>
-                  <div id="interviewCompletion" class="interview-completion form-check border rounded mt-3">
+                  <div id="interviewCompletion" class="interview-completion form-check border rounded mt-3" hidden>
                     <input id="interviewDoneInput" class="form-check-input" type="checkbox">
                     <label class="form-check-label" for="interviewDoneInput">
                       <span>Intervju genomförd</span>
@@ -1034,7 +1046,7 @@
                         <h3 class="h6 mb-1">Mötesanteckningar</h3>
                         <p class="small text-secondary mb-0">Intervjuer, uppföljningar och andra möten med mentorn.</p>
                       </div>
-                      <button id="newMeetingButton" type="button" class="btn btn-primary btn-sm">Registrera möte</button>
+                      <button id="newMeetingButton" type="button" class="btn btn-primary btn-sm">Öppna ärendets möten</button>
                     </div>
 
                     <form id="meetingForm" class="meeting-form border rounded mb-3" hidden>
@@ -1225,7 +1237,7 @@
           <div class="modal-body">
             <p id="caseLifecycleDescription" class="text-secondary"></p>
             <div class="mb-3"><label class="form-label" for="caseLifecycleReasonInput">Orsak</label><select id="caseLifecycleReasonInput" class="form-select" required><option value="">Välj orsak</option><option value="awaiting_information">Inväntar information</option><option value="work_paused">Handläggningen pausad</option><option value="completed">Handläggningen slutförd</option><option value="unsuitable">Mentorn bedöms inte lämplig</option><option value="correction">Rättelse eller ny information</option><option value="other">Annan orsak</option></select></div>
-            <div id="caseLifecycleResumeRow" class="mb-3" hidden><label class="form-label" for="caseLifecycleResumeInput">Bevakningsdatum <span class="text-secondary fw-normal">(valfritt)</span></label><input id="caseLifecycleResumeInput" class="form-control" type="date"></div>
+            <div id="caseLifecycleResumeRow" class="mb-3" hidden><label class="form-label" for="caseLifecycleResumeInput">Bevakningsdatum</label><input id="caseLifecycleResumeInput" class="form-control" type="date"></div>
             <div><label class="form-label" for="caseLifecycleNoteInput">Motivering</label><textarea id="caseLifecycleNoteInput" class="form-control" rows="4" required></textarea></div>
           </div>
           <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Avbryt</button><button id="caseLifecycleSubmitButton" type="submit" class="btn btn-primary">Bekräfta</button></div>

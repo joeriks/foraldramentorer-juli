@@ -316,7 +316,7 @@ Ett annat resultat än `Visat och kontrollerat` öppnar ett ställningstagande. 
 - Referens kunde inte nås.
 - Uppgifter behöver bedömas.
 
-Om en referens inte går att nå kan handläggaren lägga till aktiviteten `Kontakta mentorn om ny referens`, tilldela den och ange förfallodatum. Ursprunglig aktivitet kan stå i `Väntar` med `Inväntar mentor`.
+Om ett kontaktförsök inte lyckas står referensaktiviteten i `Väntar` med väntande part, bevakningsdatum och en kort notering. Ett vänteläge har inget slutresultat. När beslutade kontaktförsök är uttömda avslutas aktiviteten med exempelvis `Referens kunde inte nås`, vilket öppnar ett ställningstagande. En separat aktivitet, exempelvis `Kontakta mentorn om ny referens`, skapas bara om detta är ett eget arbetsmoment med eget ansvar eller datum.
 
 ### 8.4 Följ upp e-learning
 
@@ -556,7 +556,7 @@ En ny mentor registreras, tilldelas en handläggare, genomför alla kontroller m
 
 ### Scenario 2: referens går inte att nå
 
-Referensaktiviteten sätts i vänteläge. Handläggaren skapar `Kontakta mentorn om ny referens`, anger ansvarig och förfallodatum och ser posten i sin arbetskö. När ny referens erhållits återupptas kontrollen utan att historiken skrivs över.
+Referensaktiviteten sätts först i vänteläge med väntande part och bevakningsdatum medan kontaktförsök pågår. Om försöken uttöms avslutas den med `Referens kunde inte nås`. Handläggaren väljer därefter `Begär komplettering`; systemet föreslår aktiviteten `Kontakta mentorn om ny referens`, ansvarig och förfallodatum. När ny referens erhållits fortsätter handläggningen utan att historiken skrivs över.
 
 ### Scenario 3: registerutdrag kan inte verifieras
 
@@ -568,7 +568,7 @@ Behörig beslutsfattare öppnar ställningstagandet, väljer att avsluta, anger 
 
 ### Scenario 5: enkel kontakt blir ett ärende
 
-En handläggare snabbregistrerar ett telefonsamtal. Systemet visar ett kompatibelt öppet uppföljningsärende. Handläggaren kopplar anteckningen dit och lägger till en aktivitet med förfallodatum. Ingen dubblett skapas.
+En handläggare väljer `Ny registrering` och registrerar ett telefonsamtal. Systemet visar ett kompatibelt öppet uppföljningsärende. Handläggaren kopplar anteckningen dit och lägger till en aktivitet med förfallodatum när fortsatt arbete behövs. Ingen dubblett skapas.
 
 ### Scenario 6: byte av handläggare
 

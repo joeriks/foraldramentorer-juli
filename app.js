@@ -93,49 +93,49 @@ const NEXT_ACTIONS = [
     label: "Verifiera identitet",
     description: "Kontrollera personens identitet och markera kontrollen som klar.",
     tabId: "mentor-checks-tab",
-    buttonLabel: "Öppna kontroller"
+    buttonLabel: "Öppna aktivitet"
   },
   {
     key: "registryChecked",
     label: "Granska belastningsregister",
     description: "Granska registerutdraget och markera kontrollen som klar.",
     tabId: "mentor-checks-tab",
-    buttonLabel: "Öppna kontroller"
+    buttonLabel: "Öppna aktivitet"
   },
   {
     key: "referencesDone",
     label: "Slutför referenser",
     description: "Dokumentera att referenserna är färdiga.",
     tabId: "mentor-checks-tab",
-    buttonLabel: "Öppna kontroller"
+    buttonLabel: "Öppna aktivitet"
   },
   {
     key: "trainingDone",
     label: "Slutför e-learning",
     description: "Följ upp utbildningen och markera momentet som klart.",
     tabId: "mentor-checks-tab",
-    buttonLabel: "Öppna kontroller"
+    buttonLabel: "Öppna aktivitet"
   },
   {
     key: "quizDone",
     label: "Genomför kunskapsavstämning",
     description: "Genomför avstämningen och markera momentet som klart.",
     tabId: "mentor-checks-tab",
-    buttonLabel: "Öppna kontroller"
+    buttonLabel: "Öppna aktivitet"
   },
   {
     key: "inviteInterview",
     label: "Kalla till intervju",
     description: "Skicka kallelsen och registrera att intervjun är bokad.",
     tabId: "mentor-interview-tab",
-    buttonLabel: "Öppna intervju"
+    buttonLabel: "Öppna aktivitet"
   },
   {
     key: "interviewDone",
     label: "Genomför intervju",
     description: "Boka eller dokumentera intervjun innan ärendet går till beslut.",
     tabId: "mentor-interview-tab",
-    buttonLabel: "Öppna intervju"
+    buttonLabel: "Öppna aktivitet"
   }
 ];
 
@@ -404,6 +404,8 @@ let currentView = "dashboard";
 let renderedDetailId = null;
 let workQueueOnly = false;
 let pendingNextActionId = null;
+let pendingIdentityEditorId = null;
+let pendingCaseMeetingsId = null;
 let handlerSearchTerm = "";
 let handlerStatusFilter = "";
 let handlerModal;
@@ -578,12 +580,16 @@ const els = {
   documentInformationClassInput: document.querySelector("#documentInformationClassInput"),
   caseDocumentsEmpty: document.querySelector("#caseDocumentsEmpty"),
   caseDocumentsList: document.querySelector("#caseDocumentsList"),
+  newCaseMeetingButton: document.querySelector("#newCaseMeetingButton"),
   caseMeetingForm: document.querySelector("#caseMeetingForm"),
+  caseMeetingFormTitle: document.querySelector("#caseMeetingFormTitle"),
+  cancelCaseMeetingButton: document.querySelector("#cancelCaseMeetingButton"),
   caseMeetingTypeInput: document.querySelector("#caseMeetingTypeInput"),
   caseMeetingDateInput: document.querySelector("#caseMeetingDateInput"),
   caseMeetingModeInput: document.querySelector("#caseMeetingModeInput"),
   caseMeetingActivityInput: document.querySelector("#caseMeetingActivityInput"),
   caseMeetingSummaryInput: document.querySelector("#caseMeetingSummaryInput"),
+  caseMeetingNextStepInput: document.querySelector("#caseMeetingNextStepInput"),
   caseMeetingsEmpty: document.querySelector("#caseMeetingsEmpty"),
   caseMeetingsList: document.querySelector("#caseMeetingsList"),
   caseEventTableBody: document.querySelector("#caseEventTableBody"),
@@ -658,6 +664,9 @@ const els = {
   editNameInput: document.querySelector("#editNameInput"),
   mentorEditorDuplicatePanel: document.querySelector("#mentorEditorDuplicatePanel"),
   editPersonalNumberInput: document.querySelector("#editPersonalNumberInput"),
+  editContactDetailsInput: document.querySelector("#editContactDetailsInput"),
+  editInformationStatusInput: document.querySelector("#editInformationStatusInput"),
+  editInterestNoteInput: document.querySelector("#editInterestNoteInput"),
   editAreaInput: document.querySelector("#editAreaInput"),
   editLanguagesInput: document.querySelector("#editLanguagesInput"),
   editAvailabilityInput: document.querySelector("#editAvailabilityInput"),
@@ -666,6 +675,9 @@ const els = {
   coordinatorFieldRow: document.querySelector("#coordinatorFieldRow"),
   nameFact: document.querySelector("#nameFact"),
   personalNumberFact: document.querySelector("#personalNumberFact"),
+  contactDetailsFact: document.querySelector("#contactDetailsFact"),
+  informationStatusFact: document.querySelector("#informationStatusFact"),
+  interestNoteFact: document.querySelector("#interestNoteFact"),
   languageFact: document.querySelector("#languageFact"),
   availabilityFact: document.querySelector("#availabilityFact"),
   areaFact: document.querySelector("#areaFact"),
@@ -1845,7 +1857,13 @@ function normalizeCandidate(candidate, index = 0) {
   const personalNumber = candidate.personalNumber || (candidate.exampleData ? makeExamplePersonalNumber(index) : "");
   const identityMethod = candidate.identityMethod
     || (candidate.exampleData && candidate.checks?.identityVerified ? (index % 2 === 0 ? "bankid" : "physical_id") : "");
-  const identityVerified = Boolean(candidate.checks?.identityVerified && personalNumber && identityMethod);
+  // Identity data is saved before the case projection is rebuilt. Preserve its
+  // audit metadata during that refresh instead of trusting only the stale flag.
+  const identityVerified = Boolean(
+    personalNumber
+    && identityMethod
+    && (candidate.checks?.identityVerified || candidate.identityVerifiedAt)
+  );
   const normalized = {
     ...candidate,
     tenantId: candidate.tenantId || DEFAULT_TENANT_ID,
@@ -2279,8 +2297,8 @@ function applyRoute() {
     els.breadcrumb.textContent = `Start / ${sectionTitle}`;
   } else if (currentView === "case") {
     const isNewCase = route.id?.startsWith("new");
-    els.pageTitle.textContent = isNewCase ? "Nytt ärende" : "Ärendekort";
-    els.breadcrumb.textContent = isNewCase ? "Start / Ärenden / Nytt ärende" : "Start / Ärenden / Ärendekort";
+    els.pageTitle.textContent = isNewCase ? "Ny registrering" : "Ärendekort";
+    els.breadcrumb.textContent = isNewCase ? "Start / Ärenden / Ny registrering" : "Start / Ärenden / Ärendekort";
   } else if (currentView === "mentors") {
     els.pageTitle.textContent = workQueueOnly ? "Arbetskö" : "Mentorregister";
     els.breadcrumb.textContent = workQueueOnly ? "Start / Onboarding / Arbetskö" : "Start / Onboarding / Mentorregister";
@@ -2685,7 +2703,7 @@ function renderCases() {
   const start = (casePage - 1) * CASE_PAGE_SIZE;
   const rows = filteredRows.slice(start, start + CASE_PAGE_SIZE);
   els.caseRegisterTitle.textContent = caseTypeFilter === "matching" ? "Matchningsärenden" : caseTypeFilter === "mentor-assignment" ? "Mentoruppdrag" : "Ärenderegister";
-  els.newGeneralCaseButton.textContent = caseTypeFilter === "matching" ? "Ny matchning" : caseTypeFilter === "mentor-assignment" ? "Nytt uppdrag" : "Nytt ärende";
+  els.newGeneralCaseButton.textContent = caseTypeFilter === "matching" ? "Ny matchning" : caseTypeFilter === "mentor-assignment" ? "Nytt uppdrag" : "Ny registrering";
   els.caseListCount.textContent = filteredRows.length === typeRows.length
     ? `${typeRows.length} ${typeRows.length === 1 ? "ärende" : "ärenden"} i registret.`
     : `Visar ${filteredRows.length} av ${typeRows.length} ärenden.`;
@@ -2765,13 +2783,13 @@ function renderCaseDetail() {
   for (const element of document.querySelectorAll(".case-advanced-field")) element.hidden = creating && !caseEditMode;
   els.newCaseActivityButton.hidden = creating || caseEditMode || Boolean(selectedCaseActivityId);
   els.editCaseButton.hidden = creating || caseEditMode;
-  els.saveCaseButton.textContent = creating ? "Skapa ärende" : "Spara ändringar";
+  els.saveCaseButton.textContent = creating ? "Spara registrering" : "Spara ändringar";
 
   if (creating) {
     const mentorId = selectedCaseRecordId.startsWith("new-") ? selectedCaseRecordId.slice(4) : "";
-    els.selectedCaseType.textContent = "Nytt ärende";
+    els.selectedCaseType.textContent = "Ny registrering";
     els.selectedCaseNumber.textContent = "Ärendenummer skapas när ärendet sparas";
-    els.selectedCaseTitle.textContent = mentorId ? `Nytt ärende för ${candidates.find((candidate) => candidate.id === mentorId)?.name || "mentor"}` : "Nytt generellt ärende";
+    els.selectedCaseTitle.textContent = mentorId ? `Ny registrering för ${candidates.find((candidate) => candidate.id === mentorId)?.name || "mentor"}` : "Ny registrering";
     els.selectedCaseStatus.textContent = "Nytt";
     els.selectedCaseStatus.className = caseStatusBadge("new");
     els.selectedCaseMentor.textContent = mentorId ? candidates.find((candidate) => candidate.id === mentorId)?.name || "Saknas" : "Ej personanknutet";
@@ -2826,6 +2844,10 @@ function renderCaseDetail() {
   renderActivityDetail(caseRecord);
   if (selectedCaseActivityId) {
     requestAnimationFrame(() => bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-activities-tab")).show());
+  }
+  if (pendingCaseMeetingsId === caseRecord.id) {
+    pendingCaseMeetingsId = null;
+    requestAnimationFrame(() => bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-meetings-tab")).show());
   }
 
   if (caseEditMode && els.caseCreateForm.dataset.route !== `edit-${caseRecord.id}-${caseRecord.updatedAt}`) {
@@ -3111,11 +3133,37 @@ function renderCaseMeetings(caseRecord, meetingRows) {
     article.className = "document-row border rounded";
     article.innerHTML = `
       <div><strong>${escapeHtml(({ certification_interview: "Certifieringsintervju", follow_up: "Uppföljning", other: "Annat möte" })[meeting.meetingType])}</strong><small>${escapeHtml(formatDateTime(meeting.occurredAt))} · ${escapeHtml(({ physical: "Fysiskt", digital: "Digitalt", phone: "Telefon" })[meeting.mode] || "Ej angivet")}</small>${activity ? `<button type="button" class="document-activity-link" data-open-activity="${escapeHtml(activity.id)}">Kopplad till: ${escapeHtml(activity.title)}</button>` : ""}</div>
-      <div class="text-secondary small">${escapeHtml(meeting.summary)}</div>
+      <div class="text-secondary small">${escapeHtml(meeting.summary)}${meeting.nextStep ? `<span class="d-block mt-1">Nästa steg: ${escapeHtml(meeting.nextStep)}</span>` : ""}</div>
       <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center"><span class="text-secondary small">Registrerat av ${escapeHtml(handlerNameById(meeting.createdBy))}${meeting.supersedesMeetingId ? " · Rättad version" : ""}</span><button type="button" class="btn btn-outline-secondary btn-sm" data-edit-case-meeting="${escapeHtml(meeting.id)}">Öppna</button></div>
     `;
     els.caseMeetingsList.append(article);
   }
+}
+
+function closeCaseMeetingForm() {
+  els.caseMeetingForm.reset();
+  els.caseMeetingForm.dataset.meetingId = "";
+  els.caseMeetingForm.hidden = true;
+  els.newCaseMeetingButton.hidden = false;
+}
+
+function openCaseMeetingForm(meeting = null) {
+  els.caseMeetingForm.reset();
+  els.caseMeetingForm.dataset.meetingId = meeting?.id || "";
+  els.caseMeetingFormTitle.textContent = meeting ? "Registrera rättelse" : "Nytt möte";
+  if (meeting) {
+    els.caseMeetingTypeInput.value = meeting.meetingType;
+    els.caseMeetingDateInput.value = localDateTimeValue(meeting.occurredAt);
+    els.caseMeetingModeInput.value = meeting.mode;
+    els.caseMeetingActivityInput.value = meeting.activityId || "";
+    els.caseMeetingSummaryInput.value = meeting.summary;
+    els.caseMeetingNextStepInput.value = meeting.nextStep || "";
+  } else {
+    els.caseMeetingDateInput.value = localDateTimeValue();
+  }
+  els.caseMeetingForm.hidden = false;
+  els.newCaseMeetingButton.hidden = true;
+  els.caseMeetingSummaryInput.focus({ preventScroll: true });
 }
 
 function renderCaseEvents(events) {
@@ -3143,7 +3191,7 @@ function renderMentorCases(candidate) {
     row.innerHTML = `
       <td><a href="#/case/${escapeHtml(caseRecord.id)}"><strong>${escapeHtml(caseRecord.number)}</strong></a></td>
       <td>${escapeHtml(caseRecord.type)}</td>
-      <td><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseRecord.status)}</span></td>
+      <td><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></td>
       <td>${escapeHtml(owner?.name || "Ej tilldelad")}</td>
       <td>${escapeHtml(nextActivity?.title || "Ingen återstående")}</td>
     `;
@@ -3336,6 +3384,9 @@ function renderDetail() {
   els.selectedStatus.className = statusClass(candidate);
   els.nameFact.textContent = candidate.name;
   els.personalNumberFact.textContent = candidate.personalNumber || "Saknas";
+  els.contactDetailsFact.textContent = candidate.contactDetails || "Ej angivet";
+  els.informationStatusFact.textContent = informationStatusLabel(candidate.informationStatus);
+  els.interestNoteFact.textContent = candidate.interestNote || "Ej angivet";
   els.languageFact.textContent = candidate.languages || "Ej angivet";
   els.availabilityFact.textContent = candidate.availability || "Ej angivet";
   els.areaFact.textContent = candidate.area || "Ej angivet";
@@ -3412,16 +3463,18 @@ function renderDetail() {
     const noteText = checked && meta.note
       ? `<span class="check-row-note">Notering: ${escapeHtml(meta.note)}</span>`
       : "";
+    const certificationCase = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
+    const activity = activitiesForCase(certificationCase?.id).find((item) => item.templateId === key);
     column.innerHTML = `
-      <label class="check-row form-check border rounded h-100 ${isNextAction ? "next-required" : ""}">
-        <input class="form-check-input" type="checkbox" data-check="${key}" ${checked ? "checked" : ""}>
+      <section class="check-row border rounded h-100 ${isNextAction ? "next-required" : ""}">
         <span class="check-row-body">
           <span class="form-check-label">${label}</span>
           <span class="check-row-meta">${escapeHtml(metaText)}</span>
           ${noteText}
         </span>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-open-check-activity="${escapeHtml(activity?.id || "")}" ${activity ? "" : "disabled"}>Öppna aktivitet</button>
         ${isNextAction ? '<span class="next-required-marker">Nästa åtgärd</span>' : ""}
-      </label>
+      </section>
     `;
     els.checklist.append(column);
   }
@@ -3447,6 +3500,14 @@ function renderDetail() {
   if (pendingNextActionId === candidate.id) {
     pendingNextActionId = null;
     requestAnimationFrame(() => showNextAction(candidate));
+  }
+  if (pendingIdentityEditorId === candidate.id) {
+    pendingIdentityEditorId = null;
+    requestAnimationFrame(() => {
+      bootstrap.Tab.getOrCreateInstance(document.querySelector("#mentor-checks-tab")).show();
+      setIdentityEditMode(true);
+      els.identityPersonalNumberInput.focus({ preventScroll: true });
+    });
   }
 }
 
@@ -3480,6 +3541,12 @@ function renderNewCandidateDetail() {
   els.savePersonEditButton.textContent = "Spara mentor";
   els.editNameInput.value = "";
   els.editPersonalNumberInput.value = "";
+  els.editContactDetailsInput.value = "";
+  els.editInformationStatusInput.value = "";
+  els.editInterestNoteInput.value = "";
+  els.editContactDetailsInput.required = true;
+  els.editInformationStatusInput.required = true;
+  els.editInterestNoteInput.required = true;
   els.editAreaInput.value = "";
   els.editLanguagesInput.value = "";
   els.editAvailabilityInput.value = "";
@@ -3566,6 +3633,12 @@ function setPersonEditMode(editing) {
   if (editing && candidate) {
     els.editNameInput.value = candidate.name || "";
     els.editPersonalNumberInput.value = candidate.personalNumber || "";
+    els.editContactDetailsInput.value = candidate.contactDetails || "";
+    els.editInformationStatusInput.value = candidate.informationStatus || "";
+    els.editInterestNoteInput.value = candidate.interestNote || "";
+    els.editContactDetailsInput.required = false;
+    els.editInformationStatusInput.required = false;
+    els.editInterestNoteInput.required = false;
     els.editAreaInput.value = candidate.area || "";
     els.editLanguagesInput.value = candidate.languages || "";
     els.editAvailabilityInput.value = candidate.availability || "";
@@ -3593,6 +3666,14 @@ function showDefaultMentorTab() {
 function showNextAction(candidate) {
   const action = nextActionFor(candidate);
   if (!action.tabId) return;
+  if (action.key !== "coordinatorAssigned") {
+    const certificationCase = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
+    const activity = activitiesForCase(certificationCase?.id).find((item) => item.templateId === action.key);
+    if (activity) {
+      openCaseActivity(activity.id);
+      return;
+    }
+  }
   const tabElement = document.querySelector(`#${action.tabId}`);
   if (!tabElement || !window.bootstrap) return;
   bootstrap.Tab.getOrCreateInstance(tabElement).show();
@@ -3959,13 +4040,21 @@ function decideDeviationCommand({ deviation, caseRecord, outcome, reasonCode, no
           put(CASE_ASSIGNMENTS_STORE, assignment);
           event("assignment_changed", "assignment", assignment.id, `${currentUserName()} blev ansvarig handläggare`);
         }
+        const sourceActivity = caseActivities.find((item) => item.id === deviation.activityId);
+        const followUpTitle = ({
+          referencesDone: "Kontakta mentorn om ny referens",
+          registryChecked: "Begär nytt registerutdrag",
+          trainingDone: "Följ upp återstående e-learning",
+          quizDone: "Planera kompletterande kunskapsavstämning",
+          interviewDone: "Planera kompletterande intervju"
+        })[sourceActivity?.templateId] || "Begär komplettering från mentorn";
         const activity = {
           id: crypto.randomUUID(),
           tenantId: DEFAULT_TENANT_ID,
           caseId: currentCase.id,
           templateId: AD_HOC_ACTIVITY_TEMPLATE_ID,
           templateVersion: 1,
-          title: "Begär komplettering från mentorn",
+          title: followUpTitle,
           status: "waiting",
           resultCode: null,
           resultClassification: null,
@@ -3982,7 +4071,7 @@ function decideDeviationCommand({ deviation, caseRecord, outcome, reasonCode, no
           completedBy: null
         };
         put(CASE_ACTIVITIES_STORE, activity);
-        event("activity_updated", "activity", activity.id, "Uppföljningsaktivitet skapades: begär komplettering från mentorn");
+        event("activity_updated", "activity", activity.id, `Uppföljningsaktivitet skapades: ${followUpTitle}`);
         nextStatus = "waiting";
       } else if (outcome === "pause_case") {
         nextStatus = "paused";
@@ -4249,18 +4338,51 @@ function openCaseLifecycle(action) {
   if (!caseRecord) return;
   pendingCaseLifecycleAction = action;
   const content = {
-    pause: ["Pausa ärendet", "Öppna aktiviteter ligger kvar. Ange varför handläggningen pausas och vid behov ett bevakningsdatum.", "Pausa ärendet"],
+    pause: ["Pausa ärendet", "Öppna aktiviteter ligger kvar men ska inte handläggas under pausen. Ange orsak och bevakningsdatum.", "Pausa ärendet"],
     resume: ["Återuppta ärendet", "Ärendet blir aktivt igen. Tidigare paus och motivering ligger kvar i loggen.", "Återuppta ärendet"],
     close: ["Avsluta ärendet", "Öppna aktiviteter markeras som ej aktuella. Ärendet och all historik bevaras.", "Avsluta ärendet"],
     reopen: ["Återöppna ärendet", "Ärendet blir aktivt igen. Åtgärden kräver samordnarbehörighet och registreras i loggen.", "Återöppna ärendet"]
   }[action];
   els.caseLifecycleForm.reset();
+  const reasonOptions = {
+    pause: [
+      ["awaiting_information", "Inväntar information under längre tid"],
+      ["mentor_requested_pause", "Mentorn har begärt uppehåll"],
+      ["external_dependency", "Inväntar extern hantering"],
+      ["other", "Annan tillfällig orsak"]
+    ],
+    close: [
+      ["completed", "Handläggningen slutförd"],
+      ["unsuitable", "Mentorn bedöms inte lämplig"],
+      ["withdrawn", "Ansökan återkallad"],
+      ["duplicate", "Felregistrering eller dubblett"],
+      ["other", "Annan avslutsorsak"]
+    ],
+    resume: [
+      ["conditions_met", "Förutsättningarna är uppfyllda"],
+      ["new_information", "Ny information har kommit in"],
+      ["other", "Annan orsak"]
+    ],
+    reopen: [
+      ["correction", "Rättelse"],
+      ["new_information", "Ny information har kommit in"],
+      ["other", "Annan orsak"]
+    ]
+  }[action];
+  els.caseLifecycleReasonInput.innerHTML = '<option value="">Välj orsak</option>';
+  for (const [value, label] of reasonOptions) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    els.caseLifecycleReasonInput.append(option);
+  }
   els.caseLifecycleTitle.textContent = content[0];
   els.caseLifecycleDescription.textContent = content[1];
   els.caseLifecycleSubmitButton.textContent = content[2];
   els.caseLifecycleSubmitButton.classList.toggle("btn-danger", action === "close");
   els.caseLifecycleSubmitButton.classList.toggle("btn-primary", action !== "close");
   els.caseLifecycleResumeRow.hidden = action !== "pause";
+  els.caseLifecycleResumeInput.required = action === "pause";
   caseLifecycleModal.show();
 }
 
@@ -4401,6 +4523,9 @@ function newCandidateFromEditor() {
     caseNumber: makeCaseNumber(id),
     name: els.editNameInput.value.trim(),
     personalNumber: els.editPersonalNumberInput.value.trim(),
+    contactDetails: els.editContactDetailsInput.value.trim(),
+    informationStatus: els.editInformationStatusInput.value,
+    interestNote: els.editInterestNoteInput.value.trim(),
     area: els.editAreaInput.value.trim(),
     languages: els.editLanguagesInput.value.trim(),
     availability: els.editAvailabilityInput.value.trim(),
@@ -4474,6 +4599,14 @@ function identityMethodLabel(method) {
     bankid: "BankID",
     physical_id: "ID-kort kontrollerat på plats"
   }[method] || "Ej angivet";
+}
+
+function informationStatusLabel(status) {
+  return ({
+    provided: "Information lämnad",
+    pending: "Information ska lämnas",
+    not_applicable: "Ej aktuell"
+  })[status] || "Ej angivet";
 }
 
 function statusClass(candidate) {
@@ -5035,7 +5168,7 @@ els.activityDetailForm.addEventListener("change", updateActivityDetailDirtyState
 els.activityDetailGuidanceButton.addEventListener("click", () => {
   const mentorId = els.activityDetailGuidanceButton.dataset.mentorId;
   if (!mentorId) return;
-  pendingNextActionId = mentorId;
+  pendingIdentityEditorId = mentorId;
   navigateToCandidate(mentorId);
 });
 
@@ -5171,6 +5304,16 @@ function openCaseActivity(activityId) {
   renderCaseDetail();
 }
 
+function openCaseMeetings(caseId) {
+  pendingCaseMeetingsId = caseId;
+  if (selectedCaseRecordId === caseId && currentView === "case") {
+    pendingCaseMeetingsId = null;
+    bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-meetings-tab")).show();
+    return;
+  }
+  navigateToCase(caseId);
+}
+
 function openDocumentFormForActivity(activity) {
   selectedCaseActivityId = null;
   els.caseDocumentForm.dataset.activityId = activity.id;
@@ -5239,14 +5382,11 @@ els.caseMeetingsList.addEventListener("click", (event) => {
   if (!meetingButton) return;
   const meeting = caseMeetings.find((item) => item.id === meetingButton.dataset.editCaseMeeting);
   if (!meeting) return;
-  els.caseMeetingForm.dataset.meetingId = meeting.id;
-  els.caseMeetingTypeInput.value = meeting.meetingType;
-  els.caseMeetingDateInput.value = localDateTimeValue(meeting.occurredAt);
-  els.caseMeetingModeInput.value = meeting.mode;
-  els.caseMeetingActivityInput.value = meeting.activityId || "";
-  els.caseMeetingSummaryInput.value = meeting.summary;
-  els.caseMeetingSummaryInput.focus();
+  openCaseMeetingForm(meeting);
 });
+
+els.newCaseMeetingButton.addEventListener("click", () => openCaseMeetingForm());
+els.cancelCaseMeetingButton.addEventListener("click", closeCaseMeetingForm);
 
 els.caseMeetingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -5260,10 +5400,10 @@ els.caseMeetingForm.addEventListener("submit", async (event) => {
     occurredAt: els.caseMeetingDateInput.value,
     mode: els.caseMeetingModeInput.value,
     activityId: els.caseMeetingActivityInput.value || null,
-    summary: els.caseMeetingSummaryInput.value.trim()
+    summary: els.caseMeetingSummaryInput.value.trim(),
+    nextStep: els.caseMeetingNextStepInput.value.trim()
   });
-  els.caseMeetingForm.reset();
-  els.caseMeetingForm.dataset.meetingId = "";
+  closeCaseMeetingForm();
   markSaved();
   showFeedback(existing ? "En rättad version av mötesanteckningen har sparats." : "Mötet har registrerats.");
   await refresh();
@@ -5520,6 +5660,9 @@ els.personEditForm.addEventListener("submit", async (event) => {
   const coordinator = handlers.find((handler) => handler.id === els.coordinatorInput.value);
   const profilePatch = {
     name: els.editNameInput.value.trim(),
+    contactDetails: els.editContactDetailsInput.value.trim(),
+    informationStatus: els.editInformationStatusInput.value,
+    interestNote: els.editInterestNoteInput.value.trim(),
     area: els.editAreaInput.value.trim(),
     languages: els.editLanguagesInput.value.trim(),
     availability: els.editAvailabilityInput.value.trim()
@@ -5544,13 +5687,19 @@ els.mentorEditorDuplicatePanel.addEventListener("click", (event) => {
 els.interviewDateInput.addEventListener("change", () => { els.saveStatus.textContent = "Intervjuuppgifter ej registrerade"; });
 els.interviewModeInput.addEventListener("change", () => { els.saveStatus.textContent = "Intervjuuppgifter ej registrerade"; });
 
-els.newMeetingButton.addEventListener("click", () => openMeetingForm());
+els.newMeetingButton.addEventListener("click", () => {
+  const candidate = selectedCandidate();
+  const caseRecord = cases.find((item) => item.mentorId === candidate?.id && item.caseTypeId === "mentor-certification")
+    || cases.find((item) => item.mentorId === candidate?.id && item.status !== "closed");
+  if (caseRecord) openCaseMeetings(caseRecord.id);
+  else showFeedback("Skapa ett ärende för mentorn innan ett möte registreras.");
+});
 els.cancelMeetingButton.addEventListener("click", closeMeetingForm);
 els.meetingsTableBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-edit-meeting]");
   if (!button) return;
   const meeting = caseMeetings.find((item) => item.id === button.dataset.editMeeting);
-  if (meeting) openMeetingForm(meeting);
+  if (meeting) openCaseMeetings(meeting.caseId);
 });
 
 els.meetingForm.addEventListener("submit", async (event) => {
@@ -5659,11 +5808,10 @@ async function updateCandidateCheck(key, checked, context = {}) {
   return true;
 }
 
-els.checklist.addEventListener("change", async (event) => {
-  const input = event.target.closest("input[data-check]");
-  if (!input) return;
-  const changed = await updateCandidateCheck(input.dataset.check, input.checked);
-  if (!changed) input.checked = !input.checked;
+els.checklist.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-open-check-activity]");
+  if (!button?.dataset.openCheckActivity) return;
+  openCaseActivity(button.dataset.openCheckActivity);
 });
 
 els.interviewDoneInput.addEventListener("change", async () => {
