@@ -5750,6 +5750,19 @@ els.resetButton.addEventListener("click", async () => {
   await refresh();
 });
 
+document.addEventListener("keydown", (event) => {
+  if (!["PageUp", "PageDown"].includes(event.key) || event.defaultPrevented) return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable='true']")) return;
+  if (document.querySelector(".modal.show")) return;
+
+  event.preventDefault();
+  window.scrollBy({
+    top: window.innerHeight * 0.85 * (event.key === "PageDown" ? 1 : -1),
+    behavior: "smooth"
+  });
+});
+
 window.addEventListener("hashchange", renderAll);
 
 openDatabase()

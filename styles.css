@@ -2,6 +2,15 @@
   display: none !important;
 }
 
+html {
+  min-height: 100%;
+  overflow-y: auto;
+}
+
+body {
+  min-height: 100%;
+}
+
 :root {
   --app-space-1: 0.5rem;
   --app-space-2: 0.75rem;
