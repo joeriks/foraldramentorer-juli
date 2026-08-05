@@ -149,6 +149,8 @@ Handläggaren öppnar dashboarden och ser arbetsköer i denna ordning:
 
 Varje köpost ska visa ärende, mentor om sådan finns, nästa arbetssteg, ansvarig, förfallodatum och varför posten visas i kön. Formuleringen `Kräver åtgärd` ska undvikas. Systemet ska i stället ange exempelvis `Ställningstagande krävs av handläggare` eller `Inväntar komplettering från mentor`.
 
+**I systemet:** [Öppna dashboard och arbetskö](feature:dashboard.work-queue)
+
 ### 5.2 Öppna och bedöma ett ärende
 
 När handläggaren öppnar ett ärende ska översikten direkt besvara:
@@ -161,6 +163,8 @@ När handläggaren öppnar ett ärende ska översikten direkt besvara:
 - Vilket underlag finns redan?
 
 Handläggaren går därefter till den aktuella aktiviteten, utför arbetet, registrerar relevant resultat och kompletterar med underlag endast när det behövs.
+
+**I systemet:** [Öppna ärenderegistret](feature:cases.list)
 
 ### 5.3 Avsluta arbetsmomentet
 
@@ -191,6 +195,8 @@ Systemet registrerar automatiskt vem som gjorde ändringen och när den gjordes.
 
 **Avslut:** ansvarig registrerar slutsats och beslut om fortsatt åtgärd. Om rekrytering ska genomföras föreslår systemet `Skapa rekryteringsärende` och kopplar det nya ärendet till behovsanalysen som relaterat ärende.
 
+**I systemet:** [Skapa ett nytt ärende](feature:case.create)
+
 ### 6.2 Genomför rekryteringsinsats
 
 Vanliga aktiviteter:
@@ -218,6 +224,8 @@ Annons, beslut och sammanställning registreras som handlingar. En publicering r
 - kort notering om intresset.
 
 Systemet skapar mentorpost och certifieringsärende i samma sammanhängande operation. Dublettkontroll görs mot befintliga personer, men sammanslagning får aldrig ske automatiskt.
+
+**I systemet:** [Registrera ny mentor](feature:mentor.create)
 
 ### 7.2 Fördela ärendet
 
@@ -383,6 +391,8 @@ Matchning är ett eget ärende och ska inte döljas som en status på mentorn.
 
 En misslyckad matchning ändrar inte automatiskt mentorns certifieringsstatus. Om något framkommer som påverkar lämpligheten skapas ett separat uppföljningsärende och mentorns tillgänglighet kan pausas genom ett uttryckligt beslut.
 
+**I systemet:** [Öppna matchningsärenden](feature:matching.list)
+
 ## 11. Flöde F: mentoruppdrag och uppföljning
 
 När en matchning accepterats skapas ett uppdragsärende med startdatum, ansvarig samordnare, planerade uppföljningar och förväntat slutdatum.
@@ -407,6 +417,8 @@ Vid oro, konflikt, gränsöverskridande eller annan betydande avvikelse ska anv�
 - registrera beslut och åtgärd utan onödiga känsliga detaljer.
 
 Akuta skydds- eller orosfrågor ska följa kommunens särskilda rutin och får inte reduceras till ett vanligt arbetsflöde i systemet.
+
+**I systemet:** [Öppna uppdragsärenden](feature:assignment.list)
 
 ## 12. Flöde G: enkel registrering som kan växa
 
@@ -473,6 +485,8 @@ När ansvarig handläggare byts ska samordnaren:
 5. bekräfta överlämningen.
 
 Aktiviteter som ärver ärendeansvaret följer automatiskt med. Särskilt tilldelade aktiviteter ligger kvar på sin handläggare och visas i överlämningsdialogen. Händelsen loggas med tidigare och ny ansvarig.
+
+**I systemet:** [Administrera handläggare](feature:admin.handlers)
 
 ## 16. Systemstöd och automatiska regler
 

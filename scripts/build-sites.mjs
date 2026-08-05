@@ -9,6 +9,7 @@ const sourceFiles = [
   ["/index.html", "index.html", "text/html; charset=utf-8"],
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
   ["/case-domain.js", "case-domain.js", "text/javascript; charset=utf-8"],
+  ["/feature-links.js", "feature-links.js", "text/javascript; charset=utf-8"],
   ["/styles.css", "styles.css", "text/css; charset=utf-8"],
   ["/docs/verksamhetsfloden-och-handlaggningsrutiner.md", "docs/verksamhetsfloden-och-handlaggningsrutiner.md", "text/markdown; charset=utf-8"],
   ["/vendor/bootstrap/bootstrap.min.css", "vendor/bootstrap/bootstrap.min.css", "text/css; charset=utf-8"],

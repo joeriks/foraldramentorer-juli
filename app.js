@@ -22,6 +22,7 @@ import {
   stableHash
 } from "./case-domain.js";
 import { marked } from "./vendor/marked/marked.esm.js";
+import { resolveFeatureLink } from "./feature-links.js";
 
 const DB_NAME = "foraldramentorer";
 const DB_VERSION = 6;
@@ -2106,6 +2107,19 @@ async function loadRoutinesDocument() {
     els.routinesContent.querySelectorAll("a[href$='.md']").forEach((link) => {
       const filename = link.getAttribute("href").split("/").pop();
       link.href = `./docs/${filename}`;
+    });
+    els.routinesContent.querySelectorAll("a[href^='feature:']").forEach((link) => {
+      const featureId = link.getAttribute("href").slice("feature:".length);
+      const feature = resolveFeatureLink(featureId);
+      link.classList.add("routine-feature-link");
+      link.dataset.featureId = featureId;
+      if (feature) {
+        link.href = feature.href;
+      } else {
+        link.removeAttribute("href");
+        link.setAttribute("aria-disabled", "true");
+        link.title = "Funktionen är inte tillgänglig i denna version";
+      }
     });
     buildRoutinesNavigation();
     routinesLoaded = true;

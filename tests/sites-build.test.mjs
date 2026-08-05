@@ -29,6 +29,10 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.equal(domain.status, 200);
   assert.match(await domain.text(), /deriveCaseStatus/);
 
+  const featureLinks = await worker.fetch(new Request("https://example.test/feature-links.js"), {}, context);
+  assert.equal(featureLinks.status, 200);
+  assert.match(await featureLinks.text(), /dashboard\.work-queue/);
+
   const markdownParser = await worker.fetch(new Request("https://example.test/vendor/marked/marked.esm.js"), {}, context);
   assert.equal(markdownParser.status, 200);
   assert.match(markdownParser.headers.get("content-type"), /^text\/javascript/);

@@ -1303,6 +1303,23 @@
   background: var(--app-surface-muted);
 }
 
+.routine-feature-link {
+  font-weight: 600;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.routine-feature-link::after {
+  content: " \2192";
+  text-decoration: none;
+}
+
+.routine-feature-link[aria-disabled="true"] {
+  color: var(--app-text-muted);
+  cursor: not-allowed;
+  text-decoration-style: dotted;
+}
+
 @container (max-width: 56rem) {
   .routines-layout {
     grid-template-columns: minmax(0, 1fr);
