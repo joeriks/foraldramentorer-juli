@@ -2036,6 +2036,12 @@ function routineIllustrationElement(tagName, className = "", textContent = "") {
   return element;
 }
 
+function configureRoutineFeatureLink(link, feature) {
+  link.href = new URL(feature.href, window.location.href).href;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+}
+
 function renderRoutineIllustrations() {
   els.routinesContent.querySelectorAll("[data-routine-illustration]").forEach((placeholder) => {
     const illustrationId = placeholder.dataset.routineIllustration;
@@ -2097,7 +2103,7 @@ function renderRoutineIllustrations() {
     const feature = resolveFeatureLink(illustration.featureId);
     if (feature) {
       const link = routineIllustrationElement("a", "routine-illustration-link", "Öppna motsvarande funktion");
-      link.href = feature.href;
+      configureRoutineFeatureLink(link, feature);
       link.dataset.featureId = illustration.featureId;
       caption.append(link);
     }
@@ -2203,7 +2209,7 @@ async function loadRoutinesDocument(sectionKey = "") {
       link.classList.add("routine-feature-link");
       link.dataset.featureId = featureId;
       if (feature) {
-        link.href = feature.href;
+        configureRoutineFeatureLink(link, feature);
       } else {
         link.removeAttribute("href");
         link.setAttribute("aria-disabled", "true");
