@@ -3336,9 +3336,9 @@ function renderDetail() {
   els.selectedStatus.className = statusClass(candidate);
   els.nameFact.textContent = candidate.name;
   els.personalNumberFact.textContent = candidate.personalNumber || "Saknas";
-  els.languageFact.textContent = candidate.languages;
-  els.availabilityFact.textContent = candidate.availability;
-  els.areaFact.textContent = candidate.area;
+  els.languageFact.textContent = candidate.languages || "Ej angivet";
+  els.availabilityFact.textContent = candidate.availability || "Ej angivet";
+  els.areaFact.textContent = candidate.area || "Ej angivet";
   els.statusFact.textContent = candidate.status;
   els.coordinatorFact.textContent = candidate.coordinator || "Ej tilldelad";
   const identitySummary = candidate.checks?.identityVerified
@@ -5501,13 +5501,18 @@ els.personEditForm.addEventListener("submit", async (event) => {
       showFeedback("Kontrollera den möjliga dubbletten innan mentorn sparas.");
       return;
     }
-    const candidate = newCandidateFromEditor();
-    await saveCandidate(candidate);
-    selectedId = candidate.id;
-    markSaved();
-    showFeedback("Mentorn har registrerats.");
-    await refresh();
-    navigateToCandidate(candidate.id);
+    try {
+      const candidate = newCandidateFromEditor();
+      await saveCandidate(candidate);
+      selectedId = candidate.id;
+      markSaved();
+      showFeedback("Mentorn har registrerats.");
+      await refresh();
+      navigateToCandidate(candidate.id);
+    } catch (error) {
+      console.error("Kunde inte registrera mentor", error);
+      showFeedback("Mentorn kunde inte sparas. Försök igen eller kontrollera den lokala lagringen.");
+    }
     return;
   }
   const candidate = selectedCandidate();
