@@ -1329,21 +1329,37 @@
 }
 
 .routine-illustration {
+  position: relative;
   margin: 1.75rem 0;
   overflow: hidden;
   background: #f8fafb;
-  border: 1px dashed #81919c;
+  border: 2px dashed #8a9aa4;
   border-radius: 0.25rem;
+  box-shadow: 0.3rem 0.3rem 0 #e3e9ec;
 }
 
-.routine-illustration-notice {
-  padding: 0.5rem var(--app-space-3);
-  color: #263944;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  background: #dce8ee;
-  border-bottom: 1px dashed #81919c;
+.routine-illustration::before,
+.routine-illustration::after {
+  position: absolute;
+  z-index: 2;
+  width: 1.25rem;
+  height: 1.25rem;
+  pointer-events: none;
+  content: "";
+}
+
+.routine-illustration::before {
+  top: 0.45rem;
+  right: 0.45rem;
+  border-top: 2px solid #738893;
+  border-right: 2px solid #738893;
+}
+
+.routine-illustration::after {
+  bottom: 3.5rem;
+  left: 0.45rem;
+  border-bottom: 2px solid #738893;
+  border-left: 2px solid #738893;
 }
 
 .routine-illustration-canvas {
@@ -1353,6 +1369,7 @@
   padding: var(--app-space-3);
   overflow: hidden;
   color: #344650;
+  background: #fbfcfc;
   pointer-events: none;
   user-select: none;
 }
@@ -1362,10 +1379,11 @@
   top: 44%;
   left: 50%;
   z-index: 0;
-  color: #315f7d;
-  font-size: 4rem;
+  color: #607b8b;
+  font-family: "Segoe Print", "Bradley Hand", cursive;
+  font-size: 4.5rem;
   font-weight: 700;
-  opacity: 0.055;
+  opacity: 0.06;
   transform: translate(-50%, -50%) rotate(-12deg);
 }
 
@@ -1588,7 +1606,7 @@
   }
 
   .routine-illustration-watermark {
-    font-size: 2.5rem;
+    font-size: 2.75rem;
   }
 }
 

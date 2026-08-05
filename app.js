@@ -2049,10 +2049,9 @@ function renderRoutineIllustrations() {
     const figure = routineIllustrationElement("figure", "routine-illustration");
     figure.setAttribute("aria-label", `Illustration: ${illustration.title}. Ej interaktiv.`);
 
-    const notice = routineIllustrationElement("div", "routine-illustration-notice", "Illustration – ej interaktiv");
     const canvas = routineIllustrationElement("div", "routine-illustration-canvas");
     canvas.setAttribute("aria-hidden", "true");
-    const watermark = routineIllustrationElement("div", "routine-illustration-watermark", "ILLUSTRATION");
+    const watermark = routineIllustrationElement("div", "routine-illustration-watermark", "SKISS");
     const chrome = routineIllustrationElement("div", "routine-illustration-chrome");
     chrome.append(
       routineIllustrationElement("span", "routine-illustration-kind", illustration.kind),
@@ -2103,7 +2102,7 @@ function renderRoutineIllustrations() {
       caption.append(link);
     }
 
-    figure.append(notice, canvas, caption);
+    figure.append(canvas, caption);
     placeholder.replaceWith(figure);
   });
 }
