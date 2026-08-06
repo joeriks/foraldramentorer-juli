@@ -51,25 +51,38 @@ export const ROUTINE_ILLUSTRATIONS = Object.freeze({
     callouts: ["Avvikelsen avslutar inte ärendet automatiskt.", "Ett uttryckligt ställningstagande styr nästa läge."],
     caption: "Princip för att skilja aktivitetens resultat från beslutet om hela ärendet."
   },
+  "parent-registration": {
+    kind: "Principillustration",
+    title: "Registrera förälder och stödbehov",
+    status: "Ny registrering",
+    featureId: null,
+    meta: [["Förälder", "Nadia Hassan"], ["Kontaktväg", "Telefon"], ["Ansvarig", "Sara Lind"]],
+    panels: [
+      { title: "Föräldrapost", rows: [["Namn", "Nadia Hassan"], ["Kontaktuppgift", "Registrerad"], ["Informationsstatus", "Information lämnad"]] },
+      { title: "Ärende om föräldrastöd", rows: [["Språk", "Arabiska, svenska"], ["Område", "Öster"], ["Tillgänglighet", "Vardagskvällar"], ["Nästa steg", "Förbered matchning", "primary"]] }
+    ],
+    callouts: ["Stabila personuppgifter ligger på föräldrakortet.", "Stödbehov och matchningsuppgifter ligger i ärendet."],
+    caption: "Exempel på hur en förälder och ett separat stödärende registreras utan någon gemensam personpost."
+  },
   "matching-case": {
     kind: "Principillustration",
-    title: "Matchningsärende",
+    title: "Matcha förälder och mentor",
     status: "Urval pågår",
     featureId: "matching.list",
-    meta: [["Behov", "Familj i område Öster"], ["Språk", "Arabiska"], ["Tillgänglighet", "Vardagskvällar"]],
+    meta: [["Förälder", "Nadia Hassan"], ["Språk", "Arabiska"], ["Tillgänglighet", "Vardagskvällar"]],
     panels: [
       { title: "Hårda kriterier", rows: [["Godkänd", "Ja", "success"], ["Tillgänglig", "Ja", "success"], ["Område", "Öster", "success"]] },
       { title: "Föreslagna mentorer", rows: [["Amina Ekström", "Uppfyller 3 av 3 kriterier", "primary"], ["Leila Rahimi", "Uppfyller 2 av 3 kriterier", "muted"], ["Samira Haddad", "Inte tillgänglig", "warning"]] }
     ],
-    callouts: ["Systemet filtrerar på fastställda hårda kriterier.", "Handläggaren dokumenterar den slutliga bedömningen."],
-    caption: "Exempel på hur ett matchningsärende kan skilja automatiskt urval från handläggarens bedömning."
+    callouts: ["Systemet filtrerar endast bland godkända och tillgängliga mentorer.", "Förälderns och mentorns svar registreras var för sig innan matchningen accepteras."],
+    caption: "Exempel på hur ett matchningsärende kopplar en förälder till en föreslagen mentor och skiljer automatiskt urval från handläggarens bedömning."
   },
   "assignment-follow-up": {
     kind: "Principillustration",
     title: "Mentoruppdrag och uppföljning",
     status: "Aktivt uppdrag",
     featureId: "assignment.list",
-    meta: [["Mentor", "Amina Ekström"], ["Startdatum", "2026-09-01"], ["Ansvarig", "Jonas Berg"]],
+    meta: [["Förälder", "Nadia Hassan"], ["Mentor", "Amina Ekström"], ["Startdatum", "2026-09-01"], ["Ansvarig", "Jonas Berg"]],
     panels: [
       { title: "Planerade moment", rows: [["Bekräfta uppdragets ramar", "Klar", "success"], ["Första avstämning", "2026-09-08", "primary"], ["Fyraveckorsuppföljning", "2026-09-29", "muted"]] },
       { title: "Registrerade möten", rows: [["Introduktionsmöte", "Genomfört · 45 min"], ["Första avstämning", "Planerat"], ["Handlingar", "1 mötesanteckning"]] }

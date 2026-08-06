@@ -1,6 +1,6 @@
 # Verksamhetsflöden och handläggningsrutiner
 
-Status: Verksamhetsförslag 1.4
+Status: Verksamhetsförslag 1.5
 Produkt: FöräldraMentorer - Kommunportal  
 Senast uppdaterad: 2026-08-06
 
@@ -11,7 +11,7 @@ Relaterade dokument:
 
 ## 1. Syfte och avgränsning
 
-Detta dokument beskriver hur samordnare och handläggare bör kunna arbeta i systemet från ett identifierat rekryteringsbehov till godkänd mentor, matchning, aktivt uppdrag, uppföljning och avslut.
+Detta dokument beskriver hur samordnare och handläggare bör kunna arbeta i systemet från ett identifierat rekryteringsbehov till godkänd mentor, registrerad förälder, matchning, aktivt uppdrag, uppföljning och avslut.
 
 Beskrivningen är en föreslagen normalrutin för prototypen. Den ska prövas med verksamhetsrepresentanter innan den betraktas som en fastställd kommunal process. Kommunen måste särskilt fastställa:
 
@@ -48,6 +48,7 @@ Snabbingång:
 | En aktivitet är försenad eller saknar ansvarig | A.5 Bevakning och överlämning |
 | Någon har registrerat fel uppgift eller fel handling | A.6 Rättelse och datakvalitet |
 | En matchning fungerar inte eller ett uppdrag behöver pausas | A.7 Matchning och uppdrag |
+| En förälder saknar underlag för matchning eller tackar nej | A.7 Matchning och uppdrag |
 | Det finns oro för säkerhet, barn eller olämpligt beteende | A.8 Brådskande och känsliga situationer |
 
 ## 2. Grundläggande arbetsmodell
@@ -67,7 +68,19 @@ Minnesregel:
 
 En aktivitet omvandlas inte till en handling eller händelse. När aktiviteten utförs kan handläggaren registrera en handling, och systemet skapar automatiskt en händelse.
 
-### 2.2 Ansvar
+### 2.2 Förälder, mentor och ärende
+
+- **Förälder** och **mentor** är separata registerposter med egna kort och historik.
+- En förälderpost beskriver personen och stabila kontaktuppgifter. Stödbehov, bedömningar och uppföljningar hör till ärenden och ska inte skrivas in som löpande profiltext.
+- En förälder kan ha flera ärenden och matchningsförsök över tid.
+- Ett matchningsärende kopplar exakt en förälder till högst en föreslagen mentor åt gången.
+- Ett mentoruppdrag kopplar exakt en förälder och en mentor under en avgränsad period.
+- Systemet grupperar inte flera personer i en gemensam registerpost. Om flera föräldrar behöver stöd registreras de som egna personer och hanteras i egna ärenden.
+- Barn registreras inte som egna personer i denna del av systemet. Nödvändiga uppgifter hanteras enligt kommunens fastställda rutin och i rätt verksamhetssystem.
+
+> Föräldrakortet beskriver personen. Ärendet beskriver stödbehovet. Matchningen dokumenterar urvalet. Mentoruppdraget beskriver den överenskomna insatsen.
+
+### 2.3 Ansvar
 
 - Varje öppet ärende bör normalt ha en ansvarig handläggare.
 - Ett ärende kan ha flera medhandläggare.
@@ -76,7 +89,7 @@ En aktivitet omvandlas inte till en handling eller händelse. När aktiviteten u
 - En samordnare ansvarar för otilldelade ärenden, belastning mellan handläggare och ställningstaganden som kräver högre behörighet.
 - Systemet ska alltid lagra användar-ID, men visa personens fullständiga namn i gränssnittet.
 
-### 2.3 Status och resultat
+### 2.4 Status och resultat
 
 Status och resultat får inte blandas ihop.
 
@@ -99,24 +112,26 @@ Ett avvikande resultat betyder inte automatiskt avslag. Det öppnar ett ställni
 
 Följande ärendetyper behövs för det sammanhängande verksamhetsflödet:
 
-| Ärendetyp | Mentorkoppling | Registrera minst | Normal avslutning |
-| --- | --- | --- | --- |
-| Behovsanalys | Ingen | Rubrik, beskrivning och ansvarig enhet | Analys dokumenterad och beslutad |
-| Rekryteringsinsats | Ingen | Rubrik, ansvarig enhet och önskat utfall | Insats genomförd och utvärderad |
-| Godkännande av mentor | Exakt en mentor | Mentor, ansvarig enhet och bakgrund | Godkänd, avbruten eller ej godkänd |
-| Matchning | Exakt en mentor | Mentor, ansvarig enhet, stödbehov och grundkriterier | Matchning accepterad eller avslutad utan match |
-| Mentoruppdrag | Exakt en mentor | Mentor, ansvarig enhet och uppdragets ramar | Uppdrag avslutat |
-| Uppföljning | Högst en mentor | Ansvarig enhet, syfte och förväntat resultat | Uppföljning dokumenterad |
-| Övrigt ärende | Högst en mentor | Ansvarig enhet, avgränsad fråga och önskat resultat | Frågan hanterad |
+| Ärendetyp | Föräldrakoppling | Mentorkoppling | Registrera minst | Normal avslutning |
+| --- | --- | --- | --- | --- |
+| Behovsanalys | Ingen | Ingen | Rubrik, beskrivning och ansvarig enhet | Analys dokumenterad och beslutad |
+| Rekryteringsinsats | Ingen | Ingen | Rubrik, ansvarig enhet och önskat utfall | Insats genomförd och utvärderad |
+| Godkännande av mentor | Ingen | Exakt en mentor | Mentor, ansvarig enhet och bakgrund | Godkänd, avbruten eller ej godkänd |
+| Föräldrastöd | Exakt en förälder | Ingen | Förälder, ansvarig enhet, stödbehov och kontaktstatus | Redo för matchning eller avslutat utan matchning |
+| Matchning | Exakt en förälder | Högst en mentor | Förälder, mentor, grundkriterier och önskat utfall | Matchning accepterad eller avslutad utan match |
+| Mentoruppdrag | Exakt en förälder | Exakt en mentor | Förälder, mentor, ansvarig enhet och uppdragets ramar | Uppdrag avslutat |
+| Uppföljning | Högst en förälder | Högst en mentor | Ansvarig enhet, syfte och förväntat resultat | Uppföljning dokumenterad |
+| Övrigt ärende | Högst en förälder | Högst en mentor | Ansvarig enhet, avgränsad fråga och önskat resultat | Frågan hanterad |
 
-En mentor kan ha flera ärenden över tid, men varje ärende får vara kopplat till högst en mentor. Ett ärende om godkännande ska inte återanvändas för ett senare uppdrag eller en fristående uppföljning.
+En förälder och en mentor kan ha flera ärenden över tid, men varje ärende får vara kopplat till högst en av vardera. Ett ärende om godkännande eller föräldrastöd ska inte återanvändas som mentoruppdrag.
 
 ### 3.1 Så väljs ärendetyp
 
 - **Behovsanalys:** välj när verksamheten först behöver beskriva omfattning, målgrupp, område, språk och tidshorisont för ett nytt eller förändrat behov.
 - **Rekryteringsinsats:** välj när ett bedömt behov ska omsättas i annons, informationsinsats eller annan konkret rekrytering.
 - **Godkännande av mentor:** välj när en registrerad mentor ska genomgå kontroller, intervju och beslut om godkännande.
-- **Matchning:** välj när en godkänd mentor ska prövas mot ett konkret stödbehov.
+- **Föräldrastöd:** välj när en förälders stödbehov, kontaktstatus och förutsättningar för matchning ska dokumenteras.
+- **Matchning:** välj när en registrerad förälder ska prövas tillsammans med en godkänd och tillgänglig mentor.
 - **Mentoruppdrag:** välj när en accepterad matchning övergår till ett uppdrag med ramar och planerad uppföljning.
 - **Uppföljning:** välj för en avgränsad planerad eller behovsstyrd uppföljning. Koppla mentor när uppföljningen gäller en viss person.
 - **Övrigt ärende:** välj bara när frågan inte hör hemma i någon av typerna ovan. Ange vad som behöver vara gjort för att ärendet ska kunna avslutas.
@@ -134,7 +149,8 @@ flowchart LR
     C --> D["Pröva mentor för godkännande"]
     D -->|"Godkänd"| E["Gör mentor tillgänglig för matchning"]
     D -->|"Avbruten eller ej godkänd"| J["Avsluta och bevara motivering"]
-    E --> F["Genomför matchning"]
+    P["Registrera förälder och stödbehov"] --> F["Matcha förälder och mentor"]
+    E --> F
     F -->|"Accepterad"| G["Starta mentoruppdrag"]
     F -->|"Ingen match"| E
     G --> H["Följ upp uppdrag"]
@@ -422,17 +438,57 @@ Ställningstagandet ska ligga kvar i arbetskön tills det har hanterats. Det få
 
 <div data-routine-illustration="deviation-assessment"></div>
 
-## 10. Flöde E: matchning
+## 10. Flöde E: förälder och matchning
 
-Matchning är ett eget ärende och ska inte döljas som en status på mentorn.
+Föräldern registreras som en egen person. Stödbehovet och matchningen hanteras som ärenden och ska inte döljas som profilfält eller status på föräldern eller mentorn.
 
-1. Handläggaren startar matchningsärendet från en godkänd mentor eller ett dokumenterat familjebehov.
+### 10.1 Registrera förälder
+
+1. Handläggaren söker först efter en befintlig förälder för att undvika dubbletter.
+2. Om personen saknas registreras namn, kontaktuppgift, informationsstatus och de få stabila uppgifter som behövs för fortsatt kontakt.
+3. Systemet registrerar vem som skapade posten och när.
+4. Ett ärende av typen `Föräldrastöd` skapas och kopplas till föräldern.
+5. Stödbehov, språk, område, tillgänglighet och andra matchningsuppgifter registreras i ärendet, inte som känslig fritext på föräldrakortet.
+6. Handläggaren dokumenterar om föräldern vill gå vidare till matchning och vad nästa kontakt ska vara.
+
+Föräldraregistreringen ska inte skapa någon gemensam personpost. Om en annan förälder också behöver stöd registreras den personen separat.
+
+<div data-routine-illustration="parent-registration"></div>
+
+Föräldraregistret och föräldrakortet är beskrivna som nästa systemfunktion och är ännu inte implementerade i prototypen. Illustrationen länkar därför inte till en funktion som saknas.
+
+### 10.2 Förbered matchningen
+
+Innan en mentor föreslås ska förälderns stödärende innehålla tillräckliga och aktuella uppgifter för urvalet:
+
+- fastställda grundkriterier, exempelvis språk, område och praktisk tillgänglighet,
+- vad föräldern vill ha stöd med på en nivå som är nödvändig för matchningen,
+- kontaktstatus och om föräldern vill medverka i matchningen,
+- ansvarig handläggare och nästa planerade kontakt.
+
+Om underlaget inte räcker skapas en aktivitet för komplettering. Matchningsärendet ska inte startas med påhittade standardvärden.
+
+### 10.3 Matcha förälder och mentor
+
+Matchning är ett eget ärende och ska inte döljas som en status på föräldern eller mentorn.
+
+1. Handläggaren startar matchningsärendet från förälderns dokumenterade stödbehov.
 2. Systemet visar endast mentorer som är godkända, tillgängliga och uppfyller hårda kriterier.
 3. Handläggaren bedömer mjuka kriterier och dokumenterar kort varför en match föreslås.
-4. Mentor och berörd part kontaktas enligt kommunens rutin.
+4. Föräldern och mentorn kontaktas var för sig enligt kommunens rutin.
 5. Första mötet bokas och registreras.
 6. Båda parters återkoppling dokumenteras utan onödiga samtalsdetaljer.
 7. Matchningen accepteras eller avslutas utan match.
+
+Återkopplingen registreras separat för respektive part:
+
+| Part | Tillåtna utfall |
+| --- | --- |
+| Förälder | Accepterar, tackar nej, vill avvakta |
+| Mentor | Accepterar, tackar nej, vill avvakta |
+| Matchningsärende | Accepterad matchning, väntar på svar, avslutad utan match |
+
+Ett mentoruppdrag får skapas först när både föräldern och mentorn har accepterat samma förslag. Systemet får inte tolka uteblivet svar som ett godkännande.
 
 <div data-routine-illustration="matching-case"></div>
 
@@ -442,7 +498,7 @@ En misslyckad matchning ändrar inte automatiskt mentorns godkännandestatus. Om
 
 ## 11. Flöde F: mentoruppdrag och uppföljning
 
-När en matchning accepterats skapas ett uppdragsärende med startdatum, ansvarig samordnare, planerade uppföljningar och förväntat slutdatum.
+När en matchning accepterats skapas ett uppdragsärende kopplat till exakt en förälder och en mentor, med startdatum, ansvarig samordnare, planerade uppföljningar och förväntat slutdatum.
 
 Normala aktiviteter:
 
@@ -550,7 +606,9 @@ Systemet bör automatiskt:
 - skapa ärendenummer, tidsstämplar och revisionshändelser,
 - föreslå standardaktiviteter från versionsstyrda mallar,
 - visa nästa rekommenderade steg,
-- varna för möjliga dubbletter innan registrering,
+- varna för möjliga dubbletter av både föräldrar och mentorer innan registrering,
+- säkerställa att ett matchningsärende har exakt en förälder och högst en föreslagen mentor,
+- kräva separat registrerad återkoppling från föräldern och mentorn innan ett mentoruppdrag skapas,
 - påminna om förfallodatum och passerade bevakningsdatum,
 - kräva resultat när en aktivitet avslutas,
 - kräva notering vid avvikande resultat,
@@ -566,6 +624,8 @@ Systemet bör inte automatiskt:
 - bedöma registerutdragets rättsliga tillämplighet,
 - fatta beslut om godkännande eller avslag,
 - tolka fritext som ett verksamhetsbeslut,
+- tolka uteblivet svar från föräldern eller mentorn som att en matchning har accepterats,
+- kopiera stödbehov eller matchningsbedömningar till förälderns eller mentorns registerkort,
 - avsluta ett ärende enbart på grund av ett avvikande aktivitetsresultat,
 - återöppna eller radera avslutade ärenden,
 - lagra kopior av identitetshandlingar eller registerutdrag utan fastställd rutin,
@@ -576,6 +636,9 @@ Systemet bör inte automatiskt:
 | Moment | Handläggare | Samordnare | Administratör |
 | --- | --- | --- | --- |
 | Registrera mentor och ärende | Ja | Ja | Nej som standard |
+| Registrera förälder och stödärende | Ja | Ja | Nej som standard |
+| Föreslå matchning | Ja | Ja | Nej |
+| Bekräfta accepterad matchning och skapa uppdrag | Om delegerad | Ja | Nej |
 | Utföra och avsluta tilldelad aktivitet | Ja | Ja | Nej |
 | Registrera möte eller handling | Ja | Ja | Nej som standard |
 | Fördela otilldelat ärende | Begränsat | Ja | Nej |
@@ -621,6 +684,14 @@ Två intervjuer inför godkännande registreras som separata möten med var sin 
 
 Handläggaren växlar mellan `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden` på dashboarden. Väntande ärenden väljs via ärendeläget och öppnas i ärenderegistret. Listor är paginerade, sökbara och sorterade utan att varje ärende behöver öppnas. Antal, status, nästa aktivitet och ansvarig ska vara konsekventa på dashboard, i ärenderegistret och på ärendekortet. Mentorflödet kontrolleras separat som en sekundär registeröversikt.
 
+### Scenario 9: förälder registreras och matchas
+
+Handläggaren söker efter föräldern, registrerar en ny förälderpost och skapar ett stödärende. När stödbehovet är tillräckligt beskrivet startas en matchning. Systemet visar bara godkända och tillgängliga mentorer som uppfyller grundkriterierna. Förälderns och mentorns svar registreras separat. Först när båda har accepterat skapas mentoruppdraget.
+
+### Scenario 10: föräldern tackar nej men vill fortsätta
+
+Föräldern tackar nej till den föreslagna mentorn men vill få ett nytt förslag. Handläggaren registrerar utfallet utan personliga omdömen. Samma stödärende behålls, det första matchningsförsöket bevaras och ett nytt förslag hanteras utan att föräldern eller mentorn får en negativ registerstatus.
+
 ## 19. Frågor som måste beslutas före pilot
 
 1. Vilken organisatorisk enhet är personuppgiftsansvarig och ärendeägare?
@@ -635,6 +706,8 @@ Handläggaren växlar mellan `Mina aktiviteter`, `Otilldelade`, `Försenade` och
 10. Hur hanteras jäv, felaktiga personkopplingar och rättelsebegäranden?
 11. Vilka händelser ska skapa e-post, SMS eller interna notifieringar?
 12. Vilka uppgifter får ingå i statistik och export?
+13. Vilka identifierings- och kontaktuppgifter behöver lagras om föräldrar i denna tjänst, och vilka ska ligga i kommunens ordinarie verksamhetssystem?
+14. Vilken återkoppling från förälder och mentor krävs innan en matchning får övergå till mentoruppdrag?
 
 ## 20. Källor och rättsliga hållpunkter
 
@@ -974,6 +1047,36 @@ Situationskatalogen beskriver föreslaget systemstöd och normal handläggning. 
 
 ### A.7 Matchning och uppdrag
 
+#### En ny förälder vill ha stöd
+
+**Gör nu:** sök efter en befintlig förälderpost. Registrera personen om den saknas och skapa ett separat ärende om föräldrastöd.
+
+**Registrera:** namn, nödvändig kontaktuppgift, informationsstatus, skapad av samt en kort beskrivning av stödbehovet i ärendet.
+
+**Nästa läge:** stödärendet kompletteras tills det är redo för matchning eller avslutas om föräldern inte vill gå vidare.
+
+**Gör inte:** registrera samma person flera gånger, gruppera flera personer i samma post eller lägga hela stödbehovet som ostrukturerad text på föräldrakortet.
+
+#### Underlaget räcker inte för att föreslå en mentor
+
+**Gör nu:** kontakta föräldern och komplettera bara de uppgifter som behövs för matchningen.
+
+**Registrera:** aktivitet för komplettering, ansvarig, förfallodatum och vilka kriterier som saknas.
+
+**Nästa läge:** stödärendet är `Väntar` med bevakningsdatum. Matchningsärende skapas först när underlaget är användbart.
+
+**Gör inte:** fylla luckor med antaganden eller starta flera matchningsärenden för att prova sig fram.
+
+#### Föräldern tackar nej till en föreslagen mentor
+
+**Gör nu:** registrera svaret neutralt och fråga om föräldern vill att en annan mentor ska övervägas.
+
+**Registrera:** `Tackat nej`, datum, om fortsatt matchning önskas och endast en övergripande orsakskategori när den behövs.
+
+**Nästa läge:** matchningsärendet fortsätter med ett nytt förslag eller avslutas utan match. Förälderns stödärende och mentorns godkännande påverkas inte automatiskt.
+
+**Gör inte:** skriva personliga omdömen om föräldern eller mentorn i deras registerkort.
+
 #### Mentorn tackar nej till en föreslagen matchning
 
 **Gör nu:** registrera det neutrala utfallet och bedöm om mentorn fortfarande är tillgänglig för andra matchningar.
@@ -1004,7 +1107,7 @@ Situationskatalogen beskriver föreslaget systemstöd och normal handläggning. 
 
 **Gör inte:** ändra mentorns godkännandestatus utan ett separat underlag och beslut.
 
-#### Mentorn eller familjen vill avsluta uppdraget
+#### Föräldern eller mentorn vill avsluta uppdraget
 
 **Gör nu:** bekräfta önskemålet, hantera praktiska avslutsfrågor och erbjud beslutad avslutande uppföljning.
 

@@ -41,11 +41,21 @@ test("numbered routine headings keep stable deep-link keys when titles change", 
 
 test("every routine illustration is defined and links to a known feature", () => {
   const illustrationIds = extractRoutineIllustrationIds(routines);
-  assert.equal(illustrationIds.length, 9);
+  assert.equal(illustrationIds.length, 10);
 
   for (const illustrationId of illustrationIds) {
     const illustration = ROUTINE_ILLUSTRATIONS[illustrationId];
     assert.ok(illustration, `unknown routine illustration: ${illustrationId}`);
-    assert.ok(resolveFeatureLink(illustration.featureId), `unknown illustration feature: ${illustration.featureId}`);
+    if (illustration.featureId) {
+      assert.ok(resolveFeatureLink(illustration.featureId), `unknown illustration feature: ${illustration.featureId}`);
+    }
   }
+  assert.equal(ROUTINE_ILLUSTRATIONS["parent-registration"].featureId, null);
+});
+
+test("uses parent terminology without introducing a recipient abstraction", () => {
+  assert.match(routines, /Registrera förälder/);
+  assert.match(routines, /Matcha förälder och mentor/);
+  assert.doesNotMatch(routines, /stödmottagare/i);
+  assert.doesNotMatch(routines, /familjebehov|familjen/i);
 });

@@ -27,7 +27,7 @@ import {
 } from "./case-domain.js?v=20260806-handling-guidance-v14";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-routines-v6";
-import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-approval-terms-v10";
+import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-parent-process-v11";
 
 const DB_NAME = "foraldramentorer";
 const DB_VERSION = 6;
@@ -2312,10 +2312,10 @@ function buildRoutineProcessMap(kind) {
   const caption = routineIllustrationElement("figcaption", "routine-process-caption");
 
   if (kind === "lifecycle") {
-    figure.setAttribute("aria-label", "Övergripande livscykel från behovsanalys till avslut");
+    figure.setAttribute("aria-label", "Övergripande livscykel från mentorbehov och förälderstöd till avslut");
     header.append(
       routineIllustrationElement("span", "routine-process-kicker", "Processkarta"),
-      routineIllustrationElement("strong", "routine-process-heading", "Från behov till avslut")
+      routineIllustrationElement("strong", "routine-process-heading", "Från mentorbehov och förälderstöd till avslut")
     );
     [
       ["Analysera behov", "6-1"],
@@ -2323,17 +2323,18 @@ function buildRoutineProcessMap(kind) {
       ["Registrera intresseanmälan", "7-1"],
       ["Pröva mentor för godkännande", "8"],
       ["Gör mentor tillgänglig", "8-8"],
-      ["Genomför matchning", "10"],
+      ["Registrera förälder och stödbehov", "10-1", "Separat ingång som kan ske parallellt"],
+      ["Matcha förälder och mentor", "10-3"],
       ["Starta mentoruppdrag", "11"],
       ["Följ upp uppdrag", "11"]
-    ].forEach(([title, sectionKey], index) => track.append(routineProcessStep(index + 1, title, sectionKey)));
+    ].forEach(([title, sectionKey, note = ""], index) => track.append(routineProcessStep(index + 1, title, sectionKey, note)));
     outcomes.append(
       routineProcessOutcome("Prövning: avbruten eller inte godkänd", "Avsluta och bevara motivering", "8-8", "stop"),
       routineProcessOutcome("Matchning: ingen match", "Återgå till tillgänglig för matchning", "10", "return"),
       routineProcessOutcome("Uppföljning: behov av åtgärd", "Skapa uppföljnings- eller avvikelseärende", "11", "attention"),
       routineProcessOutcome("Uppföljning: klart", "Avsluta ärendet", "13", "complete")
     );
-    caption.textContent = "Huvudflödet visas överst. Avvikande vägar hanteras genom uttryckliga beslut och egna ärenden.";
+    caption.textContent = "Mentorprocessen och registreringen av förälderns stödbehov kan ske parallellt. De möts först i matchningsärendet. Avvikande vägar kräver uttryckliga beslut.";
   } else {
     figure.setAttribute("aria-label", "Process för avvikelse och ställningstagande");
     header.append(
