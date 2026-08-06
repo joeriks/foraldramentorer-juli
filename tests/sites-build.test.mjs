@@ -23,6 +23,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   const script = await worker.fetch(new Request("https://example.test/app.js"), {}, context);
   assert.equal(script.status, 200);
   assert.match(script.headers.get("content-type"), /^text\/javascript/);
+  assert.equal(script.headers.get("cache-control"), "no-cache");
   assert.match(await script.text(), /CASE_ACTIVITIES_STORE/);
 
   const domain = await worker.fetch(new Request("https://example.test/case-domain.js"), {}, context);
@@ -40,6 +41,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   const markdownParser = await worker.fetch(new Request("https://example.test/vendor/marked/marked.esm.js"), {}, context);
   assert.equal(markdownParser.status, 200);
   assert.match(markdownParser.headers.get("content-type"), /^text\/javascript/);
+  assert.equal(markdownParser.headers.get("cache-control"), "public, max-age=3600");
 
   const routines = await worker.fetch(new Request("https://example.test/docs/verksamhetsfloden-och-handlaggningsrutiner.md"), {}, context);
   assert.equal(routines.status, 200);

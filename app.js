@@ -21,10 +21,10 @@ import {
   resultClassification,
   resultOptions,
   stableHash
-} from "./case-domain.js";
+} from "./case-domain.js?v=20260806-case-types-v2";
 import { marked } from "./vendor/marked/marked.esm.js";
-import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js";
-import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js";
+import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-case-types-v2";
+import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-case-types-v2";
 
 const DB_NAME = "foraldramentorer";
 const DB_VERSION = 6;
