@@ -1,8 +1,8 @@
 # Verksamhetsflöden och handläggningsrutiner
 
-Status: Verksamhetsförslag 1.0  
+Status: Verksamhetsförslag 1.3
 Produkt: FöräldraMentorer - Kommunportal  
-Senast uppdaterad: 2026-08-05
+Senast uppdaterad: 2026-08-06
 
 Relaterade dokument:
 
@@ -11,7 +11,7 @@ Relaterade dokument:
 
 ## 1. Syfte och avgränsning
 
-Detta dokument beskriver hur samordnare och handläggare bör kunna arbeta i systemet från ett identifierat rekryteringsbehov till certifierad mentor, matchning, aktivt uppdrag, uppföljning och avslut.
+Detta dokument beskriver hur samordnare och handläggare bör kunna arbeta i systemet från ett identifierat rekryteringsbehov till godkänd mentor, matchning, aktivt uppdrag, uppföljning och avslut.
 
 Beskrivningen är en föreslagen normalrutin för prototypen. Den ska prövas med verksamhetsrepresentanter innan den betraktas som en fastställd kommunal process. Kommunen måste särskilt fastställa:
 
@@ -40,9 +40,9 @@ Snabbingång:
 | Det som har hänt | Gå till |
 | --- | --- |
 | Ny intresseanmälan, möjlig dubblett eller otilldelat ärende | A.1 Registrering och fördelning |
-| Identiteten kan inte verifieras | A.2 Certifieringskontroller |
-| Registerutdrag saknas, är gammalt eller kan inte bekräftas | A.2 Certifieringskontroller |
-| Referensen svarar inte eller lämnar uppgifter som måste bedömas | A.2 Certifieringskontroller |
+| Identiteten kan inte verifieras | A.2 Kontroller inför godkännande |
+| Registerutdrag saknas, är gammalt eller kan inte bekräftas | A.2 Kontroller inför godkännande |
+| Referensen svarar inte eller lämnar uppgifter som måste bedömas | A.2 Kontroller inför godkännande |
 | Mentorn uteblir, vill vänta eller återkallar sin ansökan | A.3 Kontakt och medverkan |
 | Ett kontrollresultat är inte godtagbart | A.4 Avvikelse och beslut |
 | En aktivitet är försenad eller saknar ansvarig | A.5 Bevakning och överlämning |
@@ -56,7 +56,7 @@ Snabbingång:
 
 | Objekt | Fråga som objektet besvarar | Exempel |
 | --- | --- | --- |
-| Ärende | Vad handlägger kommunen och varför? | Certifiering av Amina Ekström |
+| Ärende | Vad handlägger kommunen och varför? | Godkännande av Amina Ekström |
 | Aktivitet | Vad behöver någon i kommunen göra eller bevaka? | Kontrollera referenser |
 | Handling | Vilket underlag har kommit in eller skapats? | Tjänsteanteckning från referenssamtal |
 | Händelse | Vad har redan hänt i systemet? | Aktiviteten avslutades av Sara Lind 14:32 |
@@ -99,18 +99,31 @@ Ett avvikande resultat betyder inte automatiskt avslag. Det öppnar ett ställni
 
 Följande ärendetyper behövs för det sammanhängande verksamhetsflödet:
 
-| Ärendetyp | Mentorkoppling | Normal start | Normal avslutning |
+| Ärendetyp | Mentorkoppling | Registrera minst | Normal avslutning |
 | --- | --- | --- | --- |
-| Behovsanalys | Ingen | Nytt eller förändrat stödbehov | Analys dokumenterad och beslutad |
-| Rekryteringsinsats | Ingen | Beslut att rekrytera mentorer | Insats genomförd och utvärderad |
-| Certifiering | Exakt en mentor | Ny intresseanmälan | Godkänd, avbruten eller ej godkänd |
-| Matchning | Exakt en mentor | Certifierad mentor är tillgänglig | Matchning accepterad eller avslutad utan match |
-| Mentoruppdrag | Exakt en mentor | Matchning har accepterats | Uppdrag avslutat |
-| Uppföljning | Högst en mentor | Planerad eller behovsstyrd uppföljning | Uppföljning dokumenterad |
-| Övrigt mentorärende | Exakt en mentor | Kontakt, avvikelse eller administrativt behov | Frågan hanterad |
-| Generellt verksamhetsärende | Ingen | Administrativt eller organisatoriskt behov | Frågan hanterad |
+| Behovsanalys | Ingen | Rubrik, beskrivning och ansvarig enhet | Analys dokumenterad och beslutad |
+| Rekryteringsinsats | Ingen | Rubrik, ansvarig enhet och önskat utfall | Insats genomförd och utvärderad |
+| Godkännande av mentor | Exakt en mentor | Mentor, ansvarig enhet och bakgrund | Godkänd, avbruten eller ej godkänd |
+| Matchning | Exakt en mentor | Mentor, ansvarig enhet, stödbehov och grundkriterier | Matchning accepterad eller avslutad utan match |
+| Mentoruppdrag | Exakt en mentor | Mentor, ansvarig enhet och uppdragets ramar | Uppdrag avslutat |
+| Uppföljning | Högst en mentor | Ansvarig enhet, syfte och förväntat resultat | Uppföljning dokumenterad |
+| Övrigt ärende | Högst en mentor | Ansvarig enhet, avgränsad fråga och önskat resultat | Frågan hanterad |
 
-En mentor kan ha flera ärenden över tid, men varje ärende får vara kopplat till högst en mentor. Ett certifieringsärende ska inte återanvändas för ett senare uppdrag eller en fristående uppföljning.
+En mentor kan ha flera ärenden över tid, men varje ärende får vara kopplat till högst en mentor. Ett ärende om godkännande ska inte återanvändas för ett senare uppdrag eller en fristående uppföljning.
+
+### 3.1 Så väljs ärendetyp
+
+- **Behovsanalys:** välj när verksamheten först behöver beskriva omfattning, målgrupp, område, språk och tidshorisont för ett nytt eller förändrat behov.
+- **Rekryteringsinsats:** välj när ett bedömt behov ska omsättas i annons, informationsinsats eller annan konkret rekrytering.
+- **Godkännande av mentor:** välj när en registrerad mentor ska genomgå kontroller, intervju och beslut om godkännande.
+- **Matchning:** välj när en godkänd mentor ska prövas mot ett konkret stödbehov.
+- **Mentoruppdrag:** välj när en accepterad matchning övergår till ett uppdrag med ramar och planerad uppföljning.
+- **Uppföljning:** välj för en avgränsad planerad eller behovsstyrd uppföljning. Koppla mentor när uppföljningen gäller en viss person.
+- **Övrigt ärende:** välj bara när frågan inte hör hemma i någon av typerna ovan. Ange vad som behöver vara gjort för att ärendet ska kunna avslutas.
+
+Samma hjälp visas kortfattat direkt när handläggaren väljer ärendetyp i registreringsvyn. Det minskar behovet av att lämna arbetsläget för att slå upp grundläggande vägledning.
+
+**I systemet:** [Administrera ärendetyper](feature:admin.case-types)
 
 ## 4. Övergripande livscykel
 
@@ -118,7 +131,7 @@ En mentor kan ha flera ärenden över tid, men varje ärende får vara kopplat t
 flowchart LR
     A["Analysera behov"] --> B["Genomför rekryteringsinsats"]
     B --> C["Registrera intresseanmälan"]
-    C --> D["Handlägg certifieringsärende"]
+    C --> D["Pröva mentor för godkännande"]
     D -->|"Godkänd"| E["Gör mentor tillgänglig för matchning"]
     D -->|"Avbruten eller ej godkänd"| J["Avsluta och bevara motivering"]
     E --> F["Genomför matchning"]
@@ -138,16 +151,16 @@ flowchart LR
 
 ### 5.1 Börja arbetsdagen
 
-Handläggaren öppnar dashboarden och ser arbetsköer i denna ordning:
+Handläggaren öppnar dashboarden. Den har två nivåer som bygger på samma ärende- och aktivitetsdata:
 
-1. Ställningstaganden som krävs.
-2. Försenade aktiviteter.
-3. Aktiviteter som förfaller snart.
-4. Mina pågående aktiviteter.
-5. Ärenden eller aktiviteter som saknar ansvarig.
-6. Poster som väntar på mentor eller extern part och vars bevakningsdatum har passerat.
+1. **Ärendeläge** visar antal nya, pågående, väntande och pausade ärenden samt ärenden där ett ställningstagande krävs. Ett val öppnar motsvarande urval i ärenderegistret.
+2. **Arbetskö** visar aktiviteter som kan handläggas direkt. Köerna är `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden`.
 
-Varje köpost ska visa ärende, mentor om sådan finns, nästa arbetssteg, ansvarig, förfallodatum och varför posten visas i kön. Formuleringen `Kräver åtgärd` ska undvikas. Systemet ska i stället ange exempelvis `Ställningstagande krävs av handläggare` eller `Inväntar komplettering från mentor`.
+Rekommenderad arbetsordning är att först bedöma ställningstaganden och försenade aktiviteter och därefter fortsätta med egna aktiviteter. Samordnaren kontrollerar dessutom kön `Otilldelade` och fördelar arbetet. Ett väntande ärende visas i ärendeläget; om bevakningsdatumet passeras visas dess aktivitet även som försenad.
+
+Varje köpost ska visa ärende, mentor eller annan koppling, nästa aktivitet, förfallodatum och varför posten visas i kön. Formuleringen `Kräver åtgärd` ska undvikas. Systemet ska i stället ange exempelvis `Ställningstagande krävs av handläggare`, `Förfallodatum passerat` eller `Inväntar komplettering från mentor`.
+
+Mentorflödet längre ned på dashboarden är en sekundär registeröversikt. Det får inte användas som ersättning för ärendestatus, aktivitetskö eller beslutspunkt.
 
 **I systemet:** [Öppna dashboard och arbetskö](feature:dashboard.work-queue)
 
@@ -178,6 +191,16 @@ När en aktivitet avslutas ska användaren:
 
 Systemet registrerar automatiskt vem som gjorde ändringen och när den gjordes.
 
+### 5.4 Välj rätt vy
+
+- **Dashboard:** prioriterar dagens arbete och visar sammanräknat ärendeläge. Här ska användaren inte registrera fristående verksamhetsuppgifter.
+- **Ärenderegister:** visar den fullständiga, sökbara listan över ärenden. Här väljer användaren vilket ärende som ska öppnas.
+- **Ärendekort:** är den primära arbetsytan för översikt, aktiviteter, handlingar, logg och beslut i ett ärende.
+- **Mentorregister och mentorkort:** visar person- och registeruppgifter samt länkar till personens ärenden. Kontroller, möten och beslut ska registreras i rätt ärende och bara sammanfattas på mentorkortet.
+- **Presentation:** demonstrerar samma funktioner och dataflöden. Kommentarer i presentationsläget är prototypåterkoppling och får inte blandas med ärenden, tjänsteanteckningar eller logghändelser.
+
+Samma status ska aldrig registreras separat i flera vyer. Dashboard, listor och mentorkort ska härleda sina sammanfattningar från ärenden och aktiviteter.
+
 ## 6. Flöde A: behovsanalys och rekrytering
 
 ### 6.1 Registrera behov
@@ -188,10 +211,12 @@ Systemet registrerar automatiskt vem som gjorde ändringen och när den gjordes.
 
 - ärendetyp `Behovsanalys`,
 - rubrik,
-- kort beskrivning,
-- ansvarig enhet.
+- kort beskrivning av det uppmärksammade behovet,
+- ansvarig enhet, exempelvis `Familjestöd`.
 
-**Möjliga kompletteringar:** målgrupp, geografiskt område, språkbehov, önskat antal mentorer, önskat datum, analysunderlag och medhandläggare.
+Fältet `Mentor` visas inte eftersom en behovsanalys gäller verksamhetens samlade behov och inte en viss mentor.
+
+**Strukturerade kompletteringar i samma registrering:** målgrupp, geografiskt område, språkbehov, önskat antal mentorer och datum då behovet senast bör vara mött. Fyll i det som är känt och komplettera samma ärende senare. Analysunderlag läggs till som handling och medhandläggare läggs till när fler behöver arbeta i ärendet.
 
 <div data-routine-illustration="needs-analysis"></div>
 
@@ -225,7 +250,7 @@ Annons, beslut och sammanställning registreras som handlingar. En publicering r
 - samtyckes- eller informationsstatus enligt fastställd rutin,
 - kort notering om intresset.
 
-Systemet skapar mentorpost och certifieringsärende i samma sammanhängande operation. Dublettkontroll görs mot befintliga personer, men sammanslagning får aldrig ske automatiskt.
+Systemet skapar en mentorpost och ett ärende om godkännande i samma sammanhängande operation. Dublettkontroll görs mot befintliga personer, men sammanslagning får aldrig ske automatiskt.
 
 <div data-routine-illustration="mentor-registration"></div>
 
@@ -233,7 +258,7 @@ Systemet skapar mentorpost och certifieringsärende i samma sammanhängande oper
 
 ### 7.2 Fördela ärendet
 
-Nya certifieringsärenden kan vara otilldelade. Samordnaren:
+Nya ärenden om godkännande kan vara otilldelade. Samordnaren:
 
 1. kontrollerar arbetsbelastning och eventuell jävssituation,
 2. väljer ansvarig handläggare,
@@ -246,14 +271,14 @@ Handläggaren bekräftar intresseanmälan, beskriver processen och säkerställe
 
 Möjliga utfall:
 
-- `Vill gå vidare`: certifieringsaktiviteterna fortsätter.
+- `Vill gå vidare`: godkännandeaktiviteterna fortsätter.
 - `Återkommer senare`: ärendet sätts i vänteläge med bevakningsdatum.
 - `Avstår`: ärendet avslutas med neutral avslutsorsak.
 - `Felregistrerad/dubblett`: särskild rättelserutin används; posten tas inte bara bort.
 
-## 8. Flöde C: certifiering av mentor
+## 8. Flöde C: prövning av mentor för godkännande
 
-Certifieringsärendet skapas från en versionsstyrd mall. Aktiviteterna visas i rekommenderad ordning, men kommunen kan tillåta parallellt arbete där det är lämpligt.
+Ärendet om godkännande skapas från en versionsstyrd mall. Aktiviteterna visas i rekommenderad ordning, men kommunen kan tillåta parallellt arbete där det är lämpligt.
 
 <div data-routine-illustration="certification-case"></div>
 
@@ -294,12 +319,22 @@ För den registertyp som gäller annan verksamhet med barn får verksamheten enl
 
 **Resultat:**
 
-- Visat och kontrollerat.
+- Kontrollerat, inget fortsatt ställningstagande behövs.
+- Kontrollerat, särskilt ställningstagande krävs.
 - Inte visat.
 - Fel typ eller för gammalt.
 - Äkthet inte bekräftad.
 
-Ett annat resultat än `Visat och kontrollerat` öppnar ett ställningstagande. Handläggaren kan exempelvis begära ett nytt utdrag och sätta aktiviteten i vänteläge, pausa processen eller föreslå att ärendet avslutas.
+Resultatet `Kontrollerat, särskilt ställningstagande krävs` används när kontrollen har genomförts men fortsatt lämplighet behöver bedömas enligt kommunens fastställda rutin. Systemet registrerar inte brott, påföljd eller andra uppgifter ur utdraget. Aktiviteten avslutas och ärendet sätts i läget `Kräver ställningstagande`.
+
+Ansvarig handläggare måste därefter registrera ett uttryckligt ställningstagande:
+
+- fortsätt prövningen,
+- begär komplettering,
+- pausa ärendet, eller
+- avsluta utan godkännande.
+
+Ställningstagandet kräver en saklig motivering och loggas med handläggare och tidpunkt. Motiveringen får inte återge registerutdragets innehåll. Resultaten `Inte visat`, `Fel typ eller för gammalt` och `Äkthet inte bekräftad` följer samma ställningstagandeflöde; handläggaren kan exempelvis begära ett nytt utdrag med bevakningsdatum.
 
 ### 8.3 Kontrollera referenser
 
@@ -334,19 +369,19 @@ Aktiviteten omfattar att föreslå tid, bekräfta deltagare och registrera bokni
 
 **Resultat:** bokad, ombokning behövs, tackat nej eller ej nådd.
 
-### 8.7 Genomför certifieringsintervju
+### 8.7 Genomför intervju inför godkännande
 
-Certifieringsintervjun registreras som ett möte kopplat till aktiviteten. Det ska gå att registrera flera intervjutillfällen utan att tidigare protokoll skrivs över.
+Intervjun inför godkännande registreras som ett möte kopplat till aktiviteten. Det ska gå att registrera flera intervjutillfällen utan att tidigare protokoll skrivs över.
 
 Minsta mötesuppgifter:
 
-- mötestyp `Certifieringsintervju`,
+- mötestyp `Intervju inför godkännande`,
 - datum och tid,
 - deltagande handläggare,
 - sammanfattning,
 - bedömningsresultat.
 
-Ett mer omfattande protokoll registreras som handling kopplad till mötet och aktiviteten. Andra kontakter och senare uppföljningar registreras som egna möten med annan mötestyp, så att de inte blandas ihop med certifieringsintervjun.
+Ett mer omfattande protokoll registreras som handling kopplad till mötet och aktiviteten. Andra kontakter och senare uppföljningar registreras som egna möten med annan mötestyp, så att de inte blandas ihop med intervjun inför godkännande.
 
 ### 8.8 Fatta beslut om godkännande
 
@@ -362,12 +397,12 @@ Beslutsfattaren ska se:
 
 **Möjliga utfall:**
 
-- Godkänd och certifierad.
+- Godkänd.
 - Komplettering krävs.
 - Inte godkänd.
 - Ansökan återkallad.
 
-Beslutet kräver beslutsfattare, datum, strukturerad orsak och motivering enligt fastställd rutin. Vid godkännande uppdateras mentorns tillgänglighet för matchning. Vid övriga slutliga utfall avslutas certifieringsärendet och återstående aktiviteter markeras `Ej aktuella`.
+Beslutet kräver beslutsfattare, datum, strukturerad orsak och motivering enligt fastställd rutin. Vid godkännande uppdateras mentorns tillgänglighet för matchning. Vid övriga slutliga utfall avslutas ärendet om godkännande och återstående aktiviteter markeras `Ej aktuella`.
 
 ## 9. Flöde D: avvikelse och ställningstagande
 
@@ -389,7 +424,7 @@ Ställningstagandet ska ligga kvar i arbetskön tills det har hanterats. Det få
 
 Matchning är ett eget ärende och ska inte döljas som en status på mentorn.
 
-1. Handläggaren startar matchningsärendet från en certifierad mentor eller ett dokumenterat familjebehov.
+1. Handläggaren startar matchningsärendet från en godkänd mentor eller ett dokumenterat familjebehov.
 2. Systemet visar endast mentorer som är godkända, tillgängliga och uppfyller hårda kriterier.
 3. Handläggaren bedömer mjuka kriterier och dokumenterar kort varför en match föreslås.
 4. Mentor och berörd part kontaktas enligt kommunens rutin.
@@ -399,7 +434,7 @@ Matchning är ett eget ärende och ska inte döljas som en status på mentorn.
 
 <div data-routine-illustration="matching-case"></div>
 
-En misslyckad matchning ändrar inte automatiskt mentorns certifieringsstatus. Om något framkommer som påverkar lämpligheten skapas ett separat uppföljningsärende och mentorns tillgänglighet kan pausas genom ett uttryckligt beslut.
+En misslyckad matchning ändrar inte automatiskt mentorns godkännandestatus. Om något framkommer som påverkar lämpligheten skapas ett separat uppföljningsärende och mentorns tillgänglighet kan pausas genom ett uttryckligt beslut.
 
 **I systemet:** [Öppna matchningsärenden](feature:matching.list)
 
@@ -520,7 +555,8 @@ Systemet bör automatiskt:
 - öppna ställningstagande vid avvikelse,
 - förhindra slutligt godkännande när obligatoriska steg eller avvikelser återstår,
 - markera återstående aktiviteter som ej aktuella när ett ärende avslutas,
-- logga ansvar, status, resultat, beslut och handlingar.
+- logga ansvar, status, resultat, beslut och handlingar,
+- beräkna dashboardens antal och arbetsköer från samma ärenden och aktiviteter som visas i register och kort.
 
 Systemet bör inte automatiskt:
 
@@ -530,7 +566,8 @@ Systemet bör inte automatiskt:
 - tolka fritext som ett verksamhetsbeslut,
 - avsluta ett ärende enbart på grund av ett avvikande aktivitetsresultat,
 - återöppna eller radera avslutade ärenden,
-- lagra kopior av identitetshandlingar eller registerutdrag utan fastställd rutin.
+- lagra kopior av identitetshandlingar eller registerutdrag utan fastställd rutin,
+- skapa en separat statusuppsättning för dashboard, mentorflöde eller presentation.
 
 ## 17. Roller och beslutspunkter
 
@@ -541,7 +578,7 @@ Systemet bör inte automatiskt:
 | Registrera möte eller handling | Ja | Ja | Nej som standard |
 | Fördela otilldelat ärende | Begränsat | Ja | Nej |
 | Hantera avvikelse | Om delegerad | Ja | Nej |
-| Fatta certifieringsbeslut | Om delegerad | Ja | Nej |
+| Fatta beslut om godkännande | Om delegerad | Ja | Nej |
 | Pausa eller avsluta ärende | Om delegerad | Ja | Nej |
 | Återöppna ärende | Nej | Ja | Nej som standard |
 | Administrera användare och mallar | Nej | Begränsat | Ja |
@@ -550,7 +587,7 @@ Rollmatrisen är ett förslag. Den slutliga behörigheten ska följa kommunens d
 
 ## 18. Centrala användningsscenarier för prototyptest
 
-### Scenario 1: okomplicerad certifiering
+### Scenario 1: okomplicerad prövning för godkännande
 
 En ny mentor registreras, tilldelas en handläggare, genomför alla kontroller med godtagbara resultat, intervjuas och godkänns. Testet ska visa att nästa steg är tydligt och att inga onödiga formulär visas.
 
@@ -576,16 +613,16 @@ Samordnaren byter ansvarig på ett pågående ärende. Ärvt ansvar uppdateras p
 
 ### Scenario 7: flera intervjuer
 
-Två certifieringsintervjuer registreras som separata möten med var sin sammanfattning och deltagarlista. Båda visas kronologiskt och kan ha egna handlingar.
+Två intervjuer inför godkännande registreras som separata möten med var sin sammanfattning och deltagarlista. Båda visas kronologiskt och kan ha egna handlingar.
 
 ### Scenario 8: 250 mentorer
 
-Handläggaren filtrerar på egna, försenade, otilldelade och väntande ärenden. Listor är paginerade, sökbara och sorterade utan att varje ärende behöver öppnas. Samma data visas konsekvent på dashboard, lista och ärendekort.
+Handläggaren växlar mellan `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden` på dashboarden. Väntande ärenden väljs via ärendeläget och öppnas i ärenderegistret. Listor är paginerade, sökbara och sorterade utan att varje ärende behöver öppnas. Antal, status, nästa aktivitet och ansvarig ska vara konsekventa på dashboard, i ärenderegistret och på ärendekortet. Mentorflödet kontrolleras separat som en sekundär registeröversikt.
 
 ## 19. Frågor som måste beslutas före pilot
 
 1. Vilken organisatorisk enhet är personuppgiftsansvarig och ärendeägare?
-2. Är certifieringsbeslutet ett formellt förvaltningsbeslut och vilka regler om kommunicering, motivering och underrättelse gäller?
+2. Är beslutet om godkännande ett formellt förvaltningsbeslut och vilka regler om kommunicering, motivering och underrättelse gäller?
 3. Vilket registerutdrag får begäras för den faktiska mentorrollen och vid vilken tidpunkt?
 4. Vilken information får dokumenteras från registerkontrollen?
 5. Vilka handlingar ska diarieföras eller överföras till e-arkiv?
@@ -615,7 +652,7 @@ Situationskatalogen beskriver föreslaget systemstöd och normal handläggning. 
 
 #### En ny intresseanmälan kommer in
 
-**Gör nu:** sök efter personen innan en ny mentorpost skapas. Kontrollera möjliga träffar med tillräcklig information för att skilja personer åt. Skapa mentor och certifieringsärende om ingen säker dubblett finns.
+**Gör nu:** sök efter personen innan en ny mentorpost skapas. Kontrollera möjliga träffar med tillräcklig information för att skilja personer åt. Skapa en mentorpost och ett ärende om godkännande om ingen säker dubblett finns.
 
 **Registrera:** kontaktuppgifter, kontaktväg, kort beskrivning, informationsstatus och hur anmälan kom in. Systemet registrerar skapare och tidpunkt.
 
@@ -653,7 +690,7 @@ Situationskatalogen beskriver föreslaget systemstöd och normal handläggning. 
 
 **Gör inte:** låta systemet koppla registreringen dolt eller skapa ett nytt ärende för varje kort kontakt.
 
-### A.2 Certifieringskontroller
+### A.2 Kontroller inför godkännande
 
 #### Identiteten kan inte verifieras
 
@@ -941,7 +978,7 @@ Situationskatalogen beskriver föreslaget systemstöd och normal handläggning. 
 
 **Registrera:** `Tackat nej`, datum och övergripande orsakskategori om den behövs för fortsatt matchning.
 
-**Nästa läge:** matchningsärendet avslutas utan match eller fortsätter med ett annat förslag. Certifieringen påverkas inte automatiskt.
+**Nästa läge:** matchningsärendet avslutas utan match eller fortsätter med ett annat förslag. Godkännandet påverkas inte automatiskt.
 
 **Gör inte:** markera mentorn som olämplig enbart på grund av ett nej.
 
@@ -963,7 +1000,7 @@ Situationskatalogen beskriver föreslaget systemstöd och normal handläggning. 
 
 **Nästa läge:** uppdragsärendet är `Pausat`; mentorns matchningstillgänglighet bedöms separat.
 
-**Gör inte:** ändra mentorns certifieringsstatus utan ett separat underlag och beslut.
+**Gör inte:** ändra mentorns godkännandestatus utan ett separat underlag och beslut.
 
 #### Mentorn eller familjen vill avsluta uppdraget
 

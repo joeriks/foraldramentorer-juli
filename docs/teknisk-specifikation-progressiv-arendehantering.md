@@ -156,6 +156,10 @@ interface CaseTypeDefinition {
   name: string;
   status: "draft" | "published" | "retired";
   defaultPriority: "low" | "normal" | "high";
+  mentorMode: "required" | "optional" | "none";
+  helpText: string;
+  registrationHint: string;
+  detailFieldIds: string[];
   activityTemplateRefs: Array<{ templateId: string; version: number }>;
 }
 
@@ -176,6 +180,10 @@ interface ResultDefinition {
   requiresNote: boolean;
 }
 ```
+
+Administrationsvyn för ärendetyper är avsiktligt begränsad. Administratören kan ändra hjälptext, registreringsanvisning, mentorkoppling och välja kompletterande fält ur en centralt definierad fältkatalog. Namn, tekniskt ID, datatyp och lagringsnyckel kan inte ändras i denna vy. Därmed kan verksamheten anpassa formulären utan att skapa egna inkompatibla datamodeller.
+
+Varje sparad ändring publicerar en ny version och pensionerar den tidigare versionen. Nya ärenden använder den nya publicerade versionen. Befintliga ärenden fortsätter använda sin sparade `caseTypeVersion`. Om ett fält tas bort från en ny version döljs det i nya registreringar, men tidigare sparade värden raderas inte.
 
 ### 4.2 Aktiviteter
 
@@ -557,7 +565,13 @@ När användaren kompletterar ärendet används befintlig uppdelning:
 
 Flikarna använder samma ärende-ID och laddar relaterade poster separat.
 
-### 10.3 Systemförslag
+### 10.3 Mentorpost
+
+Mentorposten är ett personregisterkort och visar `Grunduppgifter`, `Ärenden` och `Mentorlogg`. Kontroller, möten och beslut får inte ha parallella redigeringsvyer på mentorposten utan öppnas i det ärende där de hör hemma. Mentorposten får visa en sammanfattning och ett rekommenderat nästa steg, men kommandot ska länka till rätt ärende och aktivitet.
+
+Personnummer och verifieringssätt hör till mentorpostens identitetsuppgifter. Att identiteten har kontrollerats, kontrollens resultat och handläggningshistoriken hör till aktiviteten i ärendet om godkännande.
+
+### 10.4 Systemförslag
 
 Systemet kan föreslå struktur utan att fatta verksamhetsbeslut åt användaren.
 

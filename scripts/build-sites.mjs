@@ -33,11 +33,14 @@ export default {
     const url = new URL(request.url);
     const asset = assets[url.pathname] || (request.headers.get("accept")?.includes("text/html") ? assets["/"] : null);
     if (!asset) return new Response("Not found", { status: 404 });
+    const cacheControl = url.pathname.startsWith("/vendor/")
+      ? "public, max-age=3600"
+      : "no-cache";
     return new Response(request.method === "HEAD" ? null : asset.body, {
       status: 200,
       headers: {
         "content-type": asset.contentType,
-        "cache-control": asset.contentType.startsWith("text/html") ? "no-cache" : "public, max-age=3600",
+        "cache-control": cacheControl,
         "x-content-type-options": "nosniff"
       }
     });

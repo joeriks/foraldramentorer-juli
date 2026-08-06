@@ -23,7 +23,7 @@ Plattformens roll är att göra detta möjligt i kommunal skala utan att mötet 
 
 ## Systemets huvudmoduler
 
-### 1. Onboarding och certifiering
+### 1. Introduktion och godkännande
 
 Syfte: Säkerställa att varje mentor är lämplig innan personen kan matchas med en förälder.
 
@@ -38,7 +38,7 @@ Delfunktioner:
 - Intervjubokning och intervjuprotokoll.
 - Gemensam mötesjournal för intervjuer, uppföljningar, avstämningar och andra kontakter med mentorn.
 - Kontroller ska vara spårbara med status, tidpunkt och ansvarig handläggare.
-- Certifieringsbeslut och aktivering i matchningsdatabasen.
+- Beslut om godkännande och aktivering i matchningsdatabasen.
 
 ### 2. Matchningsmotorn
 
@@ -116,16 +116,16 @@ Utbildningen föreslås bestå av fyra block:
 3. Sekretess och tystnadsplikt.
 4. Orosanmälan.
 
-Pedagogiken bör bygga på case och dilemman snarare än långa regeltexter. Kunskapsavstämningen ska lära ut genom återkoppling och låta mentorn försöka igen direkt vid fel svar. Kritiska frågor om sekretess och orosanmälan måste däremot vara korrekt förstådda innan certifiering.
+Pedagogiken bör bygga på case och dilemman snarare än långa regeltexter. Kunskapsavstämningen ska lära ut genom återkoppling och låta mentorn försöka igen direkt vid fel svar. Kritiska frågor om sekretess och orosanmälan måste däremot vara korrekt förstådda innan godkännande.
 
 ## Första prototyp: Kommunens kontrollpanel
 
-Den första prototypen ska visa administratörens vy för onboarding och certifiering.
+Den första prototypen ska visa administratörens vy för introduktion och godkännande.
 
 Prioriterade funktioner:
 
 - Enkel pipeline över kandidater.
-- Status för varje steg i certifieringen.
+- Status för varje steg i prövningen för godkännande.
 - Mentordetaljer.
 - Centralt ärenderegister.
 - Personanknutna och generella ärenden.
@@ -135,7 +135,7 @@ Prioriterade funktioner:
 - Automatisk händelselogg när aktiviteter eller handlingar ändras.
 - Intervjuanteckningar.
 - Manuell statusändring.
-- Certifieringsknapp när alla krav är uppfyllda.
+- Knapp för godkännande när alla krav är uppfyllda.
 - Lokal datalagring i IndexedDB under prototypfasen.
 
 Denna prototyp är avsiktligt enkel. Målet är att tidigt kunna känna på arbetsflödet, inte att låsa slutlig informationsarkitektur eller visuell identitet.
@@ -150,7 +150,7 @@ Minnesregel:
 
 > Aktivitet = att göra. Händelse = gjort. Handling = underlaget.
 
-Ett certifieringsärende skapas automatiskt för varje ny mentor med aktiviteter för identitet, belastningsregister, referenser, e-learning, kunskapsavstämning, kallelse, intervju och beslut. Handläggaren kan även lägga till fria uppföljningsaktiviteter, exempelvis att kontakta mentorn när en referens inte går att nå.
+Ett ärende om godkännande skapas automatiskt för varje ny mentor med aktiviteter för identitet, belastningsregister, referenser, e-learning, kunskapsavstämning, kallelse, intervju och beslut. Handläggaren kan även lägga till fria uppföljningsaktiviteter, exempelvis att kontakta mentorn när en referens inte går att nå.
 
 ### Aktiviteter och kommunal handläggningsrutin
 

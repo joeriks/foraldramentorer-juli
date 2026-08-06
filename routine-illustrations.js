@@ -20,14 +20,14 @@ export const ROUTINE_ILLUSTRATIONS = Object.freeze({
     meta: [["Namn", "Amina Ekström"], ["Kontaktväg", "Telefon"], ["Handläggare", "Ej tilldelad"]],
     panels: [
       { title: "Grunduppgifter", rows: [["Språk", "Svenska, arabiska"], ["Område", "Öster"], ["Tillgänglighet", "Vardagskvällar"]] },
-      { title: "Kontroll före registrering", rows: [["Möjliga dubbletter", "Inga säkra träffar"], ["Informationsstatus", "Information lämnad"], ["Certifieringsärende", "Skapas samtidigt"]] }
+      { title: "Kontroll före registrering", rows: [["Möjliga dubbletter", "Inga säkra träffar"], ["Informationsstatus", "Information lämnad"], ["Ärende om godkännande", "Skapas samtidigt"]] }
     ],
-    callouts: ["Dublettkontrollen sker innan posten sparas.", "Mentorpost och certifieringsärende hör ihop från start."],
-    caption: "Exempel på sammanhållen registrering av mentor och certifieringsärende."
+    callouts: ["Dublettkontrollen sker innan posten sparas.", "Mentorposten och ärendet om godkännande hör ihop från start."],
+    caption: "Exempel på sammanhållen registrering av en mentorpost och ett ärende om godkännande."
   },
   "certification-case": {
     kind: "Illustrerad prototypvy",
-    title: "Certifiering av Amina Ekström",
+    title: "Godkännande av Amina Ekström",
     status: "Pågår",
     featureId: "cases.list",
     meta: [["Ärende", "FM-4550-387"], ["Ansvarig", "Sara Lind"], ["Nästa steg", "Kontrollera referenser"]],
@@ -36,7 +36,7 @@ export const ROUTINE_ILLUSTRATIONS = Object.freeze({
       { title: "Aktuell aktivitet", rows: [["Ansvarig", "Sara Lind"], ["Förfallodatum", "2026-08-18"], ["Underlag", "1 handling"], ["Notering", "Andra kontaktförsöket planerat"]] }
     ],
     callouts: ["Status och resultat visas var för sig.", "Nästa arbetssteg syns både på ärendet och aktiviteten."],
-    caption: "Exempel på ett certifieringsärende där handläggaren snabbt ser nuläge och nästa steg."
+    caption: "Exempel på ett ärende om godkännande där handläggaren snabbt ser nuläge och nästa steg."
   },
   "deviation-assessment": {
     kind: "Principillustration",
@@ -58,7 +58,7 @@ export const ROUTINE_ILLUSTRATIONS = Object.freeze({
     featureId: "matching.list",
     meta: [["Behov", "Familj i område Öster"], ["Språk", "Arabiska"], ["Tillgänglighet", "Vardagskvällar"]],
     panels: [
-      { title: "Hårda kriterier", rows: [["Certifierad", "Ja", "success"], ["Tillgänglig", "Ja", "success"], ["Område", "Öster", "success"]] },
+      { title: "Hårda kriterier", rows: [["Godkänd", "Ja", "success"], ["Tillgänglig", "Ja", "success"], ["Område", "Öster", "success"]] },
       { title: "Föreslagna mentorer", rows: [["Amina Ekström", "Uppfyller 3 av 3 kriterier", "primary"], ["Leila Rahimi", "Uppfyller 2 av 3 kriterier", "muted"], ["Samira Haddad", "Inte tillgänglig", "warning"]] }
     ],
     callouts: ["Systemet filtrerar på fastställda hårda kriterier.", "Handläggaren dokumenterar den slutliga bedömningen."],
@@ -97,7 +97,7 @@ export const ROUTINE_ILLUSTRATIONS = Object.freeze({
     featureId: "cases.list",
     meta: [["Ärende", "FM-4550-387"], ["Mentor", "Amina Ekström"], ["Senast ändrat", "2026-08-05"]],
     panels: [
-      { title: "Registreringar", rows: [["Möte", "Certifieringsintervju · 2026-08-02"], ["Tjänsteanteckning", "Referenssamtal · 2026-07-28"], ["Handling", "Intervjuunderlag.pdf"]] },
+      { title: "Registreringar", rows: [["Möte", "Intervju inför godkännande · 2026-08-02"], ["Tjänsteanteckning", "Referenssamtal · 2026-07-28"], ["Handling", "Intervjuunderlag.pdf"]] },
       { title: "Koppling", rows: [["Ärende", "FM-4550-387"], ["Aktivitet", "Genomför intervju"], ["Version", "1"], ["Registrerad av", "Sara Lind"]] }
     ],
     callouts: ["Objekttypen visar vad registreringen representerar.", "Handlingar kan kopplas till både ärende och relevant aktivitet."],

@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260805-routine-illustrations-v4">
+    <link rel="stylesheet" href="styles.css?v=20260806-registry-assessment-v11">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -28,6 +28,7 @@
             <a id="navAdministration" class="nav-link sidebar-menu-heading" href="#/administration">Systemadministration</a>
             <div class="sidebar-subnav" aria-label="Systemadministration">
               <a id="navHandlers" class="nav-link" href="#/administration">Handläggare</a>
+              <a id="navCaseTypes" class="nav-link" href="#/case-types">Ärendetyper</a>
               <a id="navRoutines" class="nav-link" href="#/routines">Rutiner</a>
             </div>
           </div>
@@ -50,6 +51,7 @@
                   <li><hr class="dropdown-divider"></li>
                   <li><h2 class="dropdown-header">Systemadministration</h2></li>
                   <li><a class="dropdown-item" href="#/administration">Handläggare</a></li>
+                  <li><a class="dropdown-item" href="#/case-types">Ärendetyper</a></li>
                   <li><a class="dropdown-item" href="#/routines">Rutiner</a></li>
                 </ul>
               </div>
@@ -93,54 +95,49 @@
 
         <main class="app-main">
           <section id="dashboardView" class="view-stack">
-            <section class="card">
+            <section class="card" aria-label="Ärendeläge">
               <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
                 <div>
-                  <h2 class="h5 mb-1">Mentorflöde</h2>
-                  <p class="text-secondary mb-0">Mentorer fördelade efter status i introduktionen.</p>
+                  <h2 class="h5 mb-1">Ärendeläge</h2>
+                  <p class="text-secondary mb-0">Aktuellt läge i kommunens öppna handläggning.</p>
                 </div>
                 <div class="text-secondary small">
-                  Totalt <strong id="totalCount">0</strong> personer
+                  <strong id="openCaseCount">0</strong> öppna ärenden
                 </div>
               </div>
-              <div id="pipelineBoard" class="card-body">
-                <div class="pipeline-grid">
-                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Anmäld">
-                    <div class="pipeline-name fw-semibold">Anmäld</div>
-                    <div class="pipeline-count"><strong data-pipeline-count="Anmäld">0</strong><span>personer</span></div>
-                    <div class="pipeline-description">Ny intresseanmälan</div>
-                    <div class="pipeline-action">Visa mentorer</div>
+              <div id="caseSummaryBoard" class="card-body">
+                <div class="case-summary-grid">
+                  <button type="button" class="case-summary-item" data-case-summary-status="new">
+                    <span class="case-summary-label">Nya</span>
+                    <strong data-case-status-count="new">0</strong>
+                    <span class="case-summary-description">Ännu inte påbörjade</span>
                   </button>
-                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Kontrollerad">
-                    <div class="pipeline-name fw-semibold">Kontrollerad</div>
-                    <div class="pipeline-count"><strong data-pipeline-count="Kontrollerad">0</strong><span>personer</span></div>
-                    <div class="pipeline-description">Register och referenser klara</div>
-                    <div class="pipeline-action">Visa mentorer</div>
+                  <button type="button" class="case-summary-item" data-case-summary-status="in_progress">
+                    <span class="case-summary-label">Pågående</span>
+                    <strong data-case-status-count="in_progress">0</strong>
+                    <span class="case-summary-description">Aktiv handläggning</span>
                   </button>
-                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Utbildning pågår">
-                    <div class="pipeline-name fw-semibold">Utbildning pågår</div>
-                    <div class="pipeline-count"><strong data-pipeline-count="Utbildning pågår">0</strong><span>personer</span></div>
-                    <div class="pipeline-description">Utbildningsmoment återstår</div>
-                    <div class="pipeline-action">Visa mentorer</div>
+                  <button type="button" class="case-summary-item" data-case-summary-status="waiting">
+                    <span class="case-summary-label">Väntar</span>
+                    <strong data-case-status-count="waiting">0</strong>
+                    <span class="case-summary-description">Inväntar extern part</span>
                   </button>
-                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Redo för intervju">
-                    <div class="pipeline-name fw-semibold">Redo för intervju</div>
-                    <div class="pipeline-count"><strong data-pipeline-count="Redo för intervju">0</strong><span>personer</span></div>
-                    <div class="pipeline-description">Intervju eller beslut återstår</div>
-                    <div class="pipeline-action">Visa mentorer</div>
+                  <button type="button" class="case-summary-item" data-case-summary-status="decision_required">
+                    <span class="case-summary-label">Ställningstagande</span>
+                    <strong data-case-status-count="decision_required">0</strong>
+                    <span class="case-summary-description">Kräver bedömning eller beslut</span>
                   </button>
-                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Godkänd/Certifierad">
-                    <div class="pipeline-name fw-semibold">Godkänd/Certifierad</div>
-                    <div class="pipeline-count"><strong data-pipeline-count="Godkänd/Certifierad">0</strong><span>personer</span></div>
-                    <div class="pipeline-description">Tillgänglig för matchning</div>
-                    <div class="pipeline-action">Visa mentorer</div>
+                  <button type="button" class="case-summary-item" data-case-summary-status="paused">
+                    <span class="case-summary-label">Pausade</span>
+                    <strong data-case-status-count="paused">0</strong>
+                    <span class="case-summary-description">Handläggning tillfälligt stoppad</span>
                   </button>
                 </div>
               </div>
             </section>
 
             <div class="row g-4">
-              <section class="col-xl-7">
+              <section class="col-xl-8">
                 <div class="card h-100">
                   <div class="card-header bg-white d-flex justify-content-between align-items-start gap-2">
                     <div>
@@ -154,16 +151,16 @@
                       <button id="myActivitiesQueueButton" type="button" class="btn btn-primary" aria-pressed="true">Mina aktiviteter</button>
                       <button id="unassignedQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Otilldelade</button>
                       <button id="overdueQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Försenade</button>
+                      <button id="decisionQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Ställningstaganden</button>
                     </div>
                   </div>
                   <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle mb-0">
+                    <table class="table table-sm table-hover align-middle mb-0 dashboard-queue-table">
                       <thead class="table-light">
                         <tr>
                           <th>Ärende</th>
-                          <th>Person</th>
-                          <th>Nästa steg</th>
-                          <th>Förfallodatum</th>
+                          <th>Koppling</th>
+                          <th>Nästa aktivitet</th>
                           <th>Åtgärd</th>
                         </tr>
                       </thead>
@@ -173,20 +170,42 @@
                 </div>
               </section>
 
-              <section class="col-xl-5">
+              <section class="col-xl-4">
                 <div class="card dashboard-shortcuts-card">
                   <div class="card-header bg-white">
                     <h2 class="h5 mb-1">Snabbvägar</h2>
                     <p class="text-secondary mb-0">Vanliga arbetsmoment.</p>
                   </div>
                   <div class="card-body d-flex flex-column gap-2">
-                    <button id="dashboardNewCaseButton" type="button" class="btn btn-primary">Registrera mentor</button>
+                    <button id="dashboardNewCaseButton" type="button" class="btn btn-primary">Nytt ärende</button>
+                    <button id="dashboardNewMentorButton" type="button" class="btn btn-outline-primary">Registrera mentor</button>
+                    <a class="btn btn-outline-secondary" href="#/cases">Öppna ärenderegistret</a>
                     <a id="dashboardMentorRegisterLink" class="btn btn-outline-secondary" href="#/mentors">Öppna mentorregistret</a>
-                    <button type="button" class="btn btn-outline-secondary" disabled>Exportera beslutsunderlag (kommer senare)</button>
                   </div>
                 </div>
               </section>
             </div>
+
+            <section class="card">
+              <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
+                <div>
+                  <h2 class="h5 mb-1">Mentorflöde</h2>
+                  <p class="text-secondary mb-0">Registeröversikt över mentorernas läge i introduktionen.</p>
+                </div>
+                <div class="text-secondary small">
+                  Totalt <strong id="totalCount">0</strong> personer
+                </div>
+              </div>
+              <div id="pipelineBoard" class="card-body">
+                <div class="pipeline-grid">
+                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Anmäld"><div class="pipeline-name fw-semibold">Anmäld</div><div class="pipeline-count"><strong data-pipeline-count="Anmäld">0</strong><span>personer</span></div><div class="pipeline-description">Ny intresseanmälan</div><div class="pipeline-action">Visa mentorer</div></button>
+                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Kontrollerad"><div class="pipeline-name fw-semibold">Kontrollerad</div><div class="pipeline-count"><strong data-pipeline-count="Kontrollerad">0</strong><span>personer</span></div><div class="pipeline-description">Register och referenser klara</div><div class="pipeline-action">Visa mentorer</div></button>
+                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Utbildning pågår"><div class="pipeline-name fw-semibold">Utbildning pågår</div><div class="pipeline-count"><strong data-pipeline-count="Utbildning pågår">0</strong><span>personer</span></div><div class="pipeline-description">Utbildningsmoment återstår</div><div class="pipeline-action">Visa mentorer</div></button>
+                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Redo för intervju"><div class="pipeline-name fw-semibold">Redo för intervju</div><div class="pipeline-count"><strong data-pipeline-count="Redo för intervju">0</strong><span>personer</span></div><div class="pipeline-description">Intervju eller beslut återstår</div><div class="pipeline-action">Visa mentorer</div></button>
+                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Godkänd"><div class="pipeline-name fw-semibold">Godkänd</div><div class="pipeline-count"><strong data-pipeline-count="Godkänd">0</strong><span>personer</span></div><div class="pipeline-description">Tillgänglig för matchning</div><div class="pipeline-action">Visa mentorer</div></button>
+                </div>
+              </div>
+            </section>
           </section>
 
           <section id="presentationView" class="view-stack" hidden>
@@ -211,6 +230,11 @@
                           <h3 id="presentationStepTitle" class="h5 mb-1"></h3>
                           <p id="presentationStepSummary" class="text-secondary mb-0"></p>
                         </div>
+                      </div>
+
+                      <div class="presentation-points mb-3">
+                        <h4 class="h6">Visa i detta steg</h4>
+                        <ul id="presentationStepPoints" class="mb-0"></ul>
                       </div>
 
                       <form id="presentationCommentForm" class="presentation-comment-form border rounded mb-3">
@@ -328,7 +352,7 @@
                         <label class="form-label" for="caseTypeInput">Ärendetyp</label>
                         <select id="caseTypeInput" class="form-select form-select-sm" required>
                           <option value="">Välj ärendetyp</option>
-                          <option value="mentor-certification">Certifiering av mentor</option>
+                          <option value="mentor-certification">Godkännande av mentor</option>
                           <option value="mentor-follow-up">Uppföljning</option>
                           <option value="matching">Matchning</option>
                           <option value="mentor-assignment">Mentoruppdrag</option>
@@ -339,18 +363,62 @@
                       </div>
                       <div class="col-md-6">
                         <label class="form-label" for="caseTitleInput">Rubrik</label>
-                        <input id="caseTitleInput" class="form-control form-control-sm" required autocomplete="off">
+                        <input id="caseTitleInput" class="form-control form-control-sm" required autocomplete="off" placeholder="Välj ärendetyp först">
                       </div>
-                      <div class="col-md-6">
-                        <label class="form-label" for="caseMentorInput">Mentor <span class="text-secondary fw-normal">(valfritt)</span></label>
+                      <div class="col-12">
+                        <div id="caseTypeGuidance" class="case-type-guidance" hidden>
+                          <strong id="caseTypeGuidanceTitle"></strong>
+                          <p id="caseTypeGuidanceText" class="mb-1"></p>
+                          <p id="caseTypeRegistrationHint" class="mb-0"></p>
+                        </div>
+                      </div>
+                      <div id="caseMentorField" class="col-md-6">
+                        <label id="caseMentorLabel" class="form-label" for="caseMentorInput">Mentor <span class="text-secondary fw-normal">(valfritt)</span></label>
                         <input id="caseMentorInput" class="form-control form-control-sm" autocomplete="off" placeholder="Sök mentor med namn">
                         <input id="caseMentorIdInput" type="hidden">
                         <div id="caseMentorSuggestions" class="mentor-suggestions list-group mt-1" hidden></div>
                       </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="caseOrganizationUnitInput">Ansvarig enhet</label>
+                        <select id="caseOrganizationUnitInput" class="form-select form-select-sm" required>
+                          <option value="foraldramentorer">FöräldraMentorer</option>
+                          <option value="familjestod">Familjestöd</option>
+                          <option value="forebyggande-stod">Förebyggande stöd</option>
+                          <option value="integration-etablering">Integration och etablering</option>
+                        </select>
+                      </div>
                       <div class="col-12"><div id="caseDuplicatePanel" class="alert alert-warning py-2 mb-0" hidden></div></div>
                       <div class="col-12">
-                        <label class="form-label" for="caseDescriptionInput">Kort beskrivning</label>
+                        <label id="caseDescriptionLabel" class="form-label" for="caseDescriptionInput">Kort beskrivning</label>
                         <textarea id="caseDescriptionInput" class="form-control form-control-sm" rows="3"></textarea>
+                      </div>
+                      <div id="needsAnalysisFields" class="col-12" hidden>
+                        <div class="needs-analysis-fields">
+                          <h4 class="h6 mb-1">Behovets omfattning</h4>
+                          <p class="small text-secondary mb-3">Fyll i det som är känt nu. Uppgifterna kan kompletteras när analysen fortsätter.</p>
+                          <div class="row g-3">
+                            <div class="col-md-6">
+                              <label class="form-label" for="needsTargetGroupInput">Målgrupp</label>
+                              <input id="needsTargetGroupInput" class="form-control form-control-sm" placeholder="Exempel: vårdnadshavare med barn 6–12 år">
+                            </div>
+                            <div class="col-md-6">
+                              <label class="form-label" for="needsAreaInput">Geografiskt område</label>
+                              <input id="needsAreaInput" class="form-control form-control-sm" placeholder="Exempel: Öster eller hela kommunen">
+                            </div>
+                            <div class="col-md-6">
+                              <label class="form-label" for="needsLanguagesInput">Språkbehov</label>
+                              <input id="needsLanguagesInput" class="form-control form-control-sm" placeholder="Exempel: arabiska och svenska">
+                            </div>
+                            <div class="col-md-3">
+                              <label class="form-label" for="needsDesiredCountInput">Önskat antal mentorer</label>
+                              <input id="needsDesiredCountInput" class="form-control form-control-sm" type="number" min="1" step="1">
+                            </div>
+                            <div class="col-md-3">
+                              <label class="form-label" for="needsDesiredDateInput">Behövs senast</label>
+                              <input id="needsDesiredDateInput" class="form-control form-control-sm" type="date">
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       <div class="col-md-6 case-advanced-field">
                         <label class="form-label" for="caseOwnerInput">Ansvarig handläggare</label>
@@ -375,6 +443,7 @@
                     <div id="caseCoHandlerInputs" class="case-cohandlers border rounded"></div>
                   </section>
                 </div>
+                <div id="caseFormFeedback" class="alert alert-danger mt-3 mb-0" role="alert" aria-live="assertive" hidden></div>
                 <div class="d-flex justify-content-end gap-2 mt-4">
                   <button id="cancelCaseCreateButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
                   <button id="saveCaseButton" type="submit" class="btn btn-primary btn-sm">Skapa ärende</button>
@@ -405,10 +474,15 @@
                         <h3 class="record-section-title">Handläggning</h3>
                         <dl class="record-fields mb-0">
                           <div><dt>Ansvarig</dt><dd id="caseOwnerFact"></dd></div>
+                          <div><dt>Ansvarig enhet</dt><dd id="caseOrganizationUnitFact"></dd></div>
                           <div><dt>Medhandläggare</dt><dd id="caseCoHandlersFact"></dd></div>
                           <div><dt>Mentor</dt><dd id="caseMentorFact"></dd></div>
                           <div><dt>Skapat</dt><dd id="caseCreatedFact"></dd></div>
                         </dl>
+                      </section>
+                      <section id="caseTypeDetailsSection" class="record-section" hidden>
+                        <h3 id="caseTypeDetailsTitle" class="record-section-title">Kompletterande uppgifter</h3>
+                        <dl id="caseTypeDetailsFacts" class="record-fields mb-0"></dl>
                       </section>
                     </div>
                     <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
@@ -490,9 +564,9 @@
                       </form>
                       <section id="activityDeviationPanel" class="activity-deviation-panel border-top" hidden>
                         <h4 class="h6">Ställningstagande krävs</h4>
-                        <p class="small text-secondary">Aktivitetsresultatet är avvikande. Ansvarig handläggare behöver besluta hur ärendet ska fortsätta.</p>
+                        <p id="activityDeviationHelp" class="small text-secondary">Aktivitetsresultatet är avvikande. Ansvarig handläggare behöver besluta hur ärendet ska fortsätta.</p>
                         <div class="row g-3">
-                          <div class="col-md-6"><label class="form-label" for="deviationOutcomeInput">Ställningstagande</label><select id="deviationOutcomeInput" class="form-select form-select-sm"><option value="continue">Fortsätt handläggningen</option><option value="request_supplement">Begär komplettering</option><option value="pause_case">Pausa ärendet</option><option value="close_case">Avsluta ärendet</option></select></div>
+                          <div class="col-md-6"><label class="form-label" for="deviationOutcomeInput">Ställningstagande</label><select id="deviationOutcomeInput" class="form-select form-select-sm"><option value="continue">Fortsätt prövningen</option><option value="request_supplement">Begär komplettering</option><option value="pause_case">Pausa ärendet</option><option value="close_case">Avsluta utan godkännande</option></select></div>
                           <div class="col-md-6"><label class="form-label" for="deviationReasonInput">Orsak</label><select id="deviationReasonInput" class="form-select form-select-sm" required><option value="">Välj orsak</option><option value="insufficient_information">Otillräckligt underlag</option><option value="unsuitable">Bedöms inte lämplig</option><option value="awaiting_supplement">Inväntar komplettering</option><option value="other">Annan orsak</option></select></div>
                           <div class="col-md-6"><label class="form-label" for="deviationResumeDateInput">Bevakningsdatum <span class="text-secondary fw-normal">(valfritt)</span></label><input id="deviationResumeDateInput" class="form-control form-control-sm" type="date"></div>
                           <div class="col-12"><label class="form-label" for="deviationNoteInput">Motivering</label><textarea id="deviationNoteInput" class="form-control form-control-sm" rows="3" required></textarea></div>
@@ -582,13 +656,13 @@
                   </section>
                   <section class="tab-pane fade card-body" id="case-meetings-pane">
                     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
-                      <div><h3 class="h6 mb-1">Möten i ärendet</h3><p class="small text-secondary mb-0">Möten registreras här och visas även i mentorns samlade historik.</p></div>
+                      <div><h3 class="h6 mb-1">Möten i ärendet</h3><p class="small text-secondary mb-0">Möten registreras och rättas i det ärende där de hör hemma.</p></div>
                       <button id="newCaseMeetingButton" type="button" class="btn btn-primary btn-sm">Registrera möte</button>
                     </div>
                     <form id="caseMeetingForm" class="inline-editor border rounded mb-3" hidden>
                       <div class="d-flex justify-content-between align-items-center mb-3"><h4 id="caseMeetingFormTitle" class="h6 mb-0">Nytt möte</h4><button id="cancelCaseMeetingButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button></div>
                       <div class="row g-3">
-                        <div class="col-md-3"><label class="form-label" for="caseMeetingTypeInput">Mötestyp</label><select id="caseMeetingTypeInput" class="form-select form-select-sm"><option value="certification_interview">Certifieringsintervju</option><option value="follow_up">Uppföljning</option><option value="other">Annat möte</option></select></div>
+                        <div class="col-md-3"><label class="form-label" for="caseMeetingTypeInput">Mötestyp</label><select id="caseMeetingTypeInput" class="form-select form-select-sm"><option value="certification_interview">Intervju inför godkännande</option><option value="follow_up">Uppföljning</option><option value="other">Annat möte</option></select></div>
                         <div class="col-md-3"><label class="form-label" for="caseMeetingDateInput">Tidpunkt</label><input id="caseMeetingDateInput" class="form-control form-control-sm" type="datetime-local" required></div>
                         <div class="col-md-3"><label class="form-label" for="caseMeetingModeInput">Mötesform</label><select id="caseMeetingModeInput" class="form-select form-select-sm"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option></select></div>
                         <div class="col-md-3"><label class="form-label" for="caseMeetingActivityInput">Kopplad aktivitet</label><select id="caseMeetingActivityInput" class="form-select form-select-sm"><option value="">Ingen</option></select></div>
@@ -704,6 +778,106 @@
             </div>
           </section>
 
+          <section id="caseTypesAdministrationView" hidden>
+            <div id="caseTypeListPanel" class="card" aria-label="Administration av ärendetyper">
+              <div class="card-header bg-white">
+                <h2 class="h5 mb-1">Ärendetyper</h2>
+                <p class="text-secondary mb-0">Styr hjälptexter, mentorkoppling och vilka kompletterande fält som visas i ärendevyn.</p>
+              </div>
+              <div class="card-body border-bottom">
+                <div class="alert alert-light border mb-0" role="note">
+                  Ärendetypens namn och tekniska ID är fasta. Fält väljs ur en gemensam katalog så att registrering och rapportering förblir enhetlig.
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Ärendetyp</th>
+                      <th>Mentorkoppling</th>
+                      <th>Kompletterande fält</th>
+                      <th>Senast ändrad</th>
+                      <th class="text-end">Åtgärd</th>
+                    </tr>
+                  </thead>
+                  <tbody id="caseTypeAdminTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div id="caseTypeDetailPanel" class="card mentor-record" hidden>
+              <div class="card-header record-header bg-white">
+                <a class="small" href="#/case-types">Tillbaka till ärendetyper</a>
+                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start mt-2">
+                  <div>
+                    <div class="record-type">Ärendetyp</div>
+                    <p id="caseTypeAdminTechnicalId" class="record-id mb-1"></p>
+                    <h2 id="caseTypeAdminTitle" class="h5 mb-0"></h2>
+                  </div>
+                  <div class="record-edit-slot">
+                    <button id="editCaseTypeButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
+                    <div id="caseTypeEditActions" class="d-flex gap-2" hidden>
+                      <button type="submit" form="caseTypeAdminForm" class="btn btn-primary btn-sm">Spara ändringar</button>
+                      <button id="cancelCaseTypeEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                    </div>
+                  </div>
+                </div>
+                <dl class="record-meta mb-0 mt-3">
+                  <div><dt>Version</dt><dd id="caseTypeVersionMeta"></dd></div>
+                  <div><dt>Status</dt><dd>Publicerad</dd></div>
+                  <div><dt>Senast ändrad</dt><dd id="caseTypeUpdatedMeta"></dd></div>
+                </dl>
+              </div>
+
+              <div class="card-body">
+                <div id="caseTypeReadView" class="record-grid">
+                  <section class="record-section">
+                    <h3 class="record-section-title">Användning</h3>
+                    <dl class="record-fields mb-0">
+                      <div><dt>Hjälptext</dt><dd id="caseTypeHelpFact"></dd></div>
+                      <div><dt>Registreringsanvisning</dt><dd id="caseTypeHintFact"></dd></div>
+                      <div><dt>Mentorkoppling</dt><dd id="caseTypeMentorModeFact"></dd></div>
+                    </dl>
+                  </section>
+                  <section class="record-section">
+                    <h3 class="record-section-title">Kompletterande fält</h3>
+                    <div id="caseTypeFieldsFact" class="case-type-field-summary"></div>
+                  </section>
+                </div>
+
+                <form id="caseTypeAdminForm" class="record-grid" hidden>
+                  <input id="caseTypeAdminIdInput" type="hidden">
+                  <section class="record-section">
+                    <h3 class="record-section-title">Användning</h3>
+                    <div class="mb-3">
+                      <label class="form-label" for="caseTypeAdminHelpInput">Hjälptext</label>
+                      <textarea id="caseTypeAdminHelpInput" class="form-control" rows="3" required></textarea>
+                      <div class="form-text">Förklarar när ärendetypen ska användas.</div>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label" for="caseTypeAdminHintInput">Registreringsanvisning</label>
+                      <textarea id="caseTypeAdminHintInput" class="form-control" rows="2" required></textarea>
+                      <div class="form-text">Anger vilken minsta information handläggaren ska registrera.</div>
+                    </div>
+                    <div>
+                      <label class="form-label" for="caseTypeAdminMentorModeInput">Mentorkoppling</label>
+                      <select id="caseTypeAdminMentorModeInput" class="form-select" required>
+                        <option value="required">Obligatorisk</option>
+                        <option value="optional">Valfri</option>
+                        <option value="none">Visas inte</option>
+                      </select>
+                    </div>
+                  </section>
+                  <fieldset class="record-section">
+                    <legend class="record-section-title">Kompletterande fält</legend>
+                    <div id="caseTypeAdminFieldChoices" class="case-type-field-choices"></div>
+                    <div class="form-text mt-2">Avmarkerade fält döljs, men redan sparade uppgifter raderas inte.</div>
+                  </fieldset>
+                </form>
+              </div>
+            </div>
+          </section>
+
           <section id="routinesView" hidden>
             <div class="routines-shell">
               <header class="routines-header border-bottom">
@@ -714,7 +888,7 @@
                 </div>
                 <div class="routines-header-actions">
                   <button id="copyRoutinesLinkButton" type="button" class="btn btn-outline-secondary btn-sm">Kopiera länk</button>
-                  <span class="badge text-bg-light border">Verksamhetsförslag 1.0</span>
+                  <span class="badge text-bg-light border">Verksamhetsförslag 1.3</span>
                 </div>
               </header>
               <div class="routines-search border-bottom">
@@ -873,16 +1047,7 @@
                   <button class="nav-link" id="mentor-cases-tab" data-bs-toggle="tab" data-bs-target="#mentor-cases-pane" type="button" role="tab" aria-controls="mentor-cases-pane" aria-selected="false">Ärenden <span id="mentorCasesTabCount" class="tab-count">0</span></button>
                 </li>
                 <li class="nav-item" role="presentation">
-                  <button class="nav-link" id="mentor-checks-tab" data-bs-toggle="tab" data-bs-target="#mentor-checks-pane" type="button" role="tab" aria-controls="mentor-checks-pane" aria-selected="false">Kontroller <span id="checksTabCount" class="tab-count">0/6</span></button>
-                </li>
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link" id="mentor-interview-tab" data-bs-toggle="tab" data-bs-target="#mentor-interview-pane" type="button" role="tab" aria-controls="mentor-interview-pane" aria-selected="false">Möten <span id="meetingsTabCount" class="tab-count">0</span></button>
-                </li>
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link" id="mentor-decision-tab" data-bs-toggle="tab" data-bs-target="#mentor-decision-pane" type="button" role="tab" aria-controls="mentor-decision-pane" aria-selected="false">Beslut</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link" id="mentor-log-tab" data-bs-toggle="tab" data-bs-target="#mentor-log-pane" type="button" role="tab" aria-controls="mentor-log-pane" aria-selected="false">Logg <span id="logTabCount" class="tab-count">0</span></button>
+                  <button class="nav-link" id="mentor-log-tab" data-bs-toggle="tab" data-bs-target="#mentor-log-pane" type="button" role="tab" aria-controls="mentor-log-pane" aria-selected="false">Mentorlogg <span id="logTabCount" class="tab-count">0</span></button>
                 </li>
               </ul>
 
@@ -947,13 +1112,14 @@
                       </dl>
                     </section>
                   </form>
+                  <div id="mentorIdentityHost"></div>
                 </section>
 
                 <section class="tab-pane fade card-body" id="mentor-cases-pane" role="tabpanel" aria-labelledby="mentor-cases-tab" tabindex="0">
                   <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-3">
                     <div>
                       <h3 class="h6 mb-1">Mentorns ärenden</h3>
-                      <p class="small text-secondary mb-0">Certifiering, uppföljningar och andra handläggningsärenden för personen.</p>
+                      <p class="small text-secondary mb-0">Godkännande, uppföljningar och andra handläggningsärenden för personen.</p>
                     </div>
                     <button id="newMentorCaseButton" type="button" class="btn btn-primary btn-sm">Nytt ärende</button>
                   </div>
@@ -966,7 +1132,7 @@
                 </section>
 
                 <section class="tab-pane fade card-body" id="mentor-checks-pane" role="tabpanel" aria-labelledby="mentor-checks-tab" tabindex="0">
-                  <h3 class="h6">Kontroller och certifieringskrav</h3>
+                  <h3 class="h6">Kontroller och krav för godkännande</h3>
                   <section id="identityVerificationPanel" class="identity-verification mb-3">
                     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-3">
                       <div>
@@ -1059,7 +1225,7 @@
                           <label class="form-label" for="meetingTypeInput">Mötestyp</label>
                           <select id="meetingTypeInput" class="form-select form-select-sm" required>
                             <option value="">Välj mötestyp</option>
-                            <option>Certifieringsintervju</option>
+                            <option>Intervju inför godkännande</option>
                             <option>Uppföljning</option>
                             <option>Avstämning</option>
                             <option>Övrig kontakt</option>
@@ -1110,14 +1276,14 @@
                   <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
                     <div>
                       <h3 class="h6">Beslut</h3>
-                      <p id="decisionHint" class="text-secondary mb-0">Alla kritiska steg måste vara klara innan certifiering.</p>
+                      <p id="decisionHint" class="text-secondary mb-0">Alla kritiska steg måste vara klara innan godkännande.</p>
                     </div>
-                    <button id="approveButton" type="button" class="btn btn-primary btn-sm">Godkänn och certifiera</button>
+                    <button id="approveButton" type="button" class="btn btn-primary btn-sm">Godkänn mentor</button>
                   </div>
                 </section>
 
                 <section class="tab-pane fade card-body" id="mentor-log-pane" role="tabpanel" aria-labelledby="mentor-log-tab" tabindex="0">
-                  <h3 class="record-section-title">Handläggningslogg</h3>
+                  <h3 class="record-section-title">Ändringslogg för mentorposten</h3>
                   <div class="table-responsive border rounded">
                     <table class="table table-sm align-middle mb-0 audit-table">
                       <thead class="table-light">
@@ -1276,6 +1442,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260805-mentor-save-v1"></script>
+    <script type="module" src="app.js?v=20260806-registry-assessment-v11"></script>
   </body>
 </html>

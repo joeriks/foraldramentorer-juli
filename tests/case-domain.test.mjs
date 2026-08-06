@@ -3,12 +3,16 @@ import test from "node:test";
 
 import {
   assessCertificationApproval,
+  CASE_DETAIL_FIELD_DEFINITIONS,
   CASE_TYPE_DEFINITIONS,
   canTransitionActivity,
   deriveCaseStatus,
   findMentorDuplicates,
   normalizeActivityStatus,
+  normalizeApprovalCaseDescription,
+  normalizeCaseTypeTerminology,
   normalizeCaseStatus,
+  normalizeMentorStatus,
   resultClassification,
   stableHash
 } from "../case-domain.js";
@@ -22,10 +26,33 @@ test("normalizes legacy statuses without changing stable values", () => {
   assert.equal(normalizeCaseStatus("paused"), "paused");
   assert.equal(normalizeActivityStatus("Klar"), "completed");
   assert.equal(normalizeActivityStatus("waiting"), "waiting");
+  assert.equal(normalizeMentorStatus("Godkänd/Certifierad"), "Godkänd");
+  assert.equal(normalizeMentorStatus("Redo för intervju"), "Redo för intervju");
+});
+
+test("normalizes legacy approval terminology without replacing custom help", () => {
+  const legacy = normalizeCaseTypeTerminology({
+    id: "mentor-certification",
+    name: "Certifiering av mentor",
+    registrationHint: "Välj mentor och beskriv kort vad som har initierat certifieringen. Kontrollaktiviteterna skapas automatiskt."
+  });
+  assert.equal(legacy.name, "Godkännande av mentor");
+  assert.match(legacy.registrationHint, /initierat prövningen/);
+
+  const custom = normalizeCaseTypeTerminology({
+    id: "mentor-certification",
+    registrationHint: "Kommunens egen hjälptext."
+  });
+  assert.equal(custom.registrationHint, "Kommunens egen hjälptext.");
+  assert.equal(
+    normalizeApprovalCaseDescription("Prövning och certifiering inför uppdrag som föräldramentor."),
+    "Prövning inför godkännande för uppdrag som föräldramentor."
+  );
 });
 
 test("classifies acceptable and deviating activity results", () => {
   assert.equal(resultClassification("registryChecked", "shown_checked"), "acceptable");
+  assert.equal(resultClassification("registryChecked", "assessment_required"), "deviation");
   assert.equal(resultClassification("registryChecked", "authenticity_unconfirmed"), "deviation");
   assert.equal(resultClassification("registryChecked", "unknown"), null);
 });
@@ -115,6 +142,26 @@ test("defines guided workflows for matching and mentor assignments", () => {
   const assignment = CASE_TYPE_DEFINITIONS.find((item) => item.id === "mentor-assignment");
   assert.ok(matching.suggestedActivities.includes("Fatta beslut om matchning"));
   assert.ok(assignment.suggestedActivities.includes("Följ upp efter fyra veckor"));
+});
+
+test("defines registration guidance and mentor rules for every case type", () => {
+  for (const caseType of CASE_TYPE_DEFINITIONS) {
+    assert.ok(caseType.helpText, `${caseType.id} should explain when it is used`);
+    assert.ok(caseType.registrationHint, `${caseType.id} should explain what to register`);
+    assert.ok(["none", "optional", "required"].includes(caseType.mentorMode));
+  }
+  assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "needs-analysis").mentorMode, "none");
+  assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "mentor-certification").mentorMode, "required");
+});
+
+test("limits configurable case fields to the shared field catalog", () => {
+  const fieldIds = CASE_DETAIL_FIELD_DEFINITIONS.map((field) => field.id);
+  assert.equal(new Set(fieldIds).size, fieldIds.length);
+  for (const caseType of CASE_TYPE_DEFINITIONS) {
+    assert.ok(Array.isArray(caseType.detailFieldIds));
+    assert.ok(caseType.detailFieldIds.every((fieldId) => fieldIds.includes(fieldId)));
+  }
+  assert.deepEqual(CASE_TYPE_DEFINITIONS.find((item) => item.id === "needs-analysis").detailFieldIds, fieldIds);
 });
 
 test("offers the operational deviation results used by the playbook", () => {

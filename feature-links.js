@@ -6,6 +6,7 @@ export const FEATURE_LINKS = Object.freeze({
   "matching.list": Object.freeze({ href: "#/cases/matching" }),
   "assignment.list": Object.freeze({ href: "#/cases/mentor-assignment" }),
   "admin.handlers": Object.freeze({ href: "#/administration" }),
+  "admin.case-types": Object.freeze({ href: "#/case-types" }),
   "routines.view": Object.freeze({ href: "#/routines" })
 });
 

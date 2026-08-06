@@ -17,13 +17,27 @@ test("serves the application shell", async () => {
   const html = await response.text();
   assert.match(html, /FöräldraMentorer/);
   assert.match(html, /id="dashboardView"/);
+  assert.match(html, /id="caseSummaryBoard"/);
+  assert.match(html, /id="decisionQueueButton"/);
+  assert.match(html, /id="presentationStepPoints"/);
+  assert.match(html, />Nytt ärende</);
+  assert.match(html, /id="caseTypeDetailPanel"/);
+  assert.match(html, /form="caseTypeAdminForm"/);
+  assert.doesNotMatch(html, /id="caseTypeAdminModal"/);
+  assert.match(html, /Godkännande av mentor/);
+  assert.doesNotMatch(html, /certifiera/i);
 });
 
 test("serves application assets and returns 404 for unknown files", async () => {
   const script = await worker.fetch(new Request("https://example.test/app.js"), {}, context);
   assert.equal(script.status, 200);
   assert.match(script.headers.get("content-type"), /^text\/javascript/);
-  assert.match(await script.text(), /CASE_ACTIVITIES_STORE/);
+  assert.equal(script.headers.get("cache-control"), "no-cache");
+  const scriptText = await script.text();
+  assert.match(scriptText, /CASE_ACTIVITIES_STORE/);
+  assert.match(scriptText, /#\/case-types\/\$\{encodeURIComponent\(definition\.id\)\}/);
+  assert.match(scriptText, /renderRoutineFlowDiagrams/);
+  assert.match(scriptText, /routineProcessLink/);
 
   const domain = await worker.fetch(new Request("https://example.test/case-domain.js"), {}, context);
   assert.equal(domain.status, 200);
@@ -40,11 +54,15 @@ test("serves application assets and returns 404 for unknown files", async () => 
   const markdownParser = await worker.fetch(new Request("https://example.test/vendor/marked/marked.esm.js"), {}, context);
   assert.equal(markdownParser.status, 200);
   assert.match(markdownParser.headers.get("content-type"), /^text\/javascript/);
+  assert.equal(markdownParser.headers.get("cache-control"), "public, max-age=3600");
 
   const routines = await worker.fetch(new Request("https://example.test/docs/verksamhetsfloden-och-handlaggningsrutiner.md"), {}, context);
   assert.equal(routines.status, 200);
   assert.match(routines.headers.get("content-type"), /^text\/markdown/);
-  assert.match(await routines.text(), /Verksamhetsflöden och handläggningsrutiner/);
+  const routinesText = await routines.text();
+  assert.match(routinesText, /Verksamhetsflöden och handläggningsrutiner/);
+  assert.match(routinesText, /Pröva mentor för godkännande/);
+  assert.doesNotMatch(routinesText, /certifier/i);
 
   const missing = await worker.fetch(new Request("https://example.test/missing.png", {
     headers: { accept: "image/png" }

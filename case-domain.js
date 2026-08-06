@@ -53,7 +53,8 @@ export const ACTIVITY_TEMPLATES = [
     version: 1,
     title: "Kontrollera belastningsregister",
     results: [
-      ["shown_checked", "Visat och kontrollerat", "acceptable"],
+      ["shown_checked", "Kontrollerat, inget fortsatt ställningstagande behövs", "acceptable"],
+      ["assessment_required", "Kontrollerat, särskilt ställningstagande krävs", "deviation"],
       ["not_shown", "Inte visat", "deviation"],
       ["wrong_type_or_expired", "Fel typ eller för gammalt", "deviation"],
       ["authenticity_unconfirmed", "Äkthet inte bekräftad", "deviation"]
@@ -130,11 +131,23 @@ export const ACTIVITY_TEMPLATES = [
   }
 ];
 
+export const CASE_DETAIL_FIELD_DEFINITIONS = [
+  { id: "targetGroup", label: "Målgrupp", inputType: "text", placeholder: "Exempel: Vårdnadshavare med barn 6-12 år" },
+  { id: "area", label: "Geografiskt område", inputType: "text", placeholder: "Exempel: Centrum och Öster" },
+  { id: "languages", label: "Språkbehov", inputType: "text", placeholder: "Exempel: Svenska, arabiska" },
+  { id: "desiredCount", label: "Önskat antal mentorer", inputType: "number", min: 1, placeholder: "Exempel: 6" },
+  { id: "desiredDate", label: "Behovet ska vara mött senast", inputType: "date" }
+];
+
 export const CASE_TYPE_DEFINITIONS = [
   {
     id: "mentor-certification",
     version: 1,
-    name: "Certifiering av mentor",
+    name: "Godkännande av mentor",
+    mentorMode: "required",
+    helpText: "Använd när en registrerad mentor ska genomgå kommunens kontroller, intervju och beslut om godkännande.",
+    registrationHint: "Välj mentor och beskriv kort vad som har initierat prövningen. Kontrollaktiviteterna skapas automatiskt.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     activityTemplateIds: ACTIVITY_TEMPLATES.slice(0, 8).map((template) => template.id)
   },
@@ -142,6 +155,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "mentor-follow-up",
     version: 1,
     name: "Uppföljning",
+    mentorMode: "optional",
+    helpText: "Använd för en planerad eller behovsstyrd uppföljning av en mentor. Koppla mentor när uppföljningen gäller en viss person.",
+    registrationHint: "Ange vad som ska följas upp och varför. Möten och fortsatta åtgärder registreras sedan i samma ärende.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Kontakta mentorn", "Dokumentera uppföljningen", "Bedöm fortsatt behov"]
   },
@@ -149,6 +166,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "matching",
     version: 1,
     name: "Matchning",
+    mentorMode: "required",
+    helpText: "Använd när en godkänd mentor ska bedömas och tillfrågas för ett konkret stödbehov.",
+    registrationHint: "Välj mentor och sammanfatta behov, grundkriterier och vad matchningen ska leda till.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Kontrollera tillgänglighet och grundkriterier", "Dokumentera matchningsförslag", "Kontakta mentorn", "Boka första mötet", "Registrera parternas återkoppling", "Fatta beslut om matchning"]
   },
@@ -156,6 +177,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "mentor-assignment",
     version: 1,
     name: "Mentoruppdrag",
+    mentorMode: "required",
+    helpText: "Använd när en accepterad matchning övergår till ett aktivt mentoruppdrag som ska följas upp.",
+    registrationHint: "Välj mentor och beskriv uppdragets ramar. Planerade uppföljningar hanteras som aktiviteter och möten.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Bekräfta uppdragets ramar", "Genomför första avstämning", "Följ upp efter fyra veckor", "Sammanställ mötes- och ersättningsunderlag", "Utvärdera och avsluta uppdraget"]
   },
@@ -163,6 +188,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "recruitment",
     version: 1,
     name: "Rekryteringsinsats",
+    mentorMode: "none",
+    helpText: "Använd när ett beslutat rekryteringsbehov ska omsättas i annons, informationsinsats eller annan rekryteringsåtgärd.",
+    registrationHint: "Beskriv målgrupp, önskat utfall och vilken behovsanalys eller vilket beslut som ligger bakom insatsen.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Analysera behov", "Skapa platsannons", "Publicera annons", "Följ upp ansökningar"]
   },
@@ -170,6 +199,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "needs-analysis",
     version: 1,
     name: "Behovsanalys",
+    mentorMode: "none",
+    helpText: "Använd när verksamheten behöver beskriva och bedöma ett nytt eller förändrat behov av mentorer.",
+    registrationHint: "Registrera var behovet finns, vilka mentorer som efterfrågas, ungefärlig omfattning och när behovet behöver vara mött.",
+    detailFieldIds: CASE_DETAIL_FIELD_DEFINITIONS.map((field) => field.id),
     defaultPriority: "normal",
     suggestedActivities: ["Samla in underlag", "Analysera behov", "Dokumentera slutsats"]
   },
@@ -177,6 +210,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "other",
     version: 1,
     name: "Övrigt ärende",
+    mentorMode: "optional",
+    helpText: "Använd för en avgränsad fråga som inte hör hemma i någon av de övriga ärendetyperna.",
+    registrationHint: "Koppla mentor endast när frågan gäller en viss person. Beskriv tydligt önskat resultat så att ärendet kan avslutas entydigt.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: []
   }
@@ -200,6 +237,27 @@ export function normalizeCaseStatus(status) {
 
 export function normalizeActivityStatus(status) {
   return ACTIVITY_STATUS_LABELS[status] ? status : LEGACY_ACTIVITY_STATUS[status] || "not_started";
+}
+
+export function normalizeMentorStatus(status) {
+  return status === "Godkänd/Certifierad" ? "Godkänd" : status;
+}
+
+export function normalizeCaseTypeTerminology(definition) {
+  if (!definition || definition.id !== "mentor-certification") return definition;
+
+  const normalized = { ...definition };
+  if (normalized.name === "Certifiering av mentor") normalized.name = "Godkännande av mentor";
+  if (normalized.registrationHint === "Välj mentor och beskriv kort vad som har initierat certifieringen. Kontrollaktiviteterna skapas automatiskt.") {
+    normalized.registrationHint = "Välj mentor och beskriv kort vad som har initierat prövningen. Kontrollaktiviteterna skapas automatiskt.";
+  }
+  return normalized;
+}
+
+export function normalizeApprovalCaseDescription(description) {
+  return description === "Prövning och certifiering inför uppdrag som föräldramentor."
+    ? "Prövning inför godkännande för uppdrag som föräldramentor."
+    : description;
 }
 
 export function caseStatusLabel(status) {
@@ -260,7 +318,7 @@ export function canTransitionActivity(from, to, { reopen = false } = {}) {
 
 export function assessCertificationApproval({ caseRecord, activities = [], deviations = [], hasResponsible = false, identityComplete = false }) {
   const reasons = [];
-  if (!caseRecord || caseRecord.caseTypeId !== "mentor-certification") reasons.push("Ärendet är inte ett certifieringsärende.");
+  if (!caseRecord || caseRecord.caseTypeId !== "mentor-certification") reasons.push("Ärendet är inte ett ärende om godkännande.");
   if (caseRecord?.status === "paused") reasons.push("Ärendet är pausat.");
   if (caseRecord?.status === "closed") reasons.push("Ärendet är redan avslutat.");
   if (!hasResponsible) reasons.push("Ärendet saknar ansvarig handläggare.");
