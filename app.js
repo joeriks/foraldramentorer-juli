@@ -21,10 +21,10 @@ import {
   resultClassification,
   resultOptions,
   stableHash
-} from "./case-domain.js?v=20260806-case-types-v3";
+} from "./case-domain.js?v=20260806-navigation-v4";
 import { marked } from "./vendor/marked/marked.esm.js";
-import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-case-types-v3";
-import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-case-types-v3";
+import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-navigation-v4";
+import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-navigation-v4";
 
 const DB_NAME = "foraldramentorer";
 const DB_VERSION = 6;
@@ -6267,6 +6267,15 @@ document.addEventListener("keydown", (event) => {
     top: window.innerHeight * 0.85 * (event.key === "PageDown" ? 1 : -1),
     behavior: "smooth"
   });
+});
+
+document.addEventListener("click", (event) => {
+  const link = event.target.closest("a[href^='#/']");
+  if (!link || event.defaultPrevented || event.button !== 0) return;
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  if (link.target && link.target !== "_self") return;
+  event.preventDefault();
+  navigateTo(link.getAttribute("href"));
 });
 
 window.addEventListener("hashchange", renderAll);
