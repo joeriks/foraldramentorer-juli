@@ -2,6 +2,7 @@ import {
   ACTIVITY_STATUS_LABELS,
   ACTIVITY_TEMPLATES,
   AD_HOC_ACTIVITY_TEMPLATE_ID,
+  CASE_DETAIL_FIELD_DEFINITIONS,
   CASE_STATUS_LABELS,
   CASE_TYPE_DEFINITIONS,
   DEFAULT_ORGANIZATION_UNIT_ID,
@@ -11,8 +12,8 @@ import {
   assessCertificationApproval,
   canTransitionActivity,
   caseStatusLabel,
-  caseTypeById,
-  caseTypeByName,
+  caseTypeById as domainCaseTypeById,
+  caseTypeByName as domainCaseTypeByName,
   deriveCaseStatus as deriveDomainCaseStatus,
   findMentorDuplicates,
   normalizeActivityStatus,
@@ -44,6 +45,13 @@ const CASE_TYPE_DEFINITIONS_STORE = "caseTypeDefinitions";
 const ACTIVITY_TEMPLATE_DEFINITIONS_STORE = "activityTemplateDefinitions";
 const PROCESSED_COMMANDS_STORE = "processedCommands";
 const CURRENT_USER_ID = "handler-sara";
+
+const ORGANIZATION_UNIT_LABELS = {
+  foraldramentorer: "FöräldraMentorer",
+  familjestod: "Familjestöd",
+  "forebyggande-stod": "Förebyggande stöd",
+  "integration-etablering": "Integration och etablering"
+};
 
 const STATUSES = [
   "Anmäld",
@@ -92,49 +100,49 @@ const NEXT_ACTIONS = [
     key: "identityVerified",
     label: "Verifiera identitet",
     description: "Kontrollera personens identitet och markera kontrollen som klar.",
-    tabId: "mentor-checks-tab",
+    tabId: "mentor-cases-tab",
     buttonLabel: "Öppna aktivitet"
   },
   {
     key: "registryChecked",
     label: "Granska belastningsregister",
     description: "Granska registerutdraget och markera kontrollen som klar.",
-    tabId: "mentor-checks-tab",
+    tabId: "mentor-cases-tab",
     buttonLabel: "Öppna aktivitet"
   },
   {
     key: "referencesDone",
     label: "Slutför referenser",
     description: "Dokumentera att referenserna är färdiga.",
-    tabId: "mentor-checks-tab",
+    tabId: "mentor-cases-tab",
     buttonLabel: "Öppna aktivitet"
   },
   {
     key: "trainingDone",
     label: "Slutför e-learning",
     description: "Följ upp utbildningen och markera momentet som klart.",
-    tabId: "mentor-checks-tab",
+    tabId: "mentor-cases-tab",
     buttonLabel: "Öppna aktivitet"
   },
   {
     key: "quizDone",
     label: "Genomför kunskapsavstämning",
     description: "Genomför avstämningen och markera momentet som klart.",
-    tabId: "mentor-checks-tab",
+    tabId: "mentor-cases-tab",
     buttonLabel: "Öppna aktivitet"
   },
   {
     key: "inviteInterview",
     label: "Kalla till intervju",
     description: "Skicka kallelsen och registrera att intervjun är bokad.",
-    tabId: "mentor-interview-tab",
+    tabId: "mentor-cases-tab",
     buttonLabel: "Öppna aktivitet"
   },
   {
     key: "interviewDone",
     label: "Genomför intervju",
     description: "Boka eller dokumentera intervjun innan ärendet går till beslut.",
-    tabId: "mentor-interview-tab",
+    tabId: "mentor-cases-tab",
     buttonLabel: "Öppna aktivitet"
   }
 ];
@@ -388,6 +396,8 @@ let caseEvents = [];
 let activityDeviations = [];
 let deviationDecisions = [];
 let caseMeetings = [];
+let caseTypeDefinitions = CASE_TYPE_DEFINITIONS.map((definition) => ({ ...definition }));
+let caseTypeDefinitionVersions = [];
 let selectedPresentationStepId = PRESENTATION_STEPS[0].id;
 let selectedId = null;
 let selectedCaseRecordId = null;
@@ -409,6 +419,7 @@ let pendingCaseMeetingsId = null;
 let handlerSearchTerm = "";
 let handlerStatusFilter = "";
 let handlerModal;
+let caseTypeAdminModal;
 let selectedHandlerId = null;
 let selectedMeetingId = null;
 let confirmActionModal;
@@ -436,6 +447,7 @@ const els = {
   navCandidates: document.querySelector("#navCandidates"),
   navAdministration: document.querySelector("#navAdministration"),
   navHandlers: document.querySelector("#navHandlers"),
+  navCaseTypes: document.querySelector("#navCaseTypes"),
   navRoutines: document.querySelector("#navRoutines"),
   dashboardView: document.querySelector("#dashboardView"),
   presentationView: document.querySelector("#presentationView"),
@@ -444,6 +456,7 @@ const els = {
   candidatesView: document.querySelector("#candidatesView"),
   detailView: document.querySelector("#detailView"),
   administrationView: document.querySelector("#administrationView"),
+  caseTypesAdministrationView: document.querySelector("#caseTypesAdministrationView"),
   routinesView: document.querySelector("#routinesView"),
   routinesSearchInput: document.querySelector("#routinesSearchInput"),
   clearRoutinesSearchButton: document.querySelector("#clearRoutinesSearchButton"),
@@ -452,6 +465,15 @@ const els = {
   routinesContent: document.querySelector("#routinesContent"),
   copyRoutinesLinkButton: document.querySelector("#copyRoutinesLinkButton"),
   handlerDetailView: document.querySelector("#handlerDetailView"),
+  caseTypeAdminTableBody: document.querySelector("#caseTypeAdminTableBody"),
+  caseTypeAdminForm: document.querySelector("#caseTypeAdminForm"),
+  caseTypeAdminModalTitle: document.querySelector("#caseTypeAdminModalTitle"),
+  caseTypeAdminTechnicalId: document.querySelector("#caseTypeAdminTechnicalId"),
+  caseTypeAdminIdInput: document.querySelector("#caseTypeAdminIdInput"),
+  caseTypeAdminHelpInput: document.querySelector("#caseTypeAdminHelpInput"),
+  caseTypeAdminHintInput: document.querySelector("#caseTypeAdminHintInput"),
+  caseTypeAdminMentorModeInput: document.querySelector("#caseTypeAdminMentorModeInput"),
+  caseTypeAdminFieldChoices: document.querySelector("#caseTypeAdminFieldChoices"),
   handlerDetailEmpty: document.querySelector("#handlerDetailEmpty"),
   handlerDetail: document.querySelector("#handlerDetail"),
   totalCount: document.querySelector("#totalCount"),
@@ -493,16 +515,31 @@ const els = {
   caseCreateForm: document.querySelector("#caseCreateForm"),
   caseReadView: document.querySelector("#caseReadView"),
   caseTypeInput: document.querySelector("#caseTypeInput"),
+  caseTypeGuidance: document.querySelector("#caseTypeGuidance"),
+  caseTypeGuidanceTitle: document.querySelector("#caseTypeGuidanceTitle"),
+  caseTypeGuidanceText: document.querySelector("#caseTypeGuidanceText"),
+  caseTypeRegistrationHint: document.querySelector("#caseTypeRegistrationHint"),
   caseTitleInput: document.querySelector("#caseTitleInput"),
+  caseMentorField: document.querySelector("#caseMentorField"),
+  caseMentorLabel: document.querySelector("#caseMentorLabel"),
   caseMentorInput: document.querySelector("#caseMentorInput"),
   caseMentorIdInput: document.querySelector("#caseMentorIdInput"),
   caseMentorSuggestions: document.querySelector("#caseMentorSuggestions"),
   caseDuplicatePanel: document.querySelector("#caseDuplicatePanel"),
+  caseOrganizationUnitInput: document.querySelector("#caseOrganizationUnitInput"),
+  needsAnalysisFields: document.querySelector("#needsAnalysisFields"),
+  needsTargetGroupInput: document.querySelector("#needsTargetGroupInput"),
+  needsAreaInput: document.querySelector("#needsAreaInput"),
+  needsLanguagesInput: document.querySelector("#needsLanguagesInput"),
+  needsDesiredCountInput: document.querySelector("#needsDesiredCountInput"),
+  needsDesiredDateInput: document.querySelector("#needsDesiredDateInput"),
   caseOwnerInput: document.querySelector("#caseOwnerInput"),
   casePriorityInput: document.querySelector("#casePriorityInput"),
   caseDueDateInput: document.querySelector("#caseDueDateInput"),
+  caseDescriptionLabel: document.querySelector("#caseDescriptionLabel"),
   caseDescriptionInput: document.querySelector("#caseDescriptionInput"),
   caseCoHandlerInputs: document.querySelector("#caseCoHandlerInputs"),
+  caseFormFeedback: document.querySelector("#caseFormFeedback"),
   cancelCaseCreateButton: document.querySelector("#cancelCaseCreateButton"),
   saveCaseButton: document.querySelector("#saveCaseButton"),
   editCaseButton: document.querySelector("#editCaseButton"),
@@ -521,9 +558,13 @@ const els = {
   caseDueDateFact: document.querySelector("#caseDueDateFact"),
   caseDescriptionFact: document.querySelector("#caseDescriptionFact"),
   caseOwnerFact: document.querySelector("#caseOwnerFact"),
+  caseOrganizationUnitFact: document.querySelector("#caseOrganizationUnitFact"),
   caseCoHandlersFact: document.querySelector("#caseCoHandlersFact"),
   caseMentorFact: document.querySelector("#caseMentorFact"),
   caseCreatedFact: document.querySelector("#caseCreatedFact"),
+  caseTypeDetailsSection: document.querySelector("#caseTypeDetailsSection"),
+  caseTypeDetailsTitle: document.querySelector("#caseTypeDetailsTitle"),
+  caseTypeDetailsFacts: document.querySelector("#caseTypeDetailsFacts"),
   caseActivityForm: document.querySelector("#caseActivityForm"),
   cancelCaseActivityButton: document.querySelector("#cancelCaseActivityButton"),
   activityTitleInput: document.querySelector("#activityTitleInput"),
@@ -695,6 +736,7 @@ const els = {
   logTabCount: document.querySelector("#logTabCount"),
   checklist: document.querySelector("#checklist"),
   identityVerificationPanel: document.querySelector("#identityVerificationPanel"),
+  mentorIdentityHost: document.querySelector("#mentorIdentityHost"),
   identityReadView: document.querySelector("#identityReadView"),
   identityEditView: document.querySelector("#identityEditView"),
   identityPersonalNumberFact: document.querySelector("#identityPersonalNumberFact"),
@@ -763,6 +805,18 @@ function markSaved() {
 function showFeedback(message) {
   els.feedbackToastBody.textContent = message;
   bootstrap.Toast.getOrCreateInstance(els.feedbackToast, { delay: 3200 }).show();
+}
+
+function clearCaseFormError() {
+  els.caseFormFeedback.hidden = true;
+  els.caseFormFeedback.textContent = "";
+}
+
+function showCaseFormError(message, field = null) {
+  els.caseFormFeedback.textContent = message;
+  els.caseFormFeedback.hidden = false;
+  els.caseFormFeedback.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  field?.focus({ preventScroll: true });
 }
 
 function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, confirmLabel = "Bekräfta", danger = false }) {
@@ -929,6 +983,10 @@ function caseMeetingTx(mode = "readonly") {
   return db.transaction(CASE_MEETINGS_STORE, mode).objectStore(CASE_MEETINGS_STORE);
 }
 
+function caseTypeDefinitionTx(mode = "readonly") {
+  return db.transaction(CASE_TYPE_DEFINITIONS_STORE, mode).objectStore(CASE_TYPE_DEFINITIONS_STORE);
+}
+
 function getAllFrom(storeTx) {
   return new Promise((resolve, reject) => {
     const request = storeTx().getAll();
@@ -971,6 +1029,46 @@ const clearCaseEvents = () => clearStore(caseEventTx);
 const getAllActivityDeviations = () => getAllFrom(activityDeviationTx);
 const getAllDeviationDecisions = () => getAllFrom(deviationDecisionTx);
 const getAllCaseMeetings = () => getAllFrom(caseMeetingTx);
+const getAllCaseTypeDefinitions = () => getAllFrom(caseTypeDefinitionTx);
+const saveCaseTypeDefinition = (value) => putInto(caseTypeDefinitionTx, value);
+
+function caseTypeById(id, version = null) {
+  return (version ? caseTypeDefinitionVersions.find((definition) => definition.id === id && Number(definition.version) === Number(version)) : null)
+    || caseTypeDefinitions.find((definition) => definition.id === id)
+    || domainCaseTypeById(id);
+}
+
+function caseTypeByName(name) {
+  return caseTypeDefinitions.find((definition) => definition.name === name)
+    || domainCaseTypeByName(name);
+}
+
+async function loadCaseTypeDefinitions() {
+  let stored = await getAllCaseTypeDefinitions();
+  const storedIds = new Set(stored.filter((definition) => definition.tenantId === DEFAULT_TENANT_ID).map((definition) => definition.id));
+  const missing = CASE_TYPE_DEFINITIONS.filter((definition) => !storedIds.has(definition.id));
+  if (missing.length) {
+    await Promise.all(missing.map((definition) => saveCaseTypeDefinition({
+      ...definition,
+      tenantId: DEFAULT_TENANT_ID,
+      status: "published",
+      activityTemplateRefs: (definition.activityTemplateIds || []).map((templateId) => ({ templateId, version: 1 }))
+    })));
+    stored = await getAllCaseTypeDefinitions();
+  }
+  caseTypeDefinitionVersions = stored.filter((definition) => definition.tenantId === DEFAULT_TENANT_ID);
+  const storedById = new Map();
+  for (const definition of caseTypeDefinitionVersions
+    .filter((item) => item.status === "published")
+    .sort((a, b) => Number(a.version || 1) - Number(b.version || 1))) {
+    storedById.set(definition.id, definition);
+  }
+  caseTypeDefinitions = CASE_TYPE_DEFINITIONS.map((fallback) => ({
+    ...fallback,
+    ...(storedById.get(fallback.id) || {}),
+    detailFieldIds: storedById.get(fallback.id)?.detailFieldIds || fallback.detailFieldIds || []
+  }));
+}
 
 function clearAllCaseData() {
   return Promise.all([
@@ -1380,7 +1478,9 @@ async function migrateCaseDomainV6() {
       updatedBy: actorId(meeting.updatedBy || meeting.createdBy)
     }];
   });
-  const caseDefinitions = CASE_TYPE_DEFINITIONS.map((definition) => ({
+  const storedCaseTypeKeys = new Set((await getAllCaseTypeDefinitions())
+    .map((definition) => `${definition.tenantId}:${definition.id}:${definition.version}`));
+  const caseDefinitions = CASE_TYPE_DEFINITIONS.filter((definition) => !storedCaseTypeKeys.has(`${DEFAULT_TENANT_ID}:${definition.id}:${definition.version}`)).map((definition) => ({
     ...definition,
     tenantId: DEFAULT_TENANT_ID,
     status: "published",
@@ -1609,6 +1709,7 @@ async function ensureCertificationCases() {
 }
 
 async function refresh() {
+  await loadCaseTypeDefinitions();
   handlers = await getAllHandlers();
   await migrateDefaultHandlerRecords();
   handlers.sort((a, b) => a.name.localeCompare(b.name, "sv"));
@@ -1754,6 +1855,7 @@ function renderAll() {
   renderTable();
   renderDetail();
   renderHandlers();
+  renderCaseTypeAdministration();
   renderHandlerDetail();
 }
 
@@ -2014,7 +2116,7 @@ function nextActionFor(candidate) {
     key: "decision",
     label: "Fatta beslut",
     description: "Alla krav är klara. Granska underlaget och certifiera mentorn.",
-    tabId: "mentor-decision-tab",
+    tabId: "mentor-cases-tab",
     buttonLabel: "Öppna beslut"
   };
 }
@@ -2251,7 +2353,7 @@ async function loadRoutinesDocument(sectionKey = "") {
 function applyRoute() {
   const route = parseRoute();
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "administration", "routines", "handler"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "administration", "case-types", "routines", "handler"].includes(route.view) ? route.view : "dashboard";
   selectedId = currentView === "mentor" ? route.id : selectedId;
   selectedCaseRecordId = currentView === "case" ? route.id : selectedCaseRecordId;
   if (currentView !== "case") {
@@ -2272,6 +2374,7 @@ function applyRoute() {
   els.candidatesView.hidden = currentView !== "mentors";
   els.detailView.hidden = currentView !== "mentor";
   els.administrationView.hidden = currentView !== "administration";
+  els.caseTypesAdministrationView.hidden = currentView !== "case-types";
   els.routinesView.hidden = currentView !== "routines";
   els.handlerDetailView.hidden = currentView !== "handler";
 
@@ -2281,8 +2384,9 @@ function applyRoute() {
   els.navMatchings.classList.toggle("active", currentView === "cases" && caseTypeFilter === "matching");
   els.navAssignments.classList.toggle("active", currentView === "cases" && caseTypeFilter === "mentor-assignment");
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
-  els.navAdministration.classList.toggle("active", ["administration", "routines", "handler"].includes(currentView));
+  els.navAdministration.classList.toggle("active", ["administration", "case-types", "routines", "handler"].includes(currentView));
   els.navHandlers.classList.toggle("active", currentView === "administration" || currentView === "handler");
+  els.navCaseTypes.classList.toggle("active", currentView === "case-types");
   els.navRoutines.classList.toggle("active", currentView === "routines");
 
   if (currentView === "dashboard") {
@@ -2310,6 +2414,9 @@ function applyRoute() {
   } else if (currentView === "administration") {
     els.pageTitle.textContent = "Handläggare";
     els.breadcrumb.textContent = "Start / Systemadministration / Handläggare";
+  } else if (currentView === "case-types") {
+    els.pageTitle.textContent = "Ärendetyper";
+    els.breadcrumb.textContent = "Start / Systemadministration / Ärendetyper";
   } else if (currentView === "routines") {
     els.pageTitle.textContent = "Rutiner";
     els.breadcrumb.textContent = "Start / Systemadministration / Rutiner";
@@ -2746,6 +2853,104 @@ function renderCases() {
   }
 }
 
+function organizationUnitLabel(unitId) {
+  return ORGANIZATION_UNIT_LABELS[unitId] || unitId || ORGANIZATION_UNIT_LABELS[DEFAULT_ORGANIZATION_UNIT_ID];
+}
+
+function caseDetailInput(fieldId) {
+  return {
+    targetGroup: els.needsTargetGroupInput,
+    area: els.needsAreaInput,
+    languages: els.needsLanguagesInput,
+    desiredCount: els.needsDesiredCountInput,
+    desiredDate: els.needsDesiredDateInput
+  }[fieldId] || null;
+}
+
+function configuredDetailFields(caseType) {
+  const enabled = new Set(caseType?.detailFieldIds || []);
+  return CASE_DETAIL_FIELD_DEFINITIONS.filter((field) => enabled.has(field.id));
+}
+
+function renderCaseTypeGuidance(caseRecord = null) {
+  const caseType = caseTypeById(els.caseTypeInput.value, caseRecord?.caseTypeVersion);
+  els.caseTypeGuidance.hidden = !caseType;
+  els.caseTypeGuidanceTitle.textContent = caseType ? `När används ${caseType.name.toLocaleLowerCase("sv-SE")}?` : "";
+  els.caseTypeGuidanceText.textContent = caseType?.helpText || "";
+  els.caseTypeRegistrationHint.textContent = caseType ? `Registrera: ${caseType.registrationHint}` : "";
+
+  const mentorMode = caseType?.mentorMode || "optional";
+  els.caseMentorField.hidden = mentorMode === "none";
+  els.caseMentorInput.required = mentorMode === "required";
+  els.caseMentorLabel.innerHTML = mentorMode === "required"
+    ? "Mentor"
+    : 'Mentor <span class="text-secondary fw-normal">(valfritt)</span>';
+  if (mentorMode === "none") {
+    els.caseMentorInput.value = "";
+    els.caseMentorIdInput.value = "";
+    els.caseMentorSuggestions.hidden = true;
+    els.caseMentorSuggestions.innerHTML = "";
+    els.caseDuplicatePanel.hidden = true;
+  }
+
+  const needsAnalysis = caseType?.id === "needs-analysis";
+  const detailFields = configuredDetailFields(caseType);
+  els.needsAnalysisFields.hidden = detailFields.length === 0;
+  for (const field of CASE_DETAIL_FIELD_DEFINITIONS) {
+    const input = caseDetailInput(field.id);
+    if (!input) continue;
+    input.closest("[class*='col-md']").hidden = !detailFields.some((item) => item.id === field.id);
+    input.value = caseRecord?.details?.[field.id] ?? "";
+  }
+  els.caseDescriptionInput.required = needsAnalysis;
+  els.caseDescriptionLabel.textContent = needsAnalysis ? "Kort beskrivning av behovet" : "Kort beskrivning";
+
+  const titlePlaceholders = {
+    "mentor-certification": "Exempel: Certifiering av Amina Ekström",
+    "mentor-follow-up": "Exempel: Uppföljning efter första uppdraget",
+    matching: "Exempel: Matchning för stödbehov i område Öster",
+    "mentor-assignment": "Exempel: Mentoruppdrag område Öster",
+    recruitment: "Exempel: Rekrytering av arabisktalande mentorer",
+    "needs-analysis": "Exempel: Behov av arabisktalande mentorer",
+    other: "Beskriv frågan kort och konkret"
+  };
+  const descriptionPlaceholders = {
+    "mentor-certification": "Ange vad som initierat certifieringen och eventuell viktig bakgrund.",
+    "mentor-follow-up": "Ange vad som ska följas upp och vilket resultat som förväntas.",
+    matching: "Sammanfatta stödbehovet och de viktigaste matchningskriterierna.",
+    "mentor-assignment": "Beskriv uppdragets syfte, omfattning och överenskomna ramar.",
+    recruitment: "Beskriv målgrupp, önskat utfall och bakomliggande beslut eller behov.",
+    "needs-analysis": "Beskriv vilket behov som har uppmärksammats och vilket underlag bedömningen bygger på.",
+    other: "Beskriv frågan och vad som behöver vara gjort för att ärendet ska kunna avslutas."
+  };
+  els.caseTitleInput.placeholder = caseType ? titlePlaceholders[caseType.id] : "Välj ärendetyp först";
+  els.caseDescriptionInput.placeholder = caseType ? descriptionPlaceholders[caseType.id] : "";
+
+}
+
+function renderCaseTypeDetails(caseRecord) {
+  const details = caseRecord.details || {};
+  const caseType = caseTypeById(caseRecord.caseTypeId, caseRecord.caseTypeVersion);
+  const detailFields = configuredDetailFields(caseType);
+  if (!detailFields.length) {
+    els.caseTypeDetailsSection.hidden = true;
+    els.caseTypeDetailsFacts.innerHTML = "";
+    return;
+  }
+  const facts = detailFields.map((field) => {
+    const rawValue = details[field.id];
+    const value = field.id === "desiredCount" && rawValue
+      ? `${rawValue} st`
+      : field.inputType === "date" && rawValue ? formatDate(rawValue) : rawValue;
+    return [field.label, value];
+  });
+  els.caseTypeDetailsSection.hidden = false;
+  els.caseTypeDetailsTitle.textContent = caseRecord.caseTypeId === "needs-analysis" ? "Behovets omfattning" : "Kompletterande uppgifter";
+  els.caseTypeDetailsFacts.innerHTML = facts
+    .map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "Ej angivet")}</dd></div>`)
+    .join("");
+}
+
 function populateCaseForm(mentorId = "", caseRecord = null) {
   const currentOwnerId = responsibleHandler(caseRecord)?.id || CURRENT_USER_ID;
   const currentCoHandlerIds = new Set(coHandlers(caseRecord).map((handler) => handler.id));
@@ -2754,6 +2959,7 @@ function populateCaseForm(mentorId = "", caseRecord = null) {
   els.caseMentorIdInput.value = selectedMentor?.id || "";
   els.caseMentorSuggestions.hidden = true;
   els.caseMentorSuggestions.innerHTML = "";
+  els.caseOrganizationUnitInput.value = caseRecord?.organizationUnitId || DEFAULT_ORGANIZATION_UNIT_ID;
 
   els.caseOwnerInput.innerHTML = '<option value="">Välj ansvarig</option>';
   els.caseCoHandlerInputs.innerHTML = "";
@@ -2784,6 +2990,7 @@ function renderCaseDetail() {
   els.newCaseActivityButton.hidden = creating || caseEditMode || Boolean(selectedCaseActivityId);
   els.editCaseButton.hidden = creating || caseEditMode;
   els.saveCaseButton.textContent = creating ? "Spara registrering" : "Spara ändringar";
+  els.caseTypeInput.disabled = !creating;
 
   if (creating) {
     const mentorId = selectedCaseRecordId.startsWith("new-") ? selectedCaseRecordId.slice(4) : "";
@@ -2797,8 +3004,10 @@ function renderCaseDetail() {
     els.selectedCaseUpdated.textContent = "Inte sparat";
     if (els.caseCreateForm.dataset.route !== selectedCaseRecordId) {
       els.caseCreateForm.reset();
+      clearCaseFormError();
       populateCaseForm(mentorId);
       if (newCaseTypePreset) els.caseTypeInput.value = newCaseTypePreset;
+      renderCaseTypeGuidance();
       els.caseCreateForm.dataset.route = selectedCaseRecordId;
     }
     return;
@@ -2829,9 +3038,11 @@ function renderCaseDetail() {
   els.caseDueDateFact.textContent = caseRecord.dueDate ? formatDate(caseRecord.dueDate) : "Ej angivet";
   els.caseDescriptionFact.textContent = caseRecord.description || "Ingen beskrivning";
   els.caseOwnerFact.textContent = owner?.name || "Ej tilldelad";
+  els.caseOrganizationUnitFact.textContent = organizationUnitLabel(caseRecord.organizationUnitId);
   els.caseCoHandlersFact.textContent = caseCoHandlers.length ? caseCoHandlers.map((handler) => handler.name).join(", ") : "Inga";
   els.caseMentorFact.innerHTML = mentor ? `<a href="#/mentor/${escapeHtml(mentor.id)}">${escapeHtml(mentor.name)}</a>` : "Ej personanknutet";
   els.caseCreatedFact.textContent = `${formatDateTime(caseRecord.createdAt)} av ${handlerNameById(caseRecord.createdBy)}`;
+  renderCaseTypeDetails(caseRecord);
   els.caseActivityCount.textContent = activities.length;
   els.caseDocumentCount.textContent = documents.length;
   els.caseMeetingCount.textContent = meetingsForCase.filter((meeting) => !meeting.supersededByMeetingId).length;
@@ -2852,12 +3063,14 @@ function renderCaseDetail() {
 
   if (caseEditMode && els.caseCreateForm.dataset.route !== `edit-${caseRecord.id}-${caseRecord.updatedAt}`) {
     els.caseCreateForm.reset();
+    clearCaseFormError();
     populateCaseForm(caseRecord.mentorId, caseRecord);
     els.caseTypeInput.value = caseRecord.caseTypeId;
     els.caseTitleInput.value = caseRecord.title;
     els.casePriorityInput.value = caseRecord.priority || "normal";
     els.caseDueDateInput.value = caseRecord.dueDate || "";
     els.caseDescriptionInput.value = caseRecord.description || "";
+    renderCaseTypeGuidance(caseRecord);
     els.caseCreateForm.dataset.route = `edit-${caseRecord.id}-${caseRecord.updatedAt}`;
   }
   els.pauseCaseButton.hidden = ["paused", "closed"].includes(caseRecord.status);
@@ -3240,6 +3453,46 @@ function filteredHandlers() {
   });
 }
 
+function mentorModeLabel(mode) {
+  return { required: "Obligatorisk", optional: "Valfri", none: "Visas inte" }[mode] || "Valfri";
+}
+
+function renderCaseTypeAdministration() {
+  els.caseTypeAdminTableBody.innerHTML = "";
+  for (const definition of caseTypeDefinitions) {
+    const fields = configuredDetailFields(definition);
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td><strong>${escapeHtml(definition.name)}</strong><small class="d-block text-secondary">Tekniskt ID ${escapeHtml(definition.id)}</small></td>
+      <td>${escapeHtml(mentorModeLabel(definition.mentorMode))}</td>
+      <td>${fields.length ? escapeHtml(fields.map((field) => field.label).join(", ")) : '<span class="text-secondary">Inga</span>'}</td>
+      <td>${definition.updatedAt ? escapeHtml(formatDateTime(definition.updatedAt)) : '<span class="text-secondary">Grundinställning</span>'}</td>
+      <td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-edit-case-type="${escapeHtml(definition.id)}">Redigera</button></td>
+    `;
+    row.querySelector("[data-edit-case-type]").addEventListener("click", () => openCaseTypeAdminModal(definition.id));
+    els.caseTypeAdminTableBody.append(row);
+  }
+}
+
+function openCaseTypeAdminModal(caseTypeId) {
+  const definition = caseTypeById(caseTypeId);
+  if (!definition) return;
+  els.caseTypeAdminIdInput.value = definition.id;
+  els.caseTypeAdminModalTitle.textContent = definition.name;
+  els.caseTypeAdminTechnicalId.textContent = `Tekniskt ID ${definition.id}`;
+  els.caseTypeAdminHelpInput.value = definition.helpText || "";
+  els.caseTypeAdminHintInput.value = definition.registrationHint || "";
+  els.caseTypeAdminMentorModeInput.value = definition.mentorMode || "optional";
+  const selectedFields = new Set(definition.detailFieldIds || []);
+  els.caseTypeAdminFieldChoices.innerHTML = CASE_DETAIL_FIELD_DEFINITIONS.map((field) => `
+    <div class="form-check">
+      <input id="case-type-field-${escapeHtml(field.id)}" class="form-check-input" type="checkbox" value="${escapeHtml(field.id)}" ${selectedFields.has(field.id) ? "checked" : ""}>
+      <label class="form-check-label" for="case-type-field-${escapeHtml(field.id)}">${escapeHtml(field.label)}</label>
+    </div>
+  `).join("");
+  caseTypeAdminModal.show();
+}
+
 function handlerMentorCount(handler) {
   return new Set(caseAssignments
     .filter((assignment) => assignment.handlerId === handler.id)
@@ -3409,11 +3662,8 @@ function renderDetail() {
   if (nextAction.tabId) {
     document.querySelector(`#${nextAction.tabId}`)?.classList.add("next-action-tab");
   }
-  const completedChecks = CHECKS.filter(([key]) => candidate.checks?.[key]).length;
-  els.checksTabCount.textContent = `${completedChecks}/${CHECKS.length}`;
   els.logTabCount.textContent = candidate.history.length;
   renderMentorCases(candidate);
-  renderMeetings(candidate);
   setPersonEditMode(false);
 
   els.statusSelect.innerHTML = "";
@@ -3504,7 +3754,7 @@ function renderDetail() {
   if (pendingIdentityEditorId === candidate.id) {
     pendingIdentityEditorId = null;
     requestAnimationFrame(() => {
-      bootstrap.Tab.getOrCreateInstance(document.querySelector("#mentor-checks-tab")).show();
+      bootstrap.Tab.getOrCreateInstance(document.querySelector("#mentor-base-tab")).show();
       setIdentityEditMode(true);
       els.identityPersonalNumberInput.focus({ preventScroll: true });
     });
@@ -3677,6 +3927,7 @@ function showNextAction(candidate) {
   const tabElement = document.querySelector(`#${action.tabId}`);
   if (!tabElement || !window.bootstrap) return;
   bootstrap.Tab.getOrCreateInstance(tabElement).show();
+  if (action.key !== "coordinatorAssigned") return;
   if (action.key === "coordinatorAssigned") setPersonEditMode(true);
 
   requestAnimationFrame(() => {
@@ -4805,9 +5056,10 @@ els.caseLifecycleForm.addEventListener("submit", async (event) => {
 
 function compatibleRegistrationTargets(mentorId, caseTypeId, excludeCaseId = null) {
   if (!mentorId) return [];
+  const organizationUnitId = els.caseOrganizationUnitInput.value || DEFAULT_ORGANIZATION_UNIT_ID;
   return cases.filter((caseRecord) => caseRecord.id !== excludeCaseId
     && caseRecord.tenantId === DEFAULT_TENANT_ID
-    && caseRecord.organizationUnitId === DEFAULT_ORGANIZATION_UNIT_ID
+    && caseRecord.organizationUnitId === organizationUnitId
     && caseRecord.mentorId === mentorId
     && caseRecord.caseTypeId === caseTypeId
     && caseRecord.status !== "closed");
@@ -4856,7 +5108,11 @@ els.caseMentorInput.addEventListener("input", () => {
   renderRegistrationTargets();
 });
 
-els.caseTypeInput.addEventListener("change", renderRegistrationTargets);
+els.caseTypeInput.addEventListener("change", () => {
+  renderCaseTypeGuidance();
+  renderRegistrationTargets();
+});
+els.caseOrganizationUnitInput.addEventListener("change", renderRegistrationTargets);
 
 els.caseMentorSuggestions.addEventListener("click", (event) => {
   const button = event.target.closest("[data-select-case-mentor]");
@@ -4874,6 +5130,7 @@ els.caseDuplicatePanel.addEventListener("click", (event) => {
   const targetButton = event.target.closest("[data-registration-target]");
   const newButton = event.target.closest("[data-registration-new]");
   if (!targetButton && !newButton) return;
+  clearCaseFormError();
   els.caseDuplicatePanel.dataset.choice = targetButton ? targetButton.dataset.registrationTarget : "new";
   for (const button of els.caseDuplicatePanel.querySelectorAll("button")) button.classList.remove("active");
   (targetButton || newButton).classList.add("active");
@@ -4915,22 +5172,30 @@ els.cancelCaseCreateButton.addEventListener("click", () => {
   navigateTo("#/cases");
 });
 
-els.caseCreateForm.addEventListener("submit", async (event) => {
+async function submitCaseForm(event) {
   event.preventDefault();
+  clearCaseFormError();
   const existingCase = caseEditMode ? selectedCaseRecord() : null;
   const id = existingCase?.id || crypto.randomUUID();
   const requestedMentorName = els.caseMentorInput.value.trim();
   const matchedMentor = candidates.find((candidate) => candidate.name.localeCompare(requestedMentorName, "sv", { sensitivity: "base" }) === 0);
   if (requestedMentorName && !matchedMentor) {
     els.caseMentorInput.setCustomValidity("Välj en mentor från förslagslistan.");
+    showCaseFormError("Mentorn måste väljas från förslagslistan innan ärendet kan sparas.", els.caseMentorInput);
     els.caseMentorInput.reportValidity();
     return;
   }
   els.caseMentorInput.setCustomValidity("");
   const mentorId = matchedMentor?.id || null;
   els.caseMentorIdInput.value = mentorId || "";
-  const caseType = caseTypeById(els.caseTypeInput.value);
+  const caseType = caseTypeById(els.caseTypeInput.value, existingCase?.caseTypeVersion);
   if (!caseType) return;
+  if (caseType.mentorMode === "required" && !mentorId) {
+    els.caseMentorInput.setCustomValidity("Välj en mentor från förslagslistan.");
+    showCaseFormError("Den här ärendetypen kräver att en mentor väljs från förslagslistan.", els.caseMentorInput);
+    els.caseMentorInput.reportValidity();
+    return;
+  }
 
   if (!existingCase) {
     const targets = compatibleRegistrationTargets(mentorId, caseType.id);
@@ -4938,7 +5203,7 @@ els.caseCreateForm.addEventListener("submit", async (event) => {
     if (targets.length && !choice) {
       renderRegistrationTargets();
       els.caseDuplicatePanel.scrollIntoView({ block: "center" });
-      showFeedback("Välj om registreringen ska kopplas till det befintliga ärendet eller skapa ett separat ärende.");
+      showCaseFormError("Det finns redan ett kompatibelt öppet ärende. Välj om registreringen ska läggas där eller om ett separat ärende ska skapas.");
       return;
     }
     if (choice && choice !== "new") {
@@ -4999,12 +5264,29 @@ els.caseCreateForm.addEventListener("submit", async (event) => {
     ...(caseType.activityTemplateIds || []).map((templateId, sortOrder) => ({ templateId, title: activityTemplateById(templateId).title, sortOrder })),
     ...(caseType.suggestedActivities || []).map((title, index) => ({ templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, title, sortOrder: (caseType.activityTemplateIds || []).length + index }))
   ];
+  const configuredDetails = { ...(existingCase?.details || {}) };
+  for (const field of configuredDetailFields(caseType)) {
+    const input = caseDetailInput(field.id);
+    const value = input?.value || "";
+    configuredDetails[field.id] = field.inputType === "number"
+      ? (value ? Number(value) : null)
+      : (value.trim?.() || value || null);
+  }
   await executeCaseCommand({
     commandType: existingCase ? "update_case" : "quick_register_case",
     caseId: id,
     expectedVersion: existingCase?.version ?? null,
     allowMissingCase: !existingCase,
-    payload: { caseTypeId: caseType.id, mentorId, title: els.caseTitleInput.value.trim(), description: els.caseDescriptionInput.value.trim(), ownerId, coHandlerIds },
+    payload: {
+      caseTypeId: caseType.id,
+      mentorId,
+      organizationUnitId: els.caseOrganizationUnitInput.value,
+      title: els.caseTitleInput.value.trim(),
+      description: els.caseDescriptionInput.value.trim(),
+      details: configuredDetails,
+      ownerId,
+      coHandlerIds
+    },
     additionalStores: [CASE_ASSIGNMENTS_STORE, CASE_ACTIVITIES_STORE],
     mutate: ({ currentCase, now, put, event: recordEvent }) => {
       const caseRecord = {
@@ -5014,10 +5296,11 @@ els.caseCreateForm.addEventListener("submit", async (event) => {
         number: currentCase?.number || makeCaseNumber(id, new Set(cases.map((item) => item.number))),
         caseTypeId: caseType.id,
         caseTypeVersion: caseType.version,
-        organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID,
+        organizationUnitId: els.caseOrganizationUnitInput.value || DEFAULT_ORGANIZATION_UNIT_ID,
         type: caseType.name,
         title: els.caseTitleInput.value.trim(),
         description: els.caseDescriptionInput.value.trim(),
+        details: Object.keys(configuredDetails).length ? configuredDetails : null,
         mentorId,
         status: currentCase?.status || "new",
         priority: els.casePriorityInput.value || caseType.defaultPriority,
@@ -5074,7 +5357,23 @@ els.caseCreateForm.addEventListener("submit", async (event) => {
   showFeedback(existingCase ? "Ärendet har uppdaterats." : "Ärendet har skapats.");
   await refresh();
   navigateToCase(id);
+}
+
+els.caseCreateForm.addEventListener("submit", (event) => {
+  submitCaseForm(event).catch((error) => {
+    console.error("Could not save case", error);
+    showCaseFormError("Ärendet kunde inte sparas lokalt. Ladda om sidan och försök igen. Om felet kvarstår, nollställ prototypdatan i den här webbläsaren.");
+  });
 });
+
+els.caseCreateForm.addEventListener("invalid", (event) => {
+  const field = event.target;
+  const label = field.id ? document.querySelector(`label[for="${cssEscape(field.id)}"]`)?.textContent.trim() : "";
+  showCaseFormError(`${label || "Ett obligatoriskt fält"} måste fyllas i innan ärendet kan sparas.`, field);
+}, true);
+
+els.caseCreateForm.addEventListener("input", clearCaseFormError);
+els.caseCreateForm.addEventListener("change", clearCaseFormError);
 
 els.newCaseActivityButton.addEventListener("click", () => {
   els.caseActivityForm.hidden = false;
@@ -5493,6 +5792,39 @@ els.statusFilter.addEventListener("change", () => {
   renderTable();
 });
 
+els.caseTypeAdminForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const definition = caseTypeById(els.caseTypeAdminIdInput.value);
+  if (!definition) return;
+  const detailFieldIds = [...els.caseTypeAdminFieldChoices.querySelectorAll("input:checked")]
+    .map((input) => input.value);
+  const now = new Date().toISOString();
+  const nextVersion = Math.max(0, ...caseTypeDefinitionVersions
+    .filter((item) => item.id === definition.id)
+    .map((item) => Number(item.version || 1))) + 1;
+  await atomicPut({ [CASE_TYPE_DEFINITIONS_STORE]: [{
+    ...definition,
+    status: "retired",
+    updatedAt: now,
+    updatedBy: CURRENT_USER_ID
+  }, {
+    ...definition,
+    tenantId: DEFAULT_TENANT_ID,
+    version: nextVersion,
+    status: "published",
+    helpText: els.caseTypeAdminHelpInput.value.trim(),
+    registrationHint: els.caseTypeAdminHintInput.value.trim(),
+    mentorMode: els.caseTypeAdminMentorModeInput.value,
+    detailFieldIds,
+    updatedAt: now,
+    updatedBy: CURRENT_USER_ID
+  }] });
+  caseTypeAdminModal.hide();
+  markSaved();
+  showFeedback("Ärendetypen har uppdaterats.");
+  await refresh();
+});
+
 els.handlerSearchInput.addEventListener("input", () => {
   handlerSearchTerm = els.handlerSearchInput.value;
   renderHandlers();
@@ -5901,7 +6233,7 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
 els.resetButton.addEventListener("click", async () => {
   const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata? Mentorärenden tas bort och grundhandläggarna återställs. Åtgärden kan inte ångras.");
   if (!confirmed) return;
-  await Promise.all([clearCandidates(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData()]);
+  await Promise.all([clearCandidates(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStore(caseTypeDefinitionTx)]);
   await ensureDefaultHandlers();
   selectedId = null;
   markSaved();
@@ -5930,6 +6262,7 @@ openDatabase()
     candidateModal = new bootstrap.Modal(modalElement);
     const handlerModalElement = document.querySelector("#handlerModal");
     handlerModal = new bootstrap.Modal(handlerModalElement);
+    caseTypeAdminModal = new bootstrap.Modal(document.querySelector("#caseTypeAdminModal"));
     caseLifecycleModal = new bootstrap.Modal(els.caseLifecycleModal);
     confirmActionModal = new bootstrap.Modal(els.confirmActionModal);
     modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());
@@ -5939,6 +6272,8 @@ openDatabase()
       confirmActionModal.hide();
     });
     els.confirmActionModal.addEventListener("hidden.bs.modal", () => resolveConfirmation(false));
+    els.identityVerificationPanel.classList.add("mt-4", "mb-0");
+    els.mentorIdentityHost.append(els.identityVerificationPanel);
     db = database;
     await ensureDefaultHandlers();
     if (!window.location.hash) {

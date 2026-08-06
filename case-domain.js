@@ -130,11 +130,23 @@ export const ACTIVITY_TEMPLATES = [
   }
 ];
 
+export const CASE_DETAIL_FIELD_DEFINITIONS = [
+  { id: "targetGroup", label: "Målgrupp", inputType: "text", placeholder: "Exempel: Vårdnadshavare med barn 6-12 år" },
+  { id: "area", label: "Geografiskt område", inputType: "text", placeholder: "Exempel: Centrum och Öster" },
+  { id: "languages", label: "Språkbehov", inputType: "text", placeholder: "Exempel: Svenska, arabiska" },
+  { id: "desiredCount", label: "Önskat antal mentorer", inputType: "number", min: 1, placeholder: "Exempel: 6" },
+  { id: "desiredDate", label: "Behovet ska vara mött senast", inputType: "date" }
+];
+
 export const CASE_TYPE_DEFINITIONS = [
   {
     id: "mentor-certification",
     version: 1,
     name: "Certifiering av mentor",
+    mentorMode: "required",
+    helpText: "Använd när en registrerad mentor ska genomgå kommunens kontroller, intervju och beslut om godkännande.",
+    registrationHint: "Välj mentor och beskriv kort vad som har initierat certifieringen. Kontrollaktiviteterna skapas automatiskt.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     activityTemplateIds: ACTIVITY_TEMPLATES.slice(0, 8).map((template) => template.id)
   },
@@ -142,6 +154,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "mentor-follow-up",
     version: 1,
     name: "Uppföljning",
+    mentorMode: "optional",
+    helpText: "Använd för en planerad eller behovsstyrd uppföljning av en mentor. Koppla mentor när uppföljningen gäller en viss person.",
+    registrationHint: "Ange vad som ska följas upp och varför. Möten och fortsatta åtgärder registreras sedan i samma ärende.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Kontakta mentorn", "Dokumentera uppföljningen", "Bedöm fortsatt behov"]
   },
@@ -149,6 +165,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "matching",
     version: 1,
     name: "Matchning",
+    mentorMode: "required",
+    helpText: "Använd när en certifierad mentor ska bedömas och tillfrågas för ett konkret stödbehov.",
+    registrationHint: "Välj mentor och sammanfatta behov, grundkriterier och vad matchningen ska leda till.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Kontrollera tillgänglighet och grundkriterier", "Dokumentera matchningsförslag", "Kontakta mentorn", "Boka första mötet", "Registrera parternas återkoppling", "Fatta beslut om matchning"]
   },
@@ -156,6 +176,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "mentor-assignment",
     version: 1,
     name: "Mentoruppdrag",
+    mentorMode: "required",
+    helpText: "Använd när en accepterad matchning övergår till ett aktivt mentoruppdrag som ska följas upp.",
+    registrationHint: "Välj mentor och beskriv uppdragets ramar. Planerade uppföljningar hanteras som aktiviteter och möten.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Bekräfta uppdragets ramar", "Genomför första avstämning", "Följ upp efter fyra veckor", "Sammanställ mötes- och ersättningsunderlag", "Utvärdera och avsluta uppdraget"]
   },
@@ -163,6 +187,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "recruitment",
     version: 1,
     name: "Rekryteringsinsats",
+    mentorMode: "none",
+    helpText: "Använd när ett beslutat rekryteringsbehov ska omsättas i annons, informationsinsats eller annan rekryteringsåtgärd.",
+    registrationHint: "Beskriv målgrupp, önskat utfall och vilken behovsanalys eller vilket beslut som ligger bakom insatsen.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Analysera behov", "Skapa platsannons", "Publicera annons", "Följ upp ansökningar"]
   },
@@ -170,6 +198,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "needs-analysis",
     version: 1,
     name: "Behovsanalys",
+    mentorMode: "none",
+    helpText: "Använd när verksamheten behöver beskriva och bedöma ett nytt eller förändrat behov av mentorer.",
+    registrationHint: "Registrera var behovet finns, vilka mentorer som efterfrågas, ungefärlig omfattning och när behovet behöver vara mött.",
+    detailFieldIds: CASE_DETAIL_FIELD_DEFINITIONS.map((field) => field.id),
     defaultPriority: "normal",
     suggestedActivities: ["Samla in underlag", "Analysera behov", "Dokumentera slutsats"]
   },
@@ -177,6 +209,10 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "other",
     version: 1,
     name: "Övrigt ärende",
+    mentorMode: "optional",
+    helpText: "Använd för en avgränsad fråga som inte hör hemma i någon av de övriga ärendetyperna.",
+    registrationHint: "Koppla mentor endast när frågan gäller en viss person. Beskriv tydligt önskat resultat så att ärendet kan avslutas entydigt.",
+    detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: []
   }

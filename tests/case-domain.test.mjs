@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   assessCertificationApproval,
+  CASE_DETAIL_FIELD_DEFINITIONS,
   CASE_TYPE_DEFINITIONS,
   canTransitionActivity,
   deriveCaseStatus,
@@ -115,6 +116,26 @@ test("defines guided workflows for matching and mentor assignments", () => {
   const assignment = CASE_TYPE_DEFINITIONS.find((item) => item.id === "mentor-assignment");
   assert.ok(matching.suggestedActivities.includes("Fatta beslut om matchning"));
   assert.ok(assignment.suggestedActivities.includes("Följ upp efter fyra veckor"));
+});
+
+test("defines registration guidance and mentor rules for every case type", () => {
+  for (const caseType of CASE_TYPE_DEFINITIONS) {
+    assert.ok(caseType.helpText, `${caseType.id} should explain when it is used`);
+    assert.ok(caseType.registrationHint, `${caseType.id} should explain what to register`);
+    assert.ok(["none", "optional", "required"].includes(caseType.mentorMode));
+  }
+  assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "needs-analysis").mentorMode, "none");
+  assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "mentor-certification").mentorMode, "required");
+});
+
+test("limits configurable case fields to the shared field catalog", () => {
+  const fieldIds = CASE_DETAIL_FIELD_DEFINITIONS.map((field) => field.id);
+  assert.equal(new Set(fieldIds).size, fieldIds.length);
+  for (const caseType of CASE_TYPE_DEFINITIONS) {
+    assert.ok(Array.isArray(caseType.detailFieldIds));
+    assert.ok(caseType.detailFieldIds.every((fieldId) => fieldIds.includes(fieldId)));
+  }
+  assert.deepEqual(CASE_TYPE_DEFINITIONS.find((item) => item.id === "needs-analysis").detailFieldIds, fieldIds);
 });
 
 test("offers the operational deviation results used by the playbook", () => {

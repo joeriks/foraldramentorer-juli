@@ -99,18 +99,29 @@ Ett avvikande resultat betyder inte automatiskt avslag. Det öppnar ett ställni
 
 Följande ärendetyper behövs för det sammanhängande verksamhetsflödet:
 
-| Ärendetyp | Mentorkoppling | Normal start | Normal avslutning |
+| Ärendetyp | Mentorkoppling | Registrera minst | Normal avslutning |
 | --- | --- | --- | --- |
-| Behovsanalys | Ingen | Nytt eller förändrat stödbehov | Analys dokumenterad och beslutad |
-| Rekryteringsinsats | Ingen | Beslut att rekrytera mentorer | Insats genomförd och utvärderad |
-| Certifiering | Exakt en mentor | Ny intresseanmälan | Godkänd, avbruten eller ej godkänd |
-| Matchning | Exakt en mentor | Certifierad mentor är tillgänglig | Matchning accepterad eller avslutad utan match |
-| Mentoruppdrag | Exakt en mentor | Matchning har accepterats | Uppdrag avslutat |
-| Uppföljning | Högst en mentor | Planerad eller behovsstyrd uppföljning | Uppföljning dokumenterad |
-| Övrigt mentorärende | Exakt en mentor | Kontakt, avvikelse eller administrativt behov | Frågan hanterad |
-| Generellt verksamhetsärende | Ingen | Administrativt eller organisatoriskt behov | Frågan hanterad |
+| Behovsanalys | Ingen | Rubrik, beskrivning och ansvarig enhet | Analys dokumenterad och beslutad |
+| Rekryteringsinsats | Ingen | Rubrik, ansvarig enhet och önskat utfall | Insats genomförd och utvärderad |
+| Certifiering av mentor | Exakt en mentor | Mentor, ansvarig enhet och bakgrund | Godkänd, avbruten eller ej godkänd |
+| Matchning | Exakt en mentor | Mentor, ansvarig enhet, stödbehov och grundkriterier | Matchning accepterad eller avslutad utan match |
+| Mentoruppdrag | Exakt en mentor | Mentor, ansvarig enhet och uppdragets ramar | Uppdrag avslutat |
+| Uppföljning | Högst en mentor | Ansvarig enhet, syfte och förväntat resultat | Uppföljning dokumenterad |
+| Övrigt ärende | Högst en mentor | Ansvarig enhet, avgränsad fråga och önskat resultat | Frågan hanterad |
 
 En mentor kan ha flera ärenden över tid, men varje ärende får vara kopplat till högst en mentor. Ett certifieringsärende ska inte återanvändas för ett senare uppdrag eller en fristående uppföljning.
+
+### 3.1 Så väljs ärendetyp
+
+- **Behovsanalys:** välj när verksamheten först behöver beskriva omfattning, målgrupp, område, språk och tidshorisont för ett nytt eller förändrat behov.
+- **Rekryteringsinsats:** välj när ett bedömt behov ska omsättas i annons, informationsinsats eller annan konkret rekrytering.
+- **Certifiering av mentor:** välj när en registrerad mentor ska genomgå kontroller, intervju och beslut om godkännande.
+- **Matchning:** välj när en certifierad mentor ska prövas mot ett konkret stödbehov.
+- **Mentoruppdrag:** välj när en accepterad matchning övergår till ett uppdrag med ramar och planerad uppföljning.
+- **Uppföljning:** välj för en avgränsad planerad eller behovsstyrd uppföljning. Koppla mentor när uppföljningen gäller en viss person.
+- **Övrigt ärende:** välj bara när frågan inte hör hemma i någon av typerna ovan. Ange vad som behöver vara gjort för att ärendet ska kunna avslutas.
+
+Samma hjälp visas kortfattat direkt när handläggaren väljer ärendetyp i registreringsvyn. Det minskar behovet av att lämna arbetsläget för att slå upp grundläggande vägledning.
 
 ## 4. Övergripande livscykel
 
@@ -188,10 +199,12 @@ Systemet registrerar automatiskt vem som gjorde ändringen och när den gjordes.
 
 - ärendetyp `Behovsanalys`,
 - rubrik,
-- kort beskrivning,
-- ansvarig enhet.
+- kort beskrivning av det uppmärksammade behovet,
+- ansvarig enhet, exempelvis `Familjestöd`.
 
-**Möjliga kompletteringar:** målgrupp, geografiskt område, språkbehov, önskat antal mentorer, önskat datum, analysunderlag och medhandläggare.
+Fältet `Mentor` visas inte eftersom en behovsanalys gäller verksamhetens samlade behov och inte en viss mentor.
+
+**Strukturerade kompletteringar i samma registrering:** målgrupp, geografiskt område, språkbehov, önskat antal mentorer och datum då behovet senast bör vara mött. Fyll i det som är känt och komplettera samma ärende senare. Analysunderlag läggs till som handling och medhandläggare läggs till när fler behöver arbeta i ärendet.
 
 <div data-routine-illustration="needs-analysis"></div>
 
