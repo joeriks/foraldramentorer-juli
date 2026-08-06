@@ -1,8 +1,8 @@
 # Verksamhetsflöden och handläggningsrutiner
 
-Status: Verksamhetsförslag 1.0  
+Status: Verksamhetsförslag 1.1
 Produkt: FöräldraMentorer - Kommunportal  
-Senast uppdaterad: 2026-08-05
+Senast uppdaterad: 2026-08-06
 
 Relaterade dokument:
 
@@ -123,6 +123,8 @@ En mentor kan ha flera ärenden över tid, men varje ärende får vara kopplat t
 
 Samma hjälp visas kortfattat direkt när handläggaren väljer ärendetyp i registreringsvyn. Det minskar behovet av att lämna arbetsläget för att slå upp grundläggande vägledning.
 
+**I systemet:** [Administrera ärendetyper](feature:admin.case-types)
+
 ## 4. Övergripande livscykel
 
 ```mermaid
@@ -149,16 +151,16 @@ flowchart LR
 
 ### 5.1 Börja arbetsdagen
 
-Handläggaren öppnar dashboarden och ser arbetsköer i denna ordning:
+Handläggaren öppnar dashboarden. Den har två nivåer som bygger på samma ärende- och aktivitetsdata:
 
-1. Ställningstaganden som krävs.
-2. Försenade aktiviteter.
-3. Aktiviteter som förfaller snart.
-4. Mina pågående aktiviteter.
-5. Ärenden eller aktiviteter som saknar ansvarig.
-6. Poster som väntar på mentor eller extern part och vars bevakningsdatum har passerat.
+1. **Ärendeläge** visar antal nya, pågående, väntande och pausade ärenden samt ärenden där ett ställningstagande krävs. Ett val öppnar motsvarande urval i ärenderegistret.
+2. **Arbetskö** visar aktiviteter som kan handläggas direkt. Köerna är `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden`.
 
-Varje köpost ska visa ärende, mentor om sådan finns, nästa arbetssteg, ansvarig, förfallodatum och varför posten visas i kön. Formuleringen `Kräver åtgärd` ska undvikas. Systemet ska i stället ange exempelvis `Ställningstagande krävs av handläggare` eller `Inväntar komplettering från mentor`.
+Rekommenderad arbetsordning är att först bedöma ställningstaganden och försenade aktiviteter och därefter fortsätta med egna aktiviteter. Samordnaren kontrollerar dessutom kön `Otilldelade` och fördelar arbetet. Ett väntande ärende visas i ärendeläget; om bevakningsdatumet passeras visas dess aktivitet även som försenad.
+
+Varje köpost ska visa ärende, mentor eller annan koppling, nästa aktivitet, förfallodatum och varför posten visas i kön. Formuleringen `Kräver åtgärd` ska undvikas. Systemet ska i stället ange exempelvis `Ställningstagande krävs av handläggare`, `Förfallodatum passerat` eller `Inväntar komplettering från mentor`.
+
+Mentorflödet längre ned på dashboarden är en sekundär registeröversikt. Det får inte användas som ersättning för ärendestatus, aktivitetskö eller beslutspunkt.
 
 **I systemet:** [Öppna dashboard och arbetskö](feature:dashboard.work-queue)
 
@@ -188,6 +190,16 @@ När en aktivitet avslutas ska användaren:
 5. få en tydlig bekräftelse och se nästa föreslagna steg.
 
 Systemet registrerar automatiskt vem som gjorde ändringen och när den gjordes.
+
+### 5.4 Välj rätt vy
+
+- **Dashboard:** prioriterar dagens arbete och visar sammanräknat ärendeläge. Här ska användaren inte registrera fristående verksamhetsuppgifter.
+- **Ärenderegister:** visar den fullständiga, sökbara listan över ärenden. Här väljer användaren vilket ärende som ska öppnas.
+- **Ärendekort:** är den primära arbetsytan för översikt, aktiviteter, handlingar, logg och beslut i ett ärende.
+- **Mentorregister och mentorkort:** visar person- och registeruppgifter samt länkar till personens ärenden. Kontroller, möten och beslut ska registreras i rätt ärende och bara sammanfattas på mentorkortet.
+- **Presentation:** demonstrerar samma funktioner och dataflöden. Kommentarer i presentationsläget är prototypåterkoppling och får inte blandas med ärenden, tjänsteanteckningar eller logghändelser.
+
+Samma status ska aldrig registreras separat i flera vyer. Dashboard, listor och mentorkort ska härleda sina sammanfattningar från ärenden och aktiviteter.
 
 ## 6. Flöde A: behovsanalys och rekrytering
 
@@ -533,7 +545,8 @@ Systemet bör automatiskt:
 - öppna ställningstagande vid avvikelse,
 - förhindra slutligt godkännande när obligatoriska steg eller avvikelser återstår,
 - markera återstående aktiviteter som ej aktuella när ett ärende avslutas,
-- logga ansvar, status, resultat, beslut och handlingar.
+- logga ansvar, status, resultat, beslut och handlingar,
+- beräkna dashboardens antal och arbetsköer från samma ärenden och aktiviteter som visas i register och kort.
 
 Systemet bör inte automatiskt:
 
@@ -543,7 +556,8 @@ Systemet bör inte automatiskt:
 - tolka fritext som ett verksamhetsbeslut,
 - avsluta ett ärende enbart på grund av ett avvikande aktivitetsresultat,
 - återöppna eller radera avslutade ärenden,
-- lagra kopior av identitetshandlingar eller registerutdrag utan fastställd rutin.
+- lagra kopior av identitetshandlingar eller registerutdrag utan fastställd rutin,
+- skapa en separat statusuppsättning för dashboard, mentorflöde eller presentation.
 
 ## 17. Roller och beslutspunkter
 
@@ -593,7 +607,7 @@ Två certifieringsintervjuer registreras som separata möten med var sin sammanf
 
 ### Scenario 8: 250 mentorer
 
-Handläggaren filtrerar på egna, försenade, otilldelade och väntande ärenden. Listor är paginerade, sökbara och sorterade utan att varje ärende behöver öppnas. Samma data visas konsekvent på dashboard, lista och ärendekort.
+Handläggaren växlar mellan `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden` på dashboarden. Väntande ärenden väljs via ärendeläget och öppnas i ärenderegistret. Listor är paginerade, sökbara och sorterade utan att varje ärende behöver öppnas. Antal, status, nästa aktivitet och ansvarig ska vara konsekventa på dashboard, i ärenderegistret och på ärendekortet. Mentorflödet kontrolleras separat som en sekundär registeröversikt.
 
 ## 19. Frågor som måste beslutas före pilot
 

@@ -23,7 +23,7 @@ import {
   stableHash
 } from "./case-domain.js?v=20260806-navigation-v4";
 import { marked } from "./vendor/marked/marked.esm.js";
-import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-navigation-v4";
+import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-routines-v6";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-navigation-v4";
 
 const DB_NAME = "foraldramentorer";
@@ -2329,7 +2329,7 @@ async function loadRoutinesDocument(sectionKey = "") {
   els.routinesContent.innerHTML = '<p class="text-secondary">Läser in rutindokumentet...</p>';
 
   try {
-    const response = await fetch("./docs/verksamhetsfloden-och-handlaggningsrutiner.md?v=20260805-routine-illustrations-v1");
+    const response = await fetch("./docs/verksamhetsfloden-och-handlaggningsrutiner.md?v=20260806-case-routines-v2");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const markdown = await response.text();
     els.routinesContent.innerHTML = marked.parse(markdown, { gfm: true });
