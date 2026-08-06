@@ -43,6 +43,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "identityVerified",
     version: 1,
     title: "Verifiera identitet",
+    workInstruction: "Kontrollera identiteten med BankID eller genom fysisk ID-handling. Registrera personnummer och verifieringssätt på mentorkortet innan aktiviteten avslutas.",
     results: [
       ["verified", "Verifierad", "acceptable"],
       ["not_verified", "Inte verifierad", "deviation"]
@@ -52,6 +53,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "registryChecked",
     version: 1,
     title: "Kontrollera belastningsregister",
+    workInstruction: "Kontrollera att rätt registerutdrag visas, att det är giltigt och att äktheten kan bedömas. Registrera endast kontrollens resultat, inte uppgifter ur utdraget.",
     results: [
       ["shown_checked", "Kontrollerat, inget fortsatt ställningstagande behövs", "acceptable"],
       ["assessment_required", "Kontrollerat, särskilt ställningstagande krävs", "deviation"],
@@ -64,6 +66,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "referencesDone",
     version: 1,
     title: "Kontrollera referenser",
+    workInstruction: "Kontakta angivna referenser och dokumentera kontaktförsök samt en saklig sammanfattning. Skapa uppföljning om en referens inte kan nås eller behöver bedömas vidare.",
     results: [
       ["acceptable", "Godtagbara", "acceptable"],
       ["unreachable", "Referens kunde inte nås", "deviation"],
@@ -76,6 +79,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "trainingDone",
     version: 1,
     title: "Kontrollera e-learning",
+    workInstruction: "Kontrollera att aktuell utbildning är genomförd. Sätt aktiviteten till Väntar om utbildningen pågår och ange vem eller vad handläggningen väntar på.",
     results: [
       ["completed", "Genomförd", "acceptable"],
       ["partially_completed", "Delvis genomförd", "deviation"],
@@ -86,6 +90,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "quizDone",
     version: 1,
     title: "Kontrollera kunskapsavstämning",
+    workInstruction: "Kontrollera resultatet från kunskapsavstämningen och registrera om den är godkänd. Ett icke godkänt resultat ska följas av ett uttryckligt ställningstagande.",
     results: [
       ["passed", "Godkänd", "acceptable"],
       ["not_passed", "Inte godkänd", "deviation"]
@@ -95,6 +100,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "inviteInterview",
     version: 1,
     title: "Kalla till intervju",
+    workInstruction: "Kontakta mentorn, kom överens om tid och registrera kallelsen. Ange förfallodatum eller väntande part om bokningen inte kan slutföras direkt.",
     results: [
       ["invitation_sent", "Kallelse skickad", "acceptable"],
       ["not_reached", "Kunde inte nå personen", "deviation"]
@@ -104,6 +110,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "interviewDone",
     version: 1,
     title: "Genomför intervju",
+    workInstruction: "Genomför intervjun enligt verksamhetens rutin och registrera mötet eller protokollet som underlag. Avsluta aktiviteten först när utfallet är dokumenterat.",
     results: [
       ["completed", "Genomförd", "acceptable"],
       ["cancelled", "Inställd", "deviation"],
@@ -114,6 +121,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "decision",
     version: 1,
     title: "Fatta beslut om godkännande",
+    workInstruction: "Kontrollera att obligatoriska aktiviteter och eventuella ställningstaganden är klara. Registrera beslut och en saklig motivering innan ärendet avslutas.",
     results: [
       ["approved", "Godkänd", "acceptable"],
       ["not_approved", "Inte godkänd", "deviation"]
@@ -123,6 +131,7 @@ export const ACTIVITY_TEMPLATES = [
     id: AD_HOC_ACTIVITY_TEMPLATE_ID,
     version: 1,
     title: "Annan aktivitet",
+    workInstruction: "Beskriv vad som ska göras, vem som ansvarar och när det ska vara klart. Registrera resultat och notering så att nästa handläggare kan förstå vad som har gjorts.",
     results: [
       ["completed", "Genomförd", "acceptable"],
       ["not_completed", "Kunde inte genomföras", "deviation"],
@@ -147,6 +156,7 @@ export const CASE_TYPE_DEFINITIONS = [
     mentorMode: "required",
     helpText: "Använd när en registrerad mentor ska genomgå kommunens kontroller, intervju och beslut om godkännande.",
     registrationHint: "Välj mentor och beskriv kort vad som har initierat prövningen. Kontrollaktiviteterna skapas automatiskt.",
+    workInstruction: "Tilldela en ansvarig handläggare och genomför aktiviteterna i angiven ordning. Dokumentera avvikelser och gör nödvändiga ställningstaganden innan beslut om godkännande fattas.",
     detailFieldIds: [],
     defaultPriority: "normal",
     activityTemplateIds: ACTIVITY_TEMPLATES.slice(0, 8).map((template) => template.id)
@@ -158,6 +168,7 @@ export const CASE_TYPE_DEFINITIONS = [
     mentorMode: "optional",
     helpText: "Använd för en planerad eller behovsstyrd uppföljning av en mentor. Koppla mentor när uppföljningen gäller en viss person.",
     registrationHint: "Ange vad som ska följas upp och varför. Möten och fortsatta åtgärder registreras sedan i samma ärende.",
+    workInstruction: "Klargör vad som ska följas upp, registrera kontakt eller möte och dokumentera utfallet. Lägg till en ny aktivitet om fortsatt arbete behövs.",
     detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Kontakta mentorn", "Dokumentera uppföljningen", "Bedöm fortsatt behov"]
@@ -169,6 +180,7 @@ export const CASE_TYPE_DEFINITIONS = [
     mentorMode: "required",
     helpText: "Använd när en godkänd mentor ska bedömas och tillfrågas för ett konkret stödbehov.",
     registrationHint: "Välj mentor och sammanfatta behov, grundkriterier och vad matchningen ska leda till.",
+    workInstruction: "Kontrollera mentorens tillgänglighet och grundkriterier, dokumentera matchningsförslaget och registrera båda parters återkoppling innan beslut om matchning.",
     detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Kontrollera tillgänglighet och grundkriterier", "Dokumentera matchningsförslag", "Kontakta mentorn", "Boka första mötet", "Registrera parternas återkoppling", "Fatta beslut om matchning"]
@@ -180,6 +192,7 @@ export const CASE_TYPE_DEFINITIONS = [
     mentorMode: "required",
     helpText: "Använd när en accepterad matchning övergår till ett aktivt mentoruppdrag som ska följas upp.",
     registrationHint: "Välj mentor och beskriv uppdragets ramar. Planerade uppföljningar hanteras som aktiviteter och möten.",
+    workInstruction: "Bekräfta uppdragets ramar, planera uppföljningar och registrera möten och avvikelser löpande. Avsluta ärendet när uppdraget har utvärderats.",
     detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Bekräfta uppdragets ramar", "Genomför första avstämning", "Följ upp efter fyra veckor", "Sammanställ mötes- och ersättningsunderlag", "Utvärdera och avsluta uppdraget"]
@@ -191,6 +204,7 @@ export const CASE_TYPE_DEFINITIONS = [
     mentorMode: "none",
     helpText: "Använd när ett beslutat rekryteringsbehov ska omsättas i annons, informationsinsats eller annan rekryteringsåtgärd.",
     registrationHint: "Beskriv målgrupp, önskat utfall och vilken behovsanalys eller vilket beslut som ligger bakom insatsen.",
+    workInstruction: "Utgå från beslutat behov, planera och genomför rekryteringsinsatsen och följ upp utfallet. Länka relevant underlag och registrera slutsatsen i ärendet.",
     detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Analysera behov", "Skapa platsannons", "Publicera annons", "Följ upp ansökningar"]
@@ -202,6 +216,7 @@ export const CASE_TYPE_DEFINITIONS = [
     mentorMode: "none",
     helpText: "Använd när verksamheten behöver beskriva och bedöma ett nytt eller förändrat behov av mentorer.",
     registrationHint: "Registrera var behovet finns, vilka mentorer som efterfrågas, ungefärlig omfattning och när behovet behöver vara mött.",
+    workInstruction: "Samla in underlag från berörda verksamheter, komplettera behovsuppgifterna och dokumentera analysens slutsats. Skapa en rekryteringsinsats om behovet ska genomföras.",
     detailFieldIds: CASE_DETAIL_FIELD_DEFINITIONS.map((field) => field.id),
     defaultPriority: "normal",
     suggestedActivities: ["Samla in underlag", "Analysera behov", "Dokumentera slutsats"]
@@ -213,6 +228,7 @@ export const CASE_TYPE_DEFINITIONS = [
     mentorMode: "optional",
     helpText: "Använd för en avgränsad fråga som inte hör hemma i någon av de övriga ärendetyperna.",
     registrationHint: "Koppla mentor endast när frågan gäller en viss person. Beskriv tydligt önskat resultat så att ärendet kan avslutas entydigt.",
+    workInstruction: "Beskriv önskat resultat, tilldela ansvar och lägg till de aktiviteter som behövs. Dokumentera utfallet innan ärendet avslutas.",
     detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: []

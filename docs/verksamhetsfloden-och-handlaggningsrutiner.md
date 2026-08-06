@@ -1,6 +1,6 @@
 # Verksamhetsflöden och handläggningsrutiner
 
-Status: Verksamhetsförslag 1.3
+Status: Verksamhetsförslag 1.4
 Produkt: FöräldraMentorer - Kommunportal  
 Senast uppdaterad: 2026-08-06
 
@@ -251,6 +251,8 @@ Annons, beslut och sammanställning registreras som handlingar. En publicering r
 - kort notering om intresset.
 
 Systemet skapar en mentorpost och ett ärende om godkännande i samma sammanhängande operation. Dublettkontroll görs mot befintliga personer, men sammanslagning får aldrig ske automatiskt.
+
+Systemet registrerar automatiskt vilken inloggad användare som skapade mentorposten och tidpunkten för registreringen. Registreraren visas separat från ansvarig handläggare, eftersom det kan vara olika personer. Uppgiften kan inte ändras i mentorpostens redigeringsläge.
 
 <div data-routine-illustration="mentor-registration"></div>
 

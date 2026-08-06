@@ -23,8 +23,15 @@ test("serves the application shell", async () => {
   assert.match(html, />Nytt ärende</);
   assert.match(html, /id="caseTypeDetailPanel"/);
   assert.match(html, /form="caseTypeAdminForm"/);
+  assert.match(html, /id="activityTypesAdministrationView"/);
+  assert.match(html, /form="activityTypeAdminForm"/);
+  assert.match(html, /Handläggningsanvisning/);
+  assert.match(html, /<form id="personEditForm"[\s\S]*id="cancelPersonEditButton"[\s\S]*id="savePersonEditButton"[\s\S]*<\/form>/);
+  assert.doesNotMatch(html, /form="personEditForm"/);
   assert.doesNotMatch(html, /id="caseTypeAdminModal"/);
   assert.match(html, /Godkännande av mentor/);
+  assert.match(html, /Registrerad av/);
+  assert.match(html, /krävs för detta resultat/);
   assert.doesNotMatch(html, /certifiera/i);
 });
 
@@ -36,6 +43,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   const scriptText = await script.text();
   assert.match(scriptText, /CASE_ACTIVITIES_STORE/);
   assert.match(scriptText, /#\/case-types\/\$\{encodeURIComponent\(definition\.id\)\}/);
+  assert.match(scriptText, /#\/activity-types\/\$\{encodeURIComponent\(definition\.id\)\}/);
   assert.match(scriptText, /renderRoutineFlowDiagrams/);
   assert.match(scriptText, /routineProcessLink/);
 

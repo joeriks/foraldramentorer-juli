@@ -24,7 +24,7 @@ import {
   resultClassification,
   resultOptions,
   stableHash
-} from "./case-domain.js?v=20260806-registry-assessment-v11";
+} from "./case-domain.js?v=20260806-handling-guidance-v14";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-routines-v6";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-approval-terms-v10";
@@ -415,6 +415,8 @@ let deviationDecisions = [];
 let caseMeetings = [];
 let caseTypeDefinitions = CASE_TYPE_DEFINITIONS.map((definition) => ({ ...definition }));
 let caseTypeDefinitionVersions = [];
+let activityTemplateDefinitions = ACTIVITY_TEMPLATES.map((definition) => ({ ...definition }));
+let activityTemplateDefinitionVersions = [];
 let selectedPresentationStepId = PRESENTATION_STEPS[0].id;
 let selectedId = null;
 let selectedCaseRecordId = null;
@@ -439,6 +441,8 @@ let handlerModal;
 let selectedHandlerId = null;
 let selectedCaseTypeId = null;
 let caseTypeEditMode = false;
+let selectedActivityTypeId = null;
+let activityTypeEditMode = false;
 let selectedMeetingId = null;
 let confirmActionModal;
 let pendingConfirmation = null;
@@ -466,6 +470,7 @@ const els = {
   navAdministration: document.querySelector("#navAdministration"),
   navHandlers: document.querySelector("#navHandlers"),
   navCaseTypes: document.querySelector("#navCaseTypes"),
+  navActivityTypes: document.querySelector("#navActivityTypes"),
   navRoutines: document.querySelector("#navRoutines"),
   dashboardView: document.querySelector("#dashboardView"),
   presentationView: document.querySelector("#presentationView"),
@@ -475,6 +480,7 @@ const els = {
   detailView: document.querySelector("#detailView"),
   administrationView: document.querySelector("#administrationView"),
   caseTypesAdministrationView: document.querySelector("#caseTypesAdministrationView"),
+  activityTypesAdministrationView: document.querySelector("#activityTypesAdministrationView"),
   routinesView: document.querySelector("#routinesView"),
   routinesSearchInput: document.querySelector("#routinesSearchInput"),
   clearRoutinesSearchButton: document.querySelector("#clearRoutinesSearchButton"),
@@ -494,6 +500,7 @@ const els = {
   caseTypeReadView: document.querySelector("#caseTypeReadView"),
   caseTypeHelpFact: document.querySelector("#caseTypeHelpFact"),
   caseTypeHintFact: document.querySelector("#caseTypeHintFact"),
+  caseTypeWorkInstructionFact: document.querySelector("#caseTypeWorkInstructionFact"),
   caseTypeMentorModeFact: document.querySelector("#caseTypeMentorModeFact"),
   caseTypeFieldsFact: document.querySelector("#caseTypeFieldsFact"),
   editCaseTypeButton: document.querySelector("#editCaseTypeButton"),
@@ -502,8 +509,24 @@ const els = {
   caseTypeAdminIdInput: document.querySelector("#caseTypeAdminIdInput"),
   caseTypeAdminHelpInput: document.querySelector("#caseTypeAdminHelpInput"),
   caseTypeAdminHintInput: document.querySelector("#caseTypeAdminHintInput"),
+  caseTypeAdminWorkInstructionInput: document.querySelector("#caseTypeAdminWorkInstructionInput"),
   caseTypeAdminMentorModeInput: document.querySelector("#caseTypeAdminMentorModeInput"),
   caseTypeAdminFieldChoices: document.querySelector("#caseTypeAdminFieldChoices"),
+  activityTypeAdminTableBody: document.querySelector("#activityTypeAdminTableBody"),
+  activityTypeListPanel: document.querySelector("#activityTypeListPanel"),
+  activityTypeDetailPanel: document.querySelector("#activityTypeDetailPanel"),
+  activityTypeAdminForm: document.querySelector("#activityTypeAdminForm"),
+  activityTypeAdminTitle: document.querySelector("#activityTypeAdminTitle"),
+  activityTypeAdminTechnicalId: document.querySelector("#activityTypeAdminTechnicalId"),
+  activityTypeVersionMeta: document.querySelector("#activityTypeVersionMeta"),
+  activityTypeUpdatedMeta: document.querySelector("#activityTypeUpdatedMeta"),
+  activityTypeReadView: document.querySelector("#activityTypeReadView"),
+  activityTypeWorkInstructionFact: document.querySelector("#activityTypeWorkInstructionFact"),
+  editActivityTypeButton: document.querySelector("#editActivityTypeButton"),
+  activityTypeEditActions: document.querySelector("#activityTypeEditActions"),
+  cancelActivityTypeEditButton: document.querySelector("#cancelActivityTypeEditButton"),
+  activityTypeAdminIdInput: document.querySelector("#activityTypeAdminIdInput"),
+  activityTypeAdminWorkInstructionInput: document.querySelector("#activityTypeAdminWorkInstructionInput"),
   handlerDetailEmpty: document.querySelector("#handlerDetailEmpty"),
   handlerDetail: document.querySelector("#handlerDetail"),
   totalCount: document.querySelector("#totalCount"),
@@ -596,6 +619,8 @@ const els = {
   caseCoHandlersFact: document.querySelector("#caseCoHandlersFact"),
   caseMentorFact: document.querySelector("#caseMentorFact"),
   caseCreatedFact: document.querySelector("#caseCreatedFact"),
+  caseWorkGuidance: document.querySelector("#caseWorkGuidance"),
+  caseWorkGuidanceText: document.querySelector("#caseWorkGuidanceText"),
   caseTypeDetailsSection: document.querySelector("#caseTypeDetailsSection"),
   caseTypeDetailsTitle: document.querySelector("#caseTypeDetailsTitle"),
   caseTypeDetailsFacts: document.querySelector("#caseTypeDetailsFacts"),
@@ -631,6 +656,7 @@ const els = {
   activityDetailDueDateInput: document.querySelector("#activityDetailDueDateInput"),
   activityWaitingForRow: document.querySelector("#activityWaitingForRow"),
   activityDetailWaitingForInput: document.querySelector("#activityDetailWaitingForInput"),
+  activityDetailNoteRequirement: document.querySelector("#activityDetailNoteRequirement"),
   activityDetailNoteInput: document.querySelector("#activityDetailNoteInput"),
   activityDetailSaveState: document.querySelector("#activityDetailSaveState"),
   activityDetailSaveButton: document.querySelector("#activityDetailSaveButton"),
@@ -729,6 +755,7 @@ const els = {
   selectedStatus: document.querySelector("#selectedStatus"),
   selectedName: document.querySelector("#selectedName"),
   selectedCoordinatorMeta: document.querySelector("#selectedCoordinatorMeta"),
+  selectedRegisteredByMeta: document.querySelector("#selectedRegisteredByMeta"),
   selectedCreatedMeta: document.querySelector("#selectedCreatedMeta"),
   selectedUpdatedMeta: document.querySelector("#selectedUpdatedMeta"),
   recordMoreActions: document.querySelector("#recordMoreActions"),
@@ -1023,6 +1050,10 @@ function caseTypeDefinitionTx(mode = "readonly") {
   return db.transaction(CASE_TYPE_DEFINITIONS_STORE, mode).objectStore(CASE_TYPE_DEFINITIONS_STORE);
 }
 
+function activityTemplateDefinitionTx(mode = "readonly") {
+  return db.transaction(ACTIVITY_TEMPLATE_DEFINITIONS_STORE, mode).objectStore(ACTIVITY_TEMPLATE_DEFINITIONS_STORE);
+}
+
 function getAllFrom(storeTx) {
   return new Promise((resolve, reject) => {
     const request = storeTx().getAll();
@@ -1067,6 +1098,8 @@ const getAllDeviationDecisions = () => getAllFrom(deviationDecisionTx);
 const getAllCaseMeetings = () => getAllFrom(caseMeetingTx);
 const getAllCaseTypeDefinitions = () => getAllFrom(caseTypeDefinitionTx);
 const saveCaseTypeDefinition = (value) => putInto(caseTypeDefinitionTx, value);
+const getAllActivityTemplateDefinitions = () => getAllFrom(activityTemplateDefinitionTx);
+const saveActivityTemplateDefinition = (value) => putInto(activityTemplateDefinitionTx, value);
 
 function caseTypeById(id, version = null) {
   return (version ? caseTypeDefinitionVersions.find((definition) => definition.id === id && Number(definition.version) === Number(version)) : null)
@@ -1104,6 +1137,41 @@ async function loadCaseTypeDefinitions() {
     ...(storedById.get(fallback.id) || {}),
     name: fallback.name,
     detailFieldIds: storedById.get(fallback.id)?.detailFieldIds || fallback.detailFieldIds || []
+  }));
+}
+
+function activityTemplateDefinitionById(id) {
+  return activityTemplateDefinitions.find((definition) => definition.id === id)
+    || ACTIVITY_TEMPLATES.find((definition) => definition.id === id)
+    || null;
+}
+
+async function loadActivityTemplateDefinitions() {
+  let stored = await getAllActivityTemplateDefinitions();
+  const tenantDefinitions = stored.filter((definition) => definition.tenantId === DEFAULT_TENANT_ID);
+  const storedIds = new Set(tenantDefinitions.map((definition) => definition.id));
+  const missing = ACTIVITY_TEMPLATES.filter((definition) => !storedIds.has(definition.id));
+  if (missing.length) {
+    await Promise.all(missing.map((definition, sortOrder) => saveActivityTemplateDefinition({
+      ...definition,
+      tenantId: DEFAULT_TENANT_ID,
+      status: "published",
+      sortOrder
+    })));
+    stored = await getAllActivityTemplateDefinitions();
+  }
+  activityTemplateDefinitionVersions = stored.filter((definition) => definition.tenantId === DEFAULT_TENANT_ID);
+  const storedById = new Map();
+  for (const definition of activityTemplateDefinitionVersions
+    .filter((item) => item.status === "published")
+    .sort((a, b) => Number(a.version || 1) - Number(b.version || 1))) {
+    storedById.set(definition.id, definition);
+  }
+  activityTemplateDefinitions = ACTIVITY_TEMPLATES.map((fallback) => ({
+    ...fallback,
+    ...(storedById.get(fallback.id) || {}),
+    title: fallback.title,
+    results: fallback.results
   }));
 }
 
@@ -1748,13 +1816,17 @@ async function ensureCertificationCases() {
 
 async function refresh() {
   await loadCaseTypeDefinitions();
+  await loadActivityTemplateDefinitions();
   handlers = await getAllHandlers();
   await migrateDefaultHandlerRecords();
   handlers.sort((a, b) => a.name.localeCompare(b.name, "sv"));
   const storedCandidates = await getAllCandidates();
   candidates = storedCandidates.map(normalizeCandidate);
   await Promise.all(candidates
-    .filter((candidate, index) => !storedCandidates[index].tenantId || candidate.status !== storedCandidates[index].status)
+    .filter((candidate, index) => !storedCandidates[index].tenantId
+      || !storedCandidates[index].createdBy
+      || !storedCandidates[index].updatedBy
+      || candidate.status !== storedCandidates[index].status)
     .map(saveCandidate));
   meetings = await getAllMeetings();
   presentationComments = await getAllPresentationComments();
@@ -1896,6 +1968,7 @@ function renderAll() {
   renderDetail();
   renderHandlers();
   renderCaseTypeAdministration();
+  renderActivityTypeAdministration();
   renderHandlerDetail();
 }
 
@@ -2006,6 +2079,7 @@ function normalizeCandidate(candidate, index = 0) {
     && identityMethod
     && (candidate.checks?.identityVerified || candidate.identityVerifiedAt)
   );
+  const createdBy = actorId(candidate.createdBy || candidate.history?.[0]?.actor);
   const normalized = {
     ...candidate,
     status: normalizeMentorStatus(candidate.status),
@@ -2017,6 +2091,8 @@ function normalizeCandidate(candidate, index = 0) {
     },
     personalNumber,
     identityMethod,
+    createdBy,
+    updatedBy: actorId(candidate.updatedBy || createdBy),
     identityVerifiedAt: identityVerified ? candidate.identityVerifiedAt || candidate.updatedAt || candidate.createdAt : "",
     identityVerifiedBy: identityVerified ? candidate.identityVerifiedBy || candidate.coordinator || "System" : ""
   };
@@ -2486,7 +2562,7 @@ async function loadRoutinesDocument(sectionKey = "") {
 function applyRoute() {
   const route = parseRoute();
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "administration", "case-types", "routines", "handler"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "administration", "case-types", "activity-types", "routines", "handler"].includes(route.view) ? route.view : "dashboard";
   selectedId = currentView === "mentor" ? route.id : selectedId;
   selectedCaseRecordId = currentView === "case" ? route.id : selectedCaseRecordId;
   if (currentView !== "case") {
@@ -2499,6 +2575,8 @@ function applyRoute() {
   selectedHandlerId = currentView === "handler" ? route.id : selectedHandlerId;
   selectedCaseTypeId = currentView === "case-types" ? route.id : null;
   if (currentView !== "case-types" || !route.id) caseTypeEditMode = false;
+  selectedActivityTypeId = currentView === "activity-types" ? route.id : null;
+  if (currentView !== "activity-types" || !route.id) activityTypeEditMode = false;
   workQueueOnly = currentView === "mentors" && route.id === "action";
   caseTypeFilter = currentView === "cases" && ["matching", "mentor-assignment"].includes(route.id) ? route.id : "";
 
@@ -2510,6 +2588,7 @@ function applyRoute() {
   els.detailView.hidden = currentView !== "mentor";
   els.administrationView.hidden = currentView !== "administration";
   els.caseTypesAdministrationView.hidden = currentView !== "case-types";
+  els.activityTypesAdministrationView.hidden = currentView !== "activity-types";
   els.routinesView.hidden = currentView !== "routines";
   els.handlerDetailView.hidden = currentView !== "handler";
 
@@ -2519,9 +2598,10 @@ function applyRoute() {
   els.navMatchings.classList.toggle("active", currentView === "cases" && caseTypeFilter === "matching");
   els.navAssignments.classList.toggle("active", currentView === "cases" && caseTypeFilter === "mentor-assignment");
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
-  els.navAdministration.classList.toggle("active", ["administration", "case-types", "routines", "handler"].includes(currentView));
+  els.navAdministration.classList.toggle("active", ["administration", "case-types", "activity-types", "routines", "handler"].includes(currentView));
   els.navHandlers.classList.toggle("active", currentView === "administration" || currentView === "handler");
   els.navCaseTypes.classList.toggle("active", currentView === "case-types");
+  els.navActivityTypes.classList.toggle("active", currentView === "activity-types");
   els.navRoutines.classList.toggle("active", currentView === "routines");
 
   if (currentView === "dashboard") {
@@ -2552,6 +2632,9 @@ function applyRoute() {
   } else if (currentView === "case-types") {
     els.pageTitle.textContent = route.id ? "Ärendetyp" : "Ärendetyper";
     els.breadcrumb.textContent = route.id ? "Start / Systemadministration / Ärendetyper / Ärendetyp" : "Start / Systemadministration / Ärendetyper";
+  } else if (currentView === "activity-types") {
+    els.pageTitle.textContent = route.id ? "Aktivitetsmall" : "Aktivitetsmallar";
+    els.breadcrumb.textContent = route.id ? "Start / Systemadministration / Aktivitetsmallar / Aktivitetsmall" : "Start / Systemadministration / Aktivitetsmallar";
   } else if (currentView === "routines") {
     els.pageTitle.textContent = "Rutiner";
     els.breadcrumb.textContent = "Start / Systemadministration / Rutiner";
@@ -3195,6 +3278,9 @@ function renderCaseDetail() {
   els.caseCoHandlersFact.textContent = caseCoHandlers.length ? caseCoHandlers.map((handler) => handler.name).join(", ") : "Inga";
   els.caseMentorFact.innerHTML = mentor ? `<a href="#/mentor/${escapeHtml(mentor.id)}">${escapeHtml(mentor.name)}</a>` : "Ej personanknutet";
   els.caseCreatedFact.textContent = `${formatDateTime(caseRecord.createdAt)} av ${handlerNameById(caseRecord.createdBy)}`;
+  const caseGuidance = caseTypeById(caseRecord.caseTypeId)?.workInstruction?.trim() || "";
+  els.caseWorkGuidance.hidden = !caseGuidance;
+  els.caseWorkGuidanceText.textContent = caseGuidance;
   renderCaseTypeDetails(caseRecord);
   els.caseActivityCount.textContent = activities.length;
   els.caseDocumentCount.textContent = documents.length;
@@ -3380,15 +3466,19 @@ function renderActivityDetail(caseRecord) {
 
 function renderActivityGuidance(activity, caseRecord) {
   const mentor = caseMentor(caseRecord);
+  const templateGuidance = activityTemplateDefinitionById(activity.templateId)?.workInstruction?.trim() || "";
   const identityDataMissing = activity.templateId === "identityVerified"
     && mentor
     && (!mentor.personalNumber || !mentor.identityMethod);
-  els.activityDetailGuidance.hidden = !identityDataMissing;
+  els.activityDetailGuidance.hidden = !templateGuidance && !identityDataMissing;
   els.activityDetailGuidanceButton.dataset.mentorId = identityDataMissing ? mentor.id : "";
-  if (!identityDataMissing) return;
-  els.activityDetailGuidanceTitle.textContent = "Identitetsuppgifter behöver registreras";
-  els.activityDetailGuidanceText.textContent = "Personnummer och verifieringssätt måste finnas på mentorkortet innan aktiviteten kan avslutas med resultatet Verifierad.";
-  els.activityDetailGuidanceButton.textContent = "Öppna identitetsuppgifter";
+  els.activityDetailGuidanceTitle.textContent = "Så gör du";
+  els.activityDetailGuidanceText.textContent = [
+    templateGuidance,
+    identityDataMissing ? "Personnummer och verifieringssätt saknas och måste registreras på mentorkortet innan resultatet Verifierad kan sparas." : ""
+  ].filter(Boolean).join(" ");
+  els.activityDetailGuidanceButton.hidden = !identityDataMissing;
+  els.activityDetailGuidanceButton.textContent = identityDataMissing ? "Öppna identitetsuppgifter" : "";
 }
 
 function activityDetailFormSnapshot() {
@@ -3434,6 +3524,27 @@ function renderActivityResultInput(activity) {
     : completed
       ? "Resultat krävs när aktiviteten avslutas."
       : "Resultat anges när status sätts till Avslutad.";
+  updateActivityValidationState();
+}
+
+function updateActivityValidationState() {
+  const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
+  const completed = els.activityDetailStatusInput.value === "completed";
+  const waiting = els.activityDetailStatusInput.value === "waiting";
+  const requiresNote = Boolean(activity
+    && completed
+    && resultClassification(activity.templateId, els.activityDetailResultInput.value) === "deviation");
+
+  els.activityDetailNoteRequirement.hidden = !requiresNote;
+  els.activityDetailWaitingForInput.setCustomValidity(waiting && !els.activityDetailWaitingForInput.value
+    ? "Ange vem eller vad aktiviteten väntar på."
+    : "");
+  els.activityDetailResultInput.setCustomValidity(completed && !els.activityDetailResultInput.value
+    ? "Välj resultat innan aktiviteten avslutas."
+    : "");
+  els.activityDetailNoteInput.setCustomValidity(requiresNote && !els.activityDetailNoteInput.value.trim()
+    ? "Ange en kort notering när resultatet kräver ställningstagande."
+    : "");
 }
 
 function renderActivityDocuments(activity) {
@@ -3650,6 +3761,7 @@ function renderCaseTypeAdministration() {
   els.caseTypeUpdatedMeta.textContent = selectedDefinition.updatedAt ? formatDateTime(selectedDefinition.updatedAt) : "Grundinställning";
   els.caseTypeHelpFact.textContent = selectedDefinition.helpText || "Ej angivet";
   els.caseTypeHintFact.textContent = selectedDefinition.registrationHint || "Ej angivet";
+  els.caseTypeWorkInstructionFact.textContent = selectedDefinition.workInstruction || "Ej angivet";
   els.caseTypeMentorModeFact.textContent = mentorModeLabel(selectedDefinition.mentorMode);
   els.caseTypeFieldsFact.innerHTML = fields.length
     ? `<ul class="mb-0">${fields.map((field) => `<li>${escapeHtml(field.label)}</li>`).join("")}</ul>`
@@ -3658,6 +3770,7 @@ function renderCaseTypeAdministration() {
   if (caseTypeEditMode) {
     els.caseTypeAdminHelpInput.value = selectedDefinition.helpText || "";
     els.caseTypeAdminHintInput.value = selectedDefinition.registrationHint || "";
+    els.caseTypeAdminWorkInstructionInput.value = selectedDefinition.workInstruction || "";
     els.caseTypeAdminMentorModeInput.value = selectedDefinition.mentorMode || "optional";
     const selectedFields = new Set(selectedDefinition.detailFieldIds || []);
     els.caseTypeAdminFieldChoices.innerHTML = CASE_DETAIL_FIELD_DEFINITIONS.map((field) => `
@@ -3677,6 +3790,47 @@ function setCaseTypeEditMode(editing) {
   caseTypeEditMode = editing;
   renderCaseTypeAdministration();
   if (editing) els.caseTypeAdminHelpInput.focus({ preventScroll: true });
+}
+
+function renderActivityTypeAdministration() {
+  const selectedDefinition = selectedActivityTypeId ? activityTemplateDefinitionById(selectedActivityTypeId) : null;
+  els.activityTypeListPanel.hidden = Boolean(selectedActivityTypeId);
+  els.activityTypeDetailPanel.hidden = !selectedDefinition;
+  els.activityTypeAdminTableBody.innerHTML = "";
+  for (const definition of activityTemplateDefinitions) {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td><strong>${escapeHtml(definition.title)}</strong><small class="d-block text-secondary">Tekniskt ID ${escapeHtml(definition.id)}</small></td>
+      <td class="activity-guidance-preview">${escapeHtml(definition.workInstruction || "Ej angivet")}</td>
+      <td>${definition.updatedAt ? escapeHtml(formatDateTime(definition.updatedAt)) : '<span class="text-secondary">Grundinställning</span>'}</td>
+      <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/activity-types/${encodeURIComponent(definition.id)}">Öppna</a></td>
+    `;
+    els.activityTypeAdminTableBody.append(row);
+  }
+  if (!selectedActivityTypeId) return;
+  if (!selectedDefinition) {
+    els.activityTypeListPanel.hidden = true;
+    els.activityTypeDetailPanel.hidden = false;
+    els.activityTypeDetailPanel.innerHTML = '<div class="card-body py-5"><h2 class="h5">Aktivitetsmallen finns inte</h2><a class="btn btn-outline-primary btn-sm" href="#/activity-types">Tillbaka till aktivitetsmallar</a></div>';
+    return;
+  }
+  els.activityTypeAdminIdInput.value = selectedDefinition.id;
+  els.activityTypeAdminTitle.textContent = selectedDefinition.title;
+  els.activityTypeAdminTechnicalId.textContent = `Tekniskt ID ${selectedDefinition.id}`;
+  els.activityTypeVersionMeta.textContent = String(selectedDefinition.version || 1);
+  els.activityTypeUpdatedMeta.textContent = selectedDefinition.updatedAt ? formatDateTime(selectedDefinition.updatedAt) : "Grundinställning";
+  els.activityTypeWorkInstructionFact.textContent = selectedDefinition.workInstruction || "Ej angivet";
+  if (activityTypeEditMode) els.activityTypeAdminWorkInstructionInput.value = selectedDefinition.workInstruction || "";
+  els.activityTypeReadView.hidden = activityTypeEditMode;
+  els.activityTypeAdminForm.hidden = !activityTypeEditMode;
+  els.editActivityTypeButton.hidden = activityTypeEditMode;
+  els.activityTypeEditActions.hidden = !activityTypeEditMode;
+}
+
+function setActivityTypeEditMode(editing) {
+  activityTypeEditMode = editing;
+  renderActivityTypeAdministration();
+  if (editing) els.activityTypeAdminWorkInstructionInput.focus({ preventScroll: true });
 }
 
 function handlerMentorCount(handler) {
@@ -3817,6 +3971,7 @@ function renderDetail() {
   els.selectedCaseId.textContent = candidate.caseNumber;
   els.selectedName.textContent = candidate.name;
   els.selectedCoordinatorMeta.textContent = candidate.coordinator || "Ej tilldelad";
+  els.selectedRegisteredByMeta.textContent = handlerNameById(candidate.createdBy);
   els.selectedCreatedMeta.textContent = formatDateTime(candidate.createdAt);
   els.selectedUpdatedMeta.textContent = formatDateTime(candidate.updatedAt || candidate.createdAt);
   els.selectedStatus.textContent = candidate.status;
@@ -3960,6 +4115,7 @@ function renderNewCandidateDetail() {
   els.selectedCaseId.textContent = "Nytt ärende";
   els.selectedName.textContent = "Ny mentor";
   els.selectedCoordinatorMeta.textContent = "Ej tilldelad";
+  els.selectedRegisteredByMeta.textContent = currentUserName();
   els.selectedCreatedMeta.textContent = "Ej skapad";
   els.selectedUpdatedMeta.textContent = "Ej sparad";
   els.selectedStatus.textContent = "Ny";
@@ -4897,7 +5053,9 @@ function newCandidate(formData) {
     identityMethod: "",
     identityVerifiedAt: "",
     identityVerifiedBy: "",
-    history: [{ at: now, text: "Ärende skapat", actor: currentUserName() }],
+    history: [{ at: now, text: "Mentor registrerad", actor: currentUserName() }],
+    createdBy: CURRENT_USER_ID,
+    updatedBy: CURRENT_USER_ID,
     createdAt: now,
     updatedAt: now
   };
@@ -4977,7 +5135,9 @@ function newCandidateFromEditor() {
     identityMethod: "",
     identityVerifiedAt: "",
     identityVerifiedBy: "",
-    history: [{ at: now, text: "Ärende skapat", actor: currentUserName() }],
+    history: [{ at: now, text: "Mentor registrerad", actor: currentUserName() }],
+    createdBy: CURRENT_USER_ID,
+    updatedBy: CURRENT_USER_ID,
     createdAt: now,
     updatedAt: now
   };
@@ -5643,12 +5803,19 @@ els.activityDetailStatusInput.addEventListener("change", () => {
     els.activityDetailWaitingForInput.disabled = !waiting;
     els.activityDetailWaitingForInput.required = waiting;
     if (!waiting) els.activityDetailWaitingForInput.value = "";
+    updateActivityValidationState();
     updateActivityDetailDirtyState();
   }
 });
 
-els.activityDetailForm.addEventListener("input", updateActivityDetailDirtyState);
-els.activityDetailForm.addEventListener("change", updateActivityDetailDirtyState);
+els.activityDetailForm.addEventListener("input", () => {
+  updateActivityValidationState();
+  updateActivityDetailDirtyState();
+});
+els.activityDetailForm.addEventListener("change", () => {
+  updateActivityValidationState();
+  updateActivityDetailDirtyState();
+});
 
 els.activityDetailGuidanceButton.addEventListener("click", () => {
   const mentorId = els.activityDetailGuidanceButton.dataset.mentorId;
@@ -5671,24 +5838,8 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   const nextDueDate = els.activityDetailDueDateInput.value;
   const nextWaitingForParty = nextStatus === "waiting" ? els.activityDetailWaitingForInput.value : null;
   const nextNote = els.activityDetailNoteInput.value.trim();
-  if (nextStatus === "waiting" && !nextWaitingForParty) {
-    els.activityDetailWaitingForInput.setCustomValidity("Ange vem eller vad aktiviteten väntar på.");
-    els.activityDetailWaitingForInput.reportValidity();
-    return;
-  }
-  els.activityDetailWaitingForInput.setCustomValidity("");
-  if (nextStatus === "completed" && !nextResult) {
-    els.activityDetailResultInput.setCustomValidity("Välj resultat innan aktiviteten avslutas.");
-    els.activityDetailResultInput.reportValidity();
-    return;
-  }
-  els.activityDetailResultInput.setCustomValidity("");
-  if (nextStatus === "completed" && resultClassification(activity.templateId, nextResult) === "deviation" && !nextNote) {
-    els.activityDetailNoteInput.setCustomValidity("Ange en kort notering när resultatet kräver uppföljning.");
-    els.activityDetailNoteInput.reportValidity();
-    return;
-  }
-  els.activityDetailNoteInput.setCustomValidity("");
+  updateActivityValidationState();
+  if (!els.activityDetailForm.reportValidity()) return;
 
   const statusChanged = nextStatus !== activity.status;
   const resultChanged = nextResult !== activityResultValue(activity);
@@ -6001,6 +6152,7 @@ els.caseTypeAdminForm.addEventListener("submit", async (event) => {
     status: "published",
     helpText: els.caseTypeAdminHelpInput.value.trim(),
     registrationHint: els.caseTypeAdminHintInput.value.trim(),
+    workInstruction: els.caseTypeAdminWorkInstructionInput.value.trim(),
     mentorMode: els.caseTypeAdminMentorModeInput.value,
     detailFieldIds,
     updatedAt: now,
@@ -6014,6 +6166,37 @@ els.caseTypeAdminForm.addEventListener("submit", async (event) => {
 
 els.editCaseTypeButton.addEventListener("click", () => setCaseTypeEditMode(true));
 els.cancelCaseTypeEditButton.addEventListener("click", () => setCaseTypeEditMode(false));
+
+els.activityTypeAdminForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const definition = activityTemplateDefinitionById(els.activityTypeAdminIdInput.value);
+  if (!definition) return;
+  const now = new Date().toISOString();
+  const nextVersion = Math.max(0, ...activityTemplateDefinitionVersions
+    .filter((item) => item.id === definition.id)
+    .map((item) => Number(item.version || 1))) + 1;
+  await atomicPut({ [ACTIVITY_TEMPLATE_DEFINITIONS_STORE]: [{
+    ...definition,
+    status: "retired",
+    updatedAt: now,
+    updatedBy: CURRENT_USER_ID
+  }, {
+    ...definition,
+    tenantId: DEFAULT_TENANT_ID,
+    version: nextVersion,
+    status: "published",
+    workInstruction: els.activityTypeAdminWorkInstructionInput.value.trim(),
+    updatedAt: now,
+    updatedBy: CURRENT_USER_ID
+  }] });
+  activityTypeEditMode = false;
+  markSaved();
+  showFeedback("Aktivitetsmallen har uppdaterats.");
+  await refresh();
+});
+
+els.editActivityTypeButton.addEventListener("click", () => setActivityTypeEditMode(true));
+els.cancelActivityTypeEditButton.addEventListener("click", () => setActivityTypeEditMode(false));
 
 els.handlerSearchInput.addEventListener("input", () => {
   handlerSearchTerm = els.handlerSearchInput.value;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  ACTIVITY_TEMPLATES,
   assessCertificationApproval,
   CASE_DETAIL_FIELD_DEFINITIONS,
   CASE_TYPE_DEFINITIONS,
@@ -148,10 +149,17 @@ test("defines registration guidance and mentor rules for every case type", () =>
   for (const caseType of CASE_TYPE_DEFINITIONS) {
     assert.ok(caseType.helpText, `${caseType.id} should explain when it is used`);
     assert.ok(caseType.registrationHint, `${caseType.id} should explain what to register`);
+    assert.ok(caseType.workInstruction, `${caseType.id} should explain how to handle the case`);
     assert.ok(["none", "optional", "required"].includes(caseType.mentorMode));
   }
   assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "needs-analysis").mentorMode, "none");
   assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "mentor-certification").mentorMode, "required");
+});
+
+test("defines handling guidance for every activity template", () => {
+  for (const template of ACTIVITY_TEMPLATES) {
+    assert.ok(template.workInstruction, `${template.id} should explain how to perform the activity`);
+  }
 });
 
 test("limits configurable case fields to the shared field catalog", () => {

@@ -29,6 +29,7 @@
             <div class="sidebar-subnav" aria-label="Systemadministration">
               <a id="navHandlers" class="nav-link" href="#/administration">Handläggare</a>
               <a id="navCaseTypes" class="nav-link" href="#/case-types">Ärendetyper</a>
+              <a id="navActivityTypes" class="nav-link" href="#/activity-types">Aktivitetsmallar</a>
               <a id="navRoutines" class="nav-link" href="#/routines">Rutiner</a>
             </div>
           </div>
@@ -52,6 +53,7 @@
                   <li><h2 class="dropdown-header">Systemadministration</h2></li>
                   <li><a class="dropdown-item" href="#/administration">Handläggare</a></li>
                   <li><a class="dropdown-item" href="#/case-types">Ärendetyper</a></li>
+                  <li><a class="dropdown-item" href="#/activity-types">Aktivitetsmallar</a></li>
                   <li><a class="dropdown-item" href="#/routines">Rutiner</a></li>
                 </ul>
               </div>
@@ -460,6 +462,12 @@
                 </ul>
                 <div class="tab-content">
                   <section class="tab-pane fade show active card-body" id="case-overview-pane">
+                    <aside id="caseWorkGuidance" class="activity-guidance mb-3" hidden>
+                      <div>
+                        <strong>Så handläggs ärendet</strong>
+                        <p id="caseWorkGuidanceText" class="mb-0"></p>
+                      </div>
+                    </aside>
                     <div class="record-grid">
                       <section class="record-section">
                         <h3 class="record-section-title">Ärendeuppgifter</h3>
@@ -550,7 +558,7 @@
                             </select>
                           </div>
                           <div class="col-12">
-                            <label class="form-label" for="activityDetailNoteInput">Tjänsteanteckning</label>
+                            <label class="form-label" for="activityDetailNoteInput">Tjänsteanteckning <span id="activityDetailNoteRequirement" class="text-secondary fw-normal" hidden>(krävs för detta resultat)</span></label>
                             <textarea id="activityDetailNoteInput" class="form-control form-control-sm" rows="3" placeholder="Kort notering om genomförande, vänteläge eller avvikelse."></textarea>
                           </div>
                         </div>
@@ -836,6 +844,7 @@
                     <dl class="record-fields mb-0">
                       <div><dt>Hjälptext</dt><dd id="caseTypeHelpFact"></dd></div>
                       <div><dt>Registreringsanvisning</dt><dd id="caseTypeHintFact"></dd></div>
+                      <div><dt>Handläggningsanvisning</dt><dd id="caseTypeWorkInstructionFact"></dd></div>
                       <div><dt>Mentorkoppling</dt><dd id="caseTypeMentorModeFact"></dd></div>
                     </dl>
                   </section>
@@ -859,6 +868,11 @@
                       <textarea id="caseTypeAdminHintInput" class="form-control" rows="2" required></textarea>
                       <div class="form-text">Anger vilken minsta information handläggaren ska registrera.</div>
                     </div>
+                    <div class="mb-3">
+                      <label class="form-label" for="caseTypeAdminWorkInstructionInput">Handläggningsanvisning</label>
+                      <textarea id="caseTypeAdminWorkInstructionInput" class="form-control" rows="4" required></textarea>
+                      <div class="form-text">Visas på det sparade ärendet och beskriver hur handläggaren ska gå till väga.</div>
+                    </div>
                     <div>
                       <label class="form-label" for="caseTypeAdminMentorModeInput">Mentorkoppling</label>
                       <select id="caseTypeAdminMentorModeInput" class="form-select" required>
@@ -878,6 +892,54 @@
             </div>
           </section>
 
+          <section id="activityTypesAdministrationView" hidden>
+            <div id="activityTypeListPanel" class="card" aria-label="Administration av aktivitetsmallar">
+              <div class="card-header bg-white">
+                <h2 class="h5 mb-1">Aktivitetsmallar</h2>
+                <p class="text-secondary mb-0">Styr den handledande information som visas när en aktivitet öppnas.</p>
+              </div>
+              <div class="card-body border-bottom">
+                <div class="alert alert-light border mb-0" role="note">Aktivitetens namn, tekniska ID och resultatval är fasta. Endast handläggningsanvisningen kan ändras.</div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                  <thead class="table-light"><tr><th>Aktivitetsmall</th><th>Handläggningsanvisning</th><th>Senast ändrad</th><th class="text-end">Åtgärd</th></tr></thead>
+                  <tbody id="activityTypeAdminTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="activityTypeDetailPanel" class="card mentor-record" hidden>
+              <div class="card-header record-header bg-white">
+                <a class="small" href="#/activity-types">Tillbaka till aktivitetsmallar</a>
+                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start mt-2">
+                  <div><div class="record-type">Aktivitetsmall</div><p id="activityTypeAdminTechnicalId" class="record-id mb-1"></p><h2 id="activityTypeAdminTitle" class="h5 mb-0"></h2></div>
+                  <div class="record-edit-slot">
+                    <button id="editActivityTypeButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
+                    <div id="activityTypeEditActions" class="d-flex gap-2" hidden>
+                      <button type="submit" form="activityTypeAdminForm" class="btn btn-primary btn-sm">Spara ändringar</button>
+                      <button id="cancelActivityTypeEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                    </div>
+                  </div>
+                </div>
+                <dl class="record-meta mb-0 mt-3"><div><dt>Version</dt><dd id="activityTypeVersionMeta"></dd></div><div><dt>Status</dt><dd>Publicerad</dd></div><div><dt>Senast ändrad</dt><dd id="activityTypeUpdatedMeta"></dd></div></dl>
+              </div>
+              <div class="card-body">
+                <div id="activityTypeReadView" class="record-grid">
+                  <section class="record-section"><h3 class="record-section-title">Handläggarstöd</h3><dl class="record-fields mb-0"><div><dt>Handläggningsanvisning</dt><dd id="activityTypeWorkInstructionFact"></dd></div></dl></section>
+                </div>
+                <form id="activityTypeAdminForm" hidden>
+                  <input id="activityTypeAdminIdInput" type="hidden">
+                  <section class="record-section">
+                    <h3 class="record-section-title">Handläggarstöd</h3>
+                    <label class="form-label" for="activityTypeAdminWorkInstructionInput">Handläggningsanvisning</label>
+                    <textarea id="activityTypeAdminWorkInstructionInput" class="form-control" rows="5" required></textarea>
+                    <div class="form-text">Visas när handläggaren öppnar en aktivitet som bygger på mallen.</div>
+                  </section>
+                </form>
+              </div>
+            </div>
+          </section>
+
           <section id="routinesView" hidden>
             <div class="routines-shell">
               <header class="routines-header border-bottom">
@@ -888,7 +950,7 @@
                 </div>
                 <div class="routines-header-actions">
                   <button id="copyRoutinesLinkButton" type="button" class="btn btn-outline-secondary btn-sm">Kopiera länk</button>
-                  <span class="badge text-bg-light border">Verksamhetsförslag 1.3</span>
+                  <span class="badge text-bg-light border">Verksamhetsförslag 1.4</span>
                 </div>
               </header>
               <div class="routines-search border-bottom">
@@ -1025,7 +1087,8 @@
                 </div>
                 <dl class="record-meta mb-0 mt-3">
                   <div><dt>Handläggare</dt><dd id="selectedCoordinatorMeta"></dd></div>
-                  <div><dt>Skapad</dt><dd id="selectedCreatedMeta"></dd></div>
+                  <div><dt>Registrerad av</dt><dd id="selectedRegisteredByMeta"></dd></div>
+                  <div><dt>Registrerad</dt><dd id="selectedCreatedMeta"></dd></div>
                   <div><dt>Senast ändrad</dt><dd id="selectedUpdatedMeta"></dd></div>
                 </dl>
               </div>
@@ -1057,10 +1120,6 @@
                     <h3 class="h6 mb-0">Grunduppgifter</h3>
                     <div class="record-edit-slot">
                       <button id="editPersonButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
-                      <div id="personEditActions" class="d-flex gap-2" hidden>
-                        <button id="savePersonEditButton" type="submit" form="personEditForm" class="btn btn-primary btn-sm">Spara ändringar</button>
-                        <button id="cancelPersonEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
-                      </div>
                     </div>
                   </div>
                   <div id="personReadView">
@@ -1111,6 +1170,10 @@
                         <div><dt>Nästa steg</dt><dd id="nextStepEditFact"></dd></div>
                       </dl>
                     </section>
+                    <div id="personEditActions" class="d-flex flex-wrap justify-content-end gap-2 mt-4 pt-3 border-top" hidden>
+                      <button id="cancelPersonEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                      <button id="savePersonEditButton" type="submit" class="btn btn-primary btn-sm">Spara ändringar</button>
+                    </div>
                   </form>
                   <div id="mentorIdentityHost"></div>
                 </section>
@@ -1442,6 +1505,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260806-registry-assessment-v11"></script>
+    <script type="module" src="app.js?v=20260806-handling-guidance-v14"></script>
   </body>
 </html>
