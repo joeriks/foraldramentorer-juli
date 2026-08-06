@@ -21,10 +21,10 @@ import {
   resultClassification,
   resultOptions,
   stableHash
-} from "./case-domain.js?v=20260806-case-types-v2";
+} from "./case-domain.js?v=20260806-case-types-v3";
 import { marked } from "./vendor/marked/marked.esm.js";
-import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-case-types-v2";
-import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-case-types-v2";
+import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-case-types-v3";
+import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-case-types-v3";
 
 const DB_NAME = "foraldramentorer";
 const DB_VERSION = 6;
@@ -3467,16 +3467,18 @@ function renderCaseTypeAdministration() {
       <td>${escapeHtml(mentorModeLabel(definition.mentorMode))}</td>
       <td>${fields.length ? escapeHtml(fields.map((field) => field.label).join(", ")) : '<span class="text-secondary">Inga</span>'}</td>
       <td>${definition.updatedAt ? escapeHtml(formatDateTime(definition.updatedAt)) : '<span class="text-secondary">Grundinställning</span>'}</td>
-      <td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-edit-case-type="${escapeHtml(definition.id)}">Redigera</button></td>
+      <td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-edit-case-type="${escapeHtml(definition.id)}" aria-haspopup="dialog">Redigera</button></td>
     `;
-    row.querySelector("[data-edit-case-type]").addEventListener("click", () => openCaseTypeAdminModal(definition.id));
     els.caseTypeAdminTableBody.append(row);
   }
 }
 
 function openCaseTypeAdminModal(caseTypeId) {
   const definition = caseTypeById(caseTypeId);
-  if (!definition) return;
+  if (!definition) {
+    showFeedback("Ärendetypen kunde inte öppnas. Ladda om sidan och försök igen.", "danger");
+    return;
+  }
   els.caseTypeAdminIdInput.value = definition.id;
   els.caseTypeAdminModalTitle.textContent = definition.name;
   els.caseTypeAdminTechnicalId.textContent = `Tekniskt ID ${definition.id}`;
@@ -3490,6 +3492,8 @@ function openCaseTypeAdminModal(caseTypeId) {
       <label class="form-check-label" for="case-type-field-${escapeHtml(field.id)}">${escapeHtml(field.label)}</label>
     </div>
   `).join("");
+  const modalElement = document.querySelector("#caseTypeAdminModal");
+  caseTypeAdminModal = bootstrap.Modal.getOrCreateInstance(modalElement);
   caseTypeAdminModal.show();
 }
 
@@ -5823,6 +5827,17 @@ els.caseTypeAdminForm.addEventListener("submit", async (event) => {
   markSaved();
   showFeedback("Ärendetypen har uppdaterats.");
   await refresh();
+});
+
+els.caseTypeAdminTableBody.addEventListener("click", (event) => {
+  const editButton = event.target.closest("[data-edit-case-type]");
+  if (!editButton) return;
+  try {
+    openCaseTypeAdminModal(editButton.dataset.editCaseType);
+  } catch (error) {
+    console.error("Could not open case type editor", error);
+    showFeedback("Redigeringen kunde inte öppnas. Ladda om sidan och försök igen.", "danger");
+  }
 });
 
 els.handlerSearchInput.addEventListener("input", () => {
