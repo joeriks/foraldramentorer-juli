@@ -86,11 +86,11 @@
           <span class="ms-lg-auto" id="saveStatus" role="status">Lokal lagring aktiv</span>
           <div class="prototype-tools d-flex flex-wrap gap-2">
             <div class="dropdown">
-              <button id="seedButton" type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Prototypdata</button>
+              <button id="seedButton" type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" disabled>Förbereder prototypdata</button>
               <ul id="exampleDataMenu" class="dropdown-menu dropdown-menu-end" aria-labelledby="seedButton">
-                <li><button type="button" class="dropdown-item" data-example-count="1">1 mentor</button></li>
-                <li><button type="button" class="dropdown-item" data-example-count="10">10 mentorer</button></li>
-                <li><button type="button" class="dropdown-item" data-example-count="250">250 mentorer</button></li>
+                <li><button type="button" class="dropdown-item" data-example-count="1"><strong>Litet scenario</strong><span class="d-block small text-secondary">1 mentor och en komplett ärendekedja</span></button></li>
+                <li><button type="button" class="dropdown-item" data-example-count="10"><strong>Normal verksamhet</strong><span class="d-block small text-secondary">10 mentorer och flera samtidiga flöden</span></button></li>
+                <li><button type="button" class="dropdown-item" data-example-count="250"><strong>Volymtest</strong><span class="d-block small text-secondary">250 mentorer med proportionerlig ärendedata</span></button></li>
               </ul>
             </div>
             <button id="resetButton" type="button" class="btn btn-outline-secondary btn-sm">Nollställ data</button>
@@ -1665,7 +1665,7 @@
           <div class="modal-body">
             <p id="confirmActionBody" class="mb-3"></p>
             <dl class="confirm-action-facts mb-0">
-              <div><dt>Mentor</dt><dd id="confirmActionMentor"></dd></div>
+              <div><dt id="confirmActionSubjectLabel">Mentor</dt><dd id="confirmActionMentor"></dd></div>
               <div><dt>Registreras av</dt><dd id="confirmActionActor"></dd></div>
               <div><dt>Tidpunkt</dt><dd id="confirmActionTime"></dd></div>
             </dl>
@@ -1683,6 +1683,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260806-assignment-followup-v21"></script>
+    <script type="module" src="app.js?v=20260806-prototype-data-v22"></script>
   </body>
 </html>

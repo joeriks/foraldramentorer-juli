@@ -324,14 +324,22 @@ const seedCandidates10 = [
     coordinator: "Sara Lind"
   },
   {
-    ...seedCandidates[6],
+    ...seedCandidates[2],
     name: "Omar Rahimi",
     area: "Öster",
     languages: "Svenska, dari",
     availability: "Dagtid och helger",
-    coordinator: "Maja Ekström"
+    coordinator: "Maja Ekström",
+    notes: "Godkänd mentor med erfarenhet av stöd kring etablering och myndighetskontakter."
   }
 ];
+
+const singleMentorTemplate = {
+  ...seedCandidates[2],
+  name: "Amina Ekström",
+  coordinator: "Sara Lind",
+  notes: "Godkänd mentor i ett komplett exempel från stödbehov till aktivt uppdrag."
+};
 
 const exampleFirstNames = [
   "Amina", "Anders", "Aya", "Camilla", "Daniel", "Elin", "Farah", "Gunnar", "Helena", "Isak",
@@ -444,6 +452,7 @@ let caseTypeDefinitionVersions = [];
 let activityTemplateDefinitions = ACTIVITY_TEMPLATES.map((definition) => ({ ...definition }));
 let activityTemplateDefinitionVersions = [];
 let selectedPresentationStepId = PRESENTATION_STEPS[0].id;
+let prototypeDataLoading = false;
 let selectedId = null;
 let selectedParentId = null;
 let parentSearchTerm = "";
@@ -987,6 +996,7 @@ const els = {
   confirmActionEyebrow: document.querySelector("#confirmActionEyebrow"),
   confirmActionTitle: document.querySelector("#confirmActionTitle"),
   confirmActionBody: document.querySelector("#confirmActionBody"),
+  confirmActionSubjectLabel: document.querySelector("#confirmActionSubjectLabel"),
   confirmActionMentor: document.querySelector("#confirmActionMentor"),
   confirmActionActor: document.querySelector("#confirmActionActor"),
   confirmActionTime: document.querySelector("#confirmActionTime"),
@@ -1019,12 +1029,13 @@ function showCaseFormError(message, field = null) {
   field?.focus({ preventScroll: true });
 }
 
-function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, confirmLabel = "Bekräfta", danger = false }) {
+function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, subjectLabel = "Mentor", subjectValue = "", confirmLabel = "Bekräfta", danger = false }) {
   if (!confirmActionModal) return Promise.resolve({ confirmed: window.confirm(body), note: "" });
   els.confirmActionEyebrow.textContent = eyebrow;
   els.confirmActionTitle.textContent = title;
   els.confirmActionBody.textContent = body;
-  els.confirmActionMentor.textContent = mentorName || "Ej angivet";
+  els.confirmActionSubjectLabel.textContent = subjectLabel;
+  els.confirmActionMentor.textContent = subjectValue || mentorName || "Ej angivet";
   els.confirmActionActor.textContent = currentUserName();
   els.confirmActionTime.textContent = formatDateTime(new Date().toISOString());
   els.confirmActionNote.value = "";
@@ -1048,6 +1059,12 @@ function resolveConfirmation(value) {
 function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onblocked = () => {
+      els.seedButton.disabled = true;
+      els.seedButton.textContent = "Väntar på lokal lagring";
+      els.saveStatus.textContent = "Stäng andra öppna prototypflikar och ladda om sidan";
+    };
 
     request.onupgradeneeded = () => {
       const nextDb = request.result;
@@ -1145,7 +1162,16 @@ function openDatabase() {
       ensureStore(PROCESSED_COMMANDS_STORE, { keyPath: ["tenantId", "idempotencyKey"] });
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const database = request.result;
+      database.onversionchange = () => {
+        database.close();
+        els.seedButton.disabled = true;
+        els.seedButton.textContent = "Ladda om sidan";
+        els.saveStatus.textContent = "En ny prototypversion finns. Ladda om sidan.";
+      };
+      resolve(database);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -1358,20 +1384,24 @@ async function loadActivityTemplateDefinitions() {
   }));
 }
 
+const CASE_DATA_STORES = [
+  CASES_STORE, CASE_ASSIGNMENTS_STORE, CASE_ACTIVITIES_STORE, CASE_DOCUMENTS_STORE, CASE_EVENTS_STORE,
+  ACTIVITY_DEVIATIONS_STORE, DEVIATION_DECISIONS_STORE, CASE_MEETINGS_STORE, MENTOR_REPORTS_STORE,
+  PARENT_CHECK_INS_STORE, COMPENSATION_PERIODS_STORE, CASE_DOCUMENT_BLOBS_STORE, PROCESSED_COMMANDS_STORE
+];
+
+function clearStores(storeNames) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeNames, "readwrite");
+    for (const storeName of storeNames) transaction.objectStore(storeName).clear();
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
 function clearAllCaseData() {
-  return Promise.all([
-    clearCases(),
-    clearCaseAssignments(),
-    clearCaseActivities(),
-    clearCaseDocuments(),
-    clearCaseEvents(),
-    clearStore(activityDeviationTx),
-    clearStore(deviationDecisionTx),
-    clearStore(caseMeetingTx),
-    clearMentorReports(),
-    clearParentCheckIns(),
-    clearCompensationPeriods()
-  ]);
+  return clearStores(CASE_DATA_STORES);
 }
 
 function getAllCandidates() {
@@ -1495,8 +1525,25 @@ function replaceCandidates(nextCandidates) {
   });
 }
 
+function replacePrototypeDataset(exampleCandidates, workflowRecords) {
+  const storeNames = [STORE, PARENTS_STORE, MEETINGS_STORE, ...CASE_DATA_STORES];
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeNames, "readwrite");
+    for (const storeName of storeNames) transaction.objectStore(storeName).clear();
+    const candidateStore = transaction.objectStore(STORE);
+    for (const candidate of exampleCandidates) candidateStore.put(candidate);
+    for (const [storeName, records] of Object.entries(workflowRecords)) {
+      const store = transaction.objectStore(storeName);
+      for (const record of records) store.put(record);
+    }
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
 function exampleTemplates(count) {
-  if (count === 1) return seedCandidates.slice(3, 4);
+  if (count === 1) return [singleMentorTemplate];
   if (count === 10) return seedCandidates10;
 
   return Array.from({ length: count }, (_, index) => {
@@ -1515,7 +1562,7 @@ function buildExampleDataset(count) {
   return exampleTemplates(count).map((candidate, index) => {
     const id = crypto.randomUUID();
     const identityVerified = Boolean(candidate.checks?.identityVerified);
-    const coordinator = index % 2 === 0 ? "" : candidate.coordinator;
+    const coordinator = count === 1 ? candidate.coordinator : index % 2 === 0 ? "" : candidate.coordinator;
     const checkMeta = buildCheckMeta(candidate.checks, {
       checkedAt: now,
       checkedBy: coordinator || "System"
@@ -1533,7 +1580,7 @@ function buildExampleDataset(count) {
       identityVerifiedAt: identityVerified ? now : "",
       identityVerifiedBy: identityVerified ? "Sara Lind" : "",
       exampleData: true,
-      exampleDataVersion: 3,
+      exampleDataVersion: 4,
       exampleDatasetSize: count,
       caseNumber: makeCaseNumber(id),
       history: [
@@ -1546,71 +1593,88 @@ function buildExampleDataset(count) {
   });
 }
 
-async function createExampleParentWorkflow(exampleCandidates) {
+function buildExampleParentWorkflows(exampleCandidates, count) {
   const now = new Date().toISOString();
-  const parentId = crypto.randomUUID();
-  const supportCaseId = crypto.randomUUID();
-  const matchingCaseId = crypto.randomUUID();
-  const ownerId = CURRENT_USER_ID;
+  const today = now.slice(0, 10);
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const monthEnd = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0)).toISOString().slice(0, 10);
+  const ownerIds = seedHandlers.map((handler) => handler.id);
   const supportType = caseTypeById("parent-support");
   const matchingType = caseTypeById("matching");
   const assignmentType = caseTypeById("mentor-assignment");
-  const approvedMentor = exampleCandidates.find((candidate) => candidate.status === "Godkänd");
-  const reserved = new Set();
-  const parent = {
-    id: parentId, tenantId: DEFAULT_TENANT_ID, name: "Nora Mahmoud", contactDetails: "070-123 45 67",
-    informationStatus: "provided", area: "Öster", languages: "Svenska, arabiska", availability: "Vardagskvällar",
-    active: true, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, exampleData: true
-  };
-  const supportCase = {
-    id: supportCaseId, tenantId: DEFAULT_TENANT_ID, number: makeCaseNumber(supportCaseId, reserved),
-    caseTypeId: supportType.id, caseTypeVersion: supportType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID,
-    type: supportType.name, title: "Stöd kring skolfrånvaro", description: "Föräldern önskar stöd i kontakten med skolan och i att skapa fungerande vardagsrutiner.",
-    details: { supportPurpose: "Stöd kring skolfrånvaro", desiredOutcome: "En fungerande plan för skolnärvaro och kontakt med skolan", area: parent.area, languages: parent.languages },
-    mentorId: null, parentId, supportCaseId: null, sourceMatchingCaseId: null, status: approvedMentor ? "in_progress" : "new", priority: "normal", dueDate: null,
-    version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: null, closedBy: null, exampleData: true
-  };
-  reserved.add(supportCase.number);
+  const approvedMentors = exampleCandidates.filter((candidate) => candidate.status === "Godkänd");
+  const parentCount = count === 1 ? 1 : count === 10 ? 5 : 60;
+  const supportExamples = [
+    ["Stöd kring skolfrånvaro", "En fungerande plan för skolnärvaro och kontakt med skolan"],
+    ["Stöd i myndighetskontakter", "Ökad förståelse för kontakter och beslut"],
+    ["Stöd kring vardagsrutiner", "Hållbara rutiner som fungerar för föräldern"],
+    ["Stöd vid etablering i området", "Ökad kännedom om lokala verksamheter och nätverk"],
+    ["Stöd i föräldrarollen", "Stärkt trygghet i vardagliga föräldrasituationer"]
+  ];
+  const parentNames = ["Nora Mahmoud", "Emil Svensson", "Leila Hassan", "Johan Berg", "Mariam Ali", "Sofia Nilsson", "Ahmed Rahimi", "Elin Karlsson"];
   const records = {
-    [PARENTS_STORE]: [parent],
-    [CASES_STORE]: [supportCase],
-    [CASE_ASSIGNMENTS_STORE]: [{ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: supportCaseId, handlerId: ownerId, role: "responsible", version: 1, assignedAt: now, assignedBy: ownerId, endedAt: null, endedBy: null }],
-    [CASE_ACTIVITIES_STORE]: (supportType.suggestedActivities || []).map((title, sortOrder) => ({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: supportCaseId, templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1, title, status: sortOrder === 0 ? "completed" : "not_started", resultCode: sortOrder === 0 ? "completed" : null, resultClassification: sortOrder === 0 ? "acceptable" : null, handlerIdOverride: null, waitingForParty: null, dueDate: null, sortOrder, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, completedAt: sortOrder === 0 ? now : null, completedBy: sortOrder === 0 ? ownerId : null })),
-    [CASE_EVENTS_STORE]: [caseEventRecord({ caseId: supportCaseId, eventType: "case_created", entityType: "case", entityId: supportCaseId, message: "Exempel på stödärende skapades", idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now })]
+    [PARENTS_STORE]: [], [CASES_STORE]: [], [CASE_ASSIGNMENTS_STORE]: [], [CASE_ACTIVITIES_STORE]: [],
+    [CASE_EVENTS_STORE]: [], [MENTOR_REPORTS_STORE]: [], [PARENT_CHECK_INS_STORE]: [], [COMPENSATION_PERIODS_STORE]: []
   };
-  if (approvedMentor) {
-    const assignmentCaseId = crypto.randomUUID();
-    const today = now.slice(0, 10);
-    const monthStart = `${today.slice(0, 7)}-01`;
-    const monthEnd = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0)).toISOString().slice(0, 10);
-    const matchingCase = {
-      id: matchingCaseId, tenantId: DEFAULT_TENANT_ID, number: makeCaseNumber(matchingCaseId, reserved),
-      caseTypeId: matchingType.id, caseTypeVersion: matchingType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID,
-      type: matchingType.name, title: `Matchning för ${supportCase.title}`, description: "Pröva föreslagen mentor mot det avgränsade stödbehovet.", details: { parentResponse: "accepted", mentorResponse: "accepted", matchingOutcome: "accepted", matchingNote: "Båda parter har accepterat förslaget." },
-      mentorId: approvedMentor.id, parentId, supportCaseId, sourceMatchingCaseId: null, status: "closed", priority: "normal", dueDate: null,
-      version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: now, closedBy: ownerId, exampleData: true
-    };
-    reserved.add(matchingCase.number);
-    const assignmentCase = {
-      id: assignmentCaseId, tenantId: DEFAULT_TENANT_ID, number: makeCaseNumber(assignmentCaseId, reserved),
-      caseTypeId: assignmentType.id, caseTypeVersion: assignmentType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID,
-      type: assignmentType.name, title: `Mentoruppdrag: ${supportCase.title}`, description: supportCase.details.desiredOutcome,
-      details: { supportPurpose: supportCase.details.supportPurpose, desiredOutcome: supportCase.details.desiredOutcome, assignmentPlan: { startDate: monthStart, endDate: `${today.slice(0, 4)}-12-31`, contactFrequency: "weekly", contactMode: "physical", firstFollowUpDate: today, followUpFrequency: "monthly", reportDeadlineDays: 3, note: "Mentorn kontaktar handläggaren vid avvikelse eller oro.", updatedAt: now, updatedBy: ownerId } },
-      mentorId: approvedMentor.id, parentId, supportCaseId, sourceMatchingCaseId: matchingCaseId, status: "in_progress", priority: "normal", dueDate: null,
-      version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: null, closedBy: null, exampleData: true
-    };
-    records[CASES_STORE].push(matchingCase, assignmentCase);
-    records[CASE_ASSIGNMENTS_STORE].push({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: matchingCaseId, handlerId: ownerId, role: "responsible", version: 1, assignedAt: now, assignedBy: ownerId, endedAt: null, endedBy: null });
-    records[CASE_ASSIGNMENTS_STORE].push({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, handlerId: ownerId, role: "responsible", version: 1, assignedAt: now, assignedBy: ownerId, endedAt: null, endedBy: null });
-    records[CASE_ACTIVITIES_STORE].push(...(matchingType.suggestedActivities || []).map((title, sortOrder) => ({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: matchingCaseId, templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1, title, status: "not_started", resultCode: null, resultClassification: null, handlerIdOverride: null, waitingForParty: null, dueDate: null, sortOrder, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, completedAt: null, completedBy: null })));
-    records[CASE_ACTIVITIES_STORE].push(...(assignmentType.suggestedActivities || []).map((title, sortOrder) => ({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1, title, status: sortOrder === 0 ? "completed" : "not_started", resultCode: sortOrder === 0 ? "completed" : null, resultClassification: sortOrder === 0 ? "acceptable" : null, handlerIdOverride: null, waitingForParty: null, dueDate: null, sortOrder, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, completedAt: sortOrder === 0 ? now : null, completedBy: sortOrder === 0 ? ownerId : null })));
-    records[CASE_EVENTS_STORE].push(caseEventRecord({ caseId: matchingCaseId, eventType: "case_created", entityType: "case", entityId: matchingCaseId, message: `Exempel på matchning skapades från ${supportCase.number}`, idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now }));
-    records[CASE_EVENTS_STORE].push(caseEventRecord({ caseId: assignmentCaseId, eventType: "assignment_created_from_matching", entityType: "case", entityId: assignmentCaseId, message: `Exempeluppdrag skapades från ${matchingCase.number}`, idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now }));
-    records[MENTOR_REPORTS_STORE] = [{ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, mentorId: approvedMentor.id, occurredOn: today, durationMinutes: 90, mode: "physical", outcome: "completed", nextContactOn: null, summary: "Planerat mentorsamtal genomfört.", needsHandlerSupport: false, reportedByMentorId: approvedMentor.id, recordedBy: ownerId, createdAt: now, createdBy: ownerId }];
-    records[PARENT_CHECK_INS_STORE] = [{ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, parentId, occurredOn: today, mode: "phone", contactConfirmed: "yes", collaboration: "well", relevance: "yes", safety: "yes", continueStatus: "continue", note: "Kontakten fungerar enligt uppdragsplanen.", createdAt: now, createdBy: ownerId }];
-    records[COMPENSATION_PERIODS_STORE] = [{ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, periodFrom: monthStart, periodTo: monthEnd, status: "under_review", version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId }];
+  const reserved = new Set();
+  const addAssignment = (caseId, handlerId) => records[CASE_ASSIGNMENTS_STORE].push({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, handlerId, role: "responsible", version: 1, assignedAt: now, assignedBy: handlerId, endedAt: null, endedBy: null });
+  const addActivities = (caseId, type, mode = "open") => records[CASE_ACTIVITIES_STORE].push(...(type.suggestedActivities || []).map((title, sortOrder) => {
+    const completed = mode === "closed" || sortOrder === 0;
+    return { id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1, title, status: completed ? "completed" : "not_started", resultCode: completed ? "completed" : null, resultClassification: completed ? "acceptable" : null, handlerIdOverride: null, waitingForParty: null, dueDate: null, sortOrder, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, completedAt: completed ? now : null, completedBy: completed ? CURRENT_USER_ID : null };
+  }));
+  const addEvent = (caseId, eventType, message) => records[CASE_EVENTS_STORE].push(caseEventRecord({ caseId, eventType, entityType: "case", entityId: caseId, message, idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now }));
+
+  for (let parentIndex = 0; parentIndex < parentCount; parentIndex += 1) {
+    const parentId = crypto.randomUUID();
+    const ownerId = ownerIds[parentIndex % ownerIds.length];
+    const baseName = parentNames[parentIndex % parentNames.length];
+    const parentName = parentIndex < parentNames.length ? baseName : `${baseName} ${parentIndex + 1}`;
+    const parent = { id: parentId, tenantId: DEFAULT_TENANT_ID, name: parentName, contactDetails: `070-555 ${String(1000 + parentIndex).slice(-4)}`, informationStatus: "provided", area: ["Centrum", "Öster", "Väster", "Norr", "Söder"][parentIndex % 5], languages: parentIndex % 3 === 0 ? "Svenska, arabiska" : "Svenska", availability: parentIndex % 2 ? "Vardagskvällar" : "Dagtid", active: true, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, exampleData: true, exampleDataVersion: 4, exampleDatasetSize: count };
+    records[PARENTS_STORE].push(parent);
+
+    const needsForParent = count > 1 && parentIndex % 4 === 0 ? 2 : 1;
+    for (let needIndex = 0; needIndex < needsForParent; needIndex += 1) {
+      const workflowIndex = records[CASES_STORE].filter((item) => item.caseTypeId === "parent-support").length;
+      const [supportPurpose, desiredOutcome] = supportExamples[(parentIndex + needIndex) % supportExamples.length];
+      const phase = count === 1 ? 0 : workflowIndex % 5;
+      const supportCaseId = crypto.randomUUID();
+      const supportNumber = makeCaseNumber(supportCaseId, reserved);
+      reserved.add(supportNumber);
+      const supportCase = { id: supportCaseId, tenantId: DEFAULT_TENANT_ID, number: supportNumber, caseTypeId: supportType.id, caseTypeVersion: supportType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: supportType.name, title: supportPurpose, description: `Föräldern önskar ${supportPurpose.toLowerCase()}.`, details: { supportPurpose, desiredOutcome, area: parent.area, languages: parent.languages }, mentorId: null, parentId, supportCaseId: null, sourceMatchingCaseId: null, status: "in_progress", priority: "normal", dueDate: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: null, closedBy: null, exampleData: true, exampleDataVersion: 4 };
+      records[CASES_STORE].push(supportCase);
+      addAssignment(supportCaseId, ownerId);
+      addActivities(supportCaseId, supportType, "open");
+      addEvent(supportCaseId, "case_created", `Stödärendet ${supportNumber} registrerades som prototypdata`);
+
+      if (phase === 2 || !approvedMentors.length) continue;
+      const mentor = approvedMentors[workflowIndex % approvedMentors.length];
+      const matchingCaseId = crypto.randomUUID();
+      const matchingNumber = makeCaseNumber(matchingCaseId, reserved);
+      reserved.add(matchingNumber);
+      const accepted = phase === 0 || phase === 4;
+      const declined = phase === 3;
+      const matchingCase = { id: matchingCaseId, tenantId: DEFAULT_TENANT_ID, number: matchingNumber, caseTypeId: matchingType.id, caseTypeVersion: matchingType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: matchingType.name, title: `Matchning för ${supportPurpose}`, description: "Pröva föreslagen mentor mot det avgränsade stödbehovet.", details: { parentResponse: accepted ? "accepted" : declined ? "declined" : "pending", mentorResponse: accepted ? "accepted" : "pending", matchingOutcome: accepted ? "accepted" : declined ? "declined" : "pending", matchingNote: accepted ? "Båda parter har accepterat förslaget." : declined ? "Föräldern önskar ett annat förslag." : "Inväntar svar från parterna." }, mentorId: mentor.id, parentId, supportCaseId, sourceMatchingCaseId: null, status: accepted || declined ? "closed" : "in_progress", priority: "normal", dueDate: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: accepted || declined ? now : null, closedBy: accepted || declined ? ownerId : null, exampleData: true, exampleDataVersion: 4 };
+      records[CASES_STORE].push(matchingCase);
+      addAssignment(matchingCaseId, ownerId);
+      addActivities(matchingCaseId, matchingType, accepted || declined ? "closed" : "open");
+      addEvent(matchingCaseId, "case_created", `Matchningen ${matchingNumber} skapades från ${supportNumber}`);
+      if (!accepted) continue;
+
+      const assignmentCaseId = crypto.randomUUID();
+      const assignmentNumber = makeCaseNumber(assignmentCaseId, reserved);
+      reserved.add(assignmentNumber);
+      const concern = phase === 4;
+      const assignmentCase = { id: assignmentCaseId, tenantId: DEFAULT_TENANT_ID, number: assignmentNumber, caseTypeId: assignmentType.id, caseTypeVersion: assignmentType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: assignmentType.name, title: `Mentoruppdrag: ${supportPurpose}`, description: desiredOutcome, details: { supportPurpose, desiredOutcome, assignmentPlan: { startDate: monthStart, endDate: `${today.slice(0, 4)}-12-31`, contactFrequency: "weekly", contactMode: "physical", firstFollowUpDate: today, followUpFrequency: "monthly", reportDeadlineDays: 3, note: "Mentorn kontaktar handläggaren vid avvikelse eller oro.", updatedAt: now, updatedBy: ownerId } }, mentorId: mentor.id, parentId, supportCaseId, sourceMatchingCaseId: matchingCaseId, status: concern ? "decision_required" : "in_progress", priority: concern ? "high" : "normal", dueDate: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: null, closedBy: null, exampleData: true, exampleDataVersion: 4 };
+      records[CASES_STORE].push(assignmentCase);
+      addAssignment(assignmentCaseId, ownerId);
+      addActivities(assignmentCaseId, assignmentType, "open");
+      addEvent(assignmentCaseId, "assignment_created_from_matching", `Uppdraget ${assignmentNumber} skapades från ${matchingNumber}`);
+      records[MENTOR_REPORTS_STORE].push({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, mentorId: mentor.id, occurredOn: today, durationMinutes: concern ? 45 : 90, mode: "physical", outcome: "completed", nextContactOn: null, summary: concern ? "Kontakten genomfördes men mentorn önskar stöd från handläggaren." : "Planerad kontakt genomfördes enligt uppdragsplanen.", needsHandlerSupport: concern, reportedByMentorId: mentor.id, recordedBy: ownerId, createdAt: now, createdBy: ownerId });
+      records[PARENT_CHECK_INS_STORE].push({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, parentId, occurredOn: today, mode: "phone", contactConfirmed: concern ? "partly" : "yes", collaboration: concern ? "issues" : "well", relevance: "yes", safety: concern ? "concern" : "yes", continueStatus: concern ? "pause" : "continue", note: concern ? "Föräldern beskriver oro. Samordnaren behöver bedöma fortsatt kontakt." : "Kontakten fungerar enligt uppdragsplanen.", createdAt: now, createdBy: ownerId });
+      records[COMPENSATION_PERIODS_STORE].push({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, periodFrom: monthStart, periodTo: monthEnd, status: concern ? "needs_completion" : "under_review", version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId });
+    }
   }
-  await atomicPut(records);
+  return records;
 }
 
 async function loadCaseData() {
@@ -3030,9 +3094,12 @@ function renderSeedButtonState() {
     && candidates.every((candidate) => candidate.exampleData === true && candidate.exampleDatasetSize === candidates.length)
     ? candidates.length
     : null;
-  els.seedButton.textContent = size
-    ? `Prototypdata: ${size} ${size === 1 ? "mentor" : "mentorer"}`
-    : "Prototypdata";
+  els.seedButton.disabled = !db || prototypeDataLoading;
+  els.seedButton.textContent = prototypeDataLoading
+    ? "Laddar prototypdata"
+    : size
+      ? `Prototypdata: ${size} ${size === 1 ? "mentor" : "mentorer"}`
+      : "Prototypdata";
 }
 
 function renderDashboard() {
@@ -7662,28 +7729,41 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
   const count = Number(button.dataset.exampleCount);
   if (![1, 10, 250].includes(count)) return;
 
-  if (candidates.length) {
-    const confirmed = window.confirm(`Ersätt nuvarande lokala data med en exempelsamling med ${count} ${count === 1 ? "mentor" : "mentorer"}?`);
-    if (!confirmed) return;
+  if (!db || prototypeDataLoading) {
+    showFeedback("Den lokala databasen är inte redo ännu. Ladda om sidan om meddelandet kvarstår.");
+    return;
   }
 
-  await ensureDefaultHandlers();
-  await clearMeetings();
-  await clearAllCaseData();
-  await clearParents();
-  const exampleCandidates = buildExampleDataset(count);
-  await replaceCandidates(exampleCandidates);
-  await createExampleParentWorkflow(exampleCandidates);
-  selectedId = null;
-  searchTerm = "";
-  statusFilter = "";
-  els.searchInput.value = "";
-  els.statusFilter.value = "";
-  markSaved();
-  showFeedback(`Exempeldata med ${count} ${count === 1 ? "mentor" : "mentorer"} har laddats.`);
-  await refresh();
-  if (currentView === "mentor") {
-    window.location.hash = "#/mentors";
+  const datasetName = count === 1 ? "Litet scenario" : count === 10 ? "Normal verksamhet" : "Volymtest";
+  if (candidates.length || parents.length || cases.length) {
+    const confirmation = await confirmAction({ eyebrow: "Byt prototypdata", title: `Ladda ${datasetName.toLowerCase()}?`, body: "Nuvarande lokala prototypdata ersätts först när hela den nya datamängden har kunnat valideras och sparas.", subjectLabel: "Datamängd", subjectValue: `${datasetName} · ${count} ${count === 1 ? "mentor" : "mentorer"}`, confirmLabel: "Ersätt prototypdata", danger: true });
+    if (!confirmation.confirmed) return;
+  }
+
+  prototypeDataLoading = true;
+  renderSeedButtonState();
+  try {
+    await ensureDefaultHandlers();
+    const exampleCandidates = buildExampleDataset(count);
+    const workflowRecords = buildExampleParentWorkflows(exampleCandidates, count);
+    await replacePrototypeDataset(exampleCandidates, workflowRecords);
+    selectedId = null;
+    selectedParentId = null;
+    selectedCaseRecordId = null;
+    searchTerm = "";
+    statusFilter = "";
+    els.searchInput.value = "";
+    els.statusFilter.value = "";
+    await refresh();
+    markSaved();
+    showFeedback(`${datasetName} har laddats med sammanhängande prototypdata.`);
+    if (currentView === "mentor") window.location.hash = "#/mentors";
+  } catch (error) {
+    console.error("Kunde inte ladda prototypdata", error);
+    showFeedback("Prototypdatan kunde inte laddas. Tidigare data har behållits.");
+  } finally {
+    prototypeDataLoading = false;
+    renderSeedButtonState();
   }
 });
 
