@@ -33,8 +33,8 @@ import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-assignment-followup-v21";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
 
-const DB_NAME = "foraldramentorer";
-const DB_VERSION = 8;
+const DB_NAME = "foraldramentorer-prototype-v2";
+const DB_VERSION = 1;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
 const HANDLERS_STORE = "handlers";
