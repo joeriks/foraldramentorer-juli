@@ -141,6 +141,8 @@ export const ACTIVITY_TEMPLATES = [
 ];
 
 export const CASE_DETAIL_FIELD_DEFINITIONS = [
+  { id: "supportPurpose", label: "Stödets syfte", inputType: "text", placeholder: "Exempel: stöd kring skolfrånvaro" },
+  { id: "desiredOutcome", label: "Önskat resultat", inputType: "text", placeholder: "Vad ska stödet bidra till?" },
   { id: "targetGroup", label: "Målgrupp", inputType: "text", placeholder: "Exempel: Vårdnadshavare med barn 6-12 år" },
   { id: "area", label: "Geografiskt område", inputType: "text", placeholder: "Exempel: Centrum och Öster" },
   { id: "languages", label: "Språkbehov", inputType: "text", placeholder: "Exempel: Svenska, arabiska" },
@@ -149,6 +151,19 @@ export const CASE_DETAIL_FIELD_DEFINITIONS = [
 ];
 
 export const CASE_TYPE_DEFINITIONS = [
+  {
+    id: "parent-support",
+    version: 1,
+    name: "Stödärende för förälder",
+    mentorMode: "none",
+    parentMode: "required",
+    helpText: "Använd för ett avgränsat stödbehov för en registrerad förälder. Ett nytt syfte ska normalt få ett nytt stödärende.",
+    registrationHint: "Välj förälder, ange stödets syfte och önskat resultat. Matchning startas senare från stödärendet.",
+    workInstruction: "Avgränsa stödbehovet, komplettera nödvändiga matchningskriterier och dokumentera om föräldern vill gå vidare. Starta matchning först när underlaget är användbart.",
+    detailFieldIds: ["supportPurpose", "desiredOutcome", "area", "languages"],
+    defaultPriority: "normal",
+    suggestedActivities: ["Komplettera stödbehov och matchningskriterier", "Bekräfta att föräldern vill gå vidare"]
+  },
   {
     id: "mentor-certification",
     version: 1,
@@ -178,8 +193,9 @@ export const CASE_TYPE_DEFINITIONS = [
     version: 1,
     name: "Matchning",
     mentorMode: "required",
-    helpText: "Använd när en godkänd mentor ska bedömas och tillfrågas för ett konkret stödbehov.",
-    registrationHint: "Välj mentor och sammanfatta behov, grundkriterier och vad matchningen ska leda till.",
+    parentMode: "via_support_case",
+    helpText: "Använd när ett bestämt stödärende ska prövas tillsammans med en godkänd och tillgänglig mentor.",
+    registrationHint: "Välj stödärende och mentor. Stödbehovet refereras från stödärendet och ska inte kopieras till en ny personprofil.",
     workInstruction: "Kontrollera mentorens tillgänglighet och grundkriterier, dokumentera matchningsförslaget och registrera båda parters återkoppling innan beslut om matchning.",
     detailFieldIds: [],
     defaultPriority: "normal",
@@ -190,6 +206,7 @@ export const CASE_TYPE_DEFINITIONS = [
     version: 1,
     name: "Mentoruppdrag",
     mentorMode: "required",
+    parentMode: "via_support_case",
     helpText: "Använd när en accepterad matchning övergår till ett aktivt mentoruppdrag som ska följas upp.",
     registrationHint: "Välj mentor och beskriv uppdragets ramar. Planerade uppföljningar hanteras som aktiviteter och möten.",
     workInstruction: "Bekräfta uppdragets ramar, planera uppföljningar och registrera möten och avvikelser löpande. Avsluta ärendet när uppdraget har utvärderats.",
@@ -249,6 +266,36 @@ export function activityTemplateById(id) {
 
 export function normalizeCaseStatus(status) {
   return CASE_STATUS_LABELS[status] ? status : LEGACY_CASE_STATUS[status] || "new";
+}
+
+export function matchingOutcome(parentResponse, mentorResponse) {
+  if (parentResponse === "accepted" && mentorResponse === "accepted") return "accepted";
+  if (parentResponse === "declined" || mentorResponse === "declined") return "declined";
+  if (parentResponse === "waiting" || mentorResponse === "waiting") return "waiting";
+  return "incomplete";
+}
+
+export function canCreateMentorAssignment(caseRecord) {
+  return caseRecord?.caseTypeId === "matching"
+    && Boolean(caseRecord.parentId)
+    && Boolean(caseRecord.mentorId)
+    && Boolean(caseRecord.supportCaseId)
+    && matchingOutcome(caseRecord.details?.parentResponse, caseRecord.details?.mentorResponse) === "accepted";
+}
+
+export function compensationReadiness({ completedReportCount = 0, latestCheckIn = null } = {}) {
+  if (completedReportCount < 1) return "awaiting_reports";
+  if (!latestCheckIn) return "awaiting_parent_checkin";
+  return "under_review";
+}
+
+export function assessCompensationApproval({ completedReportCount = 0, latestCheckIn = null } = {}) {
+  const reasons = [];
+  if (completedReportCount < 1) reasons.push("Minst en genomförd mentorrapport krävs.");
+  if (!latestCheckIn) reasons.push("En föräldraavstämning inom perioden krävs.");
+  if (latestCheckIn?.contactConfirmed === "no") reasons.push("Föräldern har inte bekräftat att kontakterna genomförts.");
+  if (latestCheckIn?.safety === "concern") reasons.push("Oro i föräldraavstämningen måste hanteras först.");
+  return { allowed: reasons.length === 0, reasons };
 }
 
 export function normalizeActivityStatus(status) {

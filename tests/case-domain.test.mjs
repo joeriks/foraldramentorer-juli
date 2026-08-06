@@ -3,9 +3,11 @@ import test from "node:test";
 
 import {
   ACTIVITY_TEMPLATES,
+  assessCompensationApproval,
   assessCertificationApproval,
   CASE_DETAIL_FIELD_DEFINITIONS,
   CASE_TYPE_DEFINITIONS,
+  canCreateMentorAssignment,
   canTransitionActivity,
   deriveCaseStatus,
   findMentorDuplicates,
@@ -14,6 +16,8 @@ import {
   normalizeCaseTypeTerminology,
   normalizeCaseStatus,
   normalizeMentorStatus,
+  matchingOutcome,
+  compensationReadiness,
   resultClassification,
   stableHash
 } from "../case-domain.js";
@@ -143,6 +147,35 @@ test("defines guided workflows for matching and mentor assignments", () => {
   const assignment = CASE_TYPE_DEFINITIONS.find((item) => item.id === "mentor-assignment");
   assert.ok(matching.suggestedActivities.includes("Fatta beslut om matchning"));
   assert.ok(assignment.suggestedActivities.includes("Följ upp efter fyra veckor"));
+});
+
+test("requires both parties and complete links before creating a mentor assignment", () => {
+  assert.equal(matchingOutcome("accepted", "accepted"), "accepted");
+  assert.equal(matchingOutcome("accepted", "waiting"), "waiting");
+  assert.equal(matchingOutcome("declined", "accepted"), "declined");
+  const completeMatch = {
+    caseTypeId: "matching",
+    parentId: "parent-1",
+    mentorId: "mentor-1",
+    supportCaseId: "support-1",
+    details: { parentResponse: "accepted", mentorResponse: "accepted" }
+  };
+  assert.equal(canCreateMentorAssignment(completeMatch), true);
+  assert.equal(canCreateMentorAssignment({ ...completeMatch, supportCaseId: null }), false);
+  assert.equal(canCreateMentorAssignment({ ...completeMatch, details: { ...completeMatch.details, mentorResponse: "waiting" } }), false);
+});
+
+test("requires mentor reporting and a safe parent check-in before approving compensation", () => {
+  assert.equal(compensationReadiness({ completedReportCount: 0 }), "awaiting_reports");
+  assert.equal(compensationReadiness({ completedReportCount: 1 }), "awaiting_parent_checkin");
+  assert.equal(compensationReadiness({ completedReportCount: 1, latestCheckIn: { contactConfirmed: "yes", safety: "yes" } }), "under_review");
+  assert.deepEqual(
+    assessCompensationApproval({ completedReportCount: 1, latestCheckIn: { contactConfirmed: "yes", safety: "yes" } }),
+    { allowed: true, reasons: [] }
+  );
+  const blocked = assessCompensationApproval({ completedReportCount: 1, latestCheckIn: { contactConfirmed: "no", safety: "concern" } });
+  assert.equal(blocked.allowed, false);
+  assert.equal(blocked.reasons.length, 2);
 });
 
 test("defines registration guidance and mentor rules for every case type", () => {

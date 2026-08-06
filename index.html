@@ -20,6 +20,7 @@
           <a id="navPresentation" class="nav-link" href="#/presentation">Presentation</a>
           <a id="navCases" class="nav-link" href="#/cases">Ärenden</a>
           <a id="navCandidates" class="nav-link" href="#/mentors">Mentorer</a>
+          <a id="navParents" class="nav-link" href="#/parents">Föräldrar</a>
           <a id="navMatchings" class="nav-link" href="#/cases/matching">Matchningar</a>
           <a id="navAssignments" class="nav-link" href="#/cases/mentor-assignment">Uppdrag</a>
           <span class="nav-link disabled" aria-disabled="true"><span>Arvoden</span><small>Kommer senare</small></span>
@@ -47,6 +48,7 @@
                   <li><a class="dropdown-item" href="#/presentation">Presentation</a></li>
                   <li><a class="dropdown-item" href="#/cases">Ärenden</a></li>
                   <li><a class="dropdown-item" href="#/mentors">Mentorer</a></li>
+                  <li><a class="dropdown-item" href="#/parents">Föräldrar</a></li>
                   <li><a class="dropdown-item" href="#/cases/matching">Matchningar</a></li>
                   <li><a class="dropdown-item" href="#/cases/mentor-assignment">Uppdrag</a></li>
                   <li><hr class="dropdown-divider"></li>
@@ -294,7 +296,7 @@
                       <th>Ärende</th>
                       <th>Rubrik</th>
                       <th>Typ</th>
-                      <th>Mentor</th>
+                      <th>Person</th>
                       <th>Status</th>
                       <th>Ansvarig</th>
                       <th>Nästa aktivitet</th>
@@ -309,6 +311,85 @@
                   <button id="previousCasePageButton" type="button" class="btn btn-outline-secondary">Föregående</button>
                   <button id="nextCasePageButton" type="button" class="btn btn-outline-secondary">Nästa</button>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="parentsView" hidden>
+            <div class="card" aria-label="Föräldraregister">
+              <div class="card-header bg-white">
+                <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
+                  <div>
+                    <h2 class="h5 mb-1">Föräldraregister</h2>
+                    <p id="parentListCount" class="text-secondary mb-0">0 föräldrar i registret.</p>
+                  </div>
+                  <button id="newParentButton" type="button" class="btn btn-primary btn-sm">Ny förälder</button>
+                </div>
+              </div>
+              <div class="card-body border-bottom">
+                <label class="form-label" for="parentSearchInput">Sök</label>
+                <input id="parentSearchInput" class="form-control form-control-sm" autocomplete="off" placeholder="Namn, kontaktuppgift eller område">
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                  <thead class="table-light"><tr><th>Förälder</th><th>Kontakt</th><th>Område</th><th>Öppna stödärenden</th><th>Aktiva uppdrag</th><th>Senast ändrad</th></tr></thead>
+                  <tbody id="parentTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="parentDetailView" hidden>
+            <div id="parentDetailEmpty" class="card">
+              <div class="card-body py-5">
+                <div class="text-secondary small fw-semibold mb-2">Föräldrakort</div>
+                <h2 class="h5">Ingen förälder vald</h2>
+                <a class="btn btn-outline-primary btn-sm" href="#/parents">Öppna föräldraregistret</a>
+              </div>
+            </div>
+            <div id="parentDetail" class="card mentor-record" hidden>
+              <div class="card-header record-header bg-white">
+                <a class="small" href="#/parents">Tillbaka till föräldraregistret</a>
+                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start mt-2">
+                  <div><div class="record-type">Förälderpost</div><p id="selectedParentId" class="record-id mb-1"></p><h2 id="selectedParentName" class="h5 mb-0"></h2></div>
+                  <div class="record-actions d-flex flex-wrap gap-2">
+                    <button id="editParentButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
+                    <button id="newParentSupportCaseButton" type="button" class="btn btn-primary btn-sm">Nytt stödärende</button>
+                  </div>
+                </div>
+                <dl class="record-meta mb-0 mt-3">
+                  <div><dt>Registrerad av</dt><dd id="selectedParentCreatedBy"></dd></div>
+                  <div><dt>Registrerad</dt><dd id="selectedParentCreated"></dd></div>
+                  <div><dt>Senast ändrad</dt><dd id="selectedParentUpdated"></dd></div>
+                </dl>
+              </div>
+              <form id="parentForm" class="card-body">
+                <section class="record-section">
+                  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h3 class="record-section-title mb-0">Grunduppgifter</h3><span class="small text-secondary">Stödbehov registreras i stödärenden</span></div>
+                  <dl class="record-fields record-fields-edit mb-0">
+                    <div><dt><label for="parentNameInput">Namn</label></dt><dd><input id="parentNameInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
+                    <div><dt><label for="parentContactInput">Kontaktuppgift</label></dt><dd><input id="parentContactInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
+                    <div><dt><label for="parentInformationStatusInput">Informationsstatus</label></dt><dd><select id="parentInformationStatusInput" class="form-select form-select-sm" required><option value="">Välj status</option><option value="provided">Information lämnad</option><option value="pending">Information ska lämnas</option><option value="not_applicable">Ej aktuell</option></select></dd></div>
+                    <div><dt><label for="parentAreaInput">Område <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="parentAreaInput" class="form-control form-control-sm"></dd></div>
+                    <div><dt><label for="parentLanguagesInput">Språk <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="parentLanguagesInput" class="form-control form-control-sm"></dd></div>
+                    <div><dt><label for="parentAvailabilityInput">Tillgänglighet <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="parentAvailabilityInput" class="form-control form-control-sm"></dd></div>
+                  </dl>
+                </section>
+                <section id="initialSupportCaseSection" class="record-section mt-4">
+                  <div class="form-check form-switch mb-3"><input id="createInitialSupportCaseInput" class="form-check-input" type="checkbox" checked><label class="form-check-label fw-semibold" for="createInitialSupportCaseInput">Skapa stödärende när föräldern sparas</label></div>
+                  <div id="initialSupportCaseFields">
+                    <div class="row g-3">
+                      <div class="col-md-6"><label class="form-label" for="initialSupportPurposeInput">Stödets syfte</label><input id="initialSupportPurposeInput" class="form-control form-control-sm" placeholder="Exempel: stöd kring skolfrånvaro"></div>
+                      <div class="col-md-6"><label class="form-label" for="initialSupportOutcomeInput">Önskat resultat</label><input id="initialSupportOutcomeInput" class="form-control form-control-sm" placeholder="Vad ska stödet bidra till?"></div>
+                      <div class="col-12"><label class="form-label" for="initialSupportDescriptionInput">Kort beskrivning</label><textarea id="initialSupportDescriptionInput" class="form-control form-control-sm" rows="3"></textarea></div>
+                    </div>
+                  </div>
+                </section>
+                <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top"><button id="cancelParentButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button><button type="submit" class="btn btn-primary btn-sm">Spara</button></div>
+              </form>
+              <div id="parentReadView" class="card-body" hidden>
+                <section class="record-section"><h3 class="record-section-title">Grunduppgifter</h3><dl class="record-fields mb-0"><div><dt>Namn</dt><dd id="parentNameFact"></dd></div><div><dt>Kontaktuppgift</dt><dd id="parentContactFact"></dd></div><div><dt>Informationsstatus</dt><dd id="parentInformationStatusFact"></dd></div><div><dt>Område</dt><dd id="parentAreaFact"></dd></div><div><dt>Språk</dt><dd id="parentLanguagesFact"></dd></div><div><dt>Tillgänglighet</dt><dd id="parentAvailabilityFact"></dd></div></dl></section>
+                <section class="record-section mt-4"><div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div><h3 class="record-section-title mb-1">Stödärenden och uppdrag</h3><p class="small text-secondary mb-0">Varje avgränsat stödbehov har egen historik, matchning och uppdrag.</p></div></div><div class="table-responsive border rounded"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Ärende</th><th>Syfte</th><th>Status</th><th>Matchningar</th><th>Uppdrag</th></tr></thead><tbody id="parentSupportCaseTableBody"></tbody></table></div></section>
               </div>
             </div>
           </section>
@@ -339,7 +420,9 @@
                   </div>
                 </div>
                 <dl class="record-meta mb-0 mt-3">
+                  <div><dt>Förälder</dt><dd id="selectedCaseParent"></dd></div>
                   <div><dt>Mentor</dt><dd id="selectedCaseMentor"></dd></div>
+                  <div><dt>Stödärende</dt><dd id="selectedCaseSupportCase"></dd></div>
                   <div><dt>Ansvarig</dt><dd id="selectedCaseOwner"></dd></div>
                   <div><dt>Senast ändrad</dt><dd id="selectedCaseUpdated"></dd></div>
                 </dl>
@@ -354,6 +437,7 @@
                         <label class="form-label" for="caseTypeInput">Ärendetyp</label>
                         <select id="caseTypeInput" class="form-select form-select-sm" required>
                           <option value="">Välj ärendetyp</option>
+                          <option value="parent-support">Stödärende för förälder</option>
                           <option value="mentor-certification">Godkännande av mentor</option>
                           <option value="mentor-follow-up">Uppföljning</option>
                           <option value="matching">Matchning</option>
@@ -380,6 +464,15 @@
                         <input id="caseMentorIdInput" type="hidden">
                         <div id="caseMentorSuggestions" class="mentor-suggestions list-group mt-1" hidden></div>
                       </div>
+                      <div id="caseParentField" class="col-md-6" hidden>
+                        <label class="form-label" for="caseParentInput">Förälder</label>
+                        <input id="caseParentInput" class="form-control form-control-sm" autocomplete="off" placeholder="Sök förälder med namn"><input id="caseParentIdInput" type="hidden"><div id="caseParentSuggestions" class="mentor-suggestions list-group mt-1" hidden></div>
+                      </div>
+                      <div id="caseSupportCaseField" class="col-md-6" hidden>
+                        <label class="form-label" for="caseSupportCaseInput">Stödärende</label>
+                        <select id="caseSupportCaseInput" class="form-select form-select-sm"><option value="">Välj stödärende</option></select>
+                        <div class="form-text">Matchning och uppdrag kopplas till ett bestämt stödärende.</div>
+                      </div>
                       <div class="col-md-6">
                         <label class="form-label" for="caseOrganizationUnitInput">Ansvarig enhet</label>
                         <select id="caseOrganizationUnitInput" class="form-select form-select-sm" required>
@@ -399,6 +492,14 @@
                           <h4 class="h6 mb-1">Behovets omfattning</h4>
                           <p class="small text-secondary mb-3">Fyll i det som är känt nu. Uppgifterna kan kompletteras när analysen fortsätter.</p>
                           <div class="row g-3">
+                            <div class="col-md-6">
+                              <label class="form-label" for="supportPurposeInput">Stödets syfte</label>
+                              <input id="supportPurposeInput" class="form-control form-control-sm" placeholder="Exempel: stöd kring skolfrånvaro">
+                            </div>
+                            <div class="col-md-6">
+                              <label class="form-label" for="desiredOutcomeInput">Önskat resultat</label>
+                              <input id="desiredOutcomeInput" class="form-control form-control-sm" placeholder="Vad ska stödet bidra till?">
+                            </div>
                             <div class="col-md-6">
                               <label class="form-label" for="needsTargetGroupInput">Målgrupp</label>
                               <input id="needsTargetGroupInput" class="form-control form-control-sm" placeholder="Exempel: vårdnadshavare med barn 6–12 år">
@@ -456,6 +557,7 @@
                 <ul class="detail-tabs nav nav-tabs" role="tablist" aria-label="Ärendekort">
                   <li class="nav-item"><button class="nav-link active" id="case-overview-tab" data-bs-toggle="tab" data-bs-target="#case-overview-pane" type="button">Översikt</button></li>
                   <li class="nav-item"><button class="nav-link" id="case-activities-tab" data-bs-toggle="tab" data-bs-target="#case-activities-pane" type="button">Aktiviteter <span id="caseActivityCount" class="tab-count">0</span></button></li>
+                  <li id="assignmentFollowupTabItem" class="nav-item" hidden><button class="nav-link" id="assignment-followup-tab" data-bs-toggle="tab" data-bs-target="#assignment-followup-pane" type="button">Uppföljning <span id="assignmentFollowupCount" class="tab-count">0</span></button></li>
                   <li class="nav-item"><button class="nav-link" id="case-documents-tab" data-bs-toggle="tab" data-bs-target="#case-documents-pane" type="button">Handlingar <span id="caseDocumentCount" class="tab-count">0</span></button></li>
                   <li class="nav-item"><button class="nav-link" id="case-meetings-tab" data-bs-toggle="tab" data-bs-target="#case-meetings-pane" type="button">Möten <span id="caseMeetingCount" class="tab-count">0</span></button></li>
                   <li class="nav-item"><button class="nav-link" id="case-events-tab" data-bs-toggle="tab" data-bs-target="#case-events-pane" type="button">Logg <span id="caseEventCount" class="tab-count">0</span></button></li>
@@ -468,6 +570,14 @@
                         <p id="caseWorkGuidanceText" class="mb-0"></p>
                       </div>
                     </aside>
+                    <section id="caseTransitionPanel" class="record-section mb-4" hidden>
+                      <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start mb-3"><div><h3 id="caseTransitionTitle" class="record-section-title mb-1"></h3><p id="caseTransitionHelp" class="small text-secondary mb-0"></p></div></div>
+                      <form id="matchingOutcomeForm" hidden>
+                        <div class="row g-3"><div class="col-md-6"><label class="form-label" for="parentMatchResponseInput">Förälderns svar</label><select id="parentMatchResponseInput" class="form-select form-select-sm" required><option value="">Välj svar</option><option value="accepted">Accepterar</option><option value="declined">Tackar nej</option><option value="waiting">Vill avvakta</option></select></div><div class="col-md-6"><label class="form-label" for="mentorMatchResponseInput">Mentorns svar</label><select id="mentorMatchResponseInput" class="form-select form-select-sm" required><option value="">Välj svar</option><option value="accepted">Accepterar</option><option value="declined">Tackar nej</option><option value="waiting">Vill avvakta</option></select></div><div class="col-12"><label class="form-label" for="matchingOutcomeNoteInput">Kort notering</label><textarea id="matchingOutcomeNoteInput" class="form-control form-control-sm" rows="2"></textarea></div><div class="col-12"><div class="form-check form-switch"><input id="createAssignmentAfterMatchInput" class="form-check-input" type="checkbox" checked><label class="form-check-label" for="createAssignmentAfterMatchInput">Skapa mentoruppdrag när båda accepterar</label></div></div></div>
+                        <div class="d-flex justify-content-end mt-3"><button id="matchingOutcomeSubmitButton" type="submit" class="btn btn-primary btn-sm">Spara parternas svar</button></div>
+                      </form>
+                      <div id="supportCaseTransitionActions" class="d-flex flex-wrap gap-2" hidden><button id="startMatchingFromSupportButton" type="button" class="btn btn-primary btn-sm">Starta matchning</button></div>
+                    </section>
                     <div class="record-grid">
                       <section class="record-section">
                         <h3 class="record-section-title">Ärendeuppgifter</h3>
@@ -484,7 +594,9 @@
                           <div><dt>Ansvarig</dt><dd id="caseOwnerFact"></dd></div>
                           <div><dt>Ansvarig enhet</dt><dd id="caseOrganizationUnitFact"></dd></div>
                           <div><dt>Medhandläggare</dt><dd id="caseCoHandlersFact"></dd></div>
-                          <div><dt>Mentor</dt><dd id="caseMentorFact"></dd></div>
+                        <div><dt>Mentor</dt><dd id="caseMentorFact"></dd></div>
+                        <div><dt>Förälder</dt><dd id="caseParentFact"></dd></div>
+                        <div><dt>Stödärende</dt><dd id="caseSupportCaseFact"></dd></div>
                           <div><dt>Skapat</dt><dd id="caseCreatedFact"></dd></div>
                         </dl>
                       </section>
@@ -641,6 +753,72 @@
                         </table>
                       </div>
                     </div>
+                  </section>
+                  <section class="tab-pane fade card-body" id="assignment-followup-pane">
+                    <aside class="activity-guidance mb-4">
+                      <div><strong>Uppföljning och ersättning</strong><p class="mb-0">Mentorns rapport, förälderns återkoppling och handläggarens bedömning sparas som separata underlag. En rapporterad kontakt blir inte automatiskt godkänd för ersättning.</p></div>
+                    </aside>
+
+                    <section class="record-section mb-4">
+                      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3"><div><h3 class="record-section-title mb-1">Uppdragsplan</h3><p id="assignmentPlanStatus" class="small text-secondary mb-0"></p></div></div>
+                      <form id="assignmentPlanForm">
+                        <div class="row g-3">
+                          <div class="col-md-3"><label class="form-label" for="assignmentStartDateInput">Startdatum</label><input id="assignmentStartDateInput" class="form-control form-control-sm" type="date" required></div>
+                          <div class="col-md-3"><label class="form-label" for="assignmentEndDateInput">Planerat slutdatum</label><input id="assignmentEndDateInput" class="form-control form-control-sm" type="date" required></div>
+                          <div class="col-md-3"><label class="form-label" for="assignmentContactFrequencyInput">Kontaktfrekvens</label><select id="assignmentContactFrequencyInput" class="form-select form-select-sm" required><option value="weekly">Varje vecka</option><option value="biweekly">Varannan vecka</option><option value="monthly">Varje månad</option><option value="custom">Enligt individuell plan</option></select></div>
+                          <div class="col-md-3"><label class="form-label" for="assignmentContactModeInput">Normal kontaktform</label><select id="assignmentContactModeInput" class="form-select form-select-sm" required><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option><option value="mixed">Blandat</option></select></div>
+                          <div class="col-md-3"><label class="form-label" for="assignmentFirstFollowUpInput">Första föräldraavstämning</label><input id="assignmentFirstFollowUpInput" class="form-control form-control-sm" type="date" required></div>
+                          <div class="col-md-3"><label class="form-label" for="assignmentFollowUpFrequencyInput">Fortsatt avstämning</label><select id="assignmentFollowUpFrequencyInput" class="form-select form-select-sm" required><option value="monthly">Varje månad</option><option value="six_weeks">Var sjätte vecka</option><option value="quarterly">Var tredje månad</option><option value="custom">Enligt individuell plan</option></select></div>
+                          <div class="col-md-3"><label class="form-label" for="assignmentReportDeadlineInput">Mentorn rapporterar inom</label><div class="input-group input-group-sm"><input id="assignmentReportDeadlineInput" class="form-control" type="number" min="0" max="30" required value="3"><span class="input-group-text">dagar</span></div></div>
+                          <div class="col-12"><label class="form-label" for="assignmentPlanNoteInput">Ramar och särskilda instruktioner</label><textarea id="assignmentPlanNoteInput" class="form-control form-control-sm" rows="2" placeholder="Vad ska följas upp och när ska mentorn kontakta handläggaren direkt?"></textarea></div>
+                        </div>
+                        <div class="d-flex justify-content-end mt-3"><button type="submit" class="btn btn-primary btn-sm">Spara uppdragsplan</button></div>
+                      </form>
+                    </section>
+
+                    <section class="record-section mb-4">
+                      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3"><div><h3 class="record-section-title mb-1">Mentorns rapporter</h3><p class="small text-secondary mb-0">Registrera genomförd kontakt, omfattning och behov av stöd utan omfattande journaltext.</p></div><button id="newMentorReportButton" type="button" class="btn btn-primary btn-sm">Ny mentorrapport</button></div>
+                      <form id="mentorReportForm" class="inline-editor border rounded mb-3" hidden>
+                        <div class="row g-3">
+                          <div class="col-md-3"><label class="form-label" for="mentorReportDateInput">Kontaktdatum</label><input id="mentorReportDateInput" class="form-control form-control-sm" type="date" required></div>
+                          <div class="col-md-3"><label class="form-label" for="mentorReportDurationInput">Tidsåtgång</label><div class="input-group input-group-sm"><input id="mentorReportDurationInput" class="form-control" type="number" min="0" max="1440" required><span class="input-group-text">min</span></div></div>
+                          <div class="col-md-3"><label class="form-label" for="mentorReportModeInput">Kontaktform</label><select id="mentorReportModeInput" class="form-select form-select-sm" required><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option><option value="message">Meddelande</option></select></div>
+                          <div class="col-md-3"><label class="form-label" for="mentorReportOutcomeInput">Utfall</label><select id="mentorReportOutcomeInput" class="form-select form-select-sm" required><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div>
+                          <div class="col-md-4"><label class="form-label" for="mentorReportNextDateInput">Nästa kontakt <span class="text-secondary fw-normal">(valfritt)</span></label><input id="mentorReportNextDateInput" class="form-control form-control-sm" type="date"></div>
+                          <div class="col-md-8"><label class="form-label" for="mentorReportSummaryInput">Kort saklig sammanfattning</label><input id="mentorReportSummaryInput" class="form-control form-control-sm" required autocomplete="off"></div>
+                          <div class="col-12"><div class="form-check"><input id="mentorReportNeedsSupportInput" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorReportNeedsSupportInput">Mentorn behöver kontakt eller stöd från handläggaren</label></div></div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 mt-3"><button id="cancelMentorReportButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button><button type="submit" class="btn btn-primary btn-sm">Spara mentorrapport</button></div>
+                      </form>
+                      <div id="mentorReportsEmpty" class="empty-list border rounded text-secondary">Inga mentorrapporter har registrerats.</div>
+                      <div id="mentorReportsTableWrap" class="table-responsive border rounded" hidden><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Datum</th><th>Kontakt</th><th>Tid</th><th>Utfall</th><th>Sammanfattning</th><th>Rapporterad / registrerad</th></tr></thead><tbody id="mentorReportsTableBody"></tbody></table></div>
+                    </section>
+
+                    <section class="record-section mb-4">
+                      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3"><div><h3 class="record-section-title mb-1">Föräldraavstämningar</h3><p class="small text-secondary mb-0">Handläggaren stämmer av genomförande, relevans, trygghet och fortsatt behov direkt med föräldern.</p></div><button id="newParentCheckInButton" type="button" class="btn btn-primary btn-sm">Ny avstämning</button></div>
+                      <form id="parentCheckInForm" class="inline-editor border rounded mb-3" hidden>
+                        <div class="row g-3">
+                          <div class="col-md-3"><label class="form-label" for="parentCheckInDateInput">Datum</label><input id="parentCheckInDateInput" class="form-control form-control-sm" type="date" required></div>
+                          <div class="col-md-3"><label class="form-label" for="parentCheckInModeInput">Kontaktform</label><select id="parentCheckInModeInput" class="form-select form-select-sm" required><option value="phone">Telefon</option><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option></select></div>
+                          <div class="col-md-3"><label class="form-label" for="parentContactConfirmedInput">Kontakterna har ägt rum</label><select id="parentContactConfirmedInput" class="form-select form-select-sm" required><option value="yes">Ja</option><option value="partly">Delvis</option><option value="no">Nej</option></select></div>
+                          <div class="col-md-3"><label class="form-label" for="parentCollaborationInput">Samarbetet fungerar</label><select id="parentCollaborationInput" class="form-select form-select-sm" required><option value="well">Ja</option><option value="issues">Behöver justeras</option><option value="not_started">Inte kommit igång</option></select></div>
+                          <div class="col-md-3"><label class="form-label" for="parentRelevanceInput">Stödet är relevant</label><select id="parentRelevanceInput" class="form-select form-select-sm" required><option value="yes">Ja</option><option value="partly">Delvis</option><option value="no">Nej</option></select></div>
+                          <div class="col-md-3"><label class="form-label" for="parentSafetyInput">Trygghet i kontakten</label><select id="parentSafetyInput" class="form-select form-select-sm" required><option value="yes">Trygg</option><option value="concern">Oro finns</option></select></div>
+                          <div class="col-md-3"><label class="form-label" for="parentContinueInput">Fortsatt läge</label><select id="parentContinueInput" class="form-select form-select-sm" required><option value="continue">Fortsätt enligt plan</option><option value="change">Ändra uppdraget</option><option value="pause">Pausa</option><option value="end">Avsluta</option></select></div>
+                          <div class="col-md-9"><label class="form-label" for="parentCheckInNoteInput">Kort tjänsteanteckning</label><input id="parentCheckInNoteInput" class="form-control form-control-sm" autocomplete="off" placeholder="Saklig sammanfattning och eventuell fortsatt åtgärd"></div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 mt-3"><button id="cancelParentCheckInButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button><button type="submit" class="btn btn-primary btn-sm">Spara avstämning</button></div>
+                      </form>
+                      <div id="parentCheckInsEmpty" class="empty-list border rounded text-secondary">Inga föräldraavstämningar har registrerats.</div>
+                      <div id="parentCheckInsTableWrap" class="table-responsive border rounded" hidden><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Datum</th><th>Genomförande</th><th>Samarbete</th><th>Relevans</th><th>Trygghet</th><th>Fortsatt läge</th><th>Handläggare</th></tr></thead><tbody id="parentCheckInsTableBody"></tbody></table></div>
+                    </section>
+
+                    <section class="record-section">
+                      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3"><div><h3 class="record-section-title mb-1">Ersättningsperioder</h3><p class="small text-secondary mb-0">Perioden sammanställer mentorrapporter men kräver föräldraavstämning och ett uttryckligt beslut av handläggaren.</p></div><button id="newCompensationPeriodButton" type="button" class="btn btn-primary btn-sm">Ny ersättningsperiod</button></div>
+                      <form id="compensationPeriodForm" class="inline-editor border rounded mb-3" hidden><div class="row g-3"><div class="col-md-4"><label class="form-label" for="compensationPeriodFromInput">Från och med</label><input id="compensationPeriodFromInput" class="form-control form-control-sm" type="date" required></div><div class="col-md-4"><label class="form-label" for="compensationPeriodToInput">Till och med</label><input id="compensationPeriodToInput" class="form-control form-control-sm" type="date" required></div><div class="col-md-4 d-flex align-items-end"><div class="small text-secondary">Rapporter och avstämningar inom perioden sammanställs automatiskt.</div></div></div><div class="d-flex justify-content-end gap-2 mt-3"><button id="cancelCompensationPeriodButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button><button type="submit" class="btn btn-primary btn-sm">Skapa period</button></div></form>
+                      <div id="compensationPeriodsEmpty" class="empty-list border rounded text-secondary">Inga ersättningsperioder har skapats.</div>
+                      <div id="compensationPeriodsTableWrap" class="table-responsive border rounded" hidden><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Period</th><th>Mentorrapporter</th><th>Tid</th><th>Föräldraavstämning</th><th>Status</th><th><span class="visually-hidden">Åtgärd</span></th></tr></thead><tbody id="compensationPeriodsTableBody"></tbody></table></div>
+                    </section>
                   </section>
                   <section class="tab-pane fade card-body" id="case-documents-pane">
                     <form id="caseDocumentForm" class="inline-editor border rounded mb-3">
@@ -950,7 +1128,7 @@
                 </div>
                 <div class="routines-header-actions">
                   <button id="copyRoutinesLinkButton" type="button" class="btn btn-outline-secondary btn-sm">Kopiera länk</button>
-                  <span class="badge text-bg-light border">Verksamhetsförslag 1.5</span>
+                  <span class="badge text-bg-light border">Verksamhetsförslag 1.7</span>
                 </div>
               </header>
               <div class="routines-search border-bottom">
@@ -1505,6 +1683,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260806-parent-process-v15"></script>
+    <script type="module" src="app.js?v=20260806-assignment-followup-v21"></script>
   </body>
 </html>

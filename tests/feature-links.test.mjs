@@ -50,12 +50,17 @@ test("every routine illustration is defined and links to a known feature", () =>
       assert.ok(resolveFeatureLink(illustration.featureId), `unknown illustration feature: ${illustration.featureId}`);
     }
   }
-  assert.equal(ROUTINE_ILLUSTRATIONS["parent-registration"].featureId, null);
+  assert.equal(ROUTINE_ILLUSTRATIONS["parent-registration"].featureId, "parent.create");
 });
 
 test("uses parent terminology without introducing a recipient abstraction", () => {
   assert.match(routines, /Registrera förälder/);
-  assert.match(routines, /Matcha förälder och mentor/);
+  assert.match(routines, /Matcha stödärende med mentor/);
+  assert.match(routines, /annat stödbehov/i);
+  assert.match(routines, /flera samtidiga uppdrag/i);
+  assert.match(routines, /När uppdraget skapas får det en oföränderlig referens till stödärendet/);
+  assert.match(routines, /Sammanhållna men valbara övergångar/);
+  assert.match(routines, /Nästa steg är förvalt, men användaren får avmarkera/);
   assert.doesNotMatch(routines, /stödmottagare/i);
   assert.doesNotMatch(routines, /familjebehov|familjen/i);
 });
