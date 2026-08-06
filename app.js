@@ -1713,6 +1713,11 @@ function atomicPut(recordsByStore) {
   });
 }
 
+function changedRecords(originalRecords, normalizedRecords, keyOf = (record) => record.id) {
+  const originalsByKey = new Map(originalRecords.map((record) => [keyOf(record), record]));
+  return normalizedRecords.filter((record) => JSON.stringify(originalsByKey.get(keyOf(record))) !== JSON.stringify(record));
+}
+
 function normalizedCaseRecord(caseRecord) {
   const type = caseTypeById(caseRecord.caseTypeId) || caseTypeByName(caseRecord.type);
   return {
@@ -1910,34 +1915,14 @@ async function migrateCaseDomainV6() {
       updatedBy: actorId(meeting.updatedBy || meeting.createdBy)
     }];
   });
-  const storedCaseTypeKeys = new Set((await getAllCaseTypeDefinitions())
-    .map((definition) => `${definition.tenantId}:${definition.id}:${definition.version}`));
-  const caseDefinitions = CASE_TYPE_DEFINITIONS.filter((definition) => !storedCaseTypeKeys.has(`${DEFAULT_TENANT_ID}:${definition.id}:${definition.version}`)).map((definition) => ({
-    ...definition,
-    tenantId: DEFAULT_TENANT_ID,
-    status: "published",
-    activityTemplateRefs: (definition.activityTemplateIds || []).map((templateId) => ({ templateId, version: 1 }))
-  }));
-  const activityDefinitions = ACTIVITY_TEMPLATES.map((template, sortOrder) => ({
-    id: template.id,
-    tenantId: DEFAULT_TENANT_ID,
-    version: template.version,
-    status: "published",
-    title: template.title,
-    sortOrder,
-    resultDefinitions: template.results.map(([code, label, classification]) => ({ code, label, classification, requiresNote: classification === "deviation" }))
-  }));
-
   await atomicPut({
-    [CASES_STORE]: normalizedCases,
-    [CASE_ASSIGNMENTS_STORE]: normalizedAssignments,
-    [CASE_ACTIVITIES_STORE]: normalizedActivities,
-    [CASE_DOCUMENTS_STORE]: normalizedDocuments,
-    [CASE_EVENTS_STORE]: normalizedEvents,
-    [ACTIVITY_DEVIATIONS_STORE]: migratedDeviations,
-    [CASE_MEETINGS_STORE]: [...caseMeetings, ...migratedMeetings],
-    [CASE_TYPE_DEFINITIONS_STORE]: caseDefinitions,
-    [ACTIVITY_TEMPLATE_DEFINITIONS_STORE]: activityDefinitions
+    [CASES_STORE]: changedRecords(cases, normalizedCases),
+    [CASE_ASSIGNMENTS_STORE]: changedRecords(caseAssignments, normalizedAssignments),
+    [CASE_ACTIVITIES_STORE]: changedRecords(caseActivities, normalizedActivities),
+    [CASE_DOCUMENTS_STORE]: changedRecords(caseDocuments, normalizedDocuments),
+    [CASE_EVENTS_STORE]: changedRecords(caseEvents, normalizedEvents),
+    [ACTIVITY_DEVIATIONS_STORE]: changedRecords(activityDeviations, migratedDeviations),
+    [CASE_MEETINGS_STORE]: migratedMeetings
   });
 }
 
@@ -2141,6 +2126,7 @@ async function ensureCertificationCases() {
 }
 
 async function refresh() {
+  const refreshStartedAt = Date.now();
   await loadCaseTypeDefinitions();
   await loadActivityTemplateDefinitions();
   handlers = await getAllHandlers();
@@ -2184,6 +2170,7 @@ async function refresh() {
   candidates.sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.name.localeCompare(b.name, "sv"));
   parents.sort((a, b) => a.name.localeCompare(b.name, "sv"));
   renderAll();
+  document.body.dataset.refreshDurationMs = String(Date.now() - refreshStartedAt);
 }
 
 async function migrateLegacyMeetingNotes() {
@@ -2291,22 +2278,27 @@ async function migrateDefaultHandlerRecords() {
 }
 
 function renderAll() {
+  const renderStartedAt = Date.now();
   applyRoute();
   renderCurrentUser();
   renderSummary();
-  renderPipeline();
-  renderDashboard();
-  renderPresentation();
-  renderCases();
-  renderCaseDetail();
-  renderParents();
-  renderParentDetail();
-  renderTable();
-  renderDetail();
-  renderHandlers();
-  renderCaseTypeAdministration();
-  renderActivityTypeAdministration();
-  renderHandlerDetail();
+  const viewRenderer = {
+    dashboard: () => { renderPipeline(); renderDashboard(); },
+    presentation: renderPresentation,
+    cases: renderCases,
+    case: renderCaseDetail,
+    parents: renderParents,
+    parent: renderParentDetail,
+    mentors: renderTable,
+    mentor: renderDetail,
+    administration: renderHandlers,
+    "case-types": renderCaseTypeAdministration,
+    "activity-types": renderActivityTypeAdministration,
+    handler: renderHandlerDetail
+  }[currentView];
+  viewRenderer?.();
+  document.body.dataset.renderView = currentView;
+  document.body.dataset.renderDurationMs = String(Date.now() - renderStartedAt);
 }
 
 function currentUser() {
