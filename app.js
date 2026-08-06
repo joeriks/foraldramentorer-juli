@@ -2194,21 +2194,27 @@ function configureRoutineFeatureLink(link, feature) {
   link.rel = "noopener noreferrer";
 }
 
-function routineProcessStep(number, title, note = "") {
+function routineProcessLink(title, sectionKey) {
+  const link = routineIllustrationElement("a", "routine-process-link", title);
+  link.href = routineSectionRoute(sectionKey);
+  return link;
+}
+
+function routineProcessStep(number, title, sectionKey, note = "") {
   const item = routineIllustrationElement("li", "routine-process-step");
   item.append(
     routineIllustrationElement("span", "routine-process-number", String(number)),
-    routineIllustrationElement("strong", "routine-process-title", title)
+    routineProcessLink(title, sectionKey)
   );
   if (note) item.append(routineIllustrationElement("span", "routine-process-note", note));
   return item;
 }
 
-function routineProcessOutcome(condition, title, tone = "") {
+function routineProcessOutcome(condition, title, sectionKey, tone = "") {
   const item = routineIllustrationElement("div", `routine-process-outcome ${tone ? `is-${tone}` : ""}`);
   item.append(
     routineIllustrationElement("span", "routine-process-condition", condition),
-    routineIllustrationElement("strong", "routine-process-outcome-title", title)
+    routineProcessLink(title, sectionKey)
   );
   return item;
 }
@@ -2227,20 +2233,20 @@ function buildRoutineProcessMap(kind) {
       routineIllustrationElement("strong", "routine-process-heading", "Från behov till avslut")
     );
     [
-      "Analysera behov",
-      "Genomför rekryteringsinsats",
-      "Registrera intresseanmälan",
-      "Handlägg certifieringsärende",
-      "Gör mentor tillgänglig",
-      "Genomför matchning",
-      "Starta mentoruppdrag",
-      "Följ upp uppdrag"
-    ].forEach((title, index) => track.append(routineProcessStep(index + 1, title)));
+      ["Analysera behov", "6-1"],
+      ["Genomför rekryteringsinsats", "6-2"],
+      ["Registrera intresseanmälan", "7-1"],
+      ["Handlägg certifieringsärende", "8"],
+      ["Gör mentor tillgänglig", "8-8"],
+      ["Genomför matchning", "10"],
+      ["Starta mentoruppdrag", "11"],
+      ["Följ upp uppdrag", "11"]
+    ].forEach(([title, sectionKey], index) => track.append(routineProcessStep(index + 1, title, sectionKey)));
     outcomes.append(
-      routineProcessOutcome("Certifiering: avbruten eller inte godkänd", "Avsluta och bevara motivering", "stop"),
-      routineProcessOutcome("Matchning: ingen match", "Återgå till tillgänglig för matchning", "return"),
-      routineProcessOutcome("Uppföljning: behov av åtgärd", "Skapa uppföljnings- eller avvikelseärende", "attention"),
-      routineProcessOutcome("Uppföljning: klart", "Avsluta ärendet", "complete")
+      routineProcessOutcome("Certifiering: avbruten eller inte godkänd", "Avsluta och bevara motivering", "8-8", "stop"),
+      routineProcessOutcome("Matchning: ingen match", "Återgå till tillgänglig för matchning", "10", "return"),
+      routineProcessOutcome("Uppföljning: behov av åtgärd", "Skapa uppföljnings- eller avvikelseärende", "11", "attention"),
+      routineProcessOutcome("Uppföljning: klart", "Avsluta ärendet", "13", "complete")
     );
     caption.textContent = "Huvudflödet visas överst. Avvikande vägar hanteras genom uttryckliga beslut och egna ärenden.";
   } else {
@@ -2250,15 +2256,15 @@ function buildRoutineProcessMap(kind) {
       routineIllustrationElement("strong", "routine-process-heading", "Avvikelse och ställningstagande")
     );
     track.append(
-      routineProcessStep(1, "Aktivitet avslutas", "Avvikande resultat registreras"),
-      routineProcessStep(2, "Ställningstagande öppnas", "Systemet lägger det i arbetskön"),
-      routineProcessStep(3, "Behörig handläggare bedömer", "Ett uttryckligt val krävs")
+      routineProcessStep(1, "Aktivitet avslutas", "9", "Avvikande resultat registreras"),
+      routineProcessStep(2, "Ställningstagande öppnas", "9", "Systemet lägger det i arbetskön"),
+      routineProcessStep(3, "Behörig handläggare bedömer", "9", "Ett uttryckligt val krävs")
     );
     outcomes.append(
-      routineProcessOutcome("Fortsätt", "Dokumentera skäl och fortsätt processen", "complete"),
-      routineProcessOutcome("Begär komplettering", "Skapa aktivitet och sätt bevakningsdatum", "attention"),
-      routineProcessOutcome("Pausa", "Ange orsak och bevakningsdatum", "return"),
-      routineProcessOutcome("Avsluta", "Ange avslutsorsak och beslutsfattare", "stop")
+      routineProcessOutcome("Fortsätt", "Dokumentera skäl och fortsätt processen", "9", "complete"),
+      routineProcessOutcome("Begär komplettering", "Skapa aktivitet och sätt bevakningsdatum", "9", "attention"),
+      routineProcessOutcome("Pausa", "Ange orsak och bevakningsdatum", "13", "return"),
+      routineProcessOutcome("Avsluta", "Ange avslutsorsak och beslutsfattare", "13", "stop")
     );
     caption.textContent = "Ställningstagandet ligger kvar i arbetskön tills ett behörigt och dokumenterat val har gjorts.";
   }

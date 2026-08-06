@@ -35,6 +35,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /CASE_ACTIVITIES_STORE/);
   assert.match(scriptText, /#\/case-types\/\$\{encodeURIComponent\(definition\.id\)\}/);
   assert.match(scriptText, /renderRoutineFlowDiagrams/);
+  assert.match(scriptText, /routineProcessLink/);
 
   const domain = await worker.fetch(new Request("https://example.test/case-domain.js"), {}, context);
   assert.equal(domain.status, 200);
