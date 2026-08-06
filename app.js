@@ -2194,6 +2194,91 @@ function configureRoutineFeatureLink(link, feature) {
   link.rel = "noopener noreferrer";
 }
 
+function routineProcessStep(number, title, note = "") {
+  const item = routineIllustrationElement("li", "routine-process-step");
+  item.append(
+    routineIllustrationElement("span", "routine-process-number", String(number)),
+    routineIllustrationElement("strong", "routine-process-title", title)
+  );
+  if (note) item.append(routineIllustrationElement("span", "routine-process-note", note));
+  return item;
+}
+
+function routineProcessOutcome(condition, title, tone = "") {
+  const item = routineIllustrationElement("div", `routine-process-outcome ${tone ? `is-${tone}` : ""}`);
+  item.append(
+    routineIllustrationElement("span", "routine-process-condition", condition),
+    routineIllustrationElement("strong", "routine-process-outcome-title", title)
+  );
+  return item;
+}
+
+function buildRoutineProcessMap(kind) {
+  const figure = routineIllustrationElement("figure", `routine-process-map routine-process-${kind}`);
+  const header = routineIllustrationElement("div", "routine-process-header");
+  const track = routineIllustrationElement("ol", "routine-process-track");
+  const outcomes = routineIllustrationElement("div", "routine-process-outcomes");
+  const caption = routineIllustrationElement("figcaption", "routine-process-caption");
+
+  if (kind === "lifecycle") {
+    figure.setAttribute("aria-label", "Övergripande livscykel från behovsanalys till avslut");
+    header.append(
+      routineIllustrationElement("span", "routine-process-kicker", "Processkarta"),
+      routineIllustrationElement("strong", "routine-process-heading", "Från behov till avslut")
+    );
+    [
+      "Analysera behov",
+      "Genomför rekryteringsinsats",
+      "Registrera intresseanmälan",
+      "Handlägg certifieringsärende",
+      "Gör mentor tillgänglig",
+      "Genomför matchning",
+      "Starta mentoruppdrag",
+      "Följ upp uppdrag"
+    ].forEach((title, index) => track.append(routineProcessStep(index + 1, title)));
+    outcomes.append(
+      routineProcessOutcome("Certifiering: avbruten eller inte godkänd", "Avsluta och bevara motivering", "stop"),
+      routineProcessOutcome("Matchning: ingen match", "Återgå till tillgänglig för matchning", "return"),
+      routineProcessOutcome("Uppföljning: behov av åtgärd", "Skapa uppföljnings- eller avvikelseärende", "attention"),
+      routineProcessOutcome("Uppföljning: klart", "Avsluta ärendet", "complete")
+    );
+    caption.textContent = "Huvudflödet visas överst. Avvikande vägar hanteras genom uttryckliga beslut och egna ärenden.";
+  } else {
+    figure.setAttribute("aria-label", "Process för avvikelse och ställningstagande");
+    header.append(
+      routineIllustrationElement("span", "routine-process-kicker", "Beslutsflöde"),
+      routineIllustrationElement("strong", "routine-process-heading", "Avvikelse och ställningstagande")
+    );
+    track.append(
+      routineProcessStep(1, "Aktivitet avslutas", "Avvikande resultat registreras"),
+      routineProcessStep(2, "Ställningstagande öppnas", "Systemet lägger det i arbetskön"),
+      routineProcessStep(3, "Behörig handläggare bedömer", "Ett uttryckligt val krävs")
+    );
+    outcomes.append(
+      routineProcessOutcome("Fortsätt", "Dokumentera skäl och fortsätt processen", "complete"),
+      routineProcessOutcome("Begär komplettering", "Skapa aktivitet och sätt bevakningsdatum", "attention"),
+      routineProcessOutcome("Pausa", "Ange orsak och bevakningsdatum", "return"),
+      routineProcessOutcome("Avsluta", "Ange avslutsorsak och beslutsfattare", "stop")
+    );
+    caption.textContent = "Ställningstagandet ligger kvar i arbetskön tills ett behörigt och dokumenterat val har gjorts.";
+  }
+
+  const outcomesHeading = routineIllustrationElement("h4", "routine-process-outcomes-heading", kind === "lifecycle" ? "Avvikande vägar" : "Möjliga ställningstaganden");
+  figure.append(header, track, outcomesHeading, outcomes, caption);
+  return figure;
+}
+
+function renderRoutineFlowDiagrams() {
+  els.routinesContent.querySelectorAll("pre > code.language-mermaid").forEach((code) => {
+    const source = code.textContent;
+    const kind = source.includes("Analysera behov")
+      ? "lifecycle"
+      : source.includes("Aktivitet avslutas med avvikande resultat") ? "deviation" : "";
+    if (!kind) return;
+    code.parentElement.replaceWith(buildRoutineProcessMap(kind));
+  });
+}
+
 function renderRoutineIllustrations() {
   els.routinesContent.querySelectorAll("[data-routine-illustration]").forEach((placeholder) => {
     const illustrationId = placeholder.dataset.routineIllustration;
@@ -2368,6 +2453,7 @@ async function loadRoutinesDocument(sectionKey = "") {
         link.title = "Funktionen är inte tillgänglig i denna version";
       }
     });
+    renderRoutineFlowDiagrams();
     renderRoutineIllustrations();
     buildRoutinesNavigation();
     routinesLoaded = true;
