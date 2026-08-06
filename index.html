@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260806-navigation-v4">
+    <link rel="stylesheet" href="styles.css?v=20260806-dashboard-v5">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -95,54 +95,49 @@
 
         <main class="app-main">
           <section id="dashboardView" class="view-stack">
-            <section class="card">
+            <section class="card" aria-label="Ärendeläge">
               <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
                 <div>
-                  <h2 class="h5 mb-1">Mentorflöde</h2>
-                  <p class="text-secondary mb-0">Mentorer fördelade efter status i introduktionen.</p>
+                  <h2 class="h5 mb-1">Ärendeläge</h2>
+                  <p class="text-secondary mb-0">Aktuellt läge i kommunens öppna handläggning.</p>
                 </div>
                 <div class="text-secondary small">
-                  Totalt <strong id="totalCount">0</strong> personer
+                  <strong id="openCaseCount">0</strong> öppna ärenden
                 </div>
               </div>
-              <div id="pipelineBoard" class="card-body">
-                <div class="pipeline-grid">
-                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Anmäld">
-                    <div class="pipeline-name fw-semibold">Anmäld</div>
-                    <div class="pipeline-count"><strong data-pipeline-count="Anmäld">0</strong><span>personer</span></div>
-                    <div class="pipeline-description">Ny intresseanmälan</div>
-                    <div class="pipeline-action">Visa mentorer</div>
+              <div id="caseSummaryBoard" class="card-body">
+                <div class="case-summary-grid">
+                  <button type="button" class="case-summary-item" data-case-summary-status="new">
+                    <span class="case-summary-label">Nya</span>
+                    <strong data-case-status-count="new">0</strong>
+                    <span class="case-summary-description">Ännu inte påbörjade</span>
                   </button>
-                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Kontrollerad">
-                    <div class="pipeline-name fw-semibold">Kontrollerad</div>
-                    <div class="pipeline-count"><strong data-pipeline-count="Kontrollerad">0</strong><span>personer</span></div>
-                    <div class="pipeline-description">Register och referenser klara</div>
-                    <div class="pipeline-action">Visa mentorer</div>
+                  <button type="button" class="case-summary-item" data-case-summary-status="in_progress">
+                    <span class="case-summary-label">Pågående</span>
+                    <strong data-case-status-count="in_progress">0</strong>
+                    <span class="case-summary-description">Aktiv handläggning</span>
                   </button>
-                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Utbildning pågår">
-                    <div class="pipeline-name fw-semibold">Utbildning pågår</div>
-                    <div class="pipeline-count"><strong data-pipeline-count="Utbildning pågår">0</strong><span>personer</span></div>
-                    <div class="pipeline-description">Utbildningsmoment återstår</div>
-                    <div class="pipeline-action">Visa mentorer</div>
+                  <button type="button" class="case-summary-item" data-case-summary-status="waiting">
+                    <span class="case-summary-label">Väntar</span>
+                    <strong data-case-status-count="waiting">0</strong>
+                    <span class="case-summary-description">Inväntar extern part</span>
                   </button>
-                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Redo för intervju">
-                    <div class="pipeline-name fw-semibold">Redo för intervju</div>
-                    <div class="pipeline-count"><strong data-pipeline-count="Redo för intervju">0</strong><span>personer</span></div>
-                    <div class="pipeline-description">Intervju eller beslut återstår</div>
-                    <div class="pipeline-action">Visa mentorer</div>
+                  <button type="button" class="case-summary-item" data-case-summary-status="decision_required">
+                    <span class="case-summary-label">Ställningstagande</span>
+                    <strong data-case-status-count="decision_required">0</strong>
+                    <span class="case-summary-description">Kräver bedömning eller beslut</span>
                   </button>
-                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Godkänd/Certifierad">
-                    <div class="pipeline-name fw-semibold">Godkänd/Certifierad</div>
-                    <div class="pipeline-count"><strong data-pipeline-count="Godkänd/Certifierad">0</strong><span>personer</span></div>
-                    <div class="pipeline-description">Tillgänglig för matchning</div>
-                    <div class="pipeline-action">Visa mentorer</div>
+                  <button type="button" class="case-summary-item" data-case-summary-status="paused">
+                    <span class="case-summary-label">Pausade</span>
+                    <strong data-case-status-count="paused">0</strong>
+                    <span class="case-summary-description">Handläggning tillfälligt stoppad</span>
                   </button>
                 </div>
               </div>
             </section>
 
             <div class="row g-4">
-              <section class="col-xl-7">
+              <section class="col-xl-8">
                 <div class="card h-100">
                   <div class="card-header bg-white d-flex justify-content-between align-items-start gap-2">
                     <div>
@@ -156,16 +151,16 @@
                       <button id="myActivitiesQueueButton" type="button" class="btn btn-primary" aria-pressed="true">Mina aktiviteter</button>
                       <button id="unassignedQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Otilldelade</button>
                       <button id="overdueQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Försenade</button>
+                      <button id="decisionQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Ställningstaganden</button>
                     </div>
                   </div>
                   <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle mb-0">
+                    <table class="table table-sm table-hover align-middle mb-0 dashboard-queue-table">
                       <thead class="table-light">
                         <tr>
                           <th>Ärende</th>
-                          <th>Person</th>
-                          <th>Nästa steg</th>
-                          <th>Förfallodatum</th>
+                          <th>Koppling</th>
+                          <th>Nästa aktivitet</th>
                           <th>Åtgärd</th>
                         </tr>
                       </thead>
@@ -175,20 +170,42 @@
                 </div>
               </section>
 
-              <section class="col-xl-5">
+              <section class="col-xl-4">
                 <div class="card dashboard-shortcuts-card">
                   <div class="card-header bg-white">
                     <h2 class="h5 mb-1">Snabbvägar</h2>
                     <p class="text-secondary mb-0">Vanliga arbetsmoment.</p>
                   </div>
                   <div class="card-body d-flex flex-column gap-2">
-                    <button id="dashboardNewCaseButton" type="button" class="btn btn-primary">Registrera mentor</button>
+                    <button id="dashboardNewCaseButton" type="button" class="btn btn-primary">Nytt ärende</button>
+                    <button id="dashboardNewMentorButton" type="button" class="btn btn-outline-primary">Registrera mentor</button>
+                    <a class="btn btn-outline-secondary" href="#/cases">Öppna ärenderegistret</a>
                     <a id="dashboardMentorRegisterLink" class="btn btn-outline-secondary" href="#/mentors">Öppna mentorregistret</a>
-                    <button type="button" class="btn btn-outline-secondary" disabled>Exportera beslutsunderlag (kommer senare)</button>
                   </div>
                 </div>
               </section>
             </div>
+
+            <section class="card">
+              <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
+                <div>
+                  <h2 class="h5 mb-1">Mentorflöde</h2>
+                  <p class="text-secondary mb-0">Registeröversikt över mentorernas läge i introduktionen.</p>
+                </div>
+                <div class="text-secondary small">
+                  Totalt <strong id="totalCount">0</strong> personer
+                </div>
+              </div>
+              <div id="pipelineBoard" class="card-body">
+                <div class="pipeline-grid">
+                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Anmäld"><div class="pipeline-name fw-semibold">Anmäld</div><div class="pipeline-count"><strong data-pipeline-count="Anmäld">0</strong><span>personer</span></div><div class="pipeline-description">Ny intresseanmälan</div><div class="pipeline-action">Visa mentorer</div></button>
+                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Kontrollerad"><div class="pipeline-name fw-semibold">Kontrollerad</div><div class="pipeline-count"><strong data-pipeline-count="Kontrollerad">0</strong><span>personer</span></div><div class="pipeline-description">Register och referenser klara</div><div class="pipeline-action">Visa mentorer</div></button>
+                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Utbildning pågår"><div class="pipeline-name fw-semibold">Utbildning pågår</div><div class="pipeline-count"><strong data-pipeline-count="Utbildning pågår">0</strong><span>personer</span></div><div class="pipeline-description">Utbildningsmoment återstår</div><div class="pipeline-action">Visa mentorer</div></button>
+                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Redo för intervju"><div class="pipeline-name fw-semibold">Redo för intervju</div><div class="pipeline-count"><strong data-pipeline-count="Redo för intervju">0</strong><span>personer</span></div><div class="pipeline-description">Intervju eller beslut återstår</div><div class="pipeline-action">Visa mentorer</div></button>
+                  <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Godkänd/Certifierad"><div class="pipeline-name fw-semibold">Godkänd/Certifierad</div><div class="pipeline-count"><strong data-pipeline-count="Godkänd/Certifierad">0</strong><span>personer</span></div><div class="pipeline-description">Tillgänglig för matchning</div><div class="pipeline-action">Visa mentorer</div></button>
+                </div>
+              </div>
+            </section>
           </section>
 
           <section id="presentationView" class="view-stack" hidden>
@@ -213,6 +230,11 @@
                           <h3 id="presentationStepTitle" class="h5 mb-1"></h3>
                           <p id="presentationStepSummary" class="text-secondary mb-0"></p>
                         </div>
+                      </div>
+
+                      <div class="presentation-points mb-3">
+                        <h4 class="h6">Visa i detta steg</h4>
+                        <ul id="presentationStepPoints" class="mb-0"></ul>
                       </div>
 
                       <form id="presentationCommentForm" class="presentation-comment-form border rounded mb-3">
@@ -1395,6 +1417,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260806-navigation-v4"></script>
+    <script type="module" src="app.js?v=20260806-dashboard-v5"></script>
   </body>
 </html>

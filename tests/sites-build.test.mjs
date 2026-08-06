@@ -17,6 +17,10 @@ test("serves the application shell", async () => {
   const html = await response.text();
   assert.match(html, /FöräldraMentorer/);
   assert.match(html, /id="dashboardView"/);
+  assert.match(html, /id="caseSummaryBoard"/);
+  assert.match(html, /id="decisionQueueButton"/);
+  assert.match(html, /id="presentationStepPoints"/);
+  assert.match(html, />Nytt ärende</);
 });
 
 test("serves application assets and returns 404 for unknown files", async () => {

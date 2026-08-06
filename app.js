@@ -341,45 +341,59 @@ const seedHandlers = [
 const PRESENTATION_STEPS = [
   {
     id: "overview",
-    title: "Dashboard och mentorflöde",
+    title: "Dashboard och arbetskö",
     route: "#/dashboard",
-    summary: "Visa hur kommunen snabbt ser var mentorerna befinner sig i onboardingflödet och vilka ärenden som behöver handläggning."
-  },
-  {
-    id: "register",
-    title: "Mentorregister",
-    route: "#/mentors",
-    summary: "Visa registerlistan, sökning, statusfilter och hur en post öppnas som ett mentorkort."
+    summary: "Börja i handläggarens dagliga vy med ärendeläge, arbetskö och tydliga avvikelser.",
+    points: ["Ärendestatus visar kommunens samlade handläggningsläge", "Arbetskön skiljer på egna, otilldelade och försenade aktiviteter", "Mentorflödet är en sekundär registeröversikt"]
   },
   {
     id: "cases",
-    title: "Ärenden och aktiviteter",
+    title: "Ärenderegister",
     route: "#/cases",
-    summary: "Visa ärenderegistret, flera handläggare, certifieringsaktiviteter, fria uppföljningar, handlingar och automatisk logg."
+    summary: "Visa att all strukturerad handläggning utgår från ärenden, oavsett om de gäller en mentor eller ett generellt behov.",
+    points: ["Sök och filtrera på status", "Se ansvarig, kopplad mentor och nästa aktivitet", "Öppna både certifieringsärenden och generella ärenden"]
+  },
+  {
+    id: "case-work",
+    title: "Ärendekort och aktiviteter",
+    route: "#/case",
+    summary: "Följ ett ärende från nästa åtgärd till aktivitet, underlag, ställningstagande och avslut.",
+    points: ["Ärendet samlar ansvar, tidsfrister och historik", "Aktiviteter kan tilldelas och kompletteras med underlag", "Avvikande resultat kan pausa eller avsluta ärendet"]
   },
   {
     id: "new-mentor",
     title: "Registrera ny mentor",
     route: "#/mentor/new",
-    summary: "Visa att ny mentor registreras som ett vanligt mentorkort, inte som en separat dialogruta."
+    summary: "Visa den enkla standardvägen där mentorpost och certifieringsärende skapas i ett sammanhang.",
+    points: ["Grunduppgifter registreras en gång", "Dubblettkontroll sker före sparande", "Certifieringsärendet skapas och kopplas automatiskt"]
   },
   {
-    id: "controls",
-    title: "Kontroller och spårbarhet",
+    id: "new-case",
+    title: "Registrera ett generellt ärende",
+    route: "#/case/new",
+    summary: "Visa att behovsanalys, rekrytering och andra kommunala arbetsuppgifter kan registreras utan mentorkoppling.",
+    points: ["Välj ärendetyp och följ dess hjälptext", "Mentorkoppling visas bara när den är relevant", "Kompletterande fält styrs av ärendetypen"]
+  },
+  {
+    id: "mentor-record",
+    title: "Mentorkort och kopplade ärenden",
     route: "#/mentor",
-    summary: "Visa identitet, kontroller, bekräftelsedialoger, ansvarig handläggare, tidpunkt och frivillig notering."
+    summary: "Visa mentorn som en personpost med grunduppgifter, beslut, logg och en samlad lista över personens ärenden.",
+    points: ["Personuppgifter hålls åtskilda från handläggningen", "Alla ärenden för mentorn visas samlat", "Kontroller och möten hanteras i respektive ärende"]
   },
   {
-    id: "meetings",
-    title: "Möten och uppföljningar",
-    route: "#/mentor",
-    summary: "Visa mötesjournalen för certifieringsintervju, uppföljningar och andra kontakter."
+    id: "case-types",
+    title: "Administrera ärendetyper",
+    route: "#/case-types",
+    summary: "Visa den begränsade administrationen för hjälptexter, mentorkoppling och standardiserade kompletterande fält.",
+    points: ["Tekniska ID och fältkatalog är fasta", "Verksamheten kan ändra vägledning utan kodändring", "Nya versioner påverkar inte redan registrerade ärenden"]
   },
   {
-    id: "handlers",
-    title: "Administration av handläggare",
-    route: "#/administration",
-    summary: "Visa handläggarregistret och att handläggare redigeras i samma registerkortsmönster."
+    id: "routines",
+    title: "Rutiner och systemadministration",
+    route: "#/routines",
+    summary: "Avsluta med lathunden, funktionslänkarna och administrationen som stödjer en enhetlig kommunal rutin.",
+    points: ["Rutinerna beskriver vad som ska göras i vanliga situationer", "Funktionslänkar leder till motsvarande vy", "Handläggare och ärendetyper administreras i separata register"]
   }
 ];
 
@@ -477,6 +491,8 @@ const els = {
   handlerDetailEmpty: document.querySelector("#handlerDetailEmpty"),
   handlerDetail: document.querySelector("#handlerDetail"),
   totalCount: document.querySelector("#totalCount"),
+  openCaseCount: document.querySelector("#openCaseCount"),
+  caseSummaryBoard: document.querySelector("#caseSummaryBoard"),
   pipelineGrid: document.querySelector("#pipelineBoard .pipeline-grid"),
   actionTableBody: document.querySelector("#actionTableBody"),
   actionQueueSummary: document.querySelector("#actionQueueSummary"),
@@ -484,12 +500,14 @@ const els = {
   myActivitiesQueueButton: document.querySelector("#myActivitiesQueueButton"),
   unassignedQueueButton: document.querySelector("#unassignedQueueButton"),
   overdueQueueButton: document.querySelector("#overdueQueueButton"),
+  decisionQueueButton: document.querySelector("#decisionQueueButton"),
   dashboardMentorRegisterLink: document.querySelector("#dashboardMentorRegisterLink"),
   presentationStepList: document.querySelector("#presentationStepList"),
   presentationOpenStepButton: document.querySelector("#presentationOpenStepButton"),
   presentationStepNumber: document.querySelector("#presentationStepNumber"),
   presentationStepTitle: document.querySelector("#presentationStepTitle"),
   presentationStepSummary: document.querySelector("#presentationStepSummary"),
+  presentationStepPoints: document.querySelector("#presentationStepPoints"),
   presentationCommentForm: document.querySelector("#presentationCommentForm"),
   presentationCommentInput: document.querySelector("#presentationCommentInput"),
   presentationCommentsEmpty: document.querySelector("#presentationCommentsEmpty"),
@@ -639,6 +657,7 @@ const els = {
   resetButton: document.querySelector("#resetButton"),
   newCaseButton: document.querySelector("#newCaseButton"),
   dashboardNewCaseButton: document.querySelector("#dashboardNewCaseButton"),
+  dashboardNewMentorButton: document.querySelector("#dashboardNewMentorButton"),
   cancelNewCaseButton: document.querySelector("#cancelNewCaseButton"),
   candidateForm: document.querySelector("#candidateForm"),
   candidateDuplicatePanel: document.querySelector("#candidateDuplicatePanel"),
@@ -2515,6 +2534,12 @@ function renderSeedButtonState() {
 function renderDashboard() {
   els.actionTableBody.innerHTML = "";
   const openCases = cases.filter((caseRecord) => caseRecord.status !== "closed");
+  els.openCaseCount.textContent = openCases.length;
+  for (const status of ["new", "in_progress", "waiting", "decision_required", "paused"]) {
+    const count = openCases.filter((caseRecord) => caseRecord.status === status).length;
+    const target = els.caseSummaryBoard.querySelector(`[data-case-status-count="${status}"]`);
+    if (target) target.textContent = count;
+  }
   const nextActivities = openCases
     .map((caseRecord) => ({ caseRecord, activity: nextCaseActivity(caseRecord) }))
     .filter((item) => item.activity);
@@ -2522,8 +2547,9 @@ function renderDashboard() {
     const effectiveOwner = effectiveActivityHandler(activity, caseRecord);
     if (dashboardQueueMode === "unassigned") return !effectiveOwner;
     if (dashboardQueueMode === "overdue") {
-      return effectiveOwner?.id === CURRENT_USER_ID && activityDueState(activity) === "overdue";
+      return activityDueState(activity) === "overdue";
     }
+    if (dashboardQueueMode === "decision") return caseRecord.status === "decision_required" || activityHasBlockingResult(activity);
     return effectiveOwner?.id === CURRENT_USER_ID;
   }).sort((left, right) => {
     const leftDue = left.activity.dueDate || "9999-12-31";
@@ -2535,14 +2561,16 @@ function renderDashboard() {
   });
   const rows = queue.slice(0, 8);
   const queueLabels = {
-    mine: "mina aktiviteter",
+    mine: "aktiviteter i din arbetskö",
     unassigned: "otilldelade aktiviteter",
-    overdue: "försenade aktiviteter"
+    overdue: "försenade aktiviteter",
+    decision: "aktiviteter som kräver ställningstagande"
   };
   const queueSingularLabels = {
     mine: "aktivitet i din arbetskö",
     unassigned: "otilldelad aktivitet",
-    overdue: "försenad aktivitet"
+    overdue: "försenad aktivitet",
+    decision: "aktivitet som kräver ställningstagande"
   };
   els.actionQueueSummary.textContent = queue.length > rows.length
     ? `Visar ${rows.length} av ${queue.length} ${queueLabels[dashboardQueueMode]}.`
@@ -2555,7 +2583,8 @@ function renderDashboard() {
   for (const [mode, button] of [
     ["mine", els.myActivitiesQueueButton],
     ["unassigned", els.unassignedQueueButton],
-    ["overdue", els.overdueQueueButton]
+    ["overdue", els.overdueQueueButton],
+    ["decision", els.decisionQueueButton]
   ]) {
     const active = dashboardQueueMode === mode;
     button.classList.toggle("btn-primary", active);
@@ -2565,7 +2594,7 @@ function renderDashboard() {
 
   if (!rows.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="5" class="text-secondary">Inga aktiviteter kräver åtgärd i den här arbetskön.</td>`;
+    row.innerHTML = `<td colspan="4" class="text-secondary">Inga aktiviteter kräver åtgärd i den här arbetskön.</td>`;
     els.actionTableBody.append(row);
     return;
   }
@@ -2574,10 +2603,9 @@ function renderDashboard() {
     const mentor = caseMentor(caseRecord);
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td><strong>${escapeHtml(caseRecord.number)}</strong></td>
+      <td><strong class="text-nowrap">${escapeHtml(caseRecord.number)}</strong></td>
       <td>${escapeHtml(mentor?.name || caseRecord.title)}<small>${escapeHtml(activityHandlerLabel(activity, caseRecord))}</small></td>
-      <td>${escapeHtml(activity.title)}<small>${escapeHtml(activityHasBlockingResult(activity) ? "Ställningstagande krävs" : activityStatusLabel(activity.status))}</small></td>
-      <td class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityDueLabel(activity))}</td>
+      <td>${escapeHtml(activity.title)}<small class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityHasBlockingResult(activity) ? "Ställningstagande krävs" : `Förfaller: ${activityDueLabel(activity)}`)}</small></td>
       <td><button type="button" class="btn btn-outline-primary btn-sm" data-open-activity="${activity.id}">Öppna</button></td>
     `;
     els.actionTableBody.append(row);
@@ -2589,9 +2617,15 @@ function selectedPresentationStep() {
 }
 
 function presentationRoute(step) {
-  if (step.route !== "#/mentor") return step.route;
-  const candidate = candidates[0];
-  return candidate ? `#/mentor/${candidate.id}` : "#/mentor/new";
+  if (step.route === "#/mentor") {
+    const candidate = candidates[0];
+    return candidate ? `#/mentor/${candidate.id}` : "#/mentor/new";
+  }
+  if (step.route === "#/case") {
+    const caseRecord = cases.find((item) => item.status !== "closed") || cases[0];
+    return caseRecord ? `#/case/${caseRecord.id}` : "#/cases";
+  }
+  return step.route;
 }
 
 function renderPresentation() {
@@ -2618,6 +2652,9 @@ function renderPresentation() {
   els.presentationStepNumber.textContent = `Steg ${selectedIndex + 1}`;
   els.presentationStepTitle.textContent = selectedStep.title;
   els.presentationStepSummary.textContent = selectedStep.summary;
+  els.presentationStepPoints.innerHTML = selectedStep.points
+    .map((point) => `<li>${escapeHtml(point)}</li>`)
+    .join("");
   els.presentationOpenStepButton.textContent = `Öppna: ${selectedStep.title}`;
   renderPresentationComments(selectedStep.id);
 }
@@ -5742,7 +5779,8 @@ els.presentationCommentForm.addEventListener("submit", async (event) => {
 });
 
 els.newCaseButton.addEventListener("click", navigateToNewCandidate);
-els.dashboardNewCaseButton.addEventListener("click", navigateToNewCandidate);
+els.dashboardNewCaseButton.addEventListener("click", () => navigateToNewCase());
+els.dashboardNewMentorButton.addEventListener("click", navigateToNewCandidate);
 
 els.cancelNewCaseButton.addEventListener("click", () => {
   els.candidateForm.reset();
@@ -5948,13 +5986,26 @@ els.handlerEmailInput.addEventListener("input", () => els.handlerEmailInput.setC
 for (const [mode, button] of [
   ["mine", els.myActivitiesQueueButton],
   ["unassigned", els.unassignedQueueButton],
-  ["overdue", els.overdueQueueButton]
+  ["overdue", els.overdueQueueButton],
+  ["decision", els.decisionQueueButton]
 ]) {
   button.addEventListener("click", () => {
     dashboardQueueMode = mode;
     renderDashboard();
   });
 }
+
+els.caseSummaryBoard.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-case-summary-status]");
+  if (!button) return;
+  caseTypeFilter = "";
+  caseStatusFilter = button.dataset.caseSummaryStatus;
+  caseSearchTerm = "";
+  casePage = 1;
+  els.caseStatusFilter.value = caseStatusFilter;
+  els.caseSearchInput.value = "";
+  navigateTo("#/cases");
+});
 
 els.actionTableBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-activity]");
