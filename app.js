@@ -433,8 +433,9 @@ let pendingCaseMeetingsId = null;
 let handlerSearchTerm = "";
 let handlerStatusFilter = "";
 let handlerModal;
-let caseTypeAdminModal;
 let selectedHandlerId = null;
+let selectedCaseTypeId = null;
+let caseTypeEditMode = false;
 let selectedMeetingId = null;
 let confirmActionModal;
 let pendingConfirmation = null;
@@ -480,9 +481,21 @@ const els = {
   copyRoutinesLinkButton: document.querySelector("#copyRoutinesLinkButton"),
   handlerDetailView: document.querySelector("#handlerDetailView"),
   caseTypeAdminTableBody: document.querySelector("#caseTypeAdminTableBody"),
+  caseTypeListPanel: document.querySelector("#caseTypeListPanel"),
+  caseTypeDetailPanel: document.querySelector("#caseTypeDetailPanel"),
   caseTypeAdminForm: document.querySelector("#caseTypeAdminForm"),
-  caseTypeAdminModalTitle: document.querySelector("#caseTypeAdminModalTitle"),
+  caseTypeAdminTitle: document.querySelector("#caseTypeAdminTitle"),
   caseTypeAdminTechnicalId: document.querySelector("#caseTypeAdminTechnicalId"),
+  caseTypeVersionMeta: document.querySelector("#caseTypeVersionMeta"),
+  caseTypeUpdatedMeta: document.querySelector("#caseTypeUpdatedMeta"),
+  caseTypeReadView: document.querySelector("#caseTypeReadView"),
+  caseTypeHelpFact: document.querySelector("#caseTypeHelpFact"),
+  caseTypeHintFact: document.querySelector("#caseTypeHintFact"),
+  caseTypeMentorModeFact: document.querySelector("#caseTypeMentorModeFact"),
+  caseTypeFieldsFact: document.querySelector("#caseTypeFieldsFact"),
+  editCaseTypeButton: document.querySelector("#editCaseTypeButton"),
+  caseTypeEditActions: document.querySelector("#caseTypeEditActions"),
+  cancelCaseTypeEditButton: document.querySelector("#cancelCaseTypeEditButton"),
   caseTypeAdminIdInput: document.querySelector("#caseTypeAdminIdInput"),
   caseTypeAdminHelpInput: document.querySelector("#caseTypeAdminHelpInput"),
   caseTypeAdminHintInput: document.querySelector("#caseTypeAdminHintInput"),
@@ -2383,6 +2396,8 @@ function applyRoute() {
   if (currentView !== "case" || route.id !== previousCaseRecordId) activityListFilter = "all";
   if (currentView !== "case" || route.id !== previousCaseRecordId) caseEditMode = false;
   selectedHandlerId = currentView === "handler" ? route.id : selectedHandlerId;
+  selectedCaseTypeId = currentView === "case-types" ? route.id : null;
+  if (currentView !== "case-types" || !route.id) caseTypeEditMode = false;
   workQueueOnly = currentView === "mentors" && route.id === "action";
   caseTypeFilter = currentView === "cases" && ["matching", "mentor-assignment"].includes(route.id) ? route.id : "";
 
@@ -2434,8 +2449,8 @@ function applyRoute() {
     els.pageTitle.textContent = "Handläggare";
     els.breadcrumb.textContent = "Start / Systemadministration / Handläggare";
   } else if (currentView === "case-types") {
-    els.pageTitle.textContent = "Ärendetyper";
-    els.breadcrumb.textContent = "Start / Systemadministration / Ärendetyper";
+    els.pageTitle.textContent = route.id ? "Ärendetyp" : "Ärendetyper";
+    els.breadcrumb.textContent = route.id ? "Start / Systemadministration / Ärendetyper / Ärendetyp" : "Start / Systemadministration / Ärendetyper";
   } else if (currentView === "routines") {
     els.pageTitle.textContent = "Rutiner";
     els.breadcrumb.textContent = "Start / Systemadministration / Rutiner";
@@ -3495,6 +3510,9 @@ function mentorModeLabel(mode) {
 }
 
 function renderCaseTypeAdministration() {
+  const selectedDefinition = selectedCaseTypeId ? caseTypeById(selectedCaseTypeId) : null;
+  els.caseTypeListPanel.hidden = Boolean(selectedCaseTypeId);
+  els.caseTypeDetailPanel.hidden = !selectedDefinition;
   els.caseTypeAdminTableBody.innerHTML = "";
   for (const definition of caseTypeDefinitions) {
     const fields = configuredDetailFields(definition);
@@ -3504,34 +3522,53 @@ function renderCaseTypeAdministration() {
       <td>${escapeHtml(mentorModeLabel(definition.mentorMode))}</td>
       <td>${fields.length ? escapeHtml(fields.map((field) => field.label).join(", ")) : '<span class="text-secondary">Inga</span>'}</td>
       <td>${definition.updatedAt ? escapeHtml(formatDateTime(definition.updatedAt)) : '<span class="text-secondary">Grundinställning</span>'}</td>
-      <td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-edit-case-type="${escapeHtml(definition.id)}" aria-haspopup="dialog">Redigera</button></td>
+      <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/case-types/${encodeURIComponent(definition.id)}">Öppna</a></td>
     `;
     els.caseTypeAdminTableBody.append(row);
   }
-}
-
-function openCaseTypeAdminModal(caseTypeId) {
-  const definition = caseTypeById(caseTypeId);
-  if (!definition) {
-    showFeedback("Ärendetypen kunde inte öppnas. Ladda om sidan och försök igen.", "danger");
+  if (!selectedCaseTypeId) return;
+  if (!selectedDefinition) {
+    els.caseTypeListPanel.hidden = true;
+    els.caseTypeDetailPanel.hidden = false;
+    els.caseTypeDetailPanel.innerHTML = `<div class="card-body py-5"><h2 class="h5">Ärendetypen finns inte</h2><p class="text-secondary">Posten kan ha ändrats eller tagits bort.</p><a class="btn btn-outline-primary btn-sm" href="#/case-types">Tillbaka till ärendetyper</a></div>`;
     return;
   }
-  els.caseTypeAdminIdInput.value = definition.id;
-  els.caseTypeAdminModalTitle.textContent = definition.name;
-  els.caseTypeAdminTechnicalId.textContent = `Tekniskt ID ${definition.id}`;
-  els.caseTypeAdminHelpInput.value = definition.helpText || "";
-  els.caseTypeAdminHintInput.value = definition.registrationHint || "";
-  els.caseTypeAdminMentorModeInput.value = definition.mentorMode || "optional";
-  const selectedFields = new Set(definition.detailFieldIds || []);
-  els.caseTypeAdminFieldChoices.innerHTML = CASE_DETAIL_FIELD_DEFINITIONS.map((field) => `
-    <div class="form-check">
-      <input id="case-type-field-${escapeHtml(field.id)}" class="form-check-input" type="checkbox" value="${escapeHtml(field.id)}" ${selectedFields.has(field.id) ? "checked" : ""}>
-      <label class="form-check-label" for="case-type-field-${escapeHtml(field.id)}">${escapeHtml(field.label)}</label>
-    </div>
-  `).join("");
-  const modalElement = document.querySelector("#caseTypeAdminModal");
-  caseTypeAdminModal = bootstrap.Modal.getOrCreateInstance(modalElement);
-  caseTypeAdminModal.show();
+
+  const fields = configuredDetailFields(selectedDefinition);
+  els.caseTypeAdminIdInput.value = selectedDefinition.id;
+  els.caseTypeAdminTitle.textContent = selectedDefinition.name;
+  els.caseTypeAdminTechnicalId.textContent = `Tekniskt ID ${selectedDefinition.id}`;
+  els.caseTypeVersionMeta.textContent = String(selectedDefinition.version || 1);
+  els.caseTypeUpdatedMeta.textContent = selectedDefinition.updatedAt ? formatDateTime(selectedDefinition.updatedAt) : "Grundinställning";
+  els.caseTypeHelpFact.textContent = selectedDefinition.helpText || "Ej angivet";
+  els.caseTypeHintFact.textContent = selectedDefinition.registrationHint || "Ej angivet";
+  els.caseTypeMentorModeFact.textContent = mentorModeLabel(selectedDefinition.mentorMode);
+  els.caseTypeFieldsFact.innerHTML = fields.length
+    ? `<ul class="mb-0">${fields.map((field) => `<li>${escapeHtml(field.label)}</li>`).join("")}</ul>`
+    : '<p class="text-secondary mb-0">Inga kompletterande fält.</p>';
+
+  if (caseTypeEditMode) {
+    els.caseTypeAdminHelpInput.value = selectedDefinition.helpText || "";
+    els.caseTypeAdminHintInput.value = selectedDefinition.registrationHint || "";
+    els.caseTypeAdminMentorModeInput.value = selectedDefinition.mentorMode || "optional";
+    const selectedFields = new Set(selectedDefinition.detailFieldIds || []);
+    els.caseTypeAdminFieldChoices.innerHTML = CASE_DETAIL_FIELD_DEFINITIONS.map((field) => `
+      <div class="form-check">
+        <input id="case-type-field-${escapeHtml(field.id)}" class="form-check-input" type="checkbox" value="${escapeHtml(field.id)}" ${selectedFields.has(field.id) ? "checked" : ""}>
+        <label class="form-check-label" for="case-type-field-${escapeHtml(field.id)}">${escapeHtml(field.label)}</label>
+      </div>
+    `).join("");
+  }
+  els.caseTypeReadView.hidden = caseTypeEditMode;
+  els.caseTypeAdminForm.hidden = !caseTypeEditMode;
+  els.editCaseTypeButton.hidden = caseTypeEditMode;
+  els.caseTypeEditActions.hidden = !caseTypeEditMode;
+}
+
+function setCaseTypeEditMode(editing) {
+  caseTypeEditMode = editing;
+  renderCaseTypeAdministration();
+  if (editing) els.caseTypeAdminHelpInput.focus({ preventScroll: true });
 }
 
 function handlerMentorCount(handler) {
@@ -5861,22 +5898,14 @@ els.caseTypeAdminForm.addEventListener("submit", async (event) => {
     updatedAt: now,
     updatedBy: CURRENT_USER_ID
   }] });
-  caseTypeAdminModal.hide();
+  caseTypeEditMode = false;
   markSaved();
   showFeedback("Ärendetypen har uppdaterats.");
   await refresh();
 });
 
-els.caseTypeAdminTableBody.addEventListener("click", (event) => {
-  const editButton = event.target.closest("[data-edit-case-type]");
-  if (!editButton) return;
-  try {
-    openCaseTypeAdminModal(editButton.dataset.editCaseType);
-  } catch (error) {
-    console.error("Could not open case type editor", error);
-    showFeedback("Redigeringen kunde inte öppnas. Ladda om sidan och försök igen.", "danger");
-  }
-});
+els.editCaseTypeButton.addEventListener("click", () => setCaseTypeEditMode(true));
+els.cancelCaseTypeEditButton.addEventListener("click", () => setCaseTypeEditMode(false));
 
 els.handlerSearchInput.addEventListener("input", () => {
   handlerSearchTerm = els.handlerSearchInput.value;
@@ -6337,7 +6366,6 @@ openDatabase()
     candidateModal = new bootstrap.Modal(modalElement);
     const handlerModalElement = document.querySelector("#handlerModal");
     handlerModal = new bootstrap.Modal(handlerModalElement);
-    caseTypeAdminModal = new bootstrap.Modal(document.querySelector("#caseTypeAdminModal"));
     caseLifecycleModal = new bootstrap.Modal(els.caseLifecycleModal);
     confirmActionModal = new bootstrap.Modal(els.confirmActionModal);
     modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());

@@ -21,6 +21,9 @@ test("serves the application shell", async () => {
   assert.match(html, /id="decisionQueueButton"/);
   assert.match(html, /id="presentationStepPoints"/);
   assert.match(html, />Nytt ärende</);
+  assert.match(html, /id="caseTypeDetailPanel"/);
+  assert.match(html, /form="caseTypeAdminForm"/);
+  assert.doesNotMatch(html, /id="caseTypeAdminModal"/);
 });
 
 test("serves application assets and returns 404 for unknown files", async () => {
@@ -28,7 +31,9 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.equal(script.status, 200);
   assert.match(script.headers.get("content-type"), /^text\/javascript/);
   assert.equal(script.headers.get("cache-control"), "no-cache");
-  assert.match(await script.text(), /CASE_ACTIVITIES_STORE/);
+  const scriptText = await script.text();
+  assert.match(scriptText, /CASE_ACTIVITIES_STORE/);
+  assert.match(scriptText, /#\/case-types\/\$\{encodeURIComponent\(definition\.id\)\}/);
 
   const domain = await worker.fetch(new Request("https://example.test/case-domain.js"), {}, context);
   assert.equal(domain.status, 200);

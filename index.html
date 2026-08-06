@@ -779,7 +779,7 @@
           </section>
 
           <section id="caseTypesAdministrationView" hidden>
-            <div class="card" aria-label="Administration av ärendetyper">
+            <div id="caseTypeListPanel" class="card" aria-label="Administration av ärendetyper">
               <div class="card-header bg-white">
                 <h2 class="h5 mb-1">Ärendetyper</h2>
                 <p class="text-secondary mb-0">Styr hjälptexter, mentorkoppling och vilka kompletterande fält som visas i ärendevyn.</p>
@@ -802,6 +802,78 @@
                   </thead>
                   <tbody id="caseTypeAdminTableBody"></tbody>
                 </table>
+              </div>
+            </div>
+
+            <div id="caseTypeDetailPanel" class="card mentor-record" hidden>
+              <div class="card-header record-header bg-white">
+                <a class="small" href="#/case-types">Tillbaka till ärendetyper</a>
+                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start mt-2">
+                  <div>
+                    <div class="record-type">Ärendetyp</div>
+                    <p id="caseTypeAdminTechnicalId" class="record-id mb-1"></p>
+                    <h2 id="caseTypeAdminTitle" class="h5 mb-0"></h2>
+                  </div>
+                  <div class="record-edit-slot">
+                    <button id="editCaseTypeButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
+                    <div id="caseTypeEditActions" class="d-flex gap-2" hidden>
+                      <button type="submit" form="caseTypeAdminForm" class="btn btn-primary btn-sm">Spara ändringar</button>
+                      <button id="cancelCaseTypeEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                    </div>
+                  </div>
+                </div>
+                <dl class="record-meta mb-0 mt-3">
+                  <div><dt>Version</dt><dd id="caseTypeVersionMeta"></dd></div>
+                  <div><dt>Status</dt><dd>Publicerad</dd></div>
+                  <div><dt>Senast ändrad</dt><dd id="caseTypeUpdatedMeta"></dd></div>
+                </dl>
+              </div>
+
+              <div class="card-body">
+                <div id="caseTypeReadView" class="record-grid">
+                  <section class="record-section">
+                    <h3 class="record-section-title">Användning</h3>
+                    <dl class="record-fields mb-0">
+                      <div><dt>Hjälptext</dt><dd id="caseTypeHelpFact"></dd></div>
+                      <div><dt>Registreringsanvisning</dt><dd id="caseTypeHintFact"></dd></div>
+                      <div><dt>Mentorkoppling</dt><dd id="caseTypeMentorModeFact"></dd></div>
+                    </dl>
+                  </section>
+                  <section class="record-section">
+                    <h3 class="record-section-title">Kompletterande fält</h3>
+                    <div id="caseTypeFieldsFact" class="case-type-field-summary"></div>
+                  </section>
+                </div>
+
+                <form id="caseTypeAdminForm" class="record-grid" hidden>
+                  <input id="caseTypeAdminIdInput" type="hidden">
+                  <section class="record-section">
+                    <h3 class="record-section-title">Användning</h3>
+                    <div class="mb-3">
+                      <label class="form-label" for="caseTypeAdminHelpInput">Hjälptext</label>
+                      <textarea id="caseTypeAdminHelpInput" class="form-control" rows="3" required></textarea>
+                      <div class="form-text">Förklarar när ärendetypen ska användas.</div>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label" for="caseTypeAdminHintInput">Registreringsanvisning</label>
+                      <textarea id="caseTypeAdminHintInput" class="form-control" rows="2" required></textarea>
+                      <div class="form-text">Anger vilken minsta information handläggaren ska registrera.</div>
+                    </div>
+                    <div>
+                      <label class="form-label" for="caseTypeAdminMentorModeInput">Mentorkoppling</label>
+                      <select id="caseTypeAdminMentorModeInput" class="form-select" required>
+                        <option value="required">Obligatorisk</option>
+                        <option value="optional">Valfri</option>
+                        <option value="none">Visas inte</option>
+                      </select>
+                    </div>
+                  </section>
+                  <fieldset class="record-section">
+                    <legend class="record-section-title">Kompletterande fält</legend>
+                    <div id="caseTypeAdminFieldChoices" class="case-type-field-choices"></div>
+                    <div class="form-text mt-2">Avmarkerade fält döljs, men redan sparade uppgifter raderas inte.</div>
+                  </fieldset>
+                </form>
               </div>
             </div>
           </section>
@@ -1321,53 +1393,6 @@
       </div>
     </div>
 
-    <div class="modal fade" id="caseTypeAdminModal" tabindex="-1" aria-labelledby="caseTypeAdminModalTitle" aria-hidden="true">
-      <div class="modal-dialog modal-lg modal-dialog-centered">
-        <form id="caseTypeAdminForm" class="modal-content">
-          <div class="modal-header">
-            <div>
-              <p class="modal-eyebrow mb-1">Ärendetyp</p>
-              <h2 id="caseTypeAdminModalTitle" class="modal-title h5">Redigera ärendetyp</h2>
-              <p id="caseTypeAdminTechnicalId" class="small text-secondary mb-0"></p>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button>
-          </div>
-          <div class="modal-body">
-            <input id="caseTypeAdminIdInput" type="hidden">
-            <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label" for="caseTypeAdminHelpInput">Hjälptext</label>
-                <textarea id="caseTypeAdminHelpInput" class="form-control" rows="3" required></textarea>
-                <div class="form-text">Förklarar när ärendetypen ska användas.</div>
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="caseTypeAdminHintInput">Registreringsanvisning</label>
-                <textarea id="caseTypeAdminHintInput" class="form-control" rows="2" required></textarea>
-                <div class="form-text">Anger vilken minsta information handläggaren ska registrera.</div>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label" for="caseTypeAdminMentorModeInput">Mentorkoppling</label>
-                <select id="caseTypeAdminMentorModeInput" class="form-select" required>
-                  <option value="required">Obligatorisk</option>
-                  <option value="optional">Valfri</option>
-                  <option value="none">Visas inte</option>
-                </select>
-              </div>
-              <fieldset class="col-12">
-                <legend class="form-label mb-2">Kompletterande fält</legend>
-                <div id="caseTypeAdminFieldChoices" class="case-type-field-choices"></div>
-                <div class="form-text">Avmarkerade fält döljs, men redan sparade uppgifter raderas inte.</div>
-              </fieldset>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Avbryt</button>
-            <button type="submit" class="btn btn-primary">Spara ändringar</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
     <div class="modal fade" id="caseLifecycleModal" tabindex="-1" aria-labelledby="caseLifecycleTitle" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <form id="caseLifecycleForm" class="modal-content">
@@ -1417,6 +1442,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260806-routines-v6"></script>
+    <script type="module" src="app.js?v=20260806-case-type-card-v7"></script>
   </body>
 </html>
