@@ -1,5 +1,38 @@
 export const LEARNING_CONTENT = [
   {
+    id: "material-public-parent-mentor-support",
+    type: "material",
+    version: 1,
+    scope: "shared",
+    title: "Så fungerar stöd av en föräldramentor",
+    summary: "Information till föräldrar om vad en mentor kan hjälpa till med och hur stödet planeras.",
+    bodyMarkdown: "## Ett vardagsnära stöd\n\nEn föräldramentor kan vara ett praktiskt och medmänskligt stöd i en avgränsad situation. Tillsammans med kommunen beskriver du vad du vill ha hjälp med och vilket resultat som är viktigt för dig.\n\n## Vad mentorn kan göra\n\nMentorn kan lyssna, hjälpa dig att förbereda kontakter, följa med i planering och bidra med erfarenheter inom ramen för uppdraget. Mentorn ersätter inte kommunens handläggare och fattar inte myndighetsbeslut.\n\n## Så startar stödet\n\n1. Du skickar en förfrågan till kommunen.\n2. En handläggare kontaktar dig och går igenom behovet.\n3. Kommunen föreslår en mentor om stödet passar.\n4. Både du och mentorn får ta ställning innan ett uppdrag startar.",
+    status: "published",
+    updatedAt: null
+  },
+  {
+    id: "material-public-before-first-contact",
+    type: "material",
+    version: 1,
+    scope: "shared",
+    title: "Inför den första kontakten",
+    summary: "Några frågor som hjälper dig att förbereda samtalet med kommunen.",
+    bodyMarkdown: "## Fundera gärna på\n\n- Vad vill du ha hjälp med just nu?\n- Vad skulle vara annorlunda om stödet fungerar bra?\n- Finns det tider, språk eller kontaktvägar som fungerar särskilt bra för dig?\n- Finns det något kommunen behöver känna till för att kontakten ska kännas trygg?\n\nDu behöver inte ha färdiga svar. Handläggaren hjälper dig att avgränsa behovet tillsammans med dig.",
+    status: "published",
+    updatedAt: null
+  },
+  {
+    id: "material-public-other-support",
+    type: "material",
+    version: 1,
+    scope: "shared",
+    title: "När du behöver annat eller akut stöd",
+    summary: "Vägledning om när föräldramentorstöd inte är rätt väg och vart du kan vända dig.",
+    bodyMarkdown: "## Föräldramentorstöd är inte akut hjälp\n\nVid omedelbar fara ska du ringa 112. För sjukvårdsrådgivning kontaktar du 1177.\n\nOm du behöver myndighetsbeslut, ekonomiskt bistånd, behandling eller skydd ska du kontakta ansvarig kommunal verksamhet. Du kan ändå skicka en förfrågan om föräldramentorstöd, så hjälper kommunen dig att bedöma om stödet passar eller om en annan kontakt behövs.",
+    status: "published",
+    updatedAt: null
+  },
+  {
     id: "material-role-and-boundaries",
     type: "material",
     version: 1,
@@ -199,6 +232,11 @@ export const LEARNING_CONTENT = [
 ];
 
 export const DEFAULT_TENANT_LEARNING_SELECTION = ["course-foundation", "course-safe-contact"];
+export const DEFAULT_PUBLIC_LEARNING_SELECTION = [
+  "material-public-parent-mentor-support",
+  "material-public-before-first-contact",
+  "material-public-other-support"
+];
 
 export function learningContentById(content, id) {
   return content.find((item) => item.id === id) || null;

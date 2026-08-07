@@ -20,4 +20,31 @@ test("persists municipality selection and learner progress separately", () => {
   assert.match(app, /LEARNING_PROGRESS_STORE = "learningProgress"/);
   assert.match(app, /LEARNING_SELECTION_INITIALIZED_ID/);
   assert.match(app, /requiredLearningContentIds/);
+  assert.match(app, /queueLearningMutation/);
+  assert.match(app, /data-learning-admin-filter/);
+  assert.match(app, /Visa kommunens katalog/);
+});
+
+test("offers a role-switched mentor portal with protected mentor routes", () => {
+  for (const id of ["testUserTypeSelect", "navMentorHome", "navMentorAssignments", "navMentorLearning", "navMentorProfile", "mentorPortalView"]) {
+    assert.match(html, new RegExp(`id=["']${id}["']`), `${id} should exist in the application shell`);
+  }
+  for (const route of ["mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile"]) {
+    assert.match(app, new RegExp(`"${route}"`));
+  }
+  assert.match(app, /register_mentor_self_report/);
+  assert.match(app, /Du kan bara öppna uppdrag som är kopplade till din mentorprofil/);
+  assert.match(app, /Känsliga register- och identitetsuppgifter visas inte i mentorportalen/);
+});
+
+test("offers an unauthenticated parent portal and explicit public material selection", () => {
+  for (const id of ["navPublicHome", "navPublicSupport", "navPublicLearning", "publicPortalView"]) {
+    assert.match(html, new RegExp(`id=["']${id}["']`), `${id} should exist in the application shell`);
+  }
+  assert.match(html, /<option value="public">Ej inloggad förälder<\/option>/);
+  assert.match(app, /PUBLIC_SUPPORT_REQUESTS_STORE = "publicSupportRequests"/);
+  assert.match(app, /data-learning-public/);
+  assert.match(app, /selectedPublicLearningContent/);
+  assert.match(app, /Detta är en förfrågan/i);
+  assert.match(app, /source: "public_portal"/);
 });

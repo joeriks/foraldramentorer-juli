@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   LEARNING_CONTENT,
   DEFAULT_TENANT_LEARNING_SELECTION,
+  DEFAULT_PUBLIC_LEARNING_SELECTION,
   courseProgressPercent,
   prepareLearningMarkdown,
   requiredLearningContentIds,
@@ -54,4 +55,11 @@ test("provides realistic examples of every supported content type", () => {
   assert.ok(LEARNING_CONTENT.filter((item) => item.type === "material").length >= 5);
   assert.ok(LEARNING_CONTENT.filter((item) => item.type === "course").length >= 2);
   assert.ok(LEARNING_CONTENT.filter((item) => item.type === "test").length >= 2);
+});
+
+test("defaults public learning to parent-facing reference material only", () => {
+  const publicItems = DEFAULT_PUBLIC_LEARNING_SELECTION.map((id) => LEARNING_CONTENT.find((item) => item.id === id));
+  assert.ok(publicItems.length >= 3);
+  assert.ok(publicItems.every((item) => item?.type === "material"));
+  assert.ok(publicItems.every((item) => /förälder|stöd|kontakt/i.test(`${item.title} ${item.summary}`)));
 });

@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260807-learning-v15">
+    <link rel="stylesheet" href="styles.css?v=20260807-public-parent-v19">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -24,6 +24,13 @@
           <a id="navMatchings" class="nav-link" href="#/cases/matching">Matchningar</a>
           <a id="navAssignments" class="nav-link" href="#/cases/mentor-assignment">Uppdrag</a>
           <a id="navLearning" class="nav-link" href="#/learning">Utbildning</a>
+          <a id="navMentorHome" class="nav-link" href="#/mentor-home" hidden>Översikt</a>
+          <a id="navMentorAssignments" class="nav-link" href="#/mentor-assignments" hidden>Mina uppdrag</a>
+          <a id="navMentorLearning" class="nav-link" href="#/learning" hidden>Utbildning</a>
+          <a id="navMentorProfile" class="nav-link" href="#/mentor-profile" hidden>Min profil</a>
+          <a id="navPublicHome" class="nav-link" href="#/public-home" hidden>Start</a>
+          <a id="navPublicSupport" class="nav-link" href="#/public-support" hidden>Sök stöd</a>
+          <a id="navPublicLearning" class="nav-link" href="#/public-learning" hidden>Råd och material</a>
           <span class="nav-link disabled" aria-disabled="true"><span>Arvoden</span><small>Kommer senare</small></span>
           <span class="nav-link disabled" aria-disabled="true"><span>Statistik</span><small>Kommer senare</small></span>
           <div class="sidebar-menu-group">
@@ -46,6 +53,13 @@
               <div class="mobile-navigation dropdown">
                 <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Meny</button>
                 <ul class="dropdown-menu">
+                  <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/mentor-home">Översikt</a></li>
+                  <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/mentor-assignments">Mina uppdrag</a></li>
+                  <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/learning">Utbildning</a></li>
+                  <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/mentor-profile">Min profil</a></li>
+                  <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-home">Start</a></li>
+                  <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-support">Sök stöd</a></li>
+                  <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-learning">Råd och material</a></li>
                   <li><a class="dropdown-item" href="#/dashboard">Dashboard</a></li>
                   <li><a class="dropdown-item" href="#/presentation">Presentation</a></li>
                   <li><a class="dropdown-item" href="#/cases">Ärenden</a></li>
@@ -71,8 +85,17 @@
             <div class="session-user" aria-label="Inloggad användare">
               <div id="currentUserInitials" class="session-user-initials" aria-hidden="true">S</div>
               <div>
-                <div class="session-user-label">Inloggad som</div>
+                <div id="currentUserLabel" class="session-user-label">Inloggad som</div>
                 <div class="session-user-identity"><strong id="currentUserName">Sara Lind</strong><span id="currentUserRole">Samordnare</span></div>
+              </div>
+              <div class="test-user-switcher">
+                <label class="visually-hidden" for="testUserTypeSelect">Byt typ av testanvändare</label>
+                <select id="testUserTypeSelect" class="form-select form-select-sm" aria-label="Byt typ av testanvändare">
+                  <option value="coordinator">Samordnare</option>
+                  <option value="handler">Handläggare</option>
+                  <option value="mentor">Mentor</option>
+                  <option value="public">Ej inloggad förälder</option>
+                </select>
               </div>
             </div>
           </div>
@@ -927,6 +950,9 @@
             <div id="learningDetailPanel" class="card mentor-record" hidden></div>
           </section>
 
+          <section id="mentorPortalView" class="view-stack" hidden></section>
+          <section id="publicPortalView" class="view-stack" hidden></section>
+
           <section id="learningAdministrationView" hidden>
             <div id="learningAdminListPanel" class="card"></div>
             <div id="learningAdminDetailPanel" class="card mentor-record" hidden></div>
@@ -1728,6 +1754,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260807-learning-v34"></script>
+    <script type="module" src="app.js?v=20260807-public-parent-v39"></script>
   </body>
 </html>

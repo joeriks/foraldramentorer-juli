@@ -35,16 +35,17 @@ import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./fe
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
 import {
   DEFAULT_TENANT_LEARNING_SELECTION,
+  DEFAULT_PUBLIC_LEARNING_SELECTION,
   LEARNING_CONTENT,
   courseProgressPercent,
   learningContentById,
   prepareLearningMarkdown,
   requiredLearningContentIds,
   scoreKnowledgeTest
-} from "./learning-domain.js?v=20260807-learning-v2";
+} from "./learning-domain.js?v=20260807-public-parent-v3";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
 const HANDLERS_STORE = "handlers";
@@ -68,8 +69,11 @@ const PROCESSED_COMMANDS_STORE = "processedCommands";
 const LEARNING_CONTENT_STORE = "learningContent";
 const TENANT_LEARNING_SELECTION_STORE = "tenantLearningSelection";
 const LEARNING_PROGRESS_STORE = "learningProgress";
+const PUBLIC_SUPPORT_REQUESTS_STORE = "publicSupportRequests";
 const LEARNING_SELECTION_INITIALIZED_ID = "__selection_initialized__";
-const CURRENT_USER_ID = "handler-sara";
+let CURRENT_USER_ID = "handler-sara";
+const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
+const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 
 const ORGANIZATION_UNIT_LABELS = {
   foraldramentorer: "FöräldraMentorer",
@@ -512,13 +516,22 @@ let tenantLearningSelection = [];
 let learningProgress = [];
 let selectedLearnerId = "";
 let learningTypeFilter = "all";
+let learningAdminFilter = "all";
+let learningMutationQueue = Promise.resolve();
+let publicSupportRequests = [];
+let lastPublicSupportRequestId = "";
+let activeTestUserType = TEST_USER_TYPES.has(localStorage.getItem(TEST_USER_TYPE_KEY))
+  ? localStorage.getItem(TEST_USER_TYPE_KEY)
+  : "coordinator";
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
   breadcrumb: document.querySelector("#breadcrumb"),
   currentUserInitials: document.querySelector("#currentUserInitials"),
+  currentUserLabel: document.querySelector("#currentUserLabel"),
   currentUserName: document.querySelector("#currentUserName"),
   currentUserRole: document.querySelector("#currentUserRole"),
+  testUserTypeSelect: document.querySelector("#testUserTypeSelect"),
   navDashboard: document.querySelector("#navDashboard"),
   navPresentation: document.querySelector("#navPresentation"),
   navCases: document.querySelector("#navCases"),
@@ -527,6 +540,13 @@ const els = {
   navCandidates: document.querySelector("#navCandidates"),
   navParents: document.querySelector("#navParents"),
   navLearning: document.querySelector("#navLearning"),
+  navMentorHome: document.querySelector("#navMentorHome"),
+  navMentorAssignments: document.querySelector("#navMentorAssignments"),
+  navMentorLearning: document.querySelector("#navMentorLearning"),
+  navMentorProfile: document.querySelector("#navMentorProfile"),
+  navPublicHome: document.querySelector("#navPublicHome"),
+  navPublicSupport: document.querySelector("#navPublicSupport"),
+  navPublicLearning: document.querySelector("#navPublicLearning"),
   navAdministration: document.querySelector("#navAdministration"),
   navHandlers: document.querySelector("#navHandlers"),
   navCaseTypes: document.querySelector("#navCaseTypes"),
@@ -542,6 +562,8 @@ const els = {
   parentsView: document.querySelector("#parentsView"),
   parentDetailView: document.querySelector("#parentDetailView"),
   learningView: document.querySelector("#learningView"),
+  mentorPortalView: document.querySelector("#mentorPortalView"),
+  publicPortalView: document.querySelector("#publicPortalView"),
   learningCatalogPanel: document.querySelector("#learningCatalogPanel"),
   learningDetailPanel: document.querySelector("#learningDetailPanel"),
   learningAdministrationView: document.querySelector("#learningAdministrationView"),
@@ -1197,6 +1219,9 @@ function openDatabase() {
       ensureStore(LEARNING_CONTENT_STORE, { keyPath: ["id", "version"] });
       ensureStore(TENANT_LEARNING_SELECTION_STORE, { keyPath: ["tenantId", "contentId"] });
       ensureStore(LEARNING_PROGRESS_STORE, { keyPath: ["tenantId", "mentorId", "courseId"] });
+      const publicSupportRequestStore = ensureStore(PUBLIC_SUPPORT_REQUESTS_STORE);
+      ensureIndex(publicSupportRequestStore, "tenantCreatedAt", ["tenantId", "createdAt"]);
+      ensureIndex(publicSupportRequestStore, "tenantStatus", ["tenantId", "status"]);
     };
 
     request.onsuccess = () => {
@@ -1297,6 +1322,10 @@ function learningProgressTx(mode = "readonly") {
   return db.transaction(LEARNING_PROGRESS_STORE, mode).objectStore(LEARNING_PROGRESS_STORE);
 }
 
+function publicSupportRequestTx(mode = "readonly") {
+  return db.transaction(PUBLIC_SUPPORT_REQUESTS_STORE, mode).objectStore(PUBLIC_SUPPORT_REQUESTS_STORE);
+}
+
 function getAllFrom(storeTx) {
   return new Promise((resolve, reject) => {
     const request = storeTx().getAll();
@@ -1359,6 +1388,9 @@ const saveTenantLearningSelection = (value) => putInto(tenantLearningSelectionTx
 const clearTenantLearningSelection = () => clearStore(tenantLearningSelectionTx);
 const getAllLearningProgress = () => getAllFrom(learningProgressTx);
 const saveLearningProgress = (value) => putInto(learningProgressTx, value);
+const getAllPublicSupportRequests = () => getAllFrom(publicSupportRequestTx);
+const savePublicSupportRequest = (value) => putInto(publicSupportRequestTx, value);
+const clearPublicSupportRequests = () => clearStore(publicSupportRequestTx);
 
 function caseTypeById(id, version = null) {
   return (version ? caseTypeDefinitionVersions.find((definition) => definition.id === id && Number(definition.version) === Number(version)) : null)
@@ -1463,7 +1495,8 @@ async function loadLearningData() {
   const selectionInitialized = tenantSelectionRecords.some((item) => item.contentId === LEARNING_SELECTION_INITIALIZED_ID);
   tenantLearningSelection = tenantSelectionRecords.filter((item) => item.contentId !== LEARNING_SELECTION_INITIALIZED_ID);
   if (!selectionInitialized) {
-    const effectiveIds = requiredLearningContentIds(learningContent, DEFAULT_TENANT_LEARNING_SELECTION);
+    const explicitDefaultIds = [...new Set([...DEFAULT_TENANT_LEARNING_SELECTION, ...DEFAULT_PUBLIC_LEARNING_SELECTION])];
+    const effectiveIds = requiredLearningContentIds(learningContent, explicitDefaultIds);
     await Promise.all([saveTenantLearningSelection({
       tenantId: DEFAULT_TENANT_ID,
       contentId: LEARNING_SELECTION_INITIALIZED_ID,
@@ -1474,11 +1507,30 @@ async function loadLearningData() {
         tenantId: DEFAULT_TENANT_ID,
         contentId,
         selectedVersion: item.version,
-        explicit: DEFAULT_TENANT_LEARNING_SELECTION.includes(contentId),
+        explicit: explicitDefaultIds.includes(contentId),
+        public: DEFAULT_PUBLIC_LEARNING_SELECTION.includes(contentId),
         selectedAt: new Date().toISOString(),
         selectedBy: CURRENT_USER_ID
       });
     })]);
+    tenantSelectionRecords = (await getAllTenantLearningSelection()).filter((item) => item.tenantId === DEFAULT_TENANT_ID);
+    tenantLearningSelection = tenantSelectionRecords.filter((item) => item.contentId !== LEARNING_SELECTION_INITIALIZED_ID);
+  }
+  if (!tenantLearningSelection.some((selection) => typeof selection.public === "boolean")) {
+    const existingById = new Map(tenantLearningSelection.map((selection) => [selection.contentId, selection]));
+    await Promise.all(DEFAULT_PUBLIC_LEARNING_SELECTION.map((contentId) => {
+      const item = learningContentById(learningContent, contentId);
+      const existing = existingById.get(contentId);
+      return saveTenantLearningSelection({
+        tenantId: DEFAULT_TENANT_ID,
+        contentId,
+        selectedVersion: existing?.selectedVersion || item.version,
+        explicit: true,
+        public: true,
+        selectedAt: existing?.selectedAt || new Date().toISOString(),
+        selectedBy: existing?.selectedBy || CURRENT_USER_ID
+      });
+    }));
     tenantSelectionRecords = (await getAllTenantLearningSelection()).filter((item) => item.tenantId === DEFAULT_TENANT_ID);
     tenantLearningSelection = tenantSelectionRecords.filter((item) => item.contentId !== LEARNING_SELECTION_INITIALIZED_ID);
   }
@@ -1489,6 +1541,23 @@ async function loadLearningData() {
 function selectedLearningContent() {
   return tenantLearningSelection.map((selection) => learningContentVersions.find((item) => item.id === selection.contentId && Number(item.version) === Number(selection.selectedVersion)))
     .filter((item) => item?.status === "published");
+}
+
+function selectedPublicLearningContent() {
+  const publicIds = new Set(tenantLearningSelection.filter((selection) => selection.public).map((selection) => selection.contentId));
+  return selectedLearningContent().filter((item) => item.type === "material" && publicIds.has(item.id));
+}
+
+async function updateTenantLearningPublic(contentId, isPublic) {
+  const existing = tenantLearningSelection.find((selection) => selection.contentId === contentId);
+  const content = learningContentById(learningContent, contentId);
+  if (!existing || content?.type !== "material") return;
+  await saveTenantLearningSelection({
+    ...existing,
+    public: isPublic,
+    publicUpdatedAt: new Date().toISOString(),
+    publicUpdatedBy: CURRENT_USER_ID
+  });
 }
 
 async function updateTenantLearningSelection(contentId, selected) {
@@ -1510,6 +1579,7 @@ async function updateTenantLearningSelection(contentId, selected) {
       contentId: id,
       selectedVersion: previous?.selectedVersion || latest.version,
       explicit: explicitIds.has(id),
+      public: Boolean(previous?.public),
       selectedAt: previous?.selectedAt || new Date().toISOString(),
       selectedBy: previous?.selectedBy || CURRENT_USER_ID
     });
@@ -2063,6 +2133,12 @@ function handlerNameById(id) {
   return handlers.find((handler) => [handler.id, handler.userId, handler.name].includes(id))?.name || "Okänd användare";
 }
 
+function actorNameById(id) {
+  return handlers.find((handler) => [handler.id, handler.userId, handler.name].includes(id))?.name
+    || candidates.find((candidate) => candidate.id === id)?.name
+    || (id === "system" ? "System" : "Okänd användare");
+}
+
 function projectMentorWorkflow(candidate) {
   const caseRecord = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
   if (!caseRecord) return candidate;
@@ -2302,6 +2378,9 @@ async function refresh() {
   candidates.sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.name.localeCompare(b.name, "sv"));
   parents.sort((a, b) => a.name.localeCompare(b.name, "sv"));
   await loadLearningData();
+  publicSupportRequests = (await getAllPublicSupportRequests())
+    .filter((request) => request.tenantId === DEFAULT_TENANT_ID)
+    .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
   renderAll();
   document.body.dataset.refreshDurationMs = String(Date.now() - refreshStartedAt);
 }
@@ -2430,6 +2509,12 @@ function learningProgressRecord(mentorId, courseId) {
   };
 }
 
+function queueLearningMutation(action) {
+  const queued = learningMutationQueue.then(action, action);
+  learningMutationQueue = queued.catch(() => {});
+  return queued;
+}
+
 async function completeLearningModule(courseId, moduleId, extra = {}) {
   if (!selectedLearnerId) return;
   const record = learningProgressRecord(selectedLearnerId, courseId);
@@ -2440,18 +2525,19 @@ async function completeLearningModule(courseId, moduleId, extra = {}) {
 }
 
 function renderLearningCatalog() {
+  if (isMentorSession()) selectedLearnerId = currentUser().mentorId || "";
   const items = selectedLearningContent();
   const visibleItems = items.filter((item) => learningTypeFilter === "all" || item.type === learningTypeFilter);
   const learnerOptions = candidates.map((candidate) => `<option value="${escapeHtml(candidate.id)}" ${candidate.id === selectedLearnerId ? "selected" : ""}>${escapeHtml(candidate.name)}</option>`).join("");
   els.learningCatalogPanel.innerHTML = `
     <div class="card-header bg-white d-flex flex-wrap gap-3 justify-content-between align-items-start">
-      <div><h2 class="h5 mb-1">Utbildning</h2><p class="text-secondary mb-0">Kommunens valda referensmaterial, kurser och kunskapstest.</p></div>
-      <div class="learning-learner-select">
+      <div><h2 class="h5 mb-1">${isMentorSession() ? "Min utbildning" : "Utbildning"}</h2><p class="text-secondary mb-0">${isMentorSession() ? "Kurser, referensmaterial och kunskapstest som kommunen har valt för dig." : "Kommunens valda referensmaterial, kurser och kunskapstest."}</p></div>
+      ${isMentorSession() ? `<div class="learning-current-mentor"><span>Genomförande för</span><strong>${escapeHtml(currentUserName())}</strong></div>` : `<div class="learning-learner-select">
         <label class="form-label" for="learningLearnerSelect">Visa genomförande för mentor</label>
         <select id="learningLearnerSelect" class="form-select form-select-sm" ${candidates.length ? "" : "disabled"}>
           ${candidates.length ? learnerOptions : '<option>Inga mentorer registrerade</option>'}
         </select>
-      </div>
+      </div>`}
     </div>
     <div class="card-body border-bottom d-flex flex-wrap justify-content-between align-items-center gap-3">
       <div class="btn-group btn-group-sm" role="group" aria-label="Filtrera utbildningsinnehåll">
@@ -2533,10 +2619,50 @@ function renderLearningAdministration() {
   els.learningAdminListPanel.hidden = Boolean(route.id);
   els.learningAdminDetailPanel.hidden = !route.id;
   const selectionById = new Map(tenantLearningSelection.map((selection) => [selection.contentId, selection]));
-  els.learningAdminListPanel.innerHTML = `<div class="card-header bg-white"><h2 class="h5 mb-1">Utbildningsinnehåll</h2><p class="text-secondary mb-0">Gemensamt bibliotek och kommunens eget urval.</p></div><div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Innehåll</th><th>Typ</th><th>Version</th><th>Kommunens urval</th><th class="text-end">Åtgärd</th></tr></thead><tbody>${learningContent.map((content) => {
+  const explicitSelections = tenantLearningSelection.filter((selection) => selection.explicit);
+  const explicitCount = explicitSelections.length;
+  const inheritedCount = tenantLearningSelection.length - explicitCount;
+  const publicCount = tenantLearningSelection.filter((selection) => selection.public).length;
+  const visibleContent = learningContent.filter((content) => {
+    if (learningAdminFilter === "selected") return selectionById.has(content.id);
+    if (learningAdminFilter === "available") return !selectionById.has(content.id);
+    return true;
+  });
+  const requiredByCourses = (contentId) => explicitSelections
+    .map((selection) => learningContentById(learningContent, selection.contentId))
+    .filter((selected) => selected?.type === "course" && selected.modules?.some((module) => module.contentId === contentId))
+    .map((course) => course.title);
+  const filters = [
+    ["all", "Alla", learningContent.length],
+    ["selected", "Kommunens urval", tenantLearningSelection.length],
+    ["available", "Inte valda", learningContent.length - tenantLearningSelection.length]
+  ];
+  els.learningAdminListPanel.innerHTML = `
+    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div><div class="record-type">Aktuell kommun</div><h2 class="h5 mb-1">Kommunportalens utbildningsurval</h2><p class="text-secondary mb-0">Välj vilket innehåll som ska visas i kommunens utbildningskatalog.</p></div>
+      <a class="btn btn-outline-primary btn-sm" href="#/learning">Visa kommunens katalog</a>
+    </div>
+    <div class="learning-selection-summary" aria-label="Sammanfattning av kommunens utbildningsurval">
+      <div><strong>${tenantLearningSelection.length}</strong><span>innehållspaket visas</span></div>
+      <div><strong>${explicitCount}</strong><span>direkt valda</span></div>
+      <div><strong>${inheritedCount}</strong><span>ingår via kurs</span></div>
+      <div><strong>${publicCount}</strong><span>publika material</span></div>
+    </div>
+    <div class="card-body border-bottom py-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Filtrera kommunens utbildningsurval">
+          ${filters.map(([value, label, count]) => `<button type="button" class="btn ${learningAdminFilter === value ? "btn-secondary" : "btn-outline-secondary"}" data-learning-admin-filter="${value}" aria-pressed="${learningAdminFilter === value}">${label} <span class="badge text-bg-light ms-1">${count}</span></button>`).join("")}
+        </div>
+        <p class="small text-secondary mb-0">Kurser inkluderar automatiskt material och test som kursen behöver.</p>
+      </div>
+    </div>
+    <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Innehåll</th><th>Typ</th><th>Version</th><th>Kommunens urval</th><th>Publikt för föräldrar</th><th class="text-end">Åtgärd</th></tr></thead><tbody>${visibleContent.map((content) => {
     const selection = selectionById.get(content.id);
-    return `<tr><td><strong>${escapeHtml(content.title)}</strong><small class="d-block text-secondary">${escapeHtml(content.summary)}</small></td><td>${learningTypeLabel(content.type)}</td><td>v${content.version}${selection && Number(selection.selectedVersion) < Number(content.version) ? '<small class="d-block text-warning-emphasis">Ny version finns</small>' : ""}</td><td><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" aria-label="Inkludera ${escapeHtml(content.title)}" data-learning-selection="${escapeHtml(content.id)}" ${selection ? "checked" : ""} ${selection && !selection.explicit ? "disabled" : ""}><label class="form-check-label">${selection ? selection.explicit ? "Vald" : "Ingår via kurs" : "Ingår inte"}</label></div></td><td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/learning-admin/${encodeURIComponent(content.id)}">Öppna</a></td></tr>`;
-  }).join("")}</tbody></table></div>`;
+    const parentCourses = selection && !selection.explicit ? requiredByCourses(content.id) : [];
+    const selectionLabel = selection ? selection.explicit ? "Direkt valt" : "Ingår via kurs" : "Inte valt";
+    const canBePublic = Boolean(selection) && content.type === "material";
+    return `<tr><td><strong>${escapeHtml(content.title)}</strong><small class="d-block text-secondary">${escapeHtml(content.summary)}</small></td><td>${learningTypeLabel(content.type)}</td><td>v${content.version}${selection && Number(selection.selectedVersion) < Number(content.version) ? '<small class="d-block text-warning-emphasis">Ny version finns</small>' : ""}</td><td><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" aria-label="Visa ${escapeHtml(content.title)} för aktuell kommun" data-learning-selection="${escapeHtml(content.id)}" ${selection ? "checked" : ""} ${selection && !selection.explicit ? "disabled" : ""}><label class="form-check-label">${selectionLabel}</label>${parentCourses.length ? `<small class="d-block text-secondary">Krävs av: ${escapeHtml(parentCourses.join(", "))}</small>` : ""}</div></td><td><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" aria-label="Exponera ${escapeHtml(content.title)} publikt" data-learning-public="${escapeHtml(content.id)}" ${selection?.public ? "checked" : ""} ${canBePublic ? "" : "disabled"}><label class="form-check-label">${selection?.public ? "Publikt" : "Inte publikt"}</label>${content.type !== "material" ? '<small class="d-block text-secondary">Endast referensmaterial</small>' : !selection ? '<small class="d-block text-secondary">Välj först för kommunen</small>' : ""}</div></td><td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/learning-admin/${encodeURIComponent(content.id)}">Öppna</a></td></tr>`;
+  }).join("") || '<tr><td colspan="6" class="text-center text-secondary py-4">Inget innehåll matchar filtret.</td></tr>'}</tbody></table></div>`;
   if (!route.id) return;
   if (!item) {
     els.learningAdminDetailPanel.innerHTML = '<div class="card-body py-5"><h2 class="h5">Innehållspaketet finns inte</h2><a class="btn btn-outline-primary btn-sm" href="#/learning-admin">Tillbaka</a></div>';
@@ -2545,6 +2671,133 @@ function renderLearningAdministration() {
   const selection = selectionById.get(item.id);
   const structure = item.type === "course" ? `<section class="record-section"><h3 class="record-section-title">Kursmoment</h3><ol class="mb-0">${item.modules.map((module) => `<li>${escapeHtml(module.title)} <span class="text-secondary">(${learningTypeLabel(module.type)})</span></li>`).join("")}</ol></section>` : item.type === "test" ? `<section class="record-section"><h3 class="record-section-title">Testfrågor</h3><ol class="mb-0">${item.questions.map((question) => `<li>${escapeHtml(question.prompt)}</li>`).join("")}</ol></section>` : "";
   els.learningAdminDetailPanel.innerHTML = `<div class="card-header record-header bg-white"><a class="small" href="#/learning-admin">Tillbaka till utbildningsinnehåll</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">${learningTypeLabel(item.type)}</div><p class="record-id mb-1">Tekniskt ID ${escapeHtml(item.id)}</p><h2 class="h5 mb-0">${escapeHtml(item.title)}</h2></div><div class="d-flex gap-2 align-items-start">${selection && Number(selection.selectedVersion) < Number(item.version) ? `<button type="button" class="btn btn-outline-primary btn-sm" data-use-latest-learning="${escapeHtml(item.id)}">Använd version ${item.version}</button>` : ""}<button type="submit" form="learningAdminForm" class="btn btn-primary btn-sm">Spara ny version</button></div></div><dl class="record-meta mb-0 mt-3"><div><dt>Senaste version</dt><dd>${item.version}</dd></div><div><dt>Kommunens version</dt><dd>${selection ? selection.selectedVersion : "Ingår inte"}</dd></div><div><dt>Omfång</dt><dd>${item.scope === "shared" ? "Gemensamt bibliotek" : "Kommunens eget"}</dd></div></dl></div><form id="learningAdminForm" class="card-body record-grid" data-content-id="${escapeHtml(item.id)}"><section class="record-section"><h3 class="record-section-title">Innehåll</h3><label class="form-label" for="learningAdminTitle">Rubrik</label><input id="learningAdminTitle" class="form-control mb-3" value="${escapeHtml(item.title)}" required><label class="form-label" for="learningAdminSummary">Sammanfattning</label><textarea id="learningAdminSummary" class="form-control mb-3" rows="2" required>${escapeHtml(item.summary)}</textarea><label class="form-label" for="learningAdminMarkdown">Text i Markdown</label><textarea id="learningAdminMarkdown" class="form-control font-monospace" rows="10" required>${escapeHtml(item.bodyMarkdown)}</textarea><div class="form-text">Rubriker, listor, länkar och citat skrivs med vanlig Markdown.</div>${item.type === "test" ? `<label class="form-label mt-3" for="learningAdminPassingScore">Godkändgräns i procent</label><input id="learningAdminPassingScore" class="form-control" type="number" min="1" max="100" value="${Number(item.passingScore)}" required>` : ""}</section>${structure}</form>`;
+}
+
+const assignmentFrequencyLabels = { weekly: "Varje vecka", biweekly: "Varannan vecka", monthly: "Varje månad", as_needed: "Vid behov" };
+
+function mentorAssignments() {
+  const mentorId = currentUser().mentorId;
+  return cases
+    .filter((caseRecord) => caseRecord.caseTypeId === "mentor-assignment" && caseRecord.mentorId === mentorId)
+    .sort((left, right) => new Date(right.updatedAt) - new Date(left.updatedAt));
+}
+
+function mentorCourseSummary(mentorId) {
+  const courses = selectedLearningContent().filter((item) => item.type === "course");
+  const completed = courses.filter((course) => courseProgressPercent(course, learningProgressRecord(mentorId, course.id).completedModuleIds) === 100).length;
+  return { courses, completed };
+}
+
+function renderMentorHome() {
+  const mentor = currentMentorUser();
+  if (!mentor) {
+    els.mentorPortalView.innerHTML = '<section class="card"><div class="card-body py-5"><h2 class="h5">Ingen mentor finns i prototypdata</h2><p class="text-secondary mb-0">Byt testanvändare och lägg in prototypdata innan mentorläget används.</p></div></section>';
+    return;
+  }
+  const assignments = mentorAssignments();
+  const activeAssignments = assignments.filter((caseRecord) => caseRecord.status !== "closed");
+  const reports = mentorReports.filter((report) => report.mentorId === mentor.id);
+  const learning = mentorCourseSummary(mentor.id);
+  const nextContact = reports.map((report) => report.nextContactOn).filter((date) => date && date >= new Date().toISOString().slice(0, 10)).sort()[0] || null;
+  const latestAssignment = activeAssignments[0] || assignments[0] || null;
+  els.mentorPortalView.innerHTML = `
+    <section class="mentor-welcome">
+      <div><div class="record-type">Mentorportal</div><h2>Välkommen, ${escapeHtml(mentor.name)}</h2><p>Här ser du dina uppdrag, rapporterar genomförda kontakter och fortsätter din utbildning.</p></div>
+      ${latestAssignment ? `<a class="btn btn-primary" href="#/mentor-assignment/${escapeHtml(latestAssignment.id)}">Öppna aktuellt uppdrag</a>` : ""}
+    </section>
+    <section class="mentor-summary-grid" aria-label="Din sammanfattning">
+      <article><strong>${activeAssignments.length}</strong><span>aktiva uppdrag</span></article>
+      <article><strong>${reports.length}</strong><span>registrerade rapporter</span></article>
+      <article><strong>${learning.completed} av ${learning.courses.length}</strong><span>kurser klara</span></article>
+      <article><strong>${nextContact ? escapeHtml(formatDate(nextContact)) : "Ej planerad"}</strong><span>nästa kontakt</span></article>
+    </section>
+    <div class="mentor-home-grid">
+      <section class="card"><div class="card-header bg-white"><h3 class="h5 mb-1">Mina uppdrag</h3><p class="text-secondary mb-0">Aktuella överenskommelser och återrapportering.</p></div><div class="list-group list-group-flush">${activeAssignments.slice(0, 3).map((caseRecord) => {
+        const parent = caseParent(caseRecord);
+        return `<a class="list-group-item list-group-item-action mentor-task-link" href="#/mentor-assignment/${escapeHtml(caseRecord.id)}"><span><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><small>${escapeHtml(parent?.name || "Förälder")} · ${escapeHtml(caseStatusLabel(caseRecord.status))}</small></span><span>Öppna</span></a>`;
+      }).join("") || '<div class="card-body text-secondary">Du har inga aktiva uppdrag.</div>'}</div><div class="card-footer bg-white"><a href="#/mentor-assignments">Visa alla uppdrag</a></div></section>
+      <section class="card"><div class="card-header bg-white"><h3 class="h5 mb-1">Utbildning</h3><p class="text-secondary mb-0">Kommunens kurser och material för mentorer.</p></div><div class="card-body"><p class="mentor-progress-value"><strong>${learning.completed}</strong> av ${learning.courses.length} kurser slutförda</p><div class="progress mb-3" role="progressbar" aria-label="Genomförda kurser" aria-valuenow="${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}%"></div></div><a class="btn btn-outline-primary btn-sm" href="#/learning">Fortsätt utbildningen</a></div></section>
+    </div>`;
+}
+
+function renderMentorAssignments() {
+  const assignments = mentorAssignments();
+  els.mentorPortalView.innerHTML = `<section class="card"><div class="card-header bg-white"><h2 class="h5 mb-1">Mina uppdrag</h2><p class="text-secondary mb-0">Varje uppdrag gäller ett avgränsat stödbehov och har en egen plan och rapportering.</p></div><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Uppdrag</th><th>Förälder</th><th>Period</th><th>Status</th><th>Senast rapporterat</th><th></th></tr></thead><tbody>${assignments.map((caseRecord) => {
+    const plan = caseRecord.details?.assignmentPlan || {};
+    const reports = assignmentRecords(caseRecord.id).reports;
+    return `<tr><td><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><small class="d-block text-secondary">${escapeHtml(caseRecord.number)}</small></td><td>${escapeHtml(caseParent(caseRecord)?.name || "Ej angivet")}</td><td>${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}</td><td><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></td><td>${reports[0] ? escapeHtml(formatDate(reports[0].occurredOn)) : "Ingen rapport"}</td><td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/mentor-assignment/${escapeHtml(caseRecord.id)}">Öppna</a></td></tr>`;
+  }).join("") || '<tr><td colspan="6" class="text-center text-secondary py-4">Inga uppdrag är registrerade.</td></tr>'}</tbody></table></div></section>`;
+}
+
+function renderMentorAssignment() {
+  const route = parseRoute();
+  const caseRecord = mentorAssignments().find((assignment) => assignment.id === route.id);
+  if (!caseRecord) {
+    els.mentorPortalView.innerHTML = '<section class="card"><div class="card-body py-5"><h2 class="h5">Uppdraget finns inte</h2><p class="text-secondary">Du kan bara öppna uppdrag som är kopplade till din mentorprofil.</p><a class="btn btn-outline-primary btn-sm" href="#/mentor-assignments">Till mina uppdrag</a></div></section>';
+    return;
+  }
+  const plan = caseRecord.details?.assignmentPlan || {};
+  const reports = assignmentRecords(caseRecord.id).reports;
+  const parent = caseParent(caseRecord);
+  const owner = responsibleHandler(caseRecord);
+  const closed = caseRecord.status === "closed";
+  els.mentorPortalView.innerHTML = `<section class="card mentor-assignment-card"><div class="card-header record-header bg-white"><a class="small" href="#/mentor-assignments">Tillbaka till mina uppdrag</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">Mentoruppdrag · ${escapeHtml(caseRecord.number)}</div><h2 class="h5 mb-1">${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</h2><p class="text-secondary mb-0">${escapeHtml(caseRecord.details?.desiredOutcome || caseRecord.description || "")}</p></div><span class="${caseStatusBadge(caseRecord.status)} align-self-start">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></div><dl class="record-meta mt-3 mb-0"><div><dt>Förälder</dt><dd>${escapeHtml(parent?.name || "Ej angivet")}</dd></div><div><dt>Ansvarig handläggare</dt><dd>${escapeHtml(owner?.name || "Ej tilldelad")}</dd></div><div><dt>Period</dt><dd>${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}</dd></div></dl></div>
+    <div class="card-body record-grid"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div><dt>Nästa uppföljning</dt><dd>${plan.firstFollowUpDate ? escapeHtml(formatDate(plan.firstFollowUpDate)) : "Ej angivet"}</dd></div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section>
+    <section class="record-section"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h3 class="record-section-title mb-1">Återrapportera kontakt</h3><p class="small text-secondary mb-0">Registrera en kort saklig rapport efter varje planerad kontakt.</p></div></div>${closed ? '<div class="alert alert-secondary mt-3 mb-0">Uppdraget är avslutat och tar inte emot nya rapporter.</div>' : `<form id="mentorPortalReportForm" class="mentor-report-form mt-3" data-case-id="${escapeHtml(caseRecord.id)}"><div><label class="form-label" for="mentorPortalReportDate">Datum</label><input id="mentorPortalReportDate" name="occurredOn" class="form-control" type="date" value="${new Date().toISOString().slice(0, 10)}" required></div><div><label class="form-label" for="mentorPortalReportDuration">Tid i minuter</label><input id="mentorPortalReportDuration" name="durationMinutes" class="form-control" type="number" min="1" value="60" required></div><div><label class="form-label" for="mentorPortalReportMode">Kontaktform</label><select id="mentorPortalReportMode" name="mode" class="form-select"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option><option value="message">Meddelande</option></select></div><div><label class="form-label" for="mentorPortalReportOutcome">Resultat</label><select id="mentorPortalReportOutcome" name="outcome" class="form-select"><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div><div class="mentor-report-summary"><label class="form-label" for="mentorPortalReportSummary">Kort sammanfattning</label><textarea id="mentorPortalReportSummary" name="summary" class="form-control" rows="3" required></textarea></div><div><label class="form-label" for="mentorPortalNextContact">Nästa kontakt (valfritt)</label><input id="mentorPortalNextContact" name="nextContactOn" class="form-control" type="date"></div><div class="form-check mentor-report-support"><input id="mentorPortalNeedsSupport" name="needsHandlerSupport" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorPortalNeedsSupport">Jag behöver stöd från handläggaren</label></div><div class="mentor-report-actions"><button class="btn btn-primary" type="submit">Skicka rapport</button></div></form>`}</section>
+    <section class="record-section record-section-wide"><h3 class="record-section-title">Tidigare rapporter</h3><div class="table-responsive border rounded"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Datum</th><th>Kontaktform</th><th>Tid</th><th>Resultat</th><th>Sammanfattning</th></tr></thead><tbody>${reports.map((report) => `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<small class="d-block text-danger">Stöd begärt</small>' : ""}</td><td>${escapeHtml(report.summary)}</td></tr>`).join("") || '<tr><td colspan="5" class="text-center text-secondary py-3">Ingen rapport har registrerats ännu.</td></tr>'}</tbody></table></div></section></div></section>`;
+}
+
+function renderMentorProfile() {
+  const mentor = currentMentorUser();
+  if (!mentor) return renderMentorHome();
+  const owner = handlers.find((handler) => handler.id === mentor.coordinatorId);
+  els.mentorPortalView.innerHTML = `<section class="card mentor-profile-card"><div class="card-header record-header bg-white"><div class="record-type">Mentorprofil</div><h2 class="h5 mb-1">${escapeHtml(mentor.name)}</h2><p class="text-secondary mb-0">De uppgifter kommunen använder vid matchning och kontakt.</p></div><div class="card-body"><dl class="mentor-profile-facts"><div><dt>Kontaktuppgift</dt><dd>${escapeHtml(mentor.contact || "Ej angivet")}</dd></div><div><dt>Område</dt><dd>${escapeHtml(mentor.area || "Ej angivet")}</dd></div><div><dt>Språk</dt><dd>${escapeHtml(mentor.languages || "Ej angivet")}</dd></div><div><dt>Tillgänglighet</dt><dd>${escapeHtml(mentor.availability || "Ej angivet")}</dd></div><div><dt>Status</dt><dd><span class="${statusClass(mentor)}">${escapeHtml(mentor.status)}</span></dd></div><div><dt>Kontaktperson</dt><dd>${escapeHtml(owner?.name || mentor.coordinator || "Ej tilldelad")}</dd></div></dl><div class="alert alert-light border mb-0"><strong>Behöver något ändras?</strong><p class="mb-0 mt-1">Kontakta din handläggare. Känsliga register- och identitetsuppgifter visas inte i mentorportalen.</p></div></div></section>`;
+}
+
+function renderMentorPortal() {
+  if (currentView === "mentor-home") renderMentorHome();
+  else if (currentView === "mentor-assignments") renderMentorAssignments();
+  else if (currentView === "mentor-assignment") renderMentorAssignment();
+  else renderMentorProfile();
+}
+
+function renderPublicHome() {
+  const materials = selectedPublicLearningContent();
+  els.publicPortalView.innerHTML = `
+    <section class="public-intro">
+      <div><div class="record-type">Föräldramentorer</div><h2>Du kan söka stöd i din vardag som förälder</h2><p>Kommunen kan hjälpa dig att beskriva ditt behov och bedöma om stöd av en föräldramentor passar. Du behöver inte veta exakt vilket stöd du ska söka.</p><div class="d-flex flex-wrap gap-2 mt-4"><a class="btn btn-primary" href="#/public-support">Sök stöd</a><a class="btn btn-outline-primary" href="#/public-learning">Läs råd och material</a></div></div>
+      <aside><strong>Är situationen akut?</strong><p>Vid omedelbar fara, ring 112. Föräldramentorstöd är inte en akutinsats.</p></aside>
+    </section>
+    <section class="public-process" aria-labelledby="publicProcessTitle"><div><h3 id="publicProcessTitle" class="h5 mb-1">Så går det till</h3><p class="text-secondary mb-0">En förfrågan leder inte automatiskt till ett beslut eller ett mentoruppdrag.</p></div><ol><li><span>1</span><div><strong>Skicka en förfrågan</strong><p>Beskriv kort vad du vill ha hjälp med och hur kommunen kan kontakta dig.</p></div></li><li><span>2</span><div><strong>Kommunen kontaktar dig</strong><p>En handläggare går igenom behovet tillsammans med dig.</p></div></li><li><span>3</span><div><strong>Ni tar ställning</strong><p>Om stödet passar får både du och en föreslagen mentor tacka ja innan ett uppdrag startar.</p></div></li></ol></section>
+    <section class="card"><div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-start gap-3"><div><h3 class="h5 mb-1">Råd och information</h3><p class="text-secondary mb-0">Referensmaterial som kommunen har valt att publicera.</p></div><a href="#/public-learning">Visa allt material</a></div><div class="public-material-preview">${materials.slice(0, 3).map((item) => `<a href="#/public-learning/${encodeURIComponent(item.id)}"><span class="record-type">Information</span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.summary)}</small></a>`).join("") || '<p class="text-secondary mb-0">Kommunen har ännu inte publicerat något material.</p>'}</div></section>`;
+}
+
+function renderPublicSupport() {
+  const receipt = publicSupportRequests.find((request) => request.id === lastPublicSupportRequestId);
+  if (receipt) {
+    els.publicPortalView.innerHTML = `<section class="card public-support-confirmation"><div class="card-body"><div class="public-confirmation-mark" aria-hidden="true">✓</div><div class="record-type">Förfrågan registrerad</div><h2 class="h4">Tack, ${escapeHtml(receipt.name)}</h2><p>Förfrågan är registrerad med ${escapeHtml(receipt.contactMethod === "phone" ? "telefon" : "e-post")} som önskad kontaktväg.</p><div class="alert alert-warning mt-3">I prototypmiljön sparas förfrågan endast lokalt i den här webbläsaren och skickas inte till kommunen.</div><dl><div><dt>Referens</dt><dd>${escapeHtml(receipt.reference)}</dd></div><div><dt>Registrerad</dt><dd>${escapeHtml(formatDateTime(receipt.createdAt))}</dd></div></dl><p class="small text-secondary">Skicka inte känsliga uppgifter i en ny förfrågan.</p><div class="d-flex flex-wrap gap-2"><button type="button" class="btn btn-outline-primary" data-new-public-support>Skicka en ny förfrågan</button><a class="btn btn-primary" href="#/public-home">Till startsidan</a></div></div></section>`;
+    return;
+  }
+  els.publicPortalView.innerHTML = `<section class="card public-support-card"><div class="card-header bg-white"><div class="record-type">Förfrågan om stöd</div><h2 class="h5 mb-1">Berätta kort hur kommunen kan hjälpa dig</h2><p class="text-secondary mb-0">Fyll bara i det som behövs för att kommunen ska kunna kontakta dig. Du får beskriva behovet närmare tillsammans med en handläggare.</p></div><form id="publicSupportForm" class="card-body public-support-form"><div><label class="form-label" for="publicSupportName">Namn</label><input id="publicSupportName" name="name" class="form-control" autocomplete="name" required></div><div><label class="form-label" for="publicSupportContactMethod">Jag vill bli kontaktad via</label><select id="publicSupportContactMethod" name="contactMethod" class="form-select"><option value="phone">Telefon</option><option value="email">E-post</option></select></div><div><label class="form-label" for="publicSupportContact">Telefonnummer eller e-post</label><input id="publicSupportContact" name="contact" class="form-control" autocomplete="tel" required></div><div><label class="form-label" for="publicSupportArea">Område eller stadsdel <span class="text-secondary">(valfritt)</span></label><input id="publicSupportArea" name="area" class="form-control"></div><div class="public-support-description"><label class="form-label" for="publicSupportDescription">Vad vill du ha hjälp med?</label><textarea id="publicSupportDescription" name="description" class="form-control" rows="4" maxlength="1000" required></textarea><div class="form-text">Beskriv situationen kort. Ange inte personnummer, journaluppgifter eller andra känsliga uppgifter.</div></div><div class="public-support-description"><label class="form-label" for="publicSupportAvailability">När passar det att kommunen kontaktar dig? <span class="text-secondary">(valfritt)</span></label><input id="publicSupportAvailability" name="availability" class="form-control" placeholder="Till exempel vardagar efter klockan 15"></div><div class="form-check public-support-consent"><input id="publicSupportConsent" name="consent" class="form-check-input" type="checkbox" required><label class="form-check-label" for="publicSupportConsent">Jag förstår att detta är en förfrågan och att kommunen kontaktar mig innan något stöd eller uppdrag startar.</label></div><div class="public-support-actions"><a class="btn btn-outline-secondary" href="#/public-home">Avbryt</a><button type="submit" class="btn btn-primary">Skicka förfrågan</button></div></form></section>`;
+}
+
+function renderPublicLearning() {
+  const route = parseRoute();
+  const materials = selectedPublicLearningContent();
+  const item = route.id ? learningContentById(materials, route.id) : null;
+  if (route.id) {
+    els.publicPortalView.innerHTML = item
+      ? `<article class="card public-material-detail"><div class="card-header record-header bg-white"><a class="small" href="#/public-learning">Tillbaka till råd och material</a><div class="record-type mt-3">Information från kommunen</div><h2 class="h5 mb-1">${escapeHtml(item.title)}</h2><p class="text-secondary mb-0">${escapeHtml(item.summary)}</p></div><div class="card-body learning-markdown learning-material-body">${renderLearningMarkdown(item.bodyMarkdown)}</div><div class="card-footer bg-white"><a class="btn btn-primary btn-sm" href="#/public-support">Sök stöd</a></div></article>`
+      : '<section class="card"><div class="card-body py-5"><h2 class="h5">Materialet är inte publicerat</h2><p class="text-secondary">Materialet finns inte eller har tagits bort från kommunens publika urval.</p><a class="btn btn-outline-primary btn-sm" href="#/public-learning">Till råd och material</a></div></section>';
+    return;
+  }
+  els.publicPortalView.innerHTML = `<section class="card"><div class="card-header bg-white"><h2 class="h5 mb-1">Råd och material</h2><p class="text-secondary mb-0">Information som kommunen har valt att göra tillgänglig utan inloggning.</p></div><div class="public-learning-grid">${materials.map((material) => `<article><div class="record-type">Referensmaterial</div><h3>${escapeHtml(material.title)}</h3><p>${escapeHtml(material.summary)}</p><a class="btn btn-outline-primary btn-sm" href="#/public-learning/${encodeURIComponent(material.id)}">Läs materialet</a></article>`).join("") || '<div class="empty-list text-secondary">Kommunen har ännu inte publicerat något material.</div>'}</div></section>`;
+}
+
+function renderPublicPortal() {
+  if (currentView === "public-home") renderPublicHome();
+  else if (currentView === "public-support") renderPublicSupport();
+  else renderPublicLearning();
 }
 
 function renderAll() {
@@ -2566,6 +2819,13 @@ function renderAll() {
     "case-types": renderCaseTypeAdministration,
     "activity-types": renderActivityTypeAdministration,
     "learning-admin": renderLearningAdministration,
+    "mentor-home": renderMentorPortal,
+    "mentor-assignments": renderMentorPortal,
+    "mentor-assignment": renderMentorPortal,
+    "mentor-profile": renderMentorPortal,
+    "public-home": renderPublicPortal,
+    "public-support": renderPublicPortal,
+    "public-learning": renderPublicPortal,
     handler: renderHandlerDetail
   }[currentView];
   viewRenderer?.();
@@ -2573,9 +2833,43 @@ function renderAll() {
   document.body.dataset.renderDurationMs = String(Date.now() - renderStartedAt);
 }
 
+function currentMentorUser() {
+  const assignedMentorIds = new Set(cases
+    .filter((caseRecord) => caseRecord.caseTypeId === "mentor-assignment")
+    .map((caseRecord) => caseRecord.mentorId)
+    .filter(Boolean));
+  return candidates.find((candidate) => assignedMentorIds.has(candidate.id))
+    || candidates.find((candidate) => normalizeMentorStatus(candidate.status) === "Godkänd")
+    || candidates[0]
+    || null;
+}
+
 function currentUser() {
-  return handlers.find((handler) => handler.id === CURRENT_USER_ID)
-    || { id: CURRENT_USER_ID, userId: "FMU-1003", name: "Sara Lind", role: "Samordnare" };
+  if (activeTestUserType === "public") {
+    return { id: "public-visitor", name: "Ej inloggad", role: "Förälder", active: true };
+  }
+  if (activeTestUserType === "mentor") {
+    const mentor = currentMentorUser();
+    return mentor
+      ? { id: mentor.id, name: mentor.name, role: "Mentor", active: true, mentorId: mentor.id }
+      : { id: "mentor-demo", name: "Ingen mentor registrerad", role: "Mentor", active: false, mentorId: null };
+  }
+  const requestedId = activeTestUserType === "handler" ? "handler-jonas" : "handler-sara";
+  return handlers.find((handler) => handler.id === requestedId)
+    || seedHandlers.find((handler) => handler.id === requestedId)
+    || { id: requestedId, name: activeTestUserType === "handler" ? "Jonas Berg" : "Sara Lind", role: activeTestUserType === "handler" ? "Handläggare" : "Samordnare" };
+}
+
+function currentActorId() {
+  return currentUser().id;
+}
+
+function isMentorSession() {
+  return activeTestUserType === "mentor";
+}
+
+function isPublicSession() {
+  return activeTestUserType === "public";
 }
 
 function currentUserName() {
@@ -2632,9 +2926,12 @@ function userInitials(name) {
 
 function renderCurrentUser() {
   const user = currentUser();
+  CURRENT_USER_ID = user.id;
   els.currentUserName.textContent = user.name;
   els.currentUserRole.textContent = user.active === false ? `${user.role} · Inaktiv` : user.role;
   els.currentUserInitials.textContent = userInitials(user.name);
+  els.currentUserLabel.textContent = isPublicSession() ? "Besökarläge" : "Inloggad som";
+  els.testUserTypeSelect.value = activeTestUserType;
 }
 
 async function migrateCoordinatorReferences() {
@@ -3163,9 +3460,21 @@ async function loadRoutinesDocument(sectionKey = "") {
 }
 
 function applyRoute() {
-  const route = parseRoute();
+  let route = parseRoute();
+  const mentorRoutes = new Set(["mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "learning"]);
+  const publicRoutes = new Set(["public-home", "public-support", "public-learning"]);
+  if (isPublicSession() && !publicRoutes.has(route.view)) {
+    window.history.replaceState(null, "", "#/public-home");
+    route = { view: "public-home", id: null };
+  } else if (isMentorSession() && !mentorRoutes.has(route.view)) {
+    window.history.replaceState(null, "", "#/mentor-home");
+    route = { view: "mentor-home", id: null };
+  } else if (!isMentorSession() && !isPublicSession() && (mentorRoutes.has(route.view) && route.view !== "learning" || publicRoutes.has(route.view))) {
+    window.history.replaceState(null, "", "#/dashboard");
+    route = { view: "dashboard", id: null };
+  }
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-types", "activity-types", "learning-admin", "routines", "handler"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-types", "activity-types", "learning-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
   selectedId = currentView === "mentor" ? route.id : selectedId;
   selectedParentId = currentView === "parent" ? route.id : selectedParentId;
   if (currentView !== "parent") parentEditMode = false;
@@ -3194,12 +3503,37 @@ function applyRoute() {
   els.parentsView.hidden = currentView !== "parents";
   els.parentDetailView.hidden = currentView !== "parent";
   els.learningView.hidden = currentView !== "learning";
+  els.mentorPortalView.hidden = !["mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile"].includes(currentView);
+  els.publicPortalView.hidden = !["public-home", "public-support", "public-learning"].includes(currentView);
   els.administrationView.hidden = currentView !== "administration";
   els.caseTypesAdministrationView.hidden = currentView !== "case-types";
   els.activityTypesAdministrationView.hidden = currentView !== "activity-types";
   els.learningAdministrationView.hidden = currentView !== "learning-admin";
   els.routinesView.hidden = currentView !== "routines";
   els.handlerDetailView.hidden = currentView !== "handler";
+
+  const mentorSession = isMentorSession();
+  const publicSession = isPublicSession();
+  for (const navigationItem of [els.navDashboard, els.navPresentation, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navLearning, els.navAdministration]) {
+    navigationItem.hidden = mentorSession || publicSession;
+  }
+  document.querySelectorAll(".sidebar-nav > .nav-link.disabled").forEach((navigationItem) => {
+    navigationItem.hidden = mentorSession || publicSession;
+  });
+  document.querySelector(".sidebar-menu-group").hidden = mentorSession || publicSession;
+  for (const navigationItem of [els.navMentorHome, els.navMentorAssignments, els.navMentorLearning, els.navMentorProfile]) {
+    navigationItem.hidden = !mentorSession;
+  }
+  for (const navigationItem of [els.navPublicHome, els.navPublicSupport, els.navPublicLearning]) {
+    navigationItem.hidden = !publicSession;
+  }
+  document.querySelectorAll(".mobile-navigation .dropdown-menu > li").forEach((item) => {
+    item.hidden = mentorSession
+      ? !item.classList.contains("mentor-mobile-nav")
+      : publicSession
+        ? !item.classList.contains("public-mobile-nav")
+        : item.classList.contains("mentor-mobile-nav") || item.classList.contains("public-mobile-nav");
+  });
 
   els.navDashboard.classList.toggle("active", currentView === "dashboard");
   els.navPresentation.classList.toggle("active", currentView === "presentation");
@@ -3215,6 +3549,13 @@ function applyRoute() {
   els.navActivityTypes.classList.toggle("active", currentView === "activity-types");
   els.navLearningAdmin.classList.toggle("active", currentView === "learning-admin");
   els.navRoutines.classList.toggle("active", currentView === "routines");
+  els.navMentorHome.classList.toggle("active", currentView === "mentor-home");
+  els.navMentorAssignments.classList.toggle("active", ["mentor-assignments", "mentor-assignment"].includes(currentView));
+  els.navMentorLearning.classList.toggle("active", currentView === "learning");
+  els.navMentorProfile.classList.toggle("active", currentView === "mentor-profile");
+  els.navPublicHome.classList.toggle("active", currentView === "public-home");
+  els.navPublicSupport.classList.toggle("active", currentView === "public-support");
+  els.navPublicLearning.classList.toggle("active", currentView === "public-learning");
 
   if (currentView === "dashboard") {
     els.pageTitle.textContent = "Dashboard";
@@ -3247,7 +3588,28 @@ function applyRoute() {
     els.breadcrumb.textContent = isNewParent ? "Start / Föräldrar / Registrera förälder" : "Start / Föräldrar / Föräldrakort";
   } else if (currentView === "learning") {
     els.pageTitle.textContent = route.id ? "Utbildningsinnehåll" : "Utbildning";
-    els.breadcrumb.textContent = route.id ? "Start / Utbildning / Innehåll" : "Start / Utbildning";
+    els.breadcrumb.textContent = route.id ? `${mentorSession ? "Min portal" : "Start"} / Utbildning / Innehåll` : `${mentorSession ? "Min portal" : "Start"} / Utbildning`;
+  } else if (currentView === "mentor-home") {
+    els.pageTitle.textContent = "Min översikt";
+    els.breadcrumb.textContent = "Min portal / Översikt";
+  } else if (currentView === "mentor-assignments") {
+    els.pageTitle.textContent = "Mina uppdrag";
+    els.breadcrumb.textContent = "Min portal / Mina uppdrag";
+  } else if (currentView === "mentor-assignment") {
+    els.pageTitle.textContent = "Uppdrag";
+    els.breadcrumb.textContent = "Min portal / Mina uppdrag / Uppdrag";
+  } else if (currentView === "mentor-profile") {
+    els.pageTitle.textContent = "Min profil";
+    els.breadcrumb.textContent = "Min portal / Min profil";
+  } else if (currentView === "public-home") {
+    els.pageTitle.textContent = "Stöd för föräldrar";
+    els.breadcrumb.textContent = "Start";
+  } else if (currentView === "public-support") {
+    els.pageTitle.textContent = "Sök stöd";
+    els.breadcrumb.textContent = "Start / Sök stöd";
+  } else if (currentView === "public-learning") {
+    els.pageTitle.textContent = route.id ? "Råd och material" : "Råd och material";
+    els.breadcrumb.textContent = route.id ? "Start / Råd och material / Läs" : "Start / Råd och material";
   } else if (currentView === "administration") {
     els.pageTitle.textContent = "Handläggare";
     els.breadcrumb.textContent = "Start / Systemadministration / Handläggare";
@@ -3395,7 +3757,7 @@ function renderDashboard() {
       return activityDueState(activity) === "overdue";
     }
     if (dashboardQueueMode === "decision") return caseRecord.status === "decision_required" || activityHasBlockingResult(activity);
-    return effectiveOwner?.id === CURRENT_USER_ID;
+    return effectiveOwner?.id === currentActorId();
   }).sort((left, right) => {
     const leftDue = left.activity.dueDate || "9999-12-31";
     const rightDue = right.activity.dueDate || "9999-12-31";
@@ -4060,7 +4422,7 @@ function renderAssignmentFollowup(caseRecord) {
   els.mentorReportsTableWrap.hidden = reports.length === 0;
   els.mentorReportsTableBody.innerHTML = reports.map((report) => {
     const mentor = candidates.find((candidate) => candidate.id === report.reportedByMentorId);
-    return `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<span class="d-block text-danger small">Kontakt med handläggare behövs</span>' : ""}</td><td>${escapeHtml(report.summary)}</td><td>${escapeHtml(mentor?.name || "Mentorn")}<span class="d-block text-secondary small">Registrerad av ${escapeHtml(handlerNameById(report.recordedBy || report.createdBy))}</span></td></tr>`;
+    return `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<span class="d-block text-danger small">Kontakt med handläggare behövs</span>' : ""}</td><td>${escapeHtml(report.summary)}</td><td>${escapeHtml(mentor?.name || "Mentorn")}<span class="d-block text-secondary small">Registrerad av ${escapeHtml(actorNameById(report.recordedBy || report.createdBy))}</span></td></tr>`;
   }).join("");
 
   els.parentCheckInsEmpty.hidden = checkIns.length > 0;
@@ -6363,6 +6725,102 @@ function openHandlerModal(handler = null) {
   handlerModal.show();
 }
 
+els.testUserTypeSelect.addEventListener("change", () => {
+  const nextType = els.testUserTypeSelect.value;
+  if (!TEST_USER_TYPES.has(nextType)) return;
+  activeTestUserType = nextType;
+  localStorage.setItem(TEST_USER_TYPE_KEY, nextType);
+  if (nextType === "mentor") {
+    selectedLearnerId = currentMentorUser()?.id || "";
+    navigateTo("#/mentor-home");
+  } else if (nextType === "public") {
+    navigateTo("#/public-home");
+  } else {
+    dashboardQueueMode = "mine";
+    navigateTo("#/dashboard");
+  }
+  renderAll();
+});
+
+els.mentorPortalView.addEventListener("submit", async (event) => {
+  const form = event.target.closest("#mentorPortalReportForm");
+  if (!form) return;
+  event.preventDefault();
+  const caseRecord = mentorAssignments().find((assignment) => assignment.id === form.dataset.caseId);
+  if (!caseRecord || caseRecord.status === "closed") return;
+  const formData = new FormData(form);
+  const reportId = crypto.randomUUID();
+  const actor = currentActorId();
+  const occurredOn = String(formData.get("occurredOn") || "");
+  await executeCaseCommand({
+    commandType: "register_mentor_self_report",
+    caseId: caseRecord.id,
+    expectedVersion: caseRecord.version,
+    payload: { reportId, occurredOn },
+    additionalStores: [MENTOR_REPORTS_STORE],
+    mutate: ({ currentCase, now, put, event: recordEvent }) => {
+      put(MENTOR_REPORTS_STORE, {
+        id: reportId,
+        tenantId: DEFAULT_TENANT_ID,
+        caseId: currentCase.id,
+        mentorId: currentCase.mentorId,
+        occurredOn,
+        durationMinutes: Number(formData.get("durationMinutes")),
+        mode: String(formData.get("mode") || "physical"),
+        outcome: String(formData.get("outcome") || "completed"),
+        nextContactOn: String(formData.get("nextContactOn") || "") || null,
+        summary: String(formData.get("summary") || "").trim(),
+        needsHandlerSupport: formData.get("needsHandlerSupport") === "on",
+        reportedByMentorId: currentCase.mentorId,
+        recordedBy: actor,
+        createdAt: now,
+        createdBy: actor
+      });
+      const updated = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: actor };
+      put(CASES_STORE, updated);
+      recordEvent("mentor_self_report_registered", "mentor_report", reportId, `Mentorn återrapporterade kontakt ${occurredOn}`);
+      return { caseId: currentCase.id, version: updated.version };
+    }
+  });
+  markSaved();
+  showFeedback("Rapporten har skickats till handläggaren.");
+  await refresh();
+});
+
+els.publicPortalView.addEventListener("click", (event) => {
+  if (!event.target.closest("[data-new-public-support]")) return;
+  lastPublicSupportRequestId = "";
+  renderPublicSupport();
+});
+
+els.publicPortalView.addEventListener("submit", async (event) => {
+  const form = event.target.closest("#publicSupportForm");
+  if (!form) return;
+  event.preventDefault();
+  if (!form.reportValidity()) return;
+  const formData = new FormData(form);
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  const request = {
+    id,
+    tenantId: DEFAULT_TENANT_ID,
+    reference: `FMP-${now.slice(0, 4)}-${id.slice(0, 6).toUpperCase()}`,
+    name: String(formData.get("name") || "").trim(),
+    contactMethod: String(formData.get("contactMethod") || "phone"),
+    contact: String(formData.get("contact") || "").trim(),
+    area: String(formData.get("area") || "").trim(),
+    description: String(formData.get("description") || "").trim(),
+    availability: String(formData.get("availability") || "").trim(),
+    status: "received",
+    createdAt: now,
+    source: "public_portal"
+  };
+  await savePublicSupportRequest(request);
+  lastPublicSupportRequestId = id;
+  markSaved();
+  await refresh();
+});
+
 els.navDashboard.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/dashboard");
@@ -8208,7 +8666,7 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
 els.resetButton.addEventListener("click", async () => {
   const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata? Mentorärenden tas bort och grundhandläggarna återställs. Åtgärden kan inte ångras.");
   if (!confirmed) return;
-  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx)]);
+  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests()]);
   await ensureDefaultHandlers();
   selectedId = null;
   markSaved();
@@ -8238,7 +8696,10 @@ els.learningView.addEventListener("click", async (event) => {
   }
   const completeButton = event.target.closest("[data-complete-learning-module]");
   if (!completeButton || !selectedLearnerId) return;
-  await completeLearningModule(completeButton.dataset.courseId, completeButton.dataset.completeLearningModule);
+  completeButton.disabled = true;
+  const courseId = completeButton.dataset.courseId;
+  const moduleId = completeButton.dataset.completeLearningModule;
+  await queueLearningMutation(() => completeLearningModule(courseId, moduleId));
   showFeedback("Kursmomentet har markerats som klart.");
 });
 
@@ -8248,9 +8709,13 @@ els.learningView.addEventListener("submit", async (event) => {
     event.preventDefault();
     const courseId = reflectionForm.dataset.courseId;
     const moduleId = reflectionForm.dataset.learningReflection;
-    const record = learningProgressRecord(selectedLearnerId, courseId);
-    await completeLearningModule(courseId, moduleId, {
-      reflections: { ...(record.reflections || {}), [moduleId]: reflectionForm.querySelector("textarea").value.trim() }
+    const reflection = reflectionForm.querySelector("textarea").value.trim();
+    reflectionForm.querySelector('button[type="submit"]').disabled = true;
+    await queueLearningMutation(() => {
+      const record = learningProgressRecord(selectedLearnerId, courseId);
+      return completeLearningModule(courseId, moduleId, {
+        reflections: { ...(record.reflections || {}), [moduleId]: reflection }
+      });
     });
     showFeedback("Reflektionen har sparats.");
     return;
@@ -8260,24 +8725,35 @@ els.learningView.addEventListener("submit", async (event) => {
   event.preventDefault();
   const test = learningContentById(selectedLearningContent(), testForm.dataset.learningTest);
   if (!test || !selectedLearnerId) return;
+  testForm.querySelector('button[type="submit"]').disabled = true;
   const answers = Object.fromEntries(test.questions.map((question) => [question.id, new FormData(testForm).get(question.id)]));
   const result = scoreKnowledgeTest(test, answers);
   const courseId = testForm.dataset.courseId || `test:${test.id}`;
   const moduleId = testForm.dataset.moduleId;
-  const record = learningProgressRecord(selectedLearnerId, courseId);
-  const completedModuleIds = result.passed ? [...new Set([...(record.completedModuleIds || []), moduleId])] : record.completedModuleIds || [];
-  await saveLearningProgress({
-    ...record,
-    completedModuleIds,
-    attempts: [...(record.attempts || []), { testId: test.id, testVersion: test.version, answers, ...result, attemptedAt: new Date().toISOString() }],
-    updatedAt: new Date().toISOString()
+  await queueLearningMutation(async () => {
+    const record = learningProgressRecord(selectedLearnerId, courseId);
+    const completedModuleIds = result.passed ? [...new Set([...(record.completedModuleIds || []), moduleId])] : record.completedModuleIds || [];
+    await saveLearningProgress({
+      ...record,
+      completedModuleIds,
+      attempts: [...(record.attempts || []), { testId: test.id, testVersion: test.version, answers, ...result, attemptedAt: new Date().toISOString() }],
+      updatedAt: new Date().toISOString()
+    });
+    markSaved();
+    await refresh();
   });
-  markSaved();
   showFeedback(result.passed ? `Testet är godkänt med ${result.score}%.` : `Resultatet blev ${result.score}%. Testet behöver göras om.`);
-  await refresh();
 });
 
 els.learningAdministrationView.addEventListener("change", async (event) => {
+  const publicInput = event.target.closest("[data-learning-public]");
+  if (publicInput) {
+    await updateTenantLearningPublic(publicInput.dataset.learningPublic, publicInput.checked);
+    markSaved();
+    showFeedback("Det publika materialurvalet har uppdaterats.");
+    await refresh();
+    return;
+  }
   const selectionInput = event.target.closest("[data-learning-selection]");
   if (!selectionInput) return;
   await updateTenantLearningSelection(selectionInput.dataset.learningSelection, selectionInput.checked);
@@ -8287,6 +8763,12 @@ els.learningAdministrationView.addEventListener("change", async (event) => {
 });
 
 els.learningAdministrationView.addEventListener("click", async (event) => {
+  const filterButton = event.target.closest("[data-learning-admin-filter]");
+  if (filterButton) {
+    learningAdminFilter = filterButton.dataset.learningAdminFilter;
+    renderLearningAdministration();
+    return;
+  }
   const latestButton = event.target.closest("[data-use-latest-learning]");
   if (!latestButton) return;
   const contentId = latestButton.dataset.useLatestLearning;
@@ -8299,6 +8781,7 @@ els.learningAdministrationView.addEventListener("click", async (event) => {
       contentId: id,
       selectedVersion: latest.version,
       explicit: id === contentId ? true : Boolean(existing?.explicit),
+      public: Boolean(existing?.public),
       selectedAt: existing?.selectedAt || new Date().toISOString(),
       selectedBy: CURRENT_USER_ID
     });
