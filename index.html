@@ -975,6 +975,16 @@
                   Ärendetypens namn och tekniska ID är fasta. Fält väljs ur en gemensam katalog så att registrering och rapportering förblir enhetlig.
                 </div>
               </div>
+              <section class="case-type-relationship-section border-bottom" aria-labelledby="caseTypeRelationshipHeading">
+                <div class="case-type-relationship-header">
+                  <div>
+                    <h3 id="caseTypeRelationshipHeading" class="h6 mb-1">Samband mellan ärendetyper</h3>
+                    <p class="text-secondary small mb-0">Visar vilka ärenden som kan följa på varandra och vilka förutsättningar som gäller.</p>
+                  </div>
+                  <span class="badge text-bg-light border">Systemstyrda samband</span>
+                </div>
+                <div id="caseTypeRelationshipMap" class="case-type-relationship-map"></div>
+              </section>
               <div class="table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0">
                   <thead class="table-light">
@@ -1029,6 +1039,10 @@
                   <section class="record-section">
                     <h3 class="record-section-title">Kompletterande fält</h3>
                     <div id="caseTypeFieldsFact" class="case-type-field-summary"></div>
+                  </section>
+                  <section class="record-section">
+                    <h3 class="record-section-title">Samband med andra ärendetyper</h3>
+                    <div id="caseTypeRelationshipsFact" class="case-type-detail-relations"></div>
                   </section>
                 </div>
 
@@ -1683,6 +1697,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260806-render-performance-v25"></script>
+    <script type="module" src="app.js?v=20260807-case-type-relations-v26"></script>
   </body>
 </html>

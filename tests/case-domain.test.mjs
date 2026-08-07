@@ -7,6 +7,7 @@ import {
   assessCertificationApproval,
   CASE_DETAIL_FIELD_DEFINITIONS,
   CASE_TYPE_DEFINITIONS,
+  CASE_TYPE_RELATIONSHIPS,
   canCreateMentorAssignment,
   canTransitionActivity,
   deriveCaseStatus,
@@ -147,6 +148,20 @@ test("defines guided workflows for matching and mentor assignments", () => {
   const assignment = CASE_TYPE_DEFINITIONS.find((item) => item.id === "mentor-assignment");
   assert.ok(matching.suggestedActivities.includes("Fatta beslut om matchning"));
   assert.ok(assignment.suggestedActivities.includes("Följ upp efter fyra veckor"));
+});
+
+test("defines valid relationships between case types", () => {
+  const caseTypeIds = new Set(CASE_TYPE_DEFINITIONS.map((item) => item.id));
+  const relationshipKeys = CASE_TYPE_RELATIONSHIPS.map((item) => `${item.from}:${item.to}:${item.kind}`);
+  assert.equal(new Set(relationshipKeys).size, relationshipKeys.length);
+  for (const relationship of CASE_TYPE_RELATIONSHIPS) {
+    assert.ok(caseTypeIds.has(relationship.from), `unknown source case type ${relationship.from}`);
+    assert.ok(caseTypeIds.has(relationship.to), `unknown target case type ${relationship.to}`);
+    assert.ok(relationship.label);
+  }
+  assert.ok(CASE_TYPE_RELATIONSHIPS.some((item) => item.from === "parent-support" && item.to === "matching"));
+  assert.ok(CASE_TYPE_RELATIONSHIPS.some((item) => item.from === "matching" && item.to === "mentor-assignment"));
+  assert.ok(CASE_TYPE_RELATIONSHIPS.some((item) => item.from === "mentor-certification" && item.to === "matching" && item.kind === "prerequisite"));
 });
 
 test("requires both parties and complete links before creating a mentor assignment", () => {

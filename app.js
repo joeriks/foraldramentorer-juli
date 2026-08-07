@@ -5,6 +5,7 @@ import {
   CASE_DETAIL_FIELD_DEFINITIONS,
   CASE_STATUS_LABELS,
   CASE_TYPE_DEFINITIONS,
+  CASE_TYPE_RELATIONSHIPS,
   DEFAULT_ORGANIZATION_UNIT_ID,
   DEFAULT_TENANT_ID,
   activityStatusLabel as domainActivityStatusLabel,
@@ -28,7 +29,7 @@ import {
   resultClassification,
   resultOptions,
   stableHash
-} from "./case-domain.js?v=20260806-assignment-followup-v21";
+} from "./case-domain.js?v=20260807-case-type-relations-v22";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-assignment-followup-v21";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
@@ -566,6 +567,7 @@ const els = {
   copyRoutinesLinkButton: document.querySelector("#copyRoutinesLinkButton"),
   handlerDetailView: document.querySelector("#handlerDetailView"),
   caseTypeAdminTableBody: document.querySelector("#caseTypeAdminTableBody"),
+  caseTypeRelationshipMap: document.querySelector("#caseTypeRelationshipMap"),
   caseTypeListPanel: document.querySelector("#caseTypeListPanel"),
   caseTypeDetailPanel: document.querySelector("#caseTypeDetailPanel"),
   caseTypeAdminForm: document.querySelector("#caseTypeAdminForm"),
@@ -579,6 +581,7 @@ const els = {
   caseTypeWorkInstructionFact: document.querySelector("#caseTypeWorkInstructionFact"),
   caseTypeMentorModeFact: document.querySelector("#caseTypeMentorModeFact"),
   caseTypeFieldsFact: document.querySelector("#caseTypeFieldsFact"),
+  caseTypeRelationshipsFact: document.querySelector("#caseTypeRelationshipsFact"),
   editCaseTypeButton: document.querySelector("#editCaseTypeButton"),
   caseTypeEditActions: document.querySelector("#caseTypeEditActions"),
   cancelCaseTypeEditButton: document.querySelector("#cancelCaseTypeEditButton"),
@@ -4374,10 +4377,82 @@ function mentorModeLabel(mode) {
   return { required: "Obligatorisk", optional: "Valfri", none: "Visas inte" }[mode] || "Valfri";
 }
 
+function relationshipKindLabel(kind) {
+  return {
+    next_case: "Nästa ärende",
+    process_step: "Processsteg",
+    linked_case: "Länkat ärende",
+    optional_follow_up: "Vid behov",
+    prerequisite: "Förutsättning"
+  }[kind] || "Samband";
+}
+
+function caseTypeRelationshipName(caseTypeId) {
+  return caseTypeById(caseTypeId)?.name || caseTypeId;
+}
+
+function caseTypeRelationshipLink(caseTypeId) {
+  return `<a class="case-type-relationship-node" href="#/case-types/${encodeURIComponent(caseTypeId)}">${escapeHtml(caseTypeRelationshipName(caseTypeId))}</a>`;
+}
+
+function renderCaseTypeRelationshipMap() {
+  if (!els.caseTypeRelationshipMap) return;
+  const groups = [
+    ["mentor-supply", "Tillgång till mentorer"],
+    ["parent-support", "Stöd till förälder"],
+    ["prerequisite", "Tvärgående förutsättning"]
+  ];
+  els.caseTypeRelationshipMap.innerHTML = groups.map(([groupId, title]) => {
+    const relationships = CASE_TYPE_RELATIONSHIPS.filter((relationship) => relationship.group === groupId);
+    return `
+      <section class="case-type-relationship-group" aria-label="${escapeHtml(title)}">
+        <h4>${escapeHtml(title)}</h4>
+        <div class="case-type-relationship-list">
+          ${relationships.map((relationship) => `
+            <div class="case-type-relationship-row">
+              ${caseTypeRelationshipLink(relationship.from)}
+              <div class="case-type-relationship-connector">
+                <span>${escapeHtml(relationshipKindLabel(relationship.kind))}</span>
+                <i aria-hidden="true">&rarr;</i>
+                <small>${escapeHtml(relationship.label)}</small>
+              </div>
+              ${caseTypeRelationshipLink(relationship.to)}
+            </div>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  }).join("") + `
+    <section class="case-type-relationship-group" aria-label="Fristående ärendetyp">
+      <h4>Fristående ärendetyp</h4>
+      <div class="case-type-relationship-standalone">
+        ${caseTypeRelationshipLink("other")}
+        <small>Används när frågan inte ingår i ett fast systemstyrt flöde.</small>
+      </div>
+    </section>
+  `;
+}
+
+function renderCaseTypeRelationshipsFact(caseTypeId) {
+  const relationships = CASE_TYPE_RELATIONSHIPS.filter((relationship) => relationship.from === caseTypeId || relationship.to === caseTypeId);
+  if (!relationships.length) {
+    els.caseTypeRelationshipsFact.innerHTML = '<p class="text-secondary mb-0">Fristående ärendetyp utan systemstyrt samband till en annan ärendetyp.</p>';
+    return;
+  }
+  els.caseTypeRelationshipsFact.innerHTML = relationships.map((relationship) => `
+    <div class="case-type-detail-relation">
+      <span class="badge text-bg-light border">${escapeHtml(relationshipKindLabel(relationship.kind))}</span>
+      <div>${caseTypeRelationshipLink(relationship.from)} <span aria-hidden="true">&rarr;</span> ${caseTypeRelationshipLink(relationship.to)}</div>
+      <small>${escapeHtml(relationship.label)}</small>
+    </div>
+  `).join("");
+}
+
 function renderCaseTypeAdministration() {
   const selectedDefinition = selectedCaseTypeId ? caseTypeById(selectedCaseTypeId) : null;
   els.caseTypeListPanel.hidden = Boolean(selectedCaseTypeId);
   els.caseTypeDetailPanel.hidden = !selectedDefinition;
+  renderCaseTypeRelationshipMap();
   els.caseTypeAdminTableBody.innerHTML = "";
   for (const definition of caseTypeDefinitions) {
     const fields = configuredDetailFields(definition);
@@ -4412,6 +4487,7 @@ function renderCaseTypeAdministration() {
   els.caseTypeFieldsFact.innerHTML = fields.length
     ? `<ul class="mb-0">${fields.map((field) => `<li>${escapeHtml(field.label)}</li>`).join("")}</ul>`
     : '<p class="text-secondary mb-0">Inga kompletterande fält.</p>';
+  renderCaseTypeRelationshipsFact(selectedDefinition.id);
 
   if (caseTypeEditMode) {
     els.caseTypeAdminHelpInput.value = selectedDefinition.helpText || "";

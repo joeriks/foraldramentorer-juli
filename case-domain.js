@@ -252,6 +252,51 @@ export const CASE_TYPE_DEFINITIONS = [
   }
 ];
 
+export const CASE_TYPE_RELATIONSHIPS = [
+  {
+    from: "needs-analysis",
+    to: "recruitment",
+    group: "mentor-supply",
+    kind: "next_case",
+    label: "Ett beslutat behov kan leda till en rekryteringsinsats."
+  },
+  {
+    from: "recruitment",
+    to: "mentor-certification",
+    group: "mentor-supply",
+    kind: "process_step",
+    label: "Intresserade personer registreras som mentorer och prövas för godkännande."
+  },
+  {
+    from: "parent-support",
+    to: "matching",
+    group: "parent-support",
+    kind: "linked_case",
+    label: "En matchning startas för ett bestämt stödbehov och länkas till stödärendet."
+  },
+  {
+    from: "matching",
+    to: "mentor-assignment",
+    group: "parent-support",
+    kind: "linked_case",
+    label: "När båda parter accepterar kan matchningen övergå i ett länkat mentoruppdrag."
+  },
+  {
+    from: "mentor-assignment",
+    to: "mentor-follow-up",
+    group: "parent-support",
+    kind: "optional_follow_up",
+    label: "Vid behov kan en separat uppföljning av mentorn registreras."
+  },
+  {
+    from: "mentor-certification",
+    to: "matching",
+    group: "prerequisite",
+    kind: "prerequisite",
+    label: "Endast en godkänd och tillgänglig mentor ska kunna väljas i en matchning."
+  }
+];
+
 export function caseTypeById(id) {
   return CASE_TYPE_DEFINITIONS.find((definition) => definition.id === id) || null;
 }
