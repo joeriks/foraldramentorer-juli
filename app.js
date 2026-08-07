@@ -4377,6 +4377,10 @@ function mentorModeLabel(mode) {
   return { required: "Obligatorisk", optional: "Valfri", none: "Visas inte" }[mode] || "Valfri";
 }
 
+function caseDetailFieldTypeLabel(inputType) {
+  return { text: "Textfält", number: "Numeriskt fält", date: "Datumfält" }[inputType] || "Fält";
+}
+
 function relationshipKindLabel(kind) {
   return {
     next_case: "Nästa ärende",
@@ -4487,8 +4491,8 @@ function renderCaseTypeAdministration() {
   els.caseTypeWorkInstructionFact.textContent = selectedDefinition.workInstruction || "Ej angivet";
   els.caseTypeMentorModeFact.textContent = mentorModeLabel(selectedDefinition.mentorMode);
   els.caseTypeFieldsFact.innerHTML = fields.length
-    ? `<ul class="mb-0">${fields.map((field) => `<li>${escapeHtml(field.label)}</li>`).join("")}</ul>`
-    : '<p class="text-secondary mb-0">Inga kompletterande fält.</p>';
+    ? `<dl class="record-fields case-type-configured-fields mb-0">${fields.map((field) => `<div><dt>${escapeHtml(field.label)}</dt><dd>${escapeHtml(caseDetailFieldTypeLabel(field.inputType))}</dd></div>`).join("")}</dl>`
+    : '<div class="empty-list border rounded text-secondary">Inga kompletterande fält.</div>';
   renderCaseTypeRelationshipsFact(selectedDefinition.id);
 
   if (caseTypeEditMode) {

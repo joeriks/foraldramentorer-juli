@@ -760,6 +760,11 @@ body {
   text-transform: uppercase;
 }
 
+.record-grid {
+  display: grid;
+  gap: var(--app-space-4);
+}
+
 .record-fields {
   border: 1px solid var(--app-border);
   border-radius: var(--bs-border-radius);
@@ -802,6 +807,15 @@ body {
   background: #fff;
   color: #1f2c35;
   overflow-wrap: anywhere;
+}
+
+.case-type-configured-fields > div {
+  min-height: 2.75rem;
+}
+
+.case-type-configured-fields dd {
+  color: var(--app-text-muted);
+  font-size: 0.875rem;
 }
 
 .record-fields-edit dt,
