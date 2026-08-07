@@ -1034,6 +1034,7 @@
                       <div><dt>Registreringsanvisning</dt><dd id="caseTypeHintFact"></dd></div>
                       <div><dt>Handläggningsanvisning</dt><dd id="caseTypeWorkInstructionFact"></dd></div>
                       <div><dt>Mentorkoppling</dt><dd id="caseTypeMentorModeFact"></dd></div>
+                      <div><dt>Nästa ärendetyp</dt><dd id="caseTypeNextTypeFact"></dd></div>
                     </dl>
                   </section>
                   <section class="record-section">
@@ -1065,13 +1066,18 @@
                       <textarea id="caseTypeAdminWorkInstructionInput" class="form-control" rows="4" required></textarea>
                       <div class="form-text">Visas på det sparade ärendet och beskriver hur handläggaren ska gå till väga.</div>
                     </div>
-                    <div>
+                    <div class="mb-3">
                       <label class="form-label" for="caseTypeAdminMentorModeInput">Mentorkoppling</label>
                       <select id="caseTypeAdminMentorModeInput" class="form-select" required>
                         <option value="required">Obligatorisk</option>
                         <option value="optional">Valfri</option>
                         <option value="none">Visas inte</option>
                       </select>
+                    </div>
+                    <div>
+                      <label class="form-label" for="caseTypeAdminNextTypeInput">Nästa ärendetyp</label>
+                      <select id="caseTypeAdminNextTypeInput" class="form-select"></select>
+                      <div class="form-text">Visas som ett föreslaget nästa ärende. Ett nytt ärende skapas aldrig automatiskt.</div>
                     </div>
                   </section>
                   <fieldset class="record-section">
@@ -1697,6 +1703,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260807-case-type-detail-v28"></script>
+    <script type="module" src="app.js?v=20260807-next-case-type-v29"></script>
   </body>
 </html>

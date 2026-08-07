@@ -155,6 +155,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "parent-support",
     version: 1,
     name: "Stödärende för förälder",
+    nextCaseTypeId: "matching",
     mentorMode: "none",
     parentMode: "required",
     helpText: "Använd för ett avgränsat stödbehov för en registrerad förälder. Ett nytt syfte ska normalt få ett nytt stödärende.",
@@ -168,6 +169,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "mentor-certification",
     version: 1,
     name: "Godkännande av mentor",
+    nextCaseTypeId: null,
     mentorMode: "required",
     helpText: "Använd när en registrerad mentor ska genomgå kommunens kontroller, intervju och beslut om godkännande.",
     registrationHint: "Välj mentor och beskriv kort vad som har initierat prövningen. Kontrollaktiviteterna skapas automatiskt.",
@@ -180,6 +182,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "mentor-follow-up",
     version: 1,
     name: "Uppföljning",
+    nextCaseTypeId: null,
     mentorMode: "optional",
     helpText: "Använd för en planerad eller behovsstyrd uppföljning av en mentor. Koppla mentor när uppföljningen gäller en viss person.",
     registrationHint: "Ange vad som ska följas upp och varför. Möten och fortsatta åtgärder registreras sedan i samma ärende.",
@@ -192,6 +195,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "matching",
     version: 1,
     name: "Matchning",
+    nextCaseTypeId: "mentor-assignment",
     mentorMode: "required",
     parentMode: "via_support_case",
     helpText: "Använd när ett bestämt stödärende ska prövas tillsammans med en godkänd och tillgänglig mentor.",
@@ -205,6 +209,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "mentor-assignment",
     version: 1,
     name: "Mentoruppdrag",
+    nextCaseTypeId: "mentor-follow-up",
     mentorMode: "required",
     parentMode: "via_support_case",
     helpText: "Använd när en accepterad matchning övergår till ett aktivt mentoruppdrag som ska följas upp.",
@@ -218,6 +223,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "recruitment",
     version: 1,
     name: "Rekryteringsinsats",
+    nextCaseTypeId: "mentor-certification",
     mentorMode: "none",
     helpText: "Använd när ett beslutat rekryteringsbehov ska omsättas i annons, informationsinsats eller annan rekryteringsåtgärd.",
     registrationHint: "Beskriv målgrupp, önskat utfall och vilken behovsanalys eller vilket beslut som ligger bakom insatsen.",
@@ -230,6 +236,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "needs-analysis",
     version: 1,
     name: "Behovsanalys",
+    nextCaseTypeId: "recruitment",
     mentorMode: "none",
     helpText: "Använd när verksamheten behöver beskriva och bedöma ett nytt eller förändrat behov av mentorer.",
     registrationHint: "Registrera var behovet finns, vilka mentorer som efterfrågas, ungefärlig omfattning och när behovet behöver vara mött.",
@@ -242,6 +249,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "other",
     version: 1,
     name: "Övrigt ärende",
+    nextCaseTypeId: null,
     mentorMode: "optional",
     helpText: "Använd för en avgränsad fråga som inte hör hemma i någon av de övriga ärendetyperna.",
     registrationHint: "Koppla mentor endast när frågan gäller en viss person. Beskriv tydligt önskat resultat så att ärendet kan avslutas entydigt.",
@@ -253,41 +261,6 @@ export const CASE_TYPE_DEFINITIONS = [
 ];
 
 export const CASE_TYPE_RELATIONSHIPS = [
-  {
-    from: "needs-analysis",
-    to: "recruitment",
-    group: "mentor-supply",
-    kind: "next_case",
-    label: "Ett beslutat behov kan leda till en rekryteringsinsats."
-  },
-  {
-    from: "recruitment",
-    to: "mentor-certification",
-    group: "mentor-supply",
-    kind: "process_step",
-    label: "Intresserade personer registreras som mentorer och prövas för godkännande."
-  },
-  {
-    from: "parent-support",
-    to: "matching",
-    group: "parent-support",
-    kind: "linked_case",
-    label: "En matchning startas för ett bestämt stödbehov och länkas till stödärendet."
-  },
-  {
-    from: "matching",
-    to: "mentor-assignment",
-    group: "parent-support",
-    kind: "linked_case",
-    label: "När båda parter accepterar kan matchningen övergå i ett länkat mentoruppdrag."
-  },
-  {
-    from: "mentor-assignment",
-    to: "mentor-follow-up",
-    group: "parent-support",
-    kind: "optional_follow_up",
-    label: "Vid behov kan en separat uppföljning av mentorn registreras."
-  },
   {
     from: "mentor-certification",
     to: "matching",

@@ -29,7 +29,7 @@ import {
   resultClassification,
   resultOptions,
   stableHash
-} from "./case-domain.js?v=20260807-case-type-relations-v22";
+} from "./case-domain.js?v=20260807-next-case-type-v23";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-assignment-followup-v21";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
@@ -580,6 +580,7 @@ const els = {
   caseTypeHintFact: document.querySelector("#caseTypeHintFact"),
   caseTypeWorkInstructionFact: document.querySelector("#caseTypeWorkInstructionFact"),
   caseTypeMentorModeFact: document.querySelector("#caseTypeMentorModeFact"),
+  caseTypeNextTypeFact: document.querySelector("#caseTypeNextTypeFact"),
   caseTypeFieldsFact: document.querySelector("#caseTypeFieldsFact"),
   caseTypeRelationshipsFact: document.querySelector("#caseTypeRelationshipsFact"),
   editCaseTypeButton: document.querySelector("#editCaseTypeButton"),
@@ -590,6 +591,7 @@ const els = {
   caseTypeAdminHintInput: document.querySelector("#caseTypeAdminHintInput"),
   caseTypeAdminWorkInstructionInput: document.querySelector("#caseTypeAdminWorkInstructionInput"),
   caseTypeAdminMentorModeInput: document.querySelector("#caseTypeAdminMentorModeInput"),
+  caseTypeAdminNextTypeInput: document.querySelector("#caseTypeAdminNextTypeInput"),
   caseTypeAdminFieldChoices: document.querySelector("#caseTypeAdminFieldChoices"),
   activityTypeAdminTableBody: document.querySelector("#activityTypeAdminTableBody"),
   activityTypeListPanel: document.querySelector("#activityTypeListPanel"),
@@ -4402,45 +4404,97 @@ function caseTypeRelationshipLink(caseTypeId, compact = false) {
     : `<a class="case-type-relationship-node" href="#/case-types/${encodeURIComponent(caseTypeId)}"><span>${name}</span><small>Öppna ärendetyp</small></a>`;
 }
 
-function renderCaseTypeRelationshipMap() {
-  if (!els.caseTypeRelationshipMap) return;
-  const groups = [
-    ["mentor-supply", "Tillgång till mentorer"],
-    ["parent-support", "Stöd till förälder"],
-    ["prerequisite", "Tvärgående förutsättning"]
-  ];
-  els.caseTypeRelationshipMap.innerHTML = groups.map(([groupId, title]) => {
-    const relationships = CASE_TYPE_RELATIONSHIPS.filter((relationship) => relationship.group === groupId);
-    const steps = relationships.flatMap((relationship, index) => [
-      ...(index === 0 ? [caseTypeRelationshipLink(relationship.from)] : []),
+function configuredNextCaseTypeRelationships() {
+  return caseTypeDefinitions
+    .filter((definition) => definition.nextCaseTypeId && caseTypeById(definition.nextCaseTypeId))
+    .map((definition) => ({
+      from: definition.id,
+      to: definition.nextCaseTypeId,
+      kind: "next_case",
+      label: `När ärendet är avslutat kan ${caseTypeRelationshipName(definition.nextCaseTypeId)} registreras.`
+    }));
+}
+
+function configuredCaseTypeRelationships() {
+  return [...configuredNextCaseTypeRelationships(), ...CASE_TYPE_RELATIONSHIPS];
+}
+
+function caseTypeRelationshipTrack(startId, relationships, usedKeys) {
+  const steps = [caseTypeRelationshipLink(startId)];
+  const visited = new Set([startId]);
+  let currentId = startId;
+  while (currentId) {
+    const relationship = relationships.find((item) => item.from === currentId);
+    if (!relationship || visited.has(relationship.to)) break;
+    usedKeys.add(`${relationship.from}:${relationship.to}`);
+    steps.push(
       `<div class="case-type-relationship-connector">
         <span>${escapeHtml(relationshipKindLabel(relationship.kind))}</span>
         <i aria-hidden="true">&rarr;</i>
         <small>${escapeHtml(relationship.label)}</small>
       </div>`,
       caseTypeRelationshipLink(relationship.to)
-    ]);
-    return `
+    );
+    visited.add(relationship.to);
+    currentId = relationship.to;
+  }
+  return steps.join("");
+}
+
+function nextCaseTypeSelectionCreatesCycle(sourceId, nextCaseTypeId) {
+  if (!nextCaseTypeId) return false;
+  const nextById = new Map(caseTypeDefinitions.map((definition) => [definition.id, definition.nextCaseTypeId || null]));
+  nextById.set(sourceId, nextCaseTypeId);
+  const visited = new Set();
+  let currentId = sourceId;
+  while (currentId) {
+    if (visited.has(currentId)) return true;
+    visited.add(currentId);
+    currentId = nextById.get(currentId) || null;
+  }
+  return false;
+}
+
+function renderCaseTypeRelationshipMap() {
+  if (!els.caseTypeRelationshipMap) return;
+  const nextRelationships = configuredNextCaseTypeRelationships();
+  const usedKeys = new Set();
+  const tracks = [];
+  for (const [rootId, title] of [["needs-analysis", "Tillgång till mentorer"], ["parent-support", "Stöd till förälder"]]) {
+    if (nextRelationships.some((relationship) => relationship.from === rootId)) {
+      tracks.push({ title, content: caseTypeRelationshipTrack(rootId, nextRelationships, usedKeys) });
+    }
+  }
+  const remaining = () => nextRelationships.filter((relationship) => !usedKeys.has(`${relationship.from}:${relationship.to}`));
+  while (remaining().length) {
+    const pending = remaining();
+    const targets = new Set(pending.map((relationship) => relationship.to));
+    const startId = pending.find((relationship) => !targets.has(relationship.from))?.from || pending[0].from;
+    tracks.push({ title: "Övrigt konfigurerat flöde", content: caseTypeRelationshipTrack(startId, pending, usedKeys) });
+  }
+  const prerequisiteGroups = CASE_TYPE_RELATIONSHIPS.map((relationship) => ({
+    title: "Tvärgående förutsättning",
+    content: caseTypeRelationshipTrack(relationship.from, [relationship], new Set())
+  }));
+  const involvedIds = new Set(nextRelationships.flatMap((relationship) => [relationship.from, relationship.to]));
+  const standalone = caseTypeDefinitions.filter((definition) => !involvedIds.has(definition.id) && !CASE_TYPE_RELATIONSHIPS.some((relationship) => relationship.from === definition.id || relationship.to === definition.id));
+  els.caseTypeRelationshipMap.innerHTML = [...tracks, ...prerequisiteGroups].map(({ title, content }) => `
       <section class="case-type-relationship-group" aria-label="${escapeHtml(title)}">
         <h4>${escapeHtml(title)}</h4>
         <div class="case-type-relationship-track">
-          ${steps.join("")}
+          ${content}
         </div>
       </section>
-    `;
-  }).join("") + `
-    <section class="case-type-relationship-group" aria-label="Fristående ärendetyp">
-      <h4>Fristående ärendetyp</h4>
-      <div class="case-type-relationship-standalone">
-        ${caseTypeRelationshipLink("other")}
-        <small>Används när frågan inte ingår i ett fast systemstyrt flöde.</small>
-      </div>
-    </section>
-  `;
+    `).join("") + (standalone.length ? `
+      <section class="case-type-relationship-group" aria-label="Fristående ärendetyper">
+        <h4>Fristående ärendetyper</h4>
+        ${standalone.map((definition) => `<div class="case-type-relationship-standalone">${caseTypeRelationshipLink(definition.id)}<small>Ingen nästa ärendetyp är vald.</small></div>`).join("")}
+      </section>
+    ` : "");
 }
 
 function renderCaseTypeRelationshipsFact(caseTypeId) {
-  const relationships = CASE_TYPE_RELATIONSHIPS.filter((relationship) => relationship.from === caseTypeId || relationship.to === caseTypeId);
+  const relationships = configuredCaseTypeRelationships().filter((relationship) => relationship.from === caseTypeId || relationship.to === caseTypeId);
   if (!relationships.length) {
     els.caseTypeRelationshipsFact.innerHTML = '<p class="text-secondary mb-0">Fristående ärendetyp utan systemstyrt samband till en annan ärendetyp.</p>';
     return;
@@ -4490,6 +4544,7 @@ function renderCaseTypeAdministration() {
   els.caseTypeHintFact.textContent = selectedDefinition.registrationHint || "Ej angivet";
   els.caseTypeWorkInstructionFact.textContent = selectedDefinition.workInstruction || "Ej angivet";
   els.caseTypeMentorModeFact.textContent = mentorModeLabel(selectedDefinition.mentorMode);
+  els.caseTypeNextTypeFact.textContent = selectedDefinition.nextCaseTypeId ? caseTypeRelationshipName(selectedDefinition.nextCaseTypeId) : "Ingen";
   els.caseTypeFieldsFact.innerHTML = fields.length
     ? `<dl class="record-fields case-type-configured-fields mb-0">${fields.map((field) => `<div><dt>${escapeHtml(field.label)}</dt><dd>${escapeHtml(caseDetailFieldTypeLabel(field.inputType))}</dd></div>`).join("")}</dl>`
     : '<div class="empty-list border rounded text-secondary">Inga kompletterande fält.</div>';
@@ -4500,6 +4555,13 @@ function renderCaseTypeAdministration() {
     els.caseTypeAdminHintInput.value = selectedDefinition.registrationHint || "";
     els.caseTypeAdminWorkInstructionInput.value = selectedDefinition.workInstruction || "";
     els.caseTypeAdminMentorModeInput.value = selectedDefinition.mentorMode || "optional";
+    els.caseTypeAdminNextTypeInput.innerHTML = [
+      '<option value="">Ingen</option>',
+      ...caseTypeDefinitions
+        .filter((definition) => definition.id !== selectedDefinition.id)
+        .map((definition) => `<option value="${escapeHtml(definition.id)}">${escapeHtml(definition.name)}</option>`)
+    ].join("");
+    els.caseTypeAdminNextTypeInput.value = selectedDefinition.nextCaseTypeId || "";
     const selectedFields = new Set(selectedDefinition.detailFieldIds || []);
     els.caseTypeAdminFieldChoices.innerHTML = CASE_DETAIL_FIELD_DEFINITIONS.map((field) => `
       <div class="form-check">
@@ -7345,6 +7407,12 @@ els.caseTypeAdminForm.addEventListener("submit", async (event) => {
   if (!definition) return;
   const detailFieldIds = [...els.caseTypeAdminFieldChoices.querySelectorAll("input:checked")]
     .map((input) => input.value);
+  const nextCaseTypeId = els.caseTypeAdminNextTypeInput.value || null;
+  if (nextCaseTypeSelectionCreatesCycle(definition.id, nextCaseTypeId)) {
+    showFeedback("Valet skulle skapa ett cirkulärt ärendeflöde. Välj en annan ärendetyp eller Ingen.");
+    els.caseTypeAdminNextTypeInput.focus();
+    return;
+  }
   const now = new Date().toISOString();
   const nextVersion = Math.max(0, ...caseTypeDefinitionVersions
     .filter((item) => item.id === definition.id)
@@ -7363,6 +7431,7 @@ els.caseTypeAdminForm.addEventListener("submit", async (event) => {
     registrationHint: els.caseTypeAdminHintInput.value.trim(),
     workInstruction: els.caseTypeAdminWorkInstructionInput.value.trim(),
     mentorMode: els.caseTypeAdminMentorModeInput.value,
+    nextCaseTypeId,
     detailFieldIds,
     updatedAt: now,
     updatedBy: CURRENT_USER_ID

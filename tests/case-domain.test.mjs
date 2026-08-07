@@ -152,6 +152,10 @@ test("defines guided workflows for matching and mentor assignments", () => {
 
 test("defines valid relationships between case types", () => {
   const caseTypeIds = new Set(CASE_TYPE_DEFINITIONS.map((item) => item.id));
+  for (const caseType of CASE_TYPE_DEFINITIONS) {
+    assert.ok(caseType.nextCaseTypeId === null || caseTypeIds.has(caseType.nextCaseTypeId), `unknown next case type for ${caseType.id}`);
+    assert.notEqual(caseType.nextCaseTypeId, caseType.id, `${caseType.id} cannot point to itself`);
+  }
   const relationshipKeys = CASE_TYPE_RELATIONSHIPS.map((item) => `${item.from}:${item.to}:${item.kind}`);
   assert.equal(new Set(relationshipKeys).size, relationshipKeys.length);
   for (const relationship of CASE_TYPE_RELATIONSHIPS) {
@@ -159,8 +163,10 @@ test("defines valid relationships between case types", () => {
     assert.ok(caseTypeIds.has(relationship.to), `unknown target case type ${relationship.to}`);
     assert.ok(relationship.label);
   }
-  assert.ok(CASE_TYPE_RELATIONSHIPS.some((item) => item.from === "parent-support" && item.to === "matching"));
-  assert.ok(CASE_TYPE_RELATIONSHIPS.some((item) => item.from === "matching" && item.to === "mentor-assignment"));
+  assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "parent-support").nextCaseTypeId, "matching");
+  assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "matching").nextCaseTypeId, "mentor-assignment");
+  assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "needs-analysis").nextCaseTypeId, "recruitment");
+  assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "other").nextCaseTypeId, null);
   assert.ok(CASE_TYPE_RELATIONSHIPS.some((item) => item.from === "mentor-certification" && item.to === "matching" && item.kind === "prerequisite"));
 });
 
