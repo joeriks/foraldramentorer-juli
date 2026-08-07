@@ -4391,8 +4391,11 @@ function caseTypeRelationshipName(caseTypeId) {
   return caseTypeById(caseTypeId)?.name || caseTypeId;
 }
 
-function caseTypeRelationshipLink(caseTypeId) {
-  return `<a class="case-type-relationship-node" href="#/case-types/${encodeURIComponent(caseTypeId)}">${escapeHtml(caseTypeRelationshipName(caseTypeId))}</a>`;
+function caseTypeRelationshipLink(caseTypeId, compact = false) {
+  const name = escapeHtml(caseTypeRelationshipName(caseTypeId));
+  return compact
+    ? `<a class="case-type-detail-link" href="#/case-types/${encodeURIComponent(caseTypeId)}">${name}</a>`
+    : `<a class="case-type-relationship-node" href="#/case-types/${encodeURIComponent(caseTypeId)}"><span>${name}</span><small>Öppna ärendetyp</small></a>`;
 }
 
 function renderCaseTypeRelationshipMap() {
@@ -4404,21 +4407,20 @@ function renderCaseTypeRelationshipMap() {
   ];
   els.caseTypeRelationshipMap.innerHTML = groups.map(([groupId, title]) => {
     const relationships = CASE_TYPE_RELATIONSHIPS.filter((relationship) => relationship.group === groupId);
+    const steps = relationships.flatMap((relationship, index) => [
+      ...(index === 0 ? [caseTypeRelationshipLink(relationship.from)] : []),
+      `<div class="case-type-relationship-connector">
+        <span>${escapeHtml(relationshipKindLabel(relationship.kind))}</span>
+        <i aria-hidden="true">&rarr;</i>
+        <small>${escapeHtml(relationship.label)}</small>
+      </div>`,
+      caseTypeRelationshipLink(relationship.to)
+    ]);
     return `
       <section class="case-type-relationship-group" aria-label="${escapeHtml(title)}">
         <h4>${escapeHtml(title)}</h4>
-        <div class="case-type-relationship-list">
-          ${relationships.map((relationship) => `
-            <div class="case-type-relationship-row">
-              ${caseTypeRelationshipLink(relationship.from)}
-              <div class="case-type-relationship-connector">
-                <span>${escapeHtml(relationshipKindLabel(relationship.kind))}</span>
-                <i aria-hidden="true">&rarr;</i>
-                <small>${escapeHtml(relationship.label)}</small>
-              </div>
-              ${caseTypeRelationshipLink(relationship.to)}
-            </div>
-          `).join("")}
+        <div class="case-type-relationship-track">
+          ${steps.join("")}
         </div>
       </section>
     `;
@@ -4442,7 +4444,7 @@ function renderCaseTypeRelationshipsFact(caseTypeId) {
   els.caseTypeRelationshipsFact.innerHTML = relationships.map((relationship) => `
     <div class="case-type-detail-relation">
       <span class="badge text-bg-light border">${escapeHtml(relationshipKindLabel(relationship.kind))}</span>
-      <div>${caseTypeRelationshipLink(relationship.from)} <span aria-hidden="true">&rarr;</span> ${caseTypeRelationshipLink(relationship.to)}</div>
+      <div>${caseTypeRelationshipLink(relationship.from, true)} <span aria-hidden="true">&rarr;</span> ${caseTypeRelationshipLink(relationship.to, true)}</div>
       <small>${escapeHtml(relationship.label)}</small>
     </div>
   `).join("");
