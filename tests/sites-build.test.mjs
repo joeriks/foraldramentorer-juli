@@ -51,6 +51,11 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.equal(domain.status, 200);
   assert.match(await domain.text(), /deriveCaseStatus/);
 
+  const learningDomain = await worker.fetch(new Request("https://example.test/learning-domain.js"), {}, context);
+  assert.equal(learningDomain.status, 200);
+  assert.match(learningDomain.headers.get("content-type"), /^text\/javascript/);
+  assert.match(await learningDomain.text(), /requiredLearningContentIds/);
+
   const featureLinks = await worker.fetch(new Request("https://example.test/feature-links.js"), {}, context);
   assert.equal(featureLinks.status, 200);
   assert.match(await featureLinks.text(), /dashboard\.work-queue/);
