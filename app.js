@@ -4672,6 +4672,22 @@ function renderCaseActivities(caseRecord, activities) {
       ? activityOwnerOverrideId(activity, caseRecord) ? "Särskilt tilldelad" : "Ärendeansvarig"
       : "";
     const result = activity.status === "completed" ? activityResultLabel(activity) : "";
+    const canQuickComplete = !["completed", "not_applicable"].includes(activity.status)
+      && !["paused", "closed"].includes(caseRecord.status);
+    const quickResultOptions = canQuickComplete
+      ? activityResultOptions(activity).map(([value, label]) => {
+        const classification = resultClassification(activity.templateId, value);
+        const consequence = activitySaveRequiresConfirmation(activity, "completed", value)
+          ? " — avslutar ärendet"
+          : classification === "deviation"
+            ? " — kräver anteckning"
+            : "";
+        return `<option value="${escapeHtml(value)}">${escapeHtml(label + consequence)}</option>`;
+      }).join("")
+      : "";
+    const quickResultSelect = canQuickComplete
+      ? `<select class="form-select form-select-sm activity-result-quick-select" data-quick-activity-result="${escapeHtml(activity.id)}" aria-label="Registrera resultat för ${escapeHtml(activity.title)}"><option value="">Registrera resultat</option>${quickResultOptions}</select>`
+      : "";
     const stepNumber = Number.isFinite(activity.sortOrder) ? activity.sortOrder + 1 : activities.indexOf(activity) + 1;
     const row = document.createElement("tr");
     if (activityHasBlockingResult(activity)) row.classList.add("activity-row-attention");
@@ -4682,6 +4698,7 @@ function renderCaseActivities(caseRecord, activities) {
           <div>
             <button type="button" class="activity-title-button" data-open-activity="${escapeHtml(activity.id)}">${escapeHtml(activity.title)}</button>
             ${result ? `<small>Resultat: ${escapeHtml(result)}</small>` : ""}
+            ${quickResultSelect ? `<div class="activity-mobile-result mt-2">${quickResultSelect}</div>` : ""}
           </div>
         </div>
       </td>
@@ -4689,7 +4706,7 @@ function renderCaseActivities(caseRecord, activities) {
       <td><span class="activity-owner-name">${escapeHtml(handler?.name || "Ej tilldelad")}</span>${ownerSource ? `<small>${ownerSource}</small>` : ""}</td>
       <td class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityDueLabel(activity))}</td>
       <td>${documents.length ? `${documents.length} st` : '<span class="text-secondary">0</span>'}</td>
-      <td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm activity-open-button" data-open-activity="${escapeHtml(activity.id)}">Öppna</button></td>
+      <td class="text-end"><div class="activity-row-actions">${quickResultSelect ? `<div class="activity-desktop-result">${quickResultSelect}</div>` : ""}<button type="button" class="btn btn-outline-primary btn-sm activity-open-button" data-open-activity="${escapeHtml(activity.id)}">Öppna</button></div></td>
     `;
     els.caseActivityTableBody.append(row);
   }
@@ -7823,6 +7840,26 @@ els.caseActivityTableBody.addEventListener("click", (event) => {
   if (openButton) openCaseActivity(openButton.dataset.openActivity);
 });
 
+els.caseActivityTableBody.addEventListener("change", async (event) => {
+  const resultInput = event.target.closest("[data-quick-activity-result]");
+  if (!resultInput || !resultInput.value) return;
+  const activityId = resultInput.dataset.quickActivityResult;
+  const resultCode = resultInput.value;
+  for (const matchingInput of els.caseActivityTableBody.querySelectorAll(`[data-quick-activity-result="${CSS.escape(activityId)}"]`)) {
+    matchingInput.disabled = true;
+  }
+  try {
+    await registerQuickActivityResult(activityId, resultCode);
+  } catch (error) {
+    console.error("Kunde inte registrera aktivitetsresultat", error);
+    showFeedback(error.message || "Resultatet kunde inte sparas.");
+    for (const matchingInput of els.caseActivityTableBody.querySelectorAll(`[data-quick-activity-result="${CSS.escape(activityId)}"]`)) {
+      matchingInput.disabled = false;
+      matchingInput.value = "";
+    }
+  }
+});
+
 els.backToActivitiesButton.addEventListener("click", () => {
   selectedCaseActivityId = null;
   renderCaseDetail();
@@ -7968,6 +8005,53 @@ function openCaseActivity(activityId) {
   }
   bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-activities-tab")).show();
   renderCaseDetail();
+}
+
+function openCaseActivityWithResult(activityId, resultCode) {
+  const activity = caseActivities.find((item) => item.id === activityId);
+  if (!activity) return;
+  openCaseActivity(activityId);
+  els.activityDetailStatusInput.value = "completed";
+  renderActivityResultInput(activity);
+  els.activityDetailResultInput.value = resultCode;
+  updateActivityValidationState();
+  updateActivityDetailDirtyState();
+  requestAnimationFrame(() => {
+    const classification = resultClassification(activity.templateId, resultCode);
+    (classification === "deviation" ? els.activityDetailNoteInput : els.activityDetailSaveButton).focus();
+  });
+}
+
+async function registerQuickActivityResult(activityId, resultCode) {
+  const activity = caseActivities.find((item) => item.id === activityId);
+  const caseRecord = cases.find((item) => item.id === activity?.caseId);
+  const validResult = activity && activityResultOptions(activity).some(([value]) => value === resultCode);
+  if (!activity || !caseRecord || !validResult) throw new Error("Aktiviteten eller resultatet kunde inte hittas.");
+
+  const classification = resultClassification(activity.templateId, resultCode);
+  if (classification === "deviation" || activitySaveRequiresConfirmation(activity, "completed", resultCode)) {
+    openCaseActivityWithResult(activity.id, resultCode);
+    return;
+  }
+
+  const candidateSynced = await syncCandidateFromActivity(activity, "completed", "", new Date().toISOString(), resultCode);
+  if (!candidateSynced) {
+    openCaseActivityWithResult(activity.id, resultCode);
+    return;
+  }
+  await saveActivityCommand({
+    activity,
+    caseRecord,
+    nextStatus: "completed",
+    nextResult: resultCode,
+    nextHandlerId: activity.handlerIdOverride || "",
+    nextDueDate: activity.dueDate || "",
+    nextWaitingForParty: null,
+    note: ""
+  });
+  markSaved();
+  showFeedback(`Aktiviteten har avslutats med resultatet ${activityResultOptions(activity).find(([value]) => value === resultCode)?.[1] || resultCode}.`);
+  await refresh();
 }
 
 function openCaseMeetings(caseId) {
