@@ -1052,6 +1052,7 @@
                       <th>Ärendetyp</th>
                       <th>Mentorkoppling</th>
                       <th>Kompletterande fält</th>
+                      <th>Aktiviteter</th>
                       <th>Senast ändrad</th>
                       <th class="text-end">Åtgärd</th>
                     </tr>
@@ -1096,6 +1097,10 @@
                       <div><dt>Mentorkoppling</dt><dd id="caseTypeMentorModeFact"></dd></div>
                       <div><dt>Nästa ärendetyp</dt><dd id="caseTypeNextTypeFact"></dd></div>
                     </dl>
+                  </section>
+                  <section class="record-section">
+                    <h3 class="record-section-title">Aktivitetsflöde</h3>
+                    <div id="caseTypeActivitiesFact" class="case-type-activity-flow"></div>
                   </section>
                   <section class="record-section">
                     <h3 class="record-section-title">Kompletterande fält</h3>
@@ -1154,14 +1159,14 @@
             <div id="activityTypeListPanel" class="card" aria-label="Administration av aktivitetsmallar">
               <div class="card-header bg-white">
                 <h2 class="h5 mb-1">Aktivitetsmallar</h2>
-                <p class="text-secondary mb-0">Styr den handledande information som visas när en aktivitet öppnas.</p>
+                <p class="text-secondary mb-0">Visar aktiviteternas handledning, resultatregler och användning i ärendeflöden.</p>
               </div>
               <div class="card-body border-bottom">
-                <div class="alert alert-light border mb-0" role="note">Aktivitetens namn, tekniska ID och resultatval är fasta. Endast handläggningsanvisningen kan ändras.</div>
+                <div class="alert alert-light border mb-0" role="note">Aktivitetens namn, tekniska ID, statusregler och resultatval är systemstyrda. Handläggningsanvisningen kan ändras av kommunen.</div>
               </div>
               <div class="table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0">
-                  <thead class="table-light"><tr><th>Aktivitetsmall</th><th>Handläggningsanvisning</th><th>Senast ändrad</th><th class="text-end">Åtgärd</th></tr></thead>
+                  <thead class="table-light"><tr><th>Aktivitetsmall</th><th>Resultatval</th><th>Används i</th><th>Senast ändrad</th><th class="text-end">Åtgärd</th></tr></thead>
                   <tbody id="activityTypeAdminTableBody"></tbody>
                 </table>
               </div>
@@ -1184,6 +1189,22 @@
               <div class="card-body">
                 <div id="activityTypeReadView" class="record-grid">
                   <section class="record-section"><h3 class="record-section-title">Handläggarstöd</h3><dl class="record-fields mb-0"><div><dt>Handläggningsanvisning</dt><dd id="activityTypeWorkInstructionFact"></dd></div></dl></section>
+                  <section class="record-section">
+                    <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center mb-3">
+                      <h3 class="record-section-title mb-0">Systemstyrd konfiguration</h3>
+                      <span class="badge text-bg-light border">Skrivskyddad</span>
+                    </div>
+                    <dl class="record-fields mb-0">
+                      <div><dt>Statuslägen</dt><dd id="activityTypeStatusFact"></dd></div>
+                      <div><dt>Regel vid avslut</dt><dd id="activityTypeCompletionFact"></dd></div>
+                      <div><dt>Snabbavslut</dt><dd id="activityTypeQuickFact"></dd></div>
+                      <div><dt>Används i ärendetyper</dt><dd id="activityTypeUsageFact"></dd></div>
+                    </dl>
+                  </section>
+                  <section class="record-section">
+                    <h3 class="record-section-title">Tillåtna resultat</h3>
+                    <div id="activityTypeResultsFact" class="activity-type-results"></div>
+                  </section>
                 </div>
                 <form id="activityTypeAdminForm" hidden>
                   <input id="activityTypeAdminIdInput" type="hidden">
@@ -1779,6 +1800,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260808-case-closure-summary-v48"></script>
+    <script type="module" src="app.js?v=20260808-activity-admin-config-v49"></script>
   </body>
 </html>

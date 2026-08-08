@@ -1185,6 +1185,10 @@ body {
   gap: var(--app-space-4);
 }
 
+.record-grid > * {
+  min-width: 0;
+}
+
 .learning-learner-select {
   width: min(22rem, 100%);
 }
@@ -1415,6 +1419,67 @@ body {
 .case-type-configured-fields dd {
   color: var(--app-text-muted);
   font-size: 0.875rem;
+}
+
+.case-type-activity-list {
+  display: grid;
+  gap: 0;
+  margin: 0 0 var(--app-space-3);
+  padding: 0;
+  border: 1px solid var(--app-border);
+  list-style: none;
+  counter-reset: activity-step;
+}
+
+.case-type-activity-list li {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: var(--app-space-3);
+  align-items: start;
+  padding: var(--app-space-3);
+  counter-increment: activity-step;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.case-type-activity-list li:last-child {
+  border-bottom: 0;
+}
+
+.case-type-activity-order {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid #b8c5ce;
+  border-radius: 50%;
+  color: var(--app-muted);
+  font-weight: 700;
+}
+
+.case-type-activity-order::before {
+  content: counter(activity-step);
+}
+
+.case-type-activity-list small {
+  display: block;
+  margin-top: .2rem;
+  color: var(--app-muted);
+}
+
+.case-type-activity-list.suggested .case-type-activity-order {
+  border-style: dashed;
+}
+
+.activity-type-results {
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--app-border);
+  overflow: hidden;
+}
+
+.activity-type-results code {
+  color: #334b5c;
+  font-size: .82rem;
 }
 
 .record-fields-edit dt,

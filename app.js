@@ -632,6 +632,7 @@ const els = {
   caseTypeWorkInstructionFact: document.querySelector("#caseTypeWorkInstructionFact"),
   caseTypeMentorModeFact: document.querySelector("#caseTypeMentorModeFact"),
   caseTypeNextTypeFact: document.querySelector("#caseTypeNextTypeFact"),
+  caseTypeActivitiesFact: document.querySelector("#caseTypeActivitiesFact"),
   caseTypeFieldsFact: document.querySelector("#caseTypeFieldsFact"),
   caseTypeRelationshipsFact: document.querySelector("#caseTypeRelationshipsFact"),
   editCaseTypeButton: document.querySelector("#editCaseTypeButton"),
@@ -654,6 +655,11 @@ const els = {
   activityTypeUpdatedMeta: document.querySelector("#activityTypeUpdatedMeta"),
   activityTypeReadView: document.querySelector("#activityTypeReadView"),
   activityTypeWorkInstructionFact: document.querySelector("#activityTypeWorkInstructionFact"),
+  activityTypeStatusFact: document.querySelector("#activityTypeStatusFact"),
+  activityTypeCompletionFact: document.querySelector("#activityTypeCompletionFact"),
+  activityTypeQuickFact: document.querySelector("#activityTypeQuickFact"),
+  activityTypeUsageFact: document.querySelector("#activityTypeUsageFact"),
+  activityTypeResultsFact: document.querySelector("#activityTypeResultsFact"),
   editActivityTypeButton: document.querySelector("#editActivityTypeButton"),
   activityTypeEditActions: document.querySelector("#activityTypeEditActions"),
   cancelActivityTypeEditButton: document.querySelector("#cancelActivityTypeEditButton"),
@@ -5249,6 +5255,87 @@ function renderCaseTypeRelationshipsFact(caseTypeId) {
   `).join("");
 }
 
+function caseTypeActivitySummary(definition) {
+  const templateCount = definition.activityTemplateIds?.length || 0;
+  const suggestionCount = definition.suggestedActivities?.length || 0;
+  if (templateCount) return `${templateCount} standardmallar`;
+  if (suggestionCount) return `${suggestionCount} aktivitetsförslag`;
+  return "Läggs till vid behov";
+}
+
+function renderCaseTypeActivitiesFact(definition) {
+  const templateIds = definition.activityTemplateIds || [];
+  const suggestions = definition.suggestedActivities || [];
+  if (templateIds.length) {
+    els.caseTypeActivitiesFact.innerHTML = `
+      <ol class="case-type-activity-list">
+        ${templateIds.map((templateId) => {
+          const template = activityTemplateDefinitionById(templateId);
+          if (!template) return "";
+          const quickCount = template.quickCompletionResultCodes?.length || 0;
+          return `<li>
+            <span class="case-type-activity-order" aria-hidden="true"></span>
+            <div>
+              <a href="#/activity-types/${encodeURIComponent(template.id)}"><strong>${escapeHtml(template.title)}</strong></a>
+              <small>${template.results?.length || 0} resultatval · ${quickCount ? "snabbavslut tillåtet för normalt utfall" : "öppnas för fullständig registrering"}</small>
+            </div>
+          </li>`;
+        }).join("")}
+      </ol>
+      <p class="form-text mb-0">Aktiviteterna skapas automatiskt i den här ordningen när ärendet registreras.</p>`;
+    return;
+  }
+  if (suggestions.length) {
+    els.caseTypeActivitiesFact.innerHTML = `
+      <ol class="case-type-activity-list suggested">
+        ${suggestions.map((title) => `<li><span class="case-type-activity-order" aria-hidden="true"></span><div><strong>${escapeHtml(title)}</strong><small>Föreslagen manuell aktivitet</small></div></li>`).join("")}
+      </ol>
+      <p class="form-text mb-0">Förslagen är verksamhetsstöd. Handläggaren väljer vilka som behövs och de använder mallen <a href="#/activity-types/${AD_HOC_ACTIVITY_TEMPLATE_ID}">Annan aktivitet</a>.</p>`;
+    return;
+  }
+  els.caseTypeActivitiesFact.innerHTML = `<div class="empty-list border rounded text-secondary">Inget fast aktivitetsflöde. Handläggaren kan lägga till aktiviteter med mallen <a href="#/activity-types/${AD_HOC_ACTIVITY_TEMPLATE_ID}">Annan aktivitet</a>.</div>`;
+}
+
+function caseTypesUsingActivityTemplate(templateId) {
+  if (templateId === AD_HOC_ACTIVITY_TEMPLATE_ID) return caseTypeDefinitions;
+  return caseTypeDefinitions.filter((definition) => definition.activityTemplateIds?.includes(templateId));
+}
+
+function activityResultClassificationLabel(classification) {
+  return classification === "acceptable" ? "Normalt utfall" : "Kräver ställningstagande";
+}
+
+function renderActivityTypeConfiguration(definition) {
+  const results = definition.results || [];
+  const quickCodes = new Set(definition.quickCompletionResultCodes || []);
+  const quickResults = results.filter(([code]) => quickCodes.has(code));
+  const usage = caseTypesUsingActivityTemplate(definition.id);
+  els.activityTypeStatusFact.textContent = Object.values(ACTIVITY_STATUS_LABELS).join(", ");
+  els.activityTypeCompletionFact.textContent = definition.id === "decision"
+    ? "Resultat krävs. Godkänd avslutar godkännandeärendet; avvikande resultat kräver tjänsteanteckning och ställningstagande."
+    : "Resultat krävs när aktiviteten avslutas. Avvikande resultat kräver tjänsteanteckning och ställningstagande.";
+  els.activityTypeQuickFact.textContent = quickResults.length
+    ? `Tillåtet för: ${quickResults.map(([, label]) => label).join(", ")}. Handläggaren bekräftar valet innan det sparas.`
+    : "Inte tillåtet. Aktiviteten måste öppnas för att resultatet ska registreras.";
+  els.activityTypeUsageFact.innerHTML = definition.id === AD_HOC_ACTIVITY_TEMPLATE_ID
+    ? "Alla ärendetyper när handläggaren lägger till en manuell aktivitet."
+    : usage.length
+      ? usage.map((caseType) => `<a href="#/case-types/${encodeURIComponent(caseType.id)}">${escapeHtml(caseType.name)}</a>`).join(", ")
+      : "Ingen publicerad ärendetyp använder mallen automatiskt.";
+  els.activityTypeResultsFact.innerHTML = `
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light"><tr><th>Resultat</th><th>Klassificering</th><th>Snabbavslut</th><th>Teknisk kod</th></tr></thead>
+        <tbody>${results.map(([code, label, classification]) => `<tr>
+          <td><strong>${escapeHtml(label)}</strong></td>
+          <td><span class="badge ${classification === "acceptable" ? "text-bg-success" : "text-bg-warning"}">${escapeHtml(activityResultClassificationLabel(classification))}</span></td>
+          <td>${quickCodes.has(code) ? "Ja" : "Nej"}</td>
+          <td><code>${escapeHtml(code)}</code></td>
+        </tr>`).join("")}</tbody>
+      </table>
+    </div>`;
+}
+
 function renderCaseTypeAdministration() {
   const selectedDefinition = selectedCaseTypeId ? caseTypeById(selectedCaseTypeId) : null;
   els.caseTypeListPanel.hidden = Boolean(selectedCaseTypeId);
@@ -5262,6 +5349,7 @@ function renderCaseTypeAdministration() {
       <td><strong>${escapeHtml(definition.name)}</strong><small class="d-block text-secondary">Tekniskt ID ${escapeHtml(definition.id)}</small></td>
       <td>${escapeHtml(mentorModeLabel(definition.mentorMode))}</td>
       <td>${fields.length ? escapeHtml(fields.map((field) => field.label).join(", ")) : '<span class="text-secondary">Inga</span>'}</td>
+      <td>${escapeHtml(caseTypeActivitySummary(definition))}</td>
       <td>${definition.updatedAt ? escapeHtml(formatDateTime(definition.updatedAt)) : '<span class="text-secondary">Grundinställning</span>'}</td>
       <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/case-types/${encodeURIComponent(definition.id)}">Öppna</a></td>
     `;
@@ -5286,6 +5374,7 @@ function renderCaseTypeAdministration() {
   els.caseTypeWorkInstructionFact.textContent = selectedDefinition.workInstruction || "Ej angivet";
   els.caseTypeMentorModeFact.textContent = mentorModeLabel(selectedDefinition.mentorMode);
   els.caseTypeNextTypeFact.textContent = selectedDefinition.nextCaseTypeId ? caseTypeRelationshipName(selectedDefinition.nextCaseTypeId) : "Ingen";
+  renderCaseTypeActivitiesFact(selectedDefinition);
   els.caseTypeFieldsFact.innerHTML = fields.length
     ? `<dl class="record-fields case-type-configured-fields mb-0">${fields.map((field) => `<div><dt>${escapeHtml(field.label)}</dt><dd>${escapeHtml(caseDetailFieldTypeLabel(field.inputType))}</dd></div>`).join("")}</dl>`
     : '<div class="empty-list border rounded text-secondary">Inga kompletterande fält.</div>';
@@ -5329,10 +5418,12 @@ function renderActivityTypeAdministration() {
   els.activityTypeDetailPanel.hidden = !selectedDefinition;
   els.activityTypeAdminTableBody.innerHTML = "";
   for (const definition of activityTemplateDefinitions) {
+    const usage = caseTypesUsingActivityTemplate(definition.id);
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td><strong>${escapeHtml(definition.title)}</strong><small class="d-block text-secondary">Tekniskt ID ${escapeHtml(definition.id)}</small></td>
-      <td class="activity-guidance-preview">${escapeHtml(definition.workInstruction || "Ej angivet")}</td>
+      <td><strong>${escapeHtml(definition.title)}</strong><small class="d-block text-secondary activity-guidance-preview">${escapeHtml(definition.workInstruction || "Ej angivet")}</small></td>
+      <td>${definition.results?.length || 0}</td>
+      <td>${definition.id === AD_HOC_ACTIVITY_TEMPLATE_ID ? "Alla, vid manuell aktivitet" : usage.map((caseType) => escapeHtml(caseType.name)).join(", ") || '<span class="text-secondary">Ingen automatisk</span>'}</td>
       <td>${definition.updatedAt ? escapeHtml(formatDateTime(definition.updatedAt)) : '<span class="text-secondary">Grundinställning</span>'}</td>
       <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/activity-types/${encodeURIComponent(definition.id)}">Öppna</a></td>
     `;
@@ -5351,6 +5442,7 @@ function renderActivityTypeAdministration() {
   els.activityTypeVersionMeta.textContent = String(selectedDefinition.version || 1);
   els.activityTypeUpdatedMeta.textContent = selectedDefinition.updatedAt ? formatDateTime(selectedDefinition.updatedAt) : "Grundinställning";
   els.activityTypeWorkInstructionFact.textContent = selectedDefinition.workInstruction || "Ej angivet";
+  renderActivityTypeConfiguration(selectedDefinition);
   if (activityTypeEditMode) els.activityTypeAdminWorkInstructionInput.value = selectedDefinition.workInstruction || "";
   els.activityTypeReadView.hidden = activityTypeEditMode;
   els.activityTypeAdminForm.hidden = !activityTypeEditMode;

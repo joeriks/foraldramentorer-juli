@@ -24,9 +24,12 @@ test("serves the application shell", async () => {
   assert.match(html, /id="presentationStepPoints"/);
   assert.match(html, />Nytt ärende</);
   assert.match(html, /id="caseTypeDetailPanel"/);
+  assert.match(html, /id="caseTypeActivitiesFact"/);
   assert.match(html, /form="caseTypeAdminForm"/);
   assert.match(html, /id="activityTypesAdministrationView"/);
   assert.match(html, /form="activityTypeAdminForm"/);
+  assert.match(html, /id="activityTypeResultsFact"/);
+  assert.match(html, /id="activityTypeQuickFact"/);
   assert.match(html, /Handläggningsanvisning/);
   assert.match(html, /<form id="personEditForm"[\s\S]*id="cancelPersonEditButton"[\s\S]*id="savePersonEditButton"[\s\S]*<\/form>/);
   assert.doesNotMatch(html, /form="personEditForm"/);
@@ -52,6 +55,8 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /data-quick-finish-activity/);
   assert.match(scriptText, /registerQuickActivityResult/);
   assert.match(scriptText, /quickCompletionResultCodes/);
+  assert.match(scriptText, /function renderActivityTypeConfiguration/);
+  assert.match(scriptText, /function renderCaseTypeActivitiesFact/);
   assert.match(scriptText, /alternativeLabel: "Komplettera uppgifter"/);
   assert.match(scriptText, /title: "Avsluta aktiviteten\?"/);
   assert.match(scriptText, /resultOptions,/);
