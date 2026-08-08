@@ -2014,8 +2014,8 @@ body {
 }
 
 .activity-result-quick-select {
-  width: auto;
-  min-width: 11.5rem;
+  width: 11.5rem;
+  max-width: 100%;
 }
 
 .activity-mobile-result {

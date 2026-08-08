@@ -4032,6 +4032,18 @@ function activityResultOptions(activity) {
   return ACTIVITY_RESULT_OPTIONS[activity?.templateId] || ACTIVITY_RESULT_OPTIONS.default;
 }
 
+const QUICK_ACTIVITY_RESULT_CODES = {
+  registryChecked: new Set(["shown_checked"]),
+  trainingDone: new Set(["completed"]),
+  quizDone: new Set(["passed"])
+};
+
+function quickActivityResultOptions(activity) {
+  const allowedCodes = QUICK_ACTIVITY_RESULT_CODES[activity?.templateId];
+  if (!allowedCodes) return [];
+  return activityResultOptions(activity).filter(([resultCode]) => allowedCodes.has(resultCode));
+}
+
 function defaultCompletedResult(activity) {
   return activityResultOptions(activity)[0]?.[0] || "";
 }
@@ -4672,20 +4684,14 @@ function renderCaseActivities(caseRecord, activities) {
       ? activityOwnerOverrideId(activity, caseRecord) ? "Särskilt tilldelad" : "Ärendeansvarig"
       : "";
     const result = activity.status === "completed" ? activityResultLabel(activity) : "";
-    const canQuickComplete = !["completed", "not_applicable"].includes(activity.status)
-      && !["paused", "closed"].includes(caseRecord.status);
-    const quickResultOptions = canQuickComplete
-      ? activityResultOptions(activity).map(([value, label]) => {
-        const classification = resultClassification(activity.templateId, value);
-        const consequence = activitySaveRequiresConfirmation(activity, "completed", value)
-          ? " — avslutar ärendet"
-          : classification === "deviation"
-            ? " — kräver anteckning"
-            : "";
-        return `<option value="${escapeHtml(value)}">${escapeHtml(label + consequence)}</option>`;
-      }).join("")
-      : "";
-    const quickResultSelect = canQuickComplete
+    const quickResults = !["completed", "not_applicable"].includes(activity.status)
+      && !["paused", "closed"].includes(caseRecord.status)
+      ? quickActivityResultOptions(activity)
+      : [];
+    const quickResultOptions = quickResults
+      .map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)
+      .join("");
+    const quickResultSelect = quickResults.length
       ? `<select class="form-select form-select-sm activity-result-quick-select" data-quick-activity-result="${escapeHtml(activity.id)}" aria-label="Registrera resultat för ${escapeHtml(activity.title)}"><option value="">Registrera resultat</option>${quickResultOptions}</select>`
       : "";
     const stepNumber = Number.isFinite(activity.sortOrder) ? activity.sortOrder + 1 : activities.indexOf(activity) + 1;
