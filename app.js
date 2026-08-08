@@ -1090,7 +1090,7 @@ function showCaseFormError(message, field = null) {
   field?.focus({ preventScroll: true });
 }
 
-function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, subjectLabel = "Mentor", subjectValue = "", confirmLabel = "Bekräfta", alternativeLabel = "", resultOptions = [], resultValue = "", danger = false }) {
+function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, subjectLabel = "Mentor", subjectValue = "", confirmLabel = "Bekräfta", alternativeLabel = "", resultOptions = [], danger = false }) {
   if (!confirmActionModal) return Promise.resolve({ confirmed: window.confirm(body), note: "" });
   els.confirmActionEyebrow.textContent = eyebrow;
   els.confirmActionTitle.textContent = title;
@@ -1105,7 +1105,7 @@ function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName
   els.confirmActionResultInput.innerHTML = resultOptions.length
     ? `<option value="">Välj resultat</option>${resultOptions.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("")}`
     : "";
-  els.confirmActionResultInput.value = resultValue;
+  els.confirmActionResultInput.value = "";
   els.confirmActionAlternativeButton.textContent = alternativeLabel;
   els.confirmActionAlternativeButton.hidden = !alternativeLabel;
   els.confirmActionButton.textContent = confirmLabel;
@@ -1119,11 +1119,12 @@ function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName
 }
 
 function resolveConfirmation(value) {
-  if (!pendingConfirmation) return;
-  if (value === "confirm" && !els.confirmActionResultRow.hidden && !els.confirmActionResultInput.reportValidity()) return;
+  if (!pendingConfirmation) return false;
+  if (value === "confirm" && !els.confirmActionResultRow.hidden && !els.confirmActionResultInput.reportValidity()) return false;
   const resolve = pendingConfirmation;
   pendingConfirmation = null;
   resolve({ action: value, confirmed: value === "confirm", note: value === "cancel" ? "" : els.confirmActionNote.value.trim(), resultCode: els.confirmActionResultInput.value });
+  return true;
 }
 
 function openDatabase() {
@@ -8037,8 +8038,7 @@ async function registerQuickActivityResult(activityId) {
     subjectValue: activity.title,
     confirmLabel: "Avsluta aktivitet",
     alternativeLabel: "Komplettera uppgifter",
-    resultOptions,
-    resultValue: resultOptions.length === 1 ? resultOptions[0][0] : ""
+    resultOptions
   });
   const resultCode = confirmation.resultCode;
   if (confirmation.action === "alternative") {
@@ -8957,12 +8957,10 @@ openDatabase()
     modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());
     handlerModalElement.addEventListener("shown.bs.modal", () => els.handlerNameInput.focus());
     els.confirmActionButton.addEventListener("click", () => {
-      resolveConfirmation("confirm");
-      confirmActionModal.hide();
+      if (resolveConfirmation("confirm")) confirmActionModal.hide();
     });
     els.confirmActionAlternativeButton.addEventListener("click", () => {
-      resolveConfirmation("alternative");
-      confirmActionModal.hide();
+      if (resolveConfirmation("alternative")) confirmActionModal.hide();
     });
     els.confirmActionModal.addEventListener("hidden.bs.modal", () => resolveConfirmation("cancel"));
     els.identityVerificationPanel.classList.add("mt-4", "mb-0");

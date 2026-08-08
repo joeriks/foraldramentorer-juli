@@ -53,6 +53,8 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /alternativeLabel: "Komplettera uppgifter"/);
   assert.match(scriptText, /title: "Avsluta aktiviteten\?"/);
   assert.match(scriptText, /resultOptions,/);
+  assert.doesNotMatch(scriptText, /resultValue:/);
+  assert.match(scriptText, /if \(resolveConfirmation\("confirm"\)\) confirmActionModal\.hide\(\)/);
 
   const domain = await worker.fetch(new Request("https://example.test/case-domain.js"), {}, context);
   assert.equal(domain.status, 200);
