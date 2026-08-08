@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260808-ai-support-v1">
+    <link rel="stylesheet" href="styles.css?v=20260808-ai-support-v2">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -1717,7 +1717,7 @@
       <span class="support-launcher-symbol" aria-hidden="true">?</span><span>Support</span>
     </button>
 
-    <aside class="offcanvas offcanvas-end support-panel" tabindex="-1" id="supportOffcanvas" aria-labelledby="supportOffcanvasTitle">
+    <aside class="offcanvas offcanvas-end support-panel" tabindex="-1" id="supportOffcanvas" aria-labelledby="supportOffcanvasTitle" data-bs-backdrop="false" data-bs-scroll="true">
       <div class="offcanvas-header border-bottom">
         <div><div class="record-type">Systemstöd</div><h2 id="supportOffcanvasTitle" class="offcanvas-title h5 mb-0">AI-support</h2></div>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Stäng"></button>
@@ -1732,7 +1732,7 @@
         </div>
         <form id="supportForm" class="mt-auto pt-3">
           <label class="form-label" for="supportQuestionInput">Vad behöver du hjälp med?</label>
-          <textarea id="supportQuestionInput" class="form-control" rows="4" maxlength="2000" required placeholder="Beskriv vad du försöker göra och vad som händer."></textarea>
+          <textarea id="supportQuestionInput" class="form-control" rows="3" maxlength="2000" required placeholder="Beskriv vad du försöker göra och vad som händer."></textarea>
           <div class="d-flex justify-content-between align-items-center gap-2 mt-2">
             <span id="supportStatus" class="small text-secondary" role="status">Aktuell vy följer med som kontext.</span>
             <button id="askSupportButton" type="submit" class="btn btn-primary">Fråga supporten</button>
@@ -1892,6 +1892,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260808-ai-support-v1"></script>
+    <script type="module" src="app.js?v=20260808-ai-support-v2"></script>
   </body>
 </html>

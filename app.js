@@ -78,6 +78,7 @@ const TENANT_LEARNING_SELECTION_STORE = "tenantLearningSelection";
 const LEARNING_PROGRESS_STORE = "learningProgress";
 const PUBLIC_SUPPORT_REQUESTS_STORE = "publicSupportRequests";
 const SUPPORT_TICKETS_STORE = "supportTickets";
+const SUPPORT_PANEL_SESSION_KEY = "foraldramentorer.supportPanelOpen";
 const LEARNING_SELECTION_INITIALIZED_ID = "__selection_initialized__";
 let CURRENT_USER_ID = "handler-sara";
 const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
@@ -624,6 +625,7 @@ const els = {
   supportTicketTableBody: document.querySelector("#supportTicketTableBody"),
   supportTicketStatusFilter: document.querySelector("#supportTicketStatusFilter"),
   supportLauncher: document.querySelector("#supportLauncher"),
+  supportOffcanvas: document.querySelector("#supportOffcanvas"),
   supportConversation: document.querySelector("#supportConversation"),
   supportForm: document.querySelector("#supportForm"),
   supportQuestionInput: document.querySelector("#supportQuestionInput"),
@@ -7322,6 +7324,15 @@ els.navSupportAdmin.addEventListener("click", (event) => {
   navigateTo("#/support-admin");
 });
 
+els.supportOffcanvas.addEventListener("shown.bs.offcanvas", () => {
+  sessionStorage.setItem(SUPPORT_PANEL_SESSION_KEY, "true");
+  els.supportQuestionInput.focus();
+});
+
+els.supportOffcanvas.addEventListener("hidden.bs.offcanvas", () => {
+  sessionStorage.removeItem(SUPPORT_PANEL_SESSION_KEY);
+});
+
 els.supportQuestionInput.addEventListener("input", () => {
   els.supportQuestionInput.setCustomValidity("");
 });
@@ -9515,6 +9526,9 @@ openDatabase()
       window.location.hash = "#/dashboard";
     }
     await refresh();
+    if (sessionStorage.getItem(SUPPORT_PANEL_SESSION_KEY) === "true") {
+      bootstrap.Offcanvas.getOrCreateInstance(els.supportOffcanvas).show();
+    }
   })
   .catch((error) => {
     document.body.innerHTML = `<main class="p-4"><h1>Kunde inte öppna IndexedDB</h1><p>${escapeHtml(error.message)}</p></main>`;

@@ -58,12 +58,12 @@ async function handleSupport(request, env) {
     method: "POST",
     headers: { "authorization": "Bearer " + env.OPENAI_API_KEY, "content-type": "application/json" },
     body: JSON.stringify({
-      model: env.OPENAI_SUPPORT_MODEL || "gpt-5.6-luna",
+      model: env.OPENAI_SUPPORT_MODEL || "gpt-5.6-terra",
       store: false,
       max_output_tokens: 700,
-      reasoning: { effort: "low" },
+      reasoning: { effort: "medium" },
       text: { verbosity: "low" },
-      instructions: "Du är systemsupport för FöräldraMentorer, en svensk kommunal prototyp. Svara kort, sakligt och på svenska. Använd endast referensmaterialet. Hitta aldrig på genomförda registreringar eller regler. Be aldrig om personnummer, registeruppgifter eller känsliga personuppgifter. Klassificera som how_to, bug_report, feature_request, privacy_or_security eller general. Vid fel, osäkerhet, integritet eller utvecklingsförslag ska needsHuman vara true. Returnera endast JSON med answer, category, needsHuman och sources (array med title och href).",
+      instructions: "Du är systemsupport för FöräldraMentorer, en svensk kommunal prototyp. Svara direkt på den ställda frågan, kort och konkret på svenska. Referensmaterialet är sorterat med mest relevant post först: använd den första posten som primär källa och blanda inte in andra arbetsflöden om de inte behövs. Vid en hur-gör-jag-fråga ska svaret ange den exakta menyn eller knappen och ge 2-5 tydliga steg. Använd endast referensmaterialet. Om materialet inte räcker ska du säga det och sätta needsHuman till true. Hitta aldrig på genomförda registreringar eller regler. Be aldrig om personnummer, registeruppgifter eller känsliga personuppgifter. Klassificera som how_to, bug_report, feature_request, privacy_or_security eller general. Vid fel, osäkerhet, integritet eller utvecklingsförslag ska needsHuman vara true. Returnera endast JSON med answer, category, needsHuman och sources (array med title och href från referensmaterialet).",
       input: JSON.stringify({ question, context, referenceMaterial: knowledge })
     })
   });

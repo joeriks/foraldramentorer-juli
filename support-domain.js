@@ -23,6 +23,13 @@ export const SUPPORT_KNOWLEDGE = [
     href: "#/cases"
   },
   {
+    id: "register-mentor",
+    title: "Registrera ny mentor",
+    keywords: ["lägga till mentor", "lägga till en mentor", "lägger till mentor", "lägger till en mentor", "lägger jag till en mentor", "ny mentor", "registrera mentor", "skapa mentor", "intresseanmälan mentor"],
+    answer: "Gå till Mentorer och välj Registrera mentor. Fyll i grunduppgifterna och välj Spara mentor längst ned i formuläret. Systemet skapar då mentorposten och ett kopplat ärende för godkännande; inget godkännandebeslut fattas automatiskt.",
+    href: "#/mentor/new"
+  },
+  {
     id: "mentors",
     title: "Mentorer",
     keywords: ["mentor", "mentorkort", "godkänn", "grunduppgift", "kontroll", "intervju"],
@@ -101,12 +108,19 @@ export function supportCategoryLabel(category) {
 }
 
 export function findSupportKnowledge(query, context = {}, limit = 3) {
-  const words = new Set(normalize(query).split(/[^a-zåäö0-9-]+/).filter((word) => word.length > 2));
+  const queryValue = normalize(query);
+  const compact = (value) => normalize(value).replace(/\b(?:jag|du|man|en|ett|den|det)\b/g, " ").replace(/\s+/g, " ").trim();
+  const compactQuery = compact(queryValue);
+  const words = new Set(queryValue.split(/[^a-zåäö0-9-]+/).filter((word) => word.length > 2));
   const route = normalize(context.route || context.view);
   return SUPPORT_KNOWLEDGE
     .map((entry) => {
       const haystack = normalize(`${entry.title} ${entry.keywords.join(" ")} ${entry.answer}`);
-      let score = entry.keywords.reduce((sum, keyword) => sum + (normalize(query).includes(normalize(keyword)) ? 4 : 0), 0);
+      let score = entry.keywords.reduce((sum, keyword) => {
+        const keywordValue = normalize(keyword);
+        if (!queryValue.includes(keywordValue) && !compactQuery.includes(compact(keywordValue))) return sum;
+        return sum + (keyword.includes(" ") ? 8 : 4);
+      }, 0);
       for (const word of words) if (haystack.includes(word)) score += 1;
       if (route && entry.href.includes(route.replace(/^#\//, ""))) score += 2;
       if (entry.roles?.includes(context.role)) score += 6;

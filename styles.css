@@ -25,21 +25,29 @@
 }
 
 .support-panel {
-  --bs-offcanvas-width: min(31rem, 100vw);
+  --bs-offcanvas-width: min(38rem, 100vw);
+  box-shadow: -0.2rem 0 0.8rem rgb(25 45 60 / 16%);
+}
+
+.support-panel .offcanvas-body {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .support-conversation {
   display: grid;
   gap: 0.75rem;
   align-content: start;
-  min-height: 11rem;
-  max-height: 48vh;
-  padding: 0.25rem;
+  flex: 1 1 24rem;
+  min-height: min(22rem, 45vh);
+  max-height: none;
+  padding: 0.25rem 0.5rem 0.75rem 0.25rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .support-message {
-  max-width: 92%;
+  max-width: 100%;
   padding: 0.75rem 0.9rem;
   border: 1px solid var(--app-border-soft, #d6dee3);
   border-radius: 0.35rem;
@@ -48,6 +56,7 @@
 
 .support-message-user {
   justify-self: end;
+  max-width: 92%;
   background: #edf4f7;
 }
 
@@ -76,8 +85,13 @@
 }
 
 .support-ticket-actions {
+  flex: 0 0 auto;
   padding-top: 0.9rem;
   border-top: 1px solid var(--app-border-soft, #d6dee3);
+}
+
+#supportForm {
+  flex: 0 0 auto;
 }
 
 .support-filter {

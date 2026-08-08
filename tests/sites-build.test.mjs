@@ -39,6 +39,8 @@ test("serves the application shell", async () => {
   assert.match(html, /id="activityTypeQuickFact"/);
   assert.match(html, /id="supportLauncher"/);
   assert.match(html, /id="supportOffcanvas"/);
+  assert.match(html, /data-bs-backdrop="false"/);
+  assert.match(html, /data-bs-scroll="true"/);
   assert.match(html, /id="supportAdministrationView"/);
   assert.match(html, /Skriv inte personnummer/);
   assert.match(html, /Handläggningsanvisning/);
@@ -152,6 +154,8 @@ test("support endpoint keeps the key server-side and disables OpenAI storage", a
     assert.equal(upstreamRequest.url, "https://api.openai.com/v1/responses");
     assert.equal(upstreamRequest.options.headers.authorization, "Bearer server-secret");
     const requestBody = JSON.parse(upstreamRequest.options.body);
+    assert.equal(requestBody.model, "gpt-5.6-terra");
+    assert.equal(requestBody.reasoning.effort, "medium");
     assert.equal(requestBody.store, false);
     assert.doesNotMatch(JSON.stringify(requestBody), /server-secret/);
   } finally {

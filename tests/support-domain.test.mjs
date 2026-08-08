@@ -18,6 +18,9 @@ test("blocks actual personal identity numbers but allows conceptual questions", 
 });
 
 test("returns relevant system routes", () => {
+  const [createMentor] = findSupportKnowledge("Hur lägger jag till en mentor?", { role: "Samordnare", route: "#/dashboard" });
+  assert.equal(createMentor.href, "#/mentor/new");
+  assert.match(createMentor.answer, /Registrera mentor/);
   const [match] = findSupportKnowledge("Hur avslutar jag en aktivitet?", { route: "#/case/1" });
   assert.equal(match.href, "#/cases");
   const response = localSupportResponse("Hur matchar jag en förälder med mentor?");

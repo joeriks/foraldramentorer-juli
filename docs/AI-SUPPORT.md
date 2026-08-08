@@ -29,7 +29,9 @@ Supportärenden sparas i prototypens IndexedDB. De visas under **Systemadministr
 Lägg in följande hemlighet i Sites-miljön:
 
 - `OPENAI_API_KEY` - obligatorisk för AI-svar.
-- `OPENAI_SUPPORT_MODEL` - valfri modellinställning. Standard är `gpt-5.6-luna`.
+- `OPENAI_SUPPORT_MODEL` - valfri modellinställning. Standard är `gpt-5.6-terra`.
+
+Supportpanelen ligger kvar öppen under navigering och återställs efter en omladdning i samma webbläsarflik. Den stängs uttryckligen med stängningsknappen eller Escape.
 
 Publicera sedan om sajten. Endpointen `POST /api/support` svarar med `503 AI_NOT_CONFIGURED` när nyckeln saknas; klienten växlar då automatiskt till lokalt stöd.
 
