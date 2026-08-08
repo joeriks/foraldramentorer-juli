@@ -51,6 +51,8 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /registerQuickActivityResult/);
   assert.match(scriptText, /QUICK_ACTIVITY_RESULT_CODES/);
   assert.match(scriptText, /registryChecked: new Set\(\["shown_checked"\]\)/);
+  assert.match(scriptText, /alternativeLabel: "Komplettera uppgifter"/);
+  assert.match(scriptText, /title: "Avsluta aktiviteten\?"/);
 
   const domain = await worker.fetch(new Request("https://example.test/case-domain.js"), {}, context);
   assert.equal(domain.status, 200);

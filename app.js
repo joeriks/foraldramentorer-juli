@@ -1059,6 +1059,7 @@ const els = {
   confirmActionActor: document.querySelector("#confirmActionActor"),
   confirmActionTime: document.querySelector("#confirmActionTime"),
   confirmActionNote: document.querySelector("#confirmActionNote"),
+  confirmActionAlternativeButton: document.querySelector("#confirmActionAlternativeButton"),
   confirmActionButton: document.querySelector("#confirmActionButton")
 };
 
@@ -1087,7 +1088,7 @@ function showCaseFormError(message, field = null) {
   field?.focus({ preventScroll: true });
 }
 
-function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, subjectLabel = "Mentor", subjectValue = "", confirmLabel = "Bekräfta", danger = false }) {
+function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, subjectLabel = "Mentor", subjectValue = "", confirmLabel = "Bekräfta", alternativeLabel = "", danger = false }) {
   if (!confirmActionModal) return Promise.resolve({ confirmed: window.confirm(body), note: "" });
   els.confirmActionEyebrow.textContent = eyebrow;
   els.confirmActionTitle.textContent = title;
@@ -1097,6 +1098,8 @@ function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName
   els.confirmActionActor.textContent = currentUserName();
   els.confirmActionTime.textContent = formatDateTime(new Date().toISOString());
   els.confirmActionNote.value = "";
+  els.confirmActionAlternativeButton.textContent = alternativeLabel;
+  els.confirmActionAlternativeButton.hidden = !alternativeLabel;
   els.confirmActionButton.textContent = confirmLabel;
   els.confirmActionButton.classList.toggle("btn-danger", danger);
   els.confirmActionButton.classList.toggle("btn-primary", !danger);
@@ -1111,7 +1114,7 @@ function resolveConfirmation(value) {
   if (!pendingConfirmation) return;
   const resolve = pendingConfirmation;
   pendingConfirmation = null;
-  resolve({ confirmed: value, note: value ? els.confirmActionNote.value.trim() : "" });
+  resolve({ action: value, confirmed: value === "confirm", note: value === "cancel" ? "" : els.confirmActionNote.value.trim() });
 }
 
 function openDatabase() {
@@ -7859,6 +7862,7 @@ els.caseActivityTableBody.addEventListener("change", async (event) => {
   } catch (error) {
     console.error("Kunde inte registrera aktivitetsresultat", error);
     showFeedback(error.message || "Resultatet kunde inte sparas.");
+  } finally {
     for (const matchingInput of els.caseActivityTableBody.querySelectorAll(`[data-quick-activity-result="${CSS.escape(activityId)}"]`)) {
       matchingInput.disabled = false;
       matchingInput.value = "";
@@ -8040,7 +8044,25 @@ async function registerQuickActivityResult(activityId, resultCode) {
     return;
   }
 
-  const candidateSynced = await syncCandidateFromActivity(activity, "completed", "", new Date().toISOString(), resultCode);
+  const resultLabel = activityResultOptions(activity).find(([value]) => value === resultCode)?.[1] || resultCode;
+  const confirmation = await confirmAction({
+    eyebrow: "Snabbregistrering",
+    title: "Avsluta aktiviteten?",
+    body: `Aktiviteten avslutas med resultatet "${resultLabel}". Resultatet, registrerande användare och tidpunkt sparas i ärendets logg. Välj Komplettera uppgifter om du behöver registrera mer information eller koppla ett underlag.`,
+    subjectLabel: "Aktivitet",
+    subjectValue: activity.title,
+    confirmLabel: "Avsluta aktivitet",
+    alternativeLabel: "Komplettera uppgifter"
+  });
+  if (confirmation.action === "alternative") {
+    openCaseActivityWithResult(activity.id, resultCode);
+    if (confirmation.note) els.activityDetailNoteInput.value = confirmation.note;
+    updateActivityDetailDirtyState();
+    return;
+  }
+  if (!confirmation.confirmed) return;
+
+  const candidateSynced = await syncCandidateFromActivity(activity, "completed", confirmation.note, new Date().toISOString(), resultCode);
   if (!candidateSynced) {
     openCaseActivityWithResult(activity.id, resultCode);
     return;
@@ -8053,7 +8075,7 @@ async function registerQuickActivityResult(activityId, resultCode) {
     nextHandlerId: activity.handlerIdOverride || "",
     nextDueDate: activity.dueDate || "",
     nextWaitingForParty: null,
-    note: ""
+    note: confirmation.note
   });
   markSaved();
   showFeedback(`Aktiviteten har avslutats med resultatet ${activityResultOptions(activity).find(([value]) => value === resultCode)?.[1] || resultCode}.`);
@@ -8944,10 +8966,14 @@ openDatabase()
     modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());
     handlerModalElement.addEventListener("shown.bs.modal", () => els.handlerNameInput.focus());
     els.confirmActionButton.addEventListener("click", () => {
-      resolveConfirmation(true);
+      resolveConfirmation("confirm");
       confirmActionModal.hide();
     });
-    els.confirmActionModal.addEventListener("hidden.bs.modal", () => resolveConfirmation(false));
+    els.confirmActionAlternativeButton.addEventListener("click", () => {
+      resolveConfirmation("alternative");
+      confirmActionModal.hide();
+    });
+    els.confirmActionModal.addEventListener("hidden.bs.modal", () => resolveConfirmation("cancel"));
     els.identityVerificationPanel.classList.add("mt-4", "mb-0");
     els.mentorIdentityHost.append(els.identityVerificationPanel);
     db = database;
