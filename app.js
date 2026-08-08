@@ -7889,8 +7889,9 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   const candidateSynced = await syncCandidateFromActivity(activity, nextStatus, nextNote, new Date().toISOString(), nextResult);
   if (!candidateSynced) return;
   await saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nextHandlerId, nextDueDate, nextWaitingForParty, note: nextNote });
+  if (nextStatus === "completed") selectedCaseActivityId = null;
   markSaved();
-  showFeedback("Aktiviteten har sparats.");
+  showFeedback(nextStatus === "completed" ? "Aktiviteten har avslutats." : "Aktiviteten har sparats.");
   await refresh();
 });
 
