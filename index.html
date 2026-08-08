@@ -581,6 +581,22 @@
               </form>
 
               <div id="caseReadView">
+                <section id="caseClosureSummary" class="case-closure-summary" aria-labelledby="caseClosureTitle" hidden>
+                  <div class="case-closure-heading">
+                    <div>
+                      <div class="record-type">Avslutat ärende</div>
+                      <h3 id="caseClosureTitle" class="h6 mb-1">Vad hände när ärendet avslutades?</h3>
+                      <p id="caseClosureMeta" class="small mb-0"></p>
+                    </div>
+                    <span class="badge text-bg-success">Registrerat</span>
+                  </div>
+                  <dl class="case-closure-facts mb-0">
+                    <div><dt>Utfall</dt><dd id="caseClosureOutcome"></dd></div>
+                    <div><dt>Sparat i systemet</dt><dd id="caseClosureStorage"></dd></div>
+                    <div><dt>Verksamhetseffekt</dt><dd id="caseClosureEffect"></dd></div>
+                    <div><dt>Följdärende</dt><dd id="caseClosureSuccessor"></dd></div>
+                  </dl>
+                </section>
                 <ul class="detail-tabs nav nav-tabs" role="tablist" aria-label="Ärendekort">
                   <li class="nav-item"><button class="nav-link active" id="case-overview-tab" data-bs-toggle="tab" data-bs-target="#case-overview-pane" type="button">Översikt</button></li>
                   <li class="nav-item"><button class="nav-link" id="case-activities-tab" data-bs-toggle="tab" data-bs-target="#case-activities-pane" type="button">Aktiviteter <span id="caseActivityCount" class="tab-count">0</span></button></li>
@@ -732,6 +748,10 @@
                       </section>
                     </section>
                     <div id="activityListPanel">
+                      <aside id="activityCaseClosedNotice" class="case-closed-notice" hidden>
+                        <div><strong>Ärendet är avslutat</strong><p id="activityCaseClosedText" class="mb-0"></p></div>
+                        <button id="showCaseClosureButton" type="button" class="btn btn-outline-primary btn-sm">Visa sammanfattning</button>
+                      </aside>
                       <section class="activity-summary" aria-labelledby="activitySummaryTitle">
                         <div class="activity-summary-main">
                           <div class="record-type">Ärendets aktiviteter</div>
@@ -1759,6 +1779,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260808-explicit-quick-result-v47"></script>
+    <script type="module" src="app.js?v=20260808-case-closure-summary-v48"></script>
   </body>
 </html>

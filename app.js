@@ -763,6 +763,15 @@ const els = {
   caseParentFact: document.querySelector("#caseParentFact"),
   caseSupportCaseFact: document.querySelector("#caseSupportCaseFact"),
   caseCreatedFact: document.querySelector("#caseCreatedFact"),
+  caseClosureSummary: document.querySelector("#caseClosureSummary"),
+  caseClosureMeta: document.querySelector("#caseClosureMeta"),
+  caseClosureOutcome: document.querySelector("#caseClosureOutcome"),
+  caseClosureStorage: document.querySelector("#caseClosureStorage"),
+  caseClosureEffect: document.querySelector("#caseClosureEffect"),
+  caseClosureSuccessor: document.querySelector("#caseClosureSuccessor"),
+  activityCaseClosedNotice: document.querySelector("#activityCaseClosedNotice"),
+  activityCaseClosedText: document.querySelector("#activityCaseClosedText"),
+  showCaseClosureButton: document.querySelector("#showCaseClosureButton"),
   caseWorkGuidance: document.querySelector("#caseWorkGuidance"),
   caseWorkGuidanceText: document.querySelector("#caseWorkGuidanceText"),
   caseTransitionPanel: document.querySelector("#caseTransitionPanel"),
@@ -2156,6 +2165,62 @@ function actorNameById(id) {
   return handlers.find((handler) => [handler.id, handler.userId, handler.name].includes(id))?.name
     || candidates.find((candidate) => candidate.id === id)?.name
     || (id === "system" ? "System" : "Okänd användare");
+}
+
+function successorCases(caseRecord) {
+  if (caseRecord.caseTypeId === "parent-support") {
+    return cases.filter((item) => item.caseTypeId === "matching" && item.supportCaseId === caseRecord.id);
+  }
+  if (caseRecord.caseTypeId === "matching") {
+    return cases.filter((item) => item.caseTypeId === "mentor-assignment" && item.sourceMatchingCaseId === caseRecord.id);
+  }
+  return [];
+}
+
+function caseClosureDetails(caseRecord) {
+  const completed = activitiesForCase(caseRecord.id)
+    .filter((activity) => activity.status === "completed")
+    .sort((a, b) => new Date(b.completedAt || b.updatedAt || 0) - new Date(a.completedAt || a.updatedAt || 0));
+  const decision = completed.find((activity) => activity.templateId === "decision") || completed[0] || null;
+  const result = decision ? activityResultLabel(decision) : "";
+  const outcome = caseRecord.closeNote || (decision && result ? `${decision.title}: ${result}` : "Ärendet avslutades utan angivet utfall");
+  const storage = decision
+    ? `Resultatet "${result || "Ej angivet"}", avslutstid och registrerande användare har sparats i ärendet. Avslutet finns även i fliken Logg.`
+    : "Avslutsorsak, motivering, avslutstid och registrerande användare har sparats i ärendet och i fliken Logg.";
+  const mentor = caseMentor(caseRecord);
+  let effect = "Ingen separat personpost ändrades automatiskt av avslutet.";
+  if (caseRecord.caseTypeId === "mentor-certification" && decision?.resultCode === "approved" && mentor) {
+    effect = mentor.active === false
+      ? `${mentor.name} visas som Godkänd i mentorregistret, men mentorposten är inaktiv och kan inte väljas i en matchning.`
+      : `${mentor.name} visas som Godkänd i mentorregistret och kan väljas i en matchning.`;
+  }
+  const successors = successorCases(caseRecord);
+  const configuredNextTypeId = caseTypeById(caseRecord.caseTypeId)?.nextCaseTypeId || null;
+  let successorHtml = "Inget nytt ärende skapades automatiskt.";
+  let successorText = successorHtml;
+  if (successors.length) {
+    successorHtml = successors.map((item) => `<a href="#/case/${escapeHtml(item.id)}">${escapeHtml(item.number)} · ${escapeHtml(item.type)}</a>`).join(", ");
+    successorText = `${successors.length} följdärende${successors.length === 1 ? "" : "n"} skapades.`;
+  } else if (configuredNextTypeId) {
+    const nextName = caseTypeById(configuredNextTypeId)?.name || "nästa ärendetyp";
+    successorHtml = `Inget nytt ärende skapades automatiskt. Konfigurerat nästa steg är ${escapeHtml(nextName)}.`;
+    successorText = `Inget följdärende skapades. Nästa möjliga steg är ${nextName}.`;
+  }
+  return { outcome, storage, effect, successorHtml, successorText };
+}
+
+function renderCaseClosureSummary(caseRecord) {
+  const closed = caseRecord.status === "closed";
+  els.caseClosureSummary.hidden = !closed;
+  els.activityCaseClosedNotice.hidden = !closed;
+  if (!closed) return;
+  const details = caseClosureDetails(caseRecord);
+  els.caseClosureMeta.textContent = `Avslutat ${formatDateTime(caseRecord.closedAt || caseRecord.updatedAt)} av ${handlerNameById(caseRecord.closedBy || caseRecord.updatedBy)}`;
+  els.caseClosureOutcome.textContent = details.outcome;
+  els.caseClosureStorage.textContent = details.storage;
+  els.caseClosureEffect.textContent = details.effect;
+  els.caseClosureSuccessor.innerHTML = details.successorHtml;
+  els.activityCaseClosedText.textContent = `${details.outcome}. ${details.successorText}`;
 }
 
 function projectMentorWorkflow(candidate) {
@@ -4590,6 +4655,7 @@ function renderCaseDetail() {
   els.caseParentFact.innerHTML = parent ? `<a href="#/parent/${escapeHtml(parent.id)}">${escapeHtml(parent.name)}</a>` : "Ej personanknutet";
   els.caseSupportCaseFact.innerHTML = supportCase ? `<a href="#/case/${escapeHtml(supportCase.id)}">${escapeHtml(supportCase.number)} · ${escapeHtml(supportCase.details?.supportPurpose || supportCase.title)}</a>` : "Ej kopplat";
   els.caseCreatedFact.textContent = `${formatDateTime(caseRecord.createdAt)} av ${handlerNameById(caseRecord.createdBy)}`;
+  renderCaseClosureSummary(caseRecord);
   const caseGuidance = caseTypeById(caseRecord.caseTypeId)?.workInstruction?.trim() || "";
   els.caseWorkGuidance.hidden = !caseGuidance;
   els.caseWorkGuidanceText.textContent = caseGuidance;
@@ -7868,6 +7934,11 @@ els.backToActivitiesButton.addEventListener("click", () => {
   renderCaseDetail();
 });
 
+els.showCaseClosureButton.addEventListener("click", () => {
+  bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
+  requestAnimationFrame(() => els.caseClosureSummary.scrollIntoView({ behavior: "smooth", block: "start" }));
+});
+
 els.activityDetailStatusInput.addEventListener("change", () => {
   const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
   if (activity) {
@@ -7912,10 +7983,11 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   const nextDueDate = els.activityDetailDueDateInput.value;
   const nextWaitingForParty = nextStatus === "waiting" ? els.activityDetailWaitingForInput.value : null;
   const nextNote = els.activityDetailNoteInput.value.trim();
+  const closesCase = activitySaveRequiresConfirmation(activity, nextStatus, nextResult);
   updateActivityValidationState();
   if (!els.activityDetailForm.reportValidity()) return;
 
-  if (activitySaveRequiresConfirmation(activity, nextStatus, nextResult)) {
+  if (closesCase) {
     const confirmation = await confirmAction({
       eyebrow: "Beslut i ärendet",
       title: "Godkänn mentor och avsluta ärendet?",
@@ -7933,6 +8005,9 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   markSaved();
   showFeedback(nextStatus === "completed" ? "Aktiviteten har avslutats." : "Aktiviteten har sparats.");
   await refresh();
+  if (closesCase) {
+    requestAnimationFrame(() => els.activityCaseClosedNotice.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
 });
 
 els.reopenActivityButton.addEventListener("click", async () => {

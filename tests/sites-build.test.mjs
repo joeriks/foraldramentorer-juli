@@ -19,6 +19,8 @@ test("serves the application shell", async () => {
   assert.match(html, /id="dashboardView"/);
   assert.match(html, /id="caseSummaryBoard"/);
   assert.match(html, /id="decisionQueueButton"/);
+  assert.match(html, /id="caseClosureSummary"/);
+  assert.match(html, /id="activityCaseClosedNotice"/);
   assert.match(html, /id="presentationStepPoints"/);
   assert.match(html, />Nytt ärende</);
   assert.match(html, /id="caseTypeDetailPanel"/);
@@ -55,6 +57,8 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /resultOptions,/);
   assert.doesNotMatch(scriptText, /resultValue:/);
   assert.match(scriptText, /if \(resolveConfirmation\("confirm"\)\) confirmActionModal\.hide\(\)/);
+  assert.match(scriptText, /function renderCaseClosureSummary/);
+  assert.match(scriptText, /Inget nytt ärende skapades automatiskt/);
 
   const domain = await worker.fetch(new Request("https://example.test/case-domain.js"), {}, context);
   assert.equal(domain.status, 200);
