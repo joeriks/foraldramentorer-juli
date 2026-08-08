@@ -446,6 +446,12 @@ export function findMentorDuplicates(candidates, { personalNumber = "", name = "
   };
 }
 
+export function activitySaveRequiresConfirmation(activity, nextStatus, nextResult) {
+  return activity?.templateId === "decision"
+    && normalizeActivityStatus(nextStatus) === "completed"
+    && nextResult === "approved";
+}
+
 export function stableHash(value) {
   const canonicalize = (item) => {
     if (Array.isArray(item)) return item.map(canonicalize);

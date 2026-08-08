@@ -8,6 +8,7 @@ import {
   CASE_TYPE_RELATIONSHIPS,
   DEFAULT_ORGANIZATION_UNIT_ID,
   DEFAULT_TENANT_ID,
+  activitySaveRequiresConfirmation,
   activityStatusLabel as domainActivityStatusLabel,
   activityTemplateById,
   assessCertificationApproval,
@@ -29,7 +30,7 @@ import {
   resultClassification,
   resultOptions,
   stableHash
-} from "./case-domain.js?v=20260807-next-case-type-v23";
+} from "./case-domain.js?v=20260808-activity-save-v24";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-assignment-followup-v21";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
@@ -4795,7 +4796,11 @@ function activityDetailHasChanges() {
 
 function updateActivityDetailDirtyState() {
   const dirty = activityDetailHasChanges();
+  const completingActivity = dirty
+    && activityDetailBaseline?.status !== "completed"
+    && els.activityDetailStatusInput.value === "completed";
   els.activityDetailSaveButton.disabled = !dirty;
+  els.activityDetailSaveButton.textContent = completingActivity ? "Avsluta aktivitet" : "Spara ändringar";
   els.activityDetailSaveState.textContent = dirty ? "Osparade ändringar" : "Inga osparade ändringar";
   els.activityDetailSaveState.classList.toggle("activity-save-pending", dirty);
   els.backToActivitiesButton.textContent = dirty ? "Avbryt och gå tillbaka" : "Tillbaka till aktiviteterna";
@@ -7870,18 +7875,13 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   updateActivityValidationState();
   if (!els.activityDetailForm.reportValidity()) return;
 
-  const statusChanged = nextStatus !== activity.status;
-  const resultChanged = nextResult !== activityResultValue(activity);
-  if (statusChanged || resultChanged) {
-    const resultLabel = activityResultOptions(activity).find(([value]) => value === nextResult)?.[1] || "";
+  if (activitySaveRequiresConfirmation(activity, nextStatus, nextResult)) {
     const confirmation = await confirmAction({
-      eyebrow: "Aktivitet i ärendet",
-      title: nextStatus === "completed" ? "Avsluta aktiviteten?" : "Spara ändrad status?",
-      body: nextStatus === "completed"
-        ? `Aktiviteten "${activity.title}" avslutas med resultatet "${resultLabel}". Ändringen registreras i ärendets logg.`
-        : `Aktiviteten "${activity.title}" får status ${activityStatusLabel(nextStatus).toLowerCase()}. Ändringen registreras i ärendets logg.`,
+      eyebrow: "Beslut i ärendet",
+      title: "Godkänn mentor och avsluta ärendet?",
+      body: "Mentorn registreras som godkänd och godkännandeärendet avslutas. Beslutet och tidpunkten registreras i ärendets logg.",
       mentorName: caseMentor(caseRecord)?.name || "Ej personanknutet",
-      confirmLabel: nextStatus === "completed" ? "Avsluta aktivitet" : "Spara status"
+      confirmLabel: "Godkänn och avsluta"
     });
     if (!confirmation.confirmed) return;
   }

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   ACTIVITY_TEMPLATES,
+  activitySaveRequiresConfirmation,
   assessCompensationApproval,
   assessCertificationApproval,
   CASE_DETAIL_FIELD_DEFINITIONS,
@@ -34,6 +35,13 @@ test("normalizes legacy statuses without changing stable values", () => {
   assert.equal(normalizeActivityStatus("waiting"), "waiting");
   assert.equal(normalizeMentorStatus("Godkänd/Certifierad"), "Godkänd");
   assert.equal(normalizeMentorStatus("Redo för intervju"), "Redo för intervju");
+});
+
+test("confirms only activity saves that also close the approval case", () => {
+  assert.equal(activitySaveRequiresConfirmation({ templateId: "trainingDone" }, "completed", "completed"), false);
+  assert.equal(activitySaveRequiresConfirmation({ templateId: "registryChecked" }, "completed", "assessment_required"), false);
+  assert.equal(activitySaveRequiresConfirmation({ templateId: "decision" }, "completed", "not_approved"), false);
+  assert.equal(activitySaveRequiresConfirmation({ templateId: "decision" }, "completed", "approved"), true);
 });
 
 test("normalizes legacy approval terminology without replacing custom help", () => {
