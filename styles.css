@@ -2013,11 +2013,6 @@ body {
   white-space: nowrap;
 }
 
-.activity-result-quick-select {
-  width: 11.5rem;
-  max-width: 100%;
-}
-
 .activity-mobile-result {
   display: none;
 }
@@ -2975,11 +2970,6 @@ body {
 
   .activity-mobile-result {
     display: block;
-  }
-
-  .activity-mobile-result .activity-result-quick-select {
-    width: 100%;
-    min-width: 0;
   }
 
   .activity-status-badge {

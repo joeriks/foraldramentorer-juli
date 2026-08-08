@@ -1060,6 +1060,8 @@ const els = {
   confirmActionTime: document.querySelector("#confirmActionTime"),
   confirmActionNote: document.querySelector("#confirmActionNote"),
   confirmActionAlternativeButton: document.querySelector("#confirmActionAlternativeButton"),
+  confirmActionResultRow: document.querySelector("#confirmActionResultRow"),
+  confirmActionResultInput: document.querySelector("#confirmActionResultInput"),
   confirmActionButton: document.querySelector("#confirmActionButton")
 };
 
@@ -1088,7 +1090,7 @@ function showCaseFormError(message, field = null) {
   field?.focus({ preventScroll: true });
 }
 
-function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, subjectLabel = "Mentor", subjectValue = "", confirmLabel = "Bekräfta", alternativeLabel = "", danger = false }) {
+function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, subjectLabel = "Mentor", subjectValue = "", confirmLabel = "Bekräfta", alternativeLabel = "", resultOptions = [], resultValue = "", danger = false }) {
   if (!confirmActionModal) return Promise.resolve({ confirmed: window.confirm(body), note: "" });
   els.confirmActionEyebrow.textContent = eyebrow;
   els.confirmActionTitle.textContent = title;
@@ -1098,6 +1100,12 @@ function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName
   els.confirmActionActor.textContent = currentUserName();
   els.confirmActionTime.textContent = formatDateTime(new Date().toISOString());
   els.confirmActionNote.value = "";
+  els.confirmActionResultRow.hidden = !resultOptions.length;
+  els.confirmActionResultInput.required = Boolean(resultOptions.length);
+  els.confirmActionResultInput.innerHTML = resultOptions.length
+    ? `<option value="">Välj resultat</option>${resultOptions.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("")}`
+    : "";
+  els.confirmActionResultInput.value = resultValue;
   els.confirmActionAlternativeButton.textContent = alternativeLabel;
   els.confirmActionAlternativeButton.hidden = !alternativeLabel;
   els.confirmActionButton.textContent = confirmLabel;
@@ -1112,9 +1120,10 @@ function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName
 
 function resolveConfirmation(value) {
   if (!pendingConfirmation) return;
+  if (value === "confirm" && !els.confirmActionResultRow.hidden && !els.confirmActionResultInput.reportValidity()) return;
   const resolve = pendingConfirmation;
   pendingConfirmation = null;
-  resolve({ action: value, confirmed: value === "confirm", note: value === "cancel" ? "" : els.confirmActionNote.value.trim() });
+  resolve({ action: value, confirmed: value === "confirm", note: value === "cancel" ? "" : els.confirmActionNote.value.trim(), resultCode: els.confirmActionResultInput.value });
 }
 
 function openDatabase() {
@@ -4691,11 +4700,8 @@ function renderCaseActivities(caseRecord, activities) {
       && !["paused", "closed"].includes(caseRecord.status)
       ? quickActivityResultOptions(activity)
       : [];
-    const quickResultOptions = quickResults
-      .map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)
-      .join("");
-    const quickResultSelect = quickResults.length
-      ? `<select class="form-select form-select-sm activity-result-quick-select" data-quick-activity-result="${escapeHtml(activity.id)}" aria-label="Registrera resultat för ${escapeHtml(activity.title)}"><option value="">Registrera resultat</option>${quickResultOptions}</select>`
+    const quickFinishButton = quickResults.length
+      ? `<button type="button" class="btn btn-outline-primary btn-sm activity-quick-finish-button" data-quick-finish-activity="${escapeHtml(activity.id)}">Avsluta</button>`
       : "";
     const stepNumber = Number.isFinite(activity.sortOrder) ? activity.sortOrder + 1 : activities.indexOf(activity) + 1;
     const row = document.createElement("tr");
@@ -4707,7 +4713,7 @@ function renderCaseActivities(caseRecord, activities) {
           <div>
             <button type="button" class="activity-title-button" data-open-activity="${escapeHtml(activity.id)}">${escapeHtml(activity.title)}</button>
             ${result ? `<small>Resultat: ${escapeHtml(result)}</small>` : ""}
-            ${quickResultSelect ? `<div class="activity-mobile-result mt-2">${quickResultSelect}</div>` : ""}
+            ${quickFinishButton ? `<div class="activity-mobile-result mt-2">${quickFinishButton}</div>` : ""}
           </div>
         </div>
       </td>
@@ -4715,7 +4721,7 @@ function renderCaseActivities(caseRecord, activities) {
       <td><span class="activity-owner-name">${escapeHtml(handler?.name || "Ej tilldelad")}</span>${ownerSource ? `<small>${ownerSource}</small>` : ""}</td>
       <td class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityDueLabel(activity))}</td>
       <td>${documents.length ? `${documents.length} st` : '<span class="text-secondary">0</span>'}</td>
-      <td class="text-end"><div class="activity-row-actions">${quickResultSelect ? `<div class="activity-desktop-result">${quickResultSelect}</div>` : ""}<button type="button" class="btn btn-outline-primary btn-sm activity-open-button" data-open-activity="${escapeHtml(activity.id)}">Öppna</button></div></td>
+      <td class="text-end"><div class="activity-row-actions">${quickFinishButton ? `<div class="activity-desktop-result">${quickFinishButton}</div>` : ""}<button type="button" class="btn btn-outline-primary btn-sm activity-open-button" data-open-activity="${escapeHtml(activity.id)}">Öppna</button></div></td>
     `;
     els.caseActivityTableBody.append(row);
   }
@@ -7845,29 +7851,22 @@ for (const button of els.activityFilterButtons) {
 }
 
 els.caseActivityTableBody.addEventListener("click", (event) => {
+  const quickFinishButton = event.target.closest("[data-quick-finish-activity]");
+  if (quickFinishButton) {
+    const activityId = quickFinishButton.dataset.quickFinishActivity;
+    for (const matchingButton of els.caseActivityTableBody.querySelectorAll(`[data-quick-finish-activity="${CSS.escape(activityId)}"]`)) matchingButton.disabled = true;
+    registerQuickActivityResult(activityId)
+      .catch((error) => {
+        console.error("Kunde inte avsluta aktiviteten", error);
+        showFeedback(error.message || "Aktiviteten kunde inte avslutas.");
+      })
+      .finally(() => {
+        for (const matchingButton of els.caseActivityTableBody.querySelectorAll(`[data-quick-finish-activity="${CSS.escape(activityId)}"]`)) matchingButton.disabled = false;
+      });
+    return;
+  }
   const openButton = event.target.closest("[data-open-activity]");
   if (openButton) openCaseActivity(openButton.dataset.openActivity);
-});
-
-els.caseActivityTableBody.addEventListener("change", async (event) => {
-  const resultInput = event.target.closest("[data-quick-activity-result]");
-  if (!resultInput || !resultInput.value) return;
-  const activityId = resultInput.dataset.quickActivityResult;
-  const resultCode = resultInput.value;
-  for (const matchingInput of els.caseActivityTableBody.querySelectorAll(`[data-quick-activity-result="${CSS.escape(activityId)}"]`)) {
-    matchingInput.disabled = true;
-  }
-  try {
-    await registerQuickActivityResult(activityId, resultCode);
-  } catch (error) {
-    console.error("Kunde inte registrera aktivitetsresultat", error);
-    showFeedback(error.message || "Resultatet kunde inte sparas.");
-  } finally {
-    for (const matchingInput of els.caseActivityTableBody.querySelectorAll(`[data-quick-activity-result="${CSS.escape(activityId)}"]`)) {
-      matchingInput.disabled = false;
-      matchingInput.value = "";
-    }
-  }
 });
 
 els.backToActivitiesButton.addEventListener("click", () => {
@@ -8032,35 +8031,34 @@ function openCaseActivityWithResult(activityId, resultCode) {
   });
 }
 
-async function registerQuickActivityResult(activityId, resultCode) {
+async function registerQuickActivityResult(activityId) {
   const activity = caseActivities.find((item) => item.id === activityId);
   const caseRecord = cases.find((item) => item.id === activity?.caseId);
-  const validResult = activity && activityResultOptions(activity).some(([value]) => value === resultCode);
-  if (!activity || !caseRecord || !validResult) throw new Error("Aktiviteten eller resultatet kunde inte hittas.");
-
-  const classification = resultClassification(activity.templateId, resultCode);
-  if (classification === "deviation" || activitySaveRequiresConfirmation(activity, "completed", resultCode)) {
-    openCaseActivityWithResult(activity.id, resultCode);
-    return;
-  }
-
-  const resultLabel = activityResultOptions(activity).find(([value]) => value === resultCode)?.[1] || resultCode;
+  const resultOptions = activity ? quickActivityResultOptions(activity) : [];
+  if (!activity || !caseRecord || !resultOptions.length) throw new Error("Aktiviteten kan inte snabbavslutas.");
   const confirmation = await confirmAction({
     eyebrow: "Snabbregistrering",
     title: "Avsluta aktiviteten?",
-    body: `Aktiviteten avslutas med resultatet "${resultLabel}". Resultatet, registrerande användare och tidpunkt sparas i ärendets logg. Välj Komplettera uppgifter om du behöver registrera mer information eller koppla ett underlag.`,
+    body: "Välj resultat innan aktiviteten avslutas. Resultatet, registrerande användare och tidpunkt sparas i ärendets logg. Välj Komplettera uppgifter om du behöver registrera mer information eller koppla ett underlag.",
     subjectLabel: "Aktivitet",
     subjectValue: activity.title,
     confirmLabel: "Avsluta aktivitet",
-    alternativeLabel: "Komplettera uppgifter"
+    alternativeLabel: "Komplettera uppgifter",
+    resultOptions,
+    resultValue: resultOptions.length === 1 ? resultOptions[0][0] : ""
   });
+  const resultCode = confirmation.resultCode;
   if (confirmation.action === "alternative") {
-    openCaseActivityWithResult(activity.id, resultCode);
+    if (resultCode) openCaseActivityWithResult(activity.id, resultCode);
+    else openCaseActivity(activity.id);
     if (confirmation.note) els.activityDetailNoteInput.value = confirmation.note;
     updateActivityDetailDirtyState();
     return;
   }
   if (!confirmation.confirmed) return;
+
+  const validResult = resultOptions.some(([value]) => value === resultCode);
+  if (!validResult) throw new Error("Välj ett giltigt resultat.");
 
   const candidateSynced = await syncCandidateFromActivity(activity, "completed", confirmation.note, new Date().toISOString(), resultCode);
   if (!candidateSynced) {
