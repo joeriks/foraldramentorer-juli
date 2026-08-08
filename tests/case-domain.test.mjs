@@ -224,6 +224,15 @@ test("defines handling guidance for every activity template", () => {
   }
 });
 
+test("declares which activity results may use quick completion", () => {
+  const adHoc = ACTIVITY_TEMPLATES.find((template) => template.id === "ad-hoc");
+  assert.deepEqual(adHoc.quickCompletionResultCodes, ["completed"]);
+  for (const template of ACTIVITY_TEMPLATES.filter((item) => item.quickCompletionResultCodes?.length)) {
+    const resultCodes = new Set(template.results.map(([code]) => code));
+    assert.ok(template.quickCompletionResultCodes.every((code) => resultCodes.has(code)));
+  }
+});
+
 test("limits configurable case fields to the shared field catalog", () => {
   const fieldIds = CASE_DETAIL_FIELD_DEFINITIONS.map((field) => field.id);
   assert.equal(new Set(fieldIds).size, fieldIds.length);

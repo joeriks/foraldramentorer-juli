@@ -54,6 +54,7 @@ export const ACTIVITY_TEMPLATES = [
     version: 1,
     title: "Kontrollera belastningsregister",
     workInstruction: "Kontrollera att rätt registerutdrag visas, att det är giltigt och att äktheten kan bedömas. Registrera endast kontrollens resultat, inte uppgifter ur utdraget.",
+    quickCompletionResultCodes: ["shown_checked"],
     results: [
       ["shown_checked", "Kontrollerat, inget fortsatt ställningstagande behövs", "acceptable"],
       ["assessment_required", "Kontrollerat, särskilt ställningstagande krävs", "deviation"],
@@ -80,6 +81,7 @@ export const ACTIVITY_TEMPLATES = [
     version: 1,
     title: "Kontrollera e-learning",
     workInstruction: "Kontrollera att aktuell utbildning är genomförd. Sätt aktiviteten till Väntar om utbildningen pågår och ange vem eller vad handläggningen väntar på.",
+    quickCompletionResultCodes: ["completed"],
     results: [
       ["completed", "Genomförd", "acceptable"],
       ["partially_completed", "Delvis genomförd", "deviation"],
@@ -91,6 +93,7 @@ export const ACTIVITY_TEMPLATES = [
     version: 1,
     title: "Kontrollera kunskapsavstämning",
     workInstruction: "Kontrollera resultatet från kunskapsavstämningen och registrera om den är godkänd. Ett icke godkänt resultat ska följas av ett uttryckligt ställningstagande.",
+    quickCompletionResultCodes: ["passed"],
     results: [
       ["passed", "Godkänd", "acceptable"],
       ["not_passed", "Inte godkänd", "deviation"]
@@ -132,6 +135,7 @@ export const ACTIVITY_TEMPLATES = [
     version: 1,
     title: "Annan aktivitet",
     workInstruction: "Beskriv vad som ska göras, vem som ansvarar och när det ska vara klart. Registrera resultat och notering så att nästa handläggare kan förstå vad som har gjorts.",
+    quickCompletionResultCodes: ["completed"],
     results: [
       ["completed", "Genomförd", "acceptable"],
       ["not_completed", "Kunde inte genomföras", "deviation"],

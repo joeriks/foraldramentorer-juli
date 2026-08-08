@@ -4044,15 +4044,8 @@ function activityResultOptions(activity) {
   return ACTIVITY_RESULT_OPTIONS[activity?.templateId] || ACTIVITY_RESULT_OPTIONS.default;
 }
 
-const QUICK_ACTIVITY_RESULT_CODES = {
-  registryChecked: new Set(["shown_checked"]),
-  trainingDone: new Set(["completed"]),
-  quizDone: new Set(["passed"])
-};
-
 function quickActivityResultOptions(activity) {
-  const allowedCodes = QUICK_ACTIVITY_RESULT_CODES[activity?.templateId];
-  if (!allowedCodes) return [];
+  const allowedCodes = new Set(activityTemplateById(activity?.templateId)?.quickCompletionResultCodes || []);
   return activityResultOptions(activity).filter(([resultCode]) => allowedCodes.has(resultCode));
 }
 

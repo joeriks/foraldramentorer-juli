@@ -49,8 +49,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /if \(nextStatus === "completed"\) selectedCaseActivityId = null;/);
   assert.match(scriptText, /data-quick-finish-activity/);
   assert.match(scriptText, /registerQuickActivityResult/);
-  assert.match(scriptText, /QUICK_ACTIVITY_RESULT_CODES/);
-  assert.match(scriptText, /registryChecked: new Set\(\["shown_checked"\]\)/);
+  assert.match(scriptText, /quickCompletionResultCodes/);
   assert.match(scriptText, /alternativeLabel: "Komplettera uppgifter"/);
   assert.match(scriptText, /title: "Avsluta aktiviteten\?"/);
   assert.match(scriptText, /resultOptions,/);
