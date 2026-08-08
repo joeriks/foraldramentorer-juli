@@ -37,6 +37,10 @@ test("serves the application shell", async () => {
   assert.match(html, /form="activityTypeAdminForm"/);
   assert.match(html, /id="activityTypeResultsFact"/);
   assert.match(html, /id="activityTypeQuickFact"/);
+  assert.match(html, /id="supportLauncher"/);
+  assert.match(html, /id="supportOffcanvas"/);
+  assert.match(html, /id="supportAdministrationView"/);
+  assert.match(html, /Skriv inte personnummer/);
   assert.match(html, /Handläggningsanvisning/);
   assert.match(html, /<form id="personEditForm"[\s\S]*id="cancelPersonEditButton"[\s\S]*id="savePersonEditButton"[\s\S]*<\/form>/);
   assert.doesNotMatch(html, /form="personEditForm"/);
@@ -84,6 +88,18 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(learningDomain.headers.get("content-type"), /^text\/javascript/);
   assert.match(await learningDomain.text(), /requiredLearningContentIds/);
 
+  const supportDomain = await worker.fetch(new Request("https://example.test/support-domain.js"), {}, context);
+  assert.equal(supportDomain.status, 200);
+  assert.match(await supportDomain.text(), /localSupportResponse/);
+
+  const supportWithoutKey = await worker.fetch(new Request("https://example.test/api/support", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question: "Hur skapar jag ett ärende?" })
+  }), {}, context);
+  assert.equal(supportWithoutKey.status, 503);
+  assert.deepEqual(await supportWithoutKey.json(), { code: "AI_NOT_CONFIGURED" });
+
   const featureLinks = await worker.fetch(new Request("https://example.test/feature-links.js"), {}, context);
   assert.equal(featureLinks.status, 200);
   assert.match(await featureLinks.text(), /dashboard\.work-queue/);
@@ -109,4 +125,46 @@ test("serves application assets and returns 404 for unknown files", async () => 
     headers: { accept: "image/png" }
   }), {}, context);
   assert.equal(missing.status, 404);
+});
+
+test("support endpoint keeps the key server-side and disables OpenAI storage", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamRequest;
+  globalThis.fetch = async (url, options) => {
+    upstreamRequest = { url, options };
+    return new Response(JSON.stringify({
+      output: [{ content: [{ type: "output_text", text: JSON.stringify({
+        answer: "Öppna ärenderegistret.",
+        category: "how_to",
+        needsHuman: false,
+        sources: [{ title: "Ärenden", href: "#/cases" }]
+      }) }] }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://example.test/api/support", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question: "Hur öppnar jag ett ärende?", context: { role: "Handläggare", view: "dashboard" } })
+    }), { OPENAI_API_KEY: "server-secret" }, context);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).category, "how_to");
+    assert.equal(upstreamRequest.url, "https://api.openai.com/v1/responses");
+    assert.equal(upstreamRequest.options.headers.authorization, "Bearer server-secret");
+    const requestBody = JSON.parse(upstreamRequest.options.body);
+    assert.equal(requestBody.store, false);
+    assert.doesNotMatch(JSON.stringify(requestBody), /server-secret/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("support endpoint rejects personal identity numbers before an AI call", async () => {
+  const response = await worker.fetch(new Request("https://example.test/api/support", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question: "Personnummer 19800101-1234" })
+  }), { OPENAI_API_KEY: "server-secret" }, context);
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { code: "SENSITIVE_DATA" });
 });

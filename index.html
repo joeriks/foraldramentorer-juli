@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260807-public-parent-v19">
+    <link rel="stylesheet" href="styles.css?v=20260808-ai-support-v1">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -40,6 +40,7 @@
               <a id="navCaseTypes" class="nav-link" href="#/case-types">Ärendetyper</a>
               <a id="navActivityTypes" class="nav-link" href="#/activity-types">Aktivitetsmallar</a>
               <a id="navLearningAdmin" class="nav-link" href="#/learning-admin">Utbildningsinnehåll</a>
+              <a id="navSupportAdmin" class="nav-link" href="#/support-admin">Supportärenden</a>
               <a id="navRoutines" class="nav-link" href="#/routines">Rutiner</a>
             </div>
           </div>
@@ -74,6 +75,7 @@
                   <li><a class="dropdown-item" href="#/case-types">Ärendetyper</a></li>
                   <li><a class="dropdown-item" href="#/activity-types">Aktivitetsmallar</a></li>
                   <li><a class="dropdown-item" href="#/learning-admin">Utbildningsinnehåll</a></li>
+                  <li><a class="dropdown-item" href="#/support-admin">Supportärenden</a></li>
                   <li><a class="dropdown-item" href="#/routines">Rutiner</a></li>
                 </ul>
               </div>
@@ -1252,6 +1254,31 @@
             </div>
           </section>
 
+          <section id="supportAdministrationView" hidden>
+            <div class="card">
+              <div class="card-header bg-white d-flex flex-wrap gap-3 justify-content-between align-items-start">
+                <div>
+                  <h2 class="h5 mb-1">Supportärenden</h2>
+                  <p class="text-secondary mb-0">Frågor, felrapporter och utvecklingsförslag som registrerats via AI-supporten.</p>
+                </div>
+                <label class="support-filter">Status
+                  <select id="supportTicketStatusFilter" class="form-select form-select-sm">
+                    <option value="all">Alla</option>
+                    <option value="new">Nya</option>
+                    <option value="in_progress">Pågår</option>
+                    <option value="resolved">Avslutade</option>
+                  </select>
+                </label>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light"><tr><th>Registrerad</th><th>Typ</th><th>Fråga</th><th>Rapporterad av</th><th>Status</th><th class="text-end">Åtgärd</th></tr></thead>
+                  <tbody id="supportTicketTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <section id="routinesView" hidden>
             <div class="routines-shell">
               <header class="routines-header border-bottom">
@@ -1686,6 +1713,38 @@
       </div>
     </div>
 
+    <button id="supportLauncher" type="button" class="btn btn-primary support-launcher" data-bs-toggle="offcanvas" data-bs-target="#supportOffcanvas" aria-controls="supportOffcanvas" aria-label="Öppna AI-support" title="Support">
+      <span class="support-launcher-symbol" aria-hidden="true">?</span><span>Support</span>
+    </button>
+
+    <aside class="offcanvas offcanvas-end support-panel" tabindex="-1" id="supportOffcanvas" aria-labelledby="supportOffcanvasTitle">
+      <div class="offcanvas-header border-bottom">
+        <div><div class="record-type">Systemstöd</div><h2 id="supportOffcanvasTitle" class="offcanvas-title h5 mb-0">AI-support</h2></div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Stäng"></button>
+      </div>
+      <div class="offcanvas-body d-flex flex-column">
+        <div class="alert alert-warning py-2 small" role="note"><strong>Använd inte personuppgifter.</strong> Skriv inte personnummer, registeruppgifter eller känsliga uppgifter här.</div>
+        <div id="supportConversation" class="support-conversation" aria-live="polite">
+          <div class="support-message support-message-assistant">
+            <div class="support-message-label">AI-support</div>
+            <p class="mb-0">Fråga hur en funktion används, rapportera ett fel eller lämna ett utvecklingsförslag. Jag utgår från aktuell roll och vy.</p>
+          </div>
+        </div>
+        <form id="supportForm" class="mt-auto pt-3">
+          <label class="form-label" for="supportQuestionInput">Vad behöver du hjälp med?</label>
+          <textarea id="supportQuestionInput" class="form-control" rows="4" maxlength="2000" required placeholder="Beskriv vad du försöker göra och vad som händer."></textarea>
+          <div class="d-flex justify-content-between align-items-center gap-2 mt-2">
+            <span id="supportStatus" class="small text-secondary" role="status">Aktuell vy följer med som kontext.</span>
+            <button id="askSupportButton" type="submit" class="btn btn-primary">Fråga supporten</button>
+          </div>
+        </form>
+        <div id="supportTicketActions" class="support-ticket-actions mt-3" hidden>
+          <p class="small text-secondary mb-2">Behöver frågan följas upp av en person?</p>
+          <button id="createSupportTicketButton" type="button" class="btn btn-outline-primary w-100">Registrera supportärende</button>
+        </div>
+      </div>
+    </aside>
+
     <div class="toast-container position-fixed bottom-0 end-0 p-3" aria-live="polite" aria-atomic="true">
       <div id="feedbackToast" class="toast border-0 shadow" role="status" aria-live="polite" aria-atomic="true">
         <div class="d-flex">
@@ -1833,6 +1892,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260808-case-actions-v52"></script>
+    <script type="module" src="app.js?v=20260808-ai-support-v1"></script>
   </body>
 </html>

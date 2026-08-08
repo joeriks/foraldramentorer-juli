@@ -15,6 +15,14 @@ const types = {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  if (url.pathname === "/api/support") {
+    res.writeHead(req.method === "POST" ? 503 : 405, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store"
+    });
+    res.end(JSON.stringify({ code: req.method === "POST" ? "AI_NOT_CONFIGURED" : "METHOD_NOT_ALLOWED" }));
+    return;
+  }
   const requestedPath = url.pathname === "/" ? "/index.html" : url.pathname;
   const filePath = path.normalize(path.join(root, requestedPath));
 

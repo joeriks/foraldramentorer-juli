@@ -44,9 +44,15 @@ import {
   requiredLearningContentIds,
   scoreKnowledgeTest
 } from "./learning-domain.js?v=20260807-public-parent-v3";
+import {
+  containsSensitivePersonalData,
+  findSupportKnowledge,
+  localSupportResponse,
+  supportCategoryLabel
+} from "./support-domain.js?v=20260808-ai-support-v1";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
 const HANDLERS_STORE = "handlers";
@@ -71,6 +77,7 @@ const LEARNING_CONTENT_STORE = "learningContent";
 const TENANT_LEARNING_SELECTION_STORE = "tenantLearningSelection";
 const LEARNING_PROGRESS_STORE = "learningProgress";
 const PUBLIC_SUPPORT_REQUESTS_STORE = "publicSupportRequests";
+const SUPPORT_TICKETS_STORE = "supportTickets";
 const LEARNING_SELECTION_INITIALIZED_ID = "__selection_initialized__";
 let CURRENT_USER_ID = "handler-sara";
 const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
@@ -522,6 +529,9 @@ let learningAdminFilter = "all";
 let learningMutationQueue = Promise.resolve();
 let publicSupportRequests = [];
 let lastPublicSupportRequestId = "";
+let supportTickets = [];
+let lastSupportExchange = null;
+let supportTicketStatusFilter = "all";
 let activeTestUserType = TEST_USER_TYPES.has(localStorage.getItem(TEST_USER_TYPE_KEY))
   ? localStorage.getItem(TEST_USER_TYPE_KEY)
   : "coordinator";
@@ -554,6 +564,7 @@ const els = {
   navCaseTypes: document.querySelector("#navCaseTypes"),
   navActivityTypes: document.querySelector("#navActivityTypes"),
   navLearningAdmin: document.querySelector("#navLearningAdmin"),
+  navSupportAdmin: document.querySelector("#navSupportAdmin"),
   navRoutines: document.querySelector("#navRoutines"),
   dashboardView: document.querySelector("#dashboardView"),
   presentationView: document.querySelector("#presentationView"),
@@ -609,6 +620,17 @@ const els = {
   administrationView: document.querySelector("#administrationView"),
   caseTypesAdministrationView: document.querySelector("#caseTypesAdministrationView"),
   activityTypesAdministrationView: document.querySelector("#activityTypesAdministrationView"),
+  supportAdministrationView: document.querySelector("#supportAdministrationView"),
+  supportTicketTableBody: document.querySelector("#supportTicketTableBody"),
+  supportTicketStatusFilter: document.querySelector("#supportTicketStatusFilter"),
+  supportLauncher: document.querySelector("#supportLauncher"),
+  supportConversation: document.querySelector("#supportConversation"),
+  supportForm: document.querySelector("#supportForm"),
+  supportQuestionInput: document.querySelector("#supportQuestionInput"),
+  supportStatus: document.querySelector("#supportStatus"),
+  askSupportButton: document.querySelector("#askSupportButton"),
+  supportTicketActions: document.querySelector("#supportTicketActions"),
+  createSupportTicketButton: document.querySelector("#createSupportTicketButton"),
   routinesView: document.querySelector("#routinesView"),
   routinesSearchInput: document.querySelector("#routinesSearchInput"),
   clearRoutinesSearchButton: document.querySelector("#clearRoutinesSearchButton"),
@@ -1263,6 +1285,9 @@ function openDatabase() {
       const publicSupportRequestStore = ensureStore(PUBLIC_SUPPORT_REQUESTS_STORE);
       ensureIndex(publicSupportRequestStore, "tenantCreatedAt", ["tenantId", "createdAt"]);
       ensureIndex(publicSupportRequestStore, "tenantStatus", ["tenantId", "status"]);
+      const supportTicketStore = ensureStore(SUPPORT_TICKETS_STORE);
+      ensureIndex(supportTicketStore, "tenantCreatedAt", ["tenantId", "createdAt"]);
+      ensureIndex(supportTicketStore, "tenantStatus", ["tenantId", "status"]);
     };
 
     request.onsuccess = () => {
@@ -1367,6 +1392,10 @@ function publicSupportRequestTx(mode = "readonly") {
   return db.transaction(PUBLIC_SUPPORT_REQUESTS_STORE, mode).objectStore(PUBLIC_SUPPORT_REQUESTS_STORE);
 }
 
+function supportTicketTx(mode = "readonly") {
+  return db.transaction(SUPPORT_TICKETS_STORE, mode).objectStore(SUPPORT_TICKETS_STORE);
+}
+
 function getAllFrom(storeTx) {
   return new Promise((resolve, reject) => {
     const request = storeTx().getAll();
@@ -1432,6 +1461,9 @@ const saveLearningProgress = (value) => putInto(learningProgressTx, value);
 const getAllPublicSupportRequests = () => getAllFrom(publicSupportRequestTx);
 const savePublicSupportRequest = (value) => putInto(publicSupportRequestTx, value);
 const clearPublicSupportRequests = () => clearStore(publicSupportRequestTx);
+const getAllSupportTickets = () => getAllFrom(supportTicketTx);
+const saveSupportTicket = (value) => putInto(supportTicketTx, value);
+const clearSupportTickets = () => clearStore(supportTicketTx);
 
 function caseTypeById(id, version = null) {
   return (version ? caseTypeDefinitionVersions.find((definition) => definition.id === id && Number(definition.version) === Number(version)) : null)
@@ -2482,6 +2514,9 @@ async function refresh() {
   publicSupportRequests = (await getAllPublicSupportRequests())
     .filter((request) => request.tenantId === DEFAULT_TENANT_ID)
     .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
+  supportTickets = (await getAllSupportTickets())
+    .filter((ticket) => ticket.tenantId === DEFAULT_TENANT_ID)
+    .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
   renderAll();
   document.body.dataset.refreshDurationMs = String(Date.now() - refreshStartedAt);
 }
@@ -2901,6 +2936,123 @@ function renderPublicPortal() {
   else renderPublicLearning();
 }
 
+function appendSupportMessage(role, text, response = null) {
+  const message = document.createElement("div");
+  message.className = `support-message support-message-${role}`;
+  const label = document.createElement("div");
+  label.className = "support-message-label";
+  label.textContent = role === "user" ? "Du" : "AI-support";
+  const body = document.createElement("p");
+  body.className = "mb-0";
+  body.textContent = text;
+  message.append(label, body);
+  if (response) {
+    const meta = document.createElement("div");
+    meta.className = "support-answer-meta";
+    const mode = document.createElement("span");
+    mode.className = "badge text-bg-light border";
+    mode.textContent = response.mode === "ai" ? "AI-svar" : "Lokalt supportsvar";
+    const category = document.createElement("span");
+    category.className = "badge text-bg-light border";
+    category.textContent = supportCategoryLabel(response.category);
+    meta.append(mode, category);
+    message.append(meta);
+    if (response.sources?.length) {
+      const links = document.createElement("div");
+      links.className = "support-answer-links";
+      for (const source of response.sources.slice(0, 3)) {
+        const link = document.createElement("a");
+        link.href = source.href;
+        link.textContent = source.title || source.label || "Öppna funktion";
+        links.append(link);
+      }
+      message.append(links);
+    }
+  }
+  els.supportConversation.append(message);
+  els.supportConversation.scrollTop = els.supportConversation.scrollHeight;
+}
+
+function supportContext() {
+  return {
+    role: currentUser().role,
+    view: currentView,
+    route: window.location.hash || "#/dashboard"
+  };
+}
+
+async function askSupport(question) {
+  const context = supportContext();
+  const knowledge = findSupportKnowledge(question, context).map(({ title, answer, href }) => ({ title, answer, href }));
+  try {
+    const response = await fetch("./api/support", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question, context, knowledge })
+    });
+    if (!response.ok) throw new Error(`Support endpoint returned ${response.status}`);
+    const result = await response.json();
+    if (!result?.answer) throw new Error("Support response was empty");
+    return {
+      ...result,
+      category: result.category || "general",
+      mode: "ai",
+      sources: Array.isArray(result.sources) ? result.sources : knowledge.slice(0, 2)
+    };
+  } catch (error) {
+    console.info("AI-support is not configured; using local support knowledge.", error);
+    return localSupportResponse(question, context);
+  }
+}
+
+function supportTicketStatusLabel(status) {
+  return { new: "Nytt", in_progress: "Pågår", resolved: "Avslutat" }[status] || "Nytt";
+}
+
+function renderSupportAdministration() {
+  if (!els.supportTicketTableBody) return;
+  const visible = supportTickets.filter((ticket) => supportTicketStatusFilter === "all" || ticket.status === supportTicketStatusFilter);
+  els.supportTicketTableBody.replaceChildren();
+  if (!visible.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 6;
+    cell.className = "text-center text-secondary py-4";
+    cell.textContent = "Inga supportärenden i detta urval.";
+    row.append(cell);
+    els.supportTicketTableBody.append(row);
+    return;
+  }
+  for (const ticket of visible) {
+    const row = document.createElement("tr");
+    const created = document.createElement("td");
+    created.textContent = new Date(ticket.createdAt).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" });
+    const type = document.createElement("td");
+    type.textContent = supportCategoryLabel(ticket.category);
+    const question = document.createElement("td");
+    question.textContent = ticket.question;
+    const reporter = document.createElement("td");
+    reporter.textContent = `${ticket.reporterName} · ${ticket.contextRole}`;
+    const status = document.createElement("td");
+    status.textContent = supportTicketStatusLabel(ticket.status);
+    const action = document.createElement("td");
+    action.className = "text-end";
+    const select = document.createElement("select");
+    select.className = "form-select form-select-sm d-inline-block w-auto";
+    select.dataset.supportTicketStatus = ticket.id;
+    for (const [value, labelText] of [["new", "Nytt"], ["in_progress", "Pågår"], ["resolved", "Avslutat"]]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = labelText;
+      option.selected = ticket.status === value;
+      select.append(option);
+    }
+    action.append(select);
+    row.append(created, type, question, reporter, status, action);
+    els.supportTicketTableBody.append(row);
+  }
+}
+
 function renderAll() {
   const renderStartedAt = Date.now();
   applyRoute();
@@ -2920,6 +3072,7 @@ function renderAll() {
     "case-types": renderCaseTypeAdministration,
     "activity-types": renderActivityTypeAdministration,
     "learning-admin": renderLearningAdministration,
+    "support-admin": renderSupportAdministration,
     "mentor-home": renderMentorPortal,
     "mentor-assignments": renderMentorPortal,
     "mentor-assignment": renderMentorPortal,
@@ -3575,7 +3728,7 @@ function applyRoute() {
     route = { view: "dashboard", id: null };
   }
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-types", "activity-types", "learning-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-types", "activity-types", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
   selectedId = currentView === "mentor" ? route.id : selectedId;
   selectedParentId = currentView === "parent" ? route.id : selectedParentId;
   if (currentView !== "parent") parentEditMode = false;
@@ -3610,6 +3763,7 @@ function applyRoute() {
   els.caseTypesAdministrationView.hidden = currentView !== "case-types";
   els.activityTypesAdministrationView.hidden = currentView !== "activity-types";
   els.learningAdministrationView.hidden = currentView !== "learning-admin";
+  els.supportAdministrationView.hidden = currentView !== "support-admin";
   els.routinesView.hidden = currentView !== "routines";
   els.handlerDetailView.hidden = currentView !== "handler";
 
@@ -3644,11 +3798,12 @@ function applyRoute() {
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
   els.navParents.classList.toggle("active", currentView === "parents" || currentView === "parent");
   els.navLearning.classList.toggle("active", currentView === "learning");
-  els.navAdministration.classList.toggle("active", ["administration", "case-types", "activity-types", "learning-admin", "routines", "handler"].includes(currentView));
+  els.navAdministration.classList.toggle("active", ["administration", "case-types", "activity-types", "learning-admin", "support-admin", "routines", "handler"].includes(currentView));
   els.navHandlers.classList.toggle("active", currentView === "administration" || currentView === "handler");
   els.navCaseTypes.classList.toggle("active", currentView === "case-types");
   els.navActivityTypes.classList.toggle("active", currentView === "activity-types");
   els.navLearningAdmin.classList.toggle("active", currentView === "learning-admin");
+  els.navSupportAdmin.classList.toggle("active", currentView === "support-admin");
   els.navRoutines.classList.toggle("active", currentView === "routines");
   els.navMentorHome.classList.toggle("active", currentView === "mentor-home");
   els.navMentorAssignments.classList.toggle("active", ["mentor-assignments", "mentor-assignment"].includes(currentView));
@@ -3723,6 +3878,9 @@ function applyRoute() {
   } else if (currentView === "learning-admin") {
     els.pageTitle.textContent = route.id ? "Utbildningsinnehåll" : "Utbildningsbibliotek";
     els.breadcrumb.textContent = route.id ? "Start / Systemadministration / Utbildningsinnehåll / Innehåll" : "Start / Systemadministration / Utbildningsinnehåll";
+  } else if (currentView === "support-admin") {
+    els.pageTitle.textContent = "Supportärenden";
+    els.breadcrumb.textContent = "Start / Systemadministration / Supportärenden";
   } else if (currentView === "routines") {
     els.pageTitle.textContent = "Rutiner";
     els.breadcrumb.textContent = "Start / Systemadministration / Rutiner";
@@ -7159,6 +7317,90 @@ els.navAdministration.addEventListener("click", (event) => {
   navigateTo("#/administration");
 });
 
+els.navSupportAdmin.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/support-admin");
+});
+
+els.supportQuestionInput.addEventListener("input", () => {
+  els.supportQuestionInput.setCustomValidity("");
+});
+
+els.supportForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const question = els.supportQuestionInput.value.trim();
+  if (!question) return;
+  if (containsSensitivePersonalData(question)) {
+    els.supportQuestionInput.setCustomValidity("Ta bort personnummer eller känsliga registeruppgifter innan frågan skickas.");
+    els.supportQuestionInput.reportValidity();
+    return;
+  }
+  els.supportQuestionInput.setCustomValidity("");
+  appendSupportMessage("user", question);
+  els.askSupportButton.disabled = true;
+  els.supportStatus.textContent = "Söker i systemstödet…";
+  const answer = await askSupport(question);
+  lastSupportExchange = { question, answer, context: supportContext() };
+  appendSupportMessage("assistant", answer.answer, answer);
+  els.supportQuestionInput.value = "";
+  els.askSupportButton.disabled = false;
+  els.supportStatus.textContent = answer.mode === "ai" ? "Svar från AI-supporten." : "Lokalt svar; AI-tjänsten är inte aktiverad.";
+  els.supportTicketActions.hidden = false;
+});
+
+els.createSupportTicketButton.addEventListener("click", async () => {
+  if (!lastSupportExchange) return;
+  const now = new Date().toISOString();
+  const actor = currentUser();
+  const ticket = {
+    id: crypto.randomUUID(),
+    tenantId: DEFAULT_TENANT_ID,
+    category: lastSupportExchange.answer.category || "general",
+    status: "new",
+    question: lastSupportExchange.question,
+    answer: lastSupportExchange.answer.answer,
+    answerMode: lastSupportExchange.answer.mode,
+    contextView: lastSupportExchange.context.view,
+    contextRoute: lastSupportExchange.context.route,
+    contextRole: lastSupportExchange.context.role,
+    reporterId: actor.id,
+    reporterName: actor.name,
+    createdAt: now,
+    updatedAt: now
+  };
+  await saveSupportTicket(ticket);
+  supportTickets.unshift(ticket);
+  els.supportTicketActions.hidden = true;
+  const email = document.createElement("a");
+  const emailSubject = encodeURIComponent(`Support: ${supportCategoryLabel(ticket.category)}`);
+  const emailBody = encodeURIComponent(`${ticket.question}\n\nAktuell vy: ${ticket.contextRoute}`);
+  email.href = `mailto:support@programenta.se?subject=${emailSubject}&body=${emailBody}`;
+  email.textContent = "Skicka även via e-post";
+  const notice = document.createElement("div");
+  notice.className = "support-message support-message-assistant";
+  notice.append("Supportärendet är sparat i prototypens lokala supportkö. ", email);
+  els.supportConversation.append(notice);
+  markSaved();
+});
+
+els.supportTicketStatusFilter.addEventListener("change", () => {
+  supportTicketStatusFilter = els.supportTicketStatusFilter.value;
+  renderSupportAdministration();
+});
+
+els.supportTicketTableBody.addEventListener("change", async (event) => {
+  const select = event.target.closest("[data-support-ticket-status]");
+  if (!select) return;
+  const ticket = supportTickets.find((item) => item.id === select.dataset.supportTicketStatus);
+  if (!ticket) return;
+  ticket.status = select.value;
+  ticket.updatedAt = new Date().toISOString();
+  ticket.updatedBy = currentActorId();
+  await saveSupportTicket(ticket);
+  renderSupportAdministration();
+  markSaved();
+});
+
 els.navHandlers.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/administration");
@@ -9077,7 +9319,7 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
 els.resetButton.addEventListener("click", async () => {
   const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata? Mentorärenden tas bort och grundhandläggarna återställs. Åtgärden kan inte ångras.");
   if (!confirmed) return;
-  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests()]);
+  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests(), clearSupportTickets()]);
   await ensureDefaultHandlers();
   selectedId = null;
   markSaved();

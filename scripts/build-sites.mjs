@@ -9,6 +9,7 @@ const sourceFiles = [
   ["/index.html", "index.html", "text/html; charset=utf-8"],
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
   ["/learning-domain.js", "learning-domain.js", "text/javascript; charset=utf-8"],
+  ["/support-domain.js", "support-domain.js", "text/javascript; charset=utf-8"],
   ["/case-domain.js", "case-domain.js", "text/javascript; charset=utf-8"],
   ["/feature-links.js", "feature-links.js", "text/javascript; charset=utf-8"],
   ["/routine-illustrations.js", "routine-illustrations.js", "text/javascript; charset=utf-8"],
@@ -29,21 +30,73 @@ for (const [pathname, filename, contentType] of sourceFiles) {
 
 const worker = `const assets = ${JSON.stringify(assets)};
 
+const sensitivePattern = /\\b(?:19|20)?\\d{6}[-+]?\\d{4}\\b/;
+
+function jsonResponse(value, status = 200) {
+  return new Response(JSON.stringify(value), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" }
+  });
+}
+
+async function handleSupport(request, env) {
+  if (!env?.OPENAI_API_KEY) return jsonResponse({ code: "AI_NOT_CONFIGURED" }, 503);
+  let payload;
+  try { payload = await request.json(); } catch { return jsonResponse({ code: "INVALID_JSON" }, 400); }
+  const question = String(payload?.question || "").trim();
+  if (!question || question.length > 2000) return jsonResponse({ code: "INVALID_QUESTION" }, 400);
+  if (sensitivePattern.test(question)) return jsonResponse({ code: "SENSITIVE_DATA" }, 400);
+  const context = {
+    role: String(payload?.context?.role || "Okänd"),
+    view: String(payload?.context?.view || "Okänd"),
+    route: String(payload?.context?.route || "")
+  };
+  const knowledge = Array.isArray(payload?.knowledge) ? payload.knowledge.slice(0, 3).map((item) => ({
+    title: String(item?.title || ""), answer: String(item?.answer || "").slice(0, 1200), href: String(item?.href || "")
+  })) : [];
+  const upstream = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { "authorization": "Bearer " + env.OPENAI_API_KEY, "content-type": "application/json" },
+    body: JSON.stringify({
+      model: env.OPENAI_SUPPORT_MODEL || "gpt-5.6-luna",
+      store: false,
+      max_output_tokens: 700,
+      reasoning: { effort: "low" },
+      text: { verbosity: "low" },
+      instructions: "Du är systemsupport för FöräldraMentorer, en svensk kommunal prototyp. Svara kort, sakligt och på svenska. Använd endast referensmaterialet. Hitta aldrig på genomförda registreringar eller regler. Be aldrig om personnummer, registeruppgifter eller känsliga personuppgifter. Klassificera som how_to, bug_report, feature_request, privacy_or_security eller general. Vid fel, osäkerhet, integritet eller utvecklingsförslag ska needsHuman vara true. Returnera endast JSON med answer, category, needsHuman och sources (array med title och href).",
+      input: JSON.stringify({ question, context, referenceMaterial: knowledge })
+    })
+  });
+  if (!upstream.ok) return jsonResponse({ code: "AI_UNAVAILABLE" }, 502);
+  const result = await upstream.json();
+  const outputText = (result.output || []).flatMap((item) => item.content || []).find((item) => item.type === "output_text")?.text || "";
+  try {
+    const clean = outputText.replace(/^\\s*\`\`\`(?:json)?/i, "").replace(/\`\`\`\\s*$/, "").trim();
+    const answer = JSON.parse(clean);
+    return jsonResponse({
+      answer: String(answer.answer || "").slice(0, 3000),
+      category: String(answer.category || "general"),
+      needsHuman: Boolean(answer.needsHuman),
+      sources: Array.isArray(answer.sources) ? answer.sources.slice(0, 3) : knowledge.slice(0, 2)
+    });
+  } catch {
+    return jsonResponse({ answer: outputText.slice(0, 3000), category: "general", needsHuman: true, sources: knowledge.slice(0, 2) });
+  }
+}
+
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/support") {
+      if (request.method !== "POST") return jsonResponse({ code: "METHOD_NOT_ALLOWED" }, 405);
+      return handleSupport(request, env);
+    }
     const asset = assets[url.pathname] || (request.headers.get("accept")?.includes("text/html") ? assets["/"] : null);
     if (!asset) return new Response("Not found", { status: 404 });
-    const cacheControl = url.pathname.startsWith("/vendor/")
-      ? "public, max-age=3600"
-      : "no-cache";
+    const cacheControl = url.pathname.startsWith("/vendor/") ? "public, max-age=3600" : "no-cache";
     return new Response(request.method === "HEAD" ? null : asset.body, {
       status: 200,
-      headers: {
-        "content-type": asset.contentType,
-        "cache-control": cacheControl,
-        "x-content-type-options": "nosniff"
-      }
+      headers: { "content-type": asset.contentType, "cache-control": cacheControl, "x-content-type-options": "nosniff" }
     });
   }
 };
