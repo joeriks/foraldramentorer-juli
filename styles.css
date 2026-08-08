@@ -1106,6 +1106,54 @@ body {
   justify-content: flex-end;
 }
 
+.case-actions-panel {
+  margin-top: var(--app-space-4);
+  border-top: 1px solid var(--app-border);
+  padding-top: var(--app-space-3);
+}
+
+.case-actions-heading {
+  margin-bottom: var(--app-space-2);
+}
+
+.case-actions-list {
+  border-top: 1px solid var(--app-border);
+}
+
+.case-action-row {
+  display: flex;
+  min-height: 4.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-4);
+  border-bottom: 1px solid var(--app-border);
+  padding: var(--app-space-2) 0;
+}
+
+.case-action-row[hidden] {
+  display: none;
+}
+
+.case-action-copy {
+  min-width: 0;
+}
+
+.case-action-copy strong {
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.case-action-copy p {
+  margin: 0;
+  color: var(--bs-secondary-color);
+  font-size: 0.875rem;
+}
+
+.case-action-row .btn {
+  width: 13rem;
+  flex: 0 0 13rem;
+}
+
 .next-action-bar {
   display: flex;
   align-items: center;
@@ -3099,6 +3147,18 @@ body {
 
   .case-ready-notice-actions .btn {
     width: 100%;
+  }
+
+  .case-action-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--app-space-2);
+    padding: var(--app-space-3) 0;
+  }
+
+  .case-action-row .btn {
+    width: 100%;
+    flex-basis: auto;
   }
 
   .activity-record-header,

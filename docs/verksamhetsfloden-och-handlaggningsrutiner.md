@@ -134,6 +134,8 @@ När ett arbetsmoment normalt följs av att ett nytt objekt skapas ska systemet 
 
 Gränssnittet ska före bekräftelsen visa vilka poster som kommer att skapas eller ändras. Ett förval får aldrig genomföras dolt. Om användaren väljer bort nästa steg ska det sparade objektet få ett tydligt och sökbart läge så att processen kan fortsätta senare. Obligatoriska verksamhetsbeslut får inte ersättas av ett förval.
 
+Att den sista aktiviteten avslutas är inte i sig en övergång. Systemet sparar aktivitetens resultat och visar vilket verksamhetsbeslut som nu behövs, men avslutar inte ärendet, skapar inte ett följdärende och ändrar inte en förälder- eller mentorpost utan ett uttryckligt kommando. Om ett följdärende redan finns ska det visas i stället för att ett nytt föreslås.
+
 ## 3. Ärendetyper
 
 Följande ärendetyper behövs för det sammanhängande verksamhetsflödet:
@@ -226,15 +228,25 @@ Handläggaren går därefter till den aktuella aktiviteten, utför arbetet, regi
 
 ### 5.3 Avsluta arbetsmomentet
 
-När en aktivitet avslutas ska användaren:
+När en aktivitet avslutas i den fullständiga aktivitetsvyn ska användaren:
 
 1. välja ett strukturerat resultat,
 2. ange notering om resultattypen kräver det,
 3. registrera eller länka relevant handling,
-4. bekräfta avslutningen,
-5. få en tydlig bekräftelse och se nästa föreslagna steg.
+4. spara avslutningen,
+5. återgå till ärendets aktivitetslista och se nästa föreslagna steg.
 
-Systemet registrerar automatiskt vem som gjorde ändringen och när den gjordes.
+Systemet registrerar automatiskt vem som gjorde ändringen och när den gjordes. Resultat får inte vara förvalt.
+
+För vanliga, väldefinierade utfall kan aktivitetslistan visa kommandot `Avsluta`. Det öppnar en kompakt dialog med aktivitetens handledande text, valbara resultat och en förklaring av vad som sparas. Dialogen ska även erbjuda `Komplettera uppgifter`, som öppnar den fullständiga aktivitetsvyn. Snabbavslut får bara användas för resultat som aktivitetsmallen uttryckligen tillåter och ska inte visas när utfallet kräver tjänsteanteckning, möte, handling eller andra kompletterande uppgifter.
+
+När alla tillämpliga aktiviteter är avslutade och inga ställningstaganden återstår ska aktivitetsvyn visa:
+
+- att ärendet fortfarande är öppet,
+- vilka uppgifter som har sparats i aktiviteten och loggen,
+- att inget följdärende eller registerkort har ändrats automatiskt,
+- ett primärt förslag anpassat till ärendetypen,
+- kommandot `Avsluta ärendet` som ett separat, uttryckligt beslut.
 
 ### 5.4 Välj rätt vy
 
@@ -638,6 +650,19 @@ Används efter ett uttryckligt ställningstagande när handläggningen tillfäll
 
 Avslut kräver strukturerad avslutsorsak, motivering och beslutsfattare. Återstående aktiviteter blir `Ej aktuella`. Ärendet och dess historik tas inte bort.
 
+### När alla aktiviteter är klara
+
+Ett ärende är inte avslutat bara för att alla aktiviteter är avslutade. Ärendet ligger kvar som pågående tills handläggaren väljer nästa verksamhetssteg. Systemet visar ett beslutsläge med de alternativ som är relevanta för ärendetypen:
+
+- öppna ett redan länkat följdärende,
+- registrera ett föreslaget följdärende,
+- granska och komplettera ärendet,
+- avsluta ärendet med strukturerad orsak.
+
+För ett stödärende är normalförslaget `Starta matchning` när föräldern vill gå vidare. För ett matchningsärende ska parternas svar registreras innan ett mentoruppdrag kan skapas. För ett mentoruppdrag ska rapporter, föräldraavstämningar och ersättningsunderlag granskas före avslut.
+
+Ett särskilt verksamhetskommando kan ha en definierad sammansatt effekt. Exempelvis kan `Fatta beslut om godkännande` både registrera beslutet, avsluta godkännandeärendet och göra den godkända mentorn tillgänglig för matchning. En sådan effekt ska alltid beskrivas före bekräftelsen och loggas som ett uttryckligt beslut; den får inte utlösas enbart av att en godtycklig sista aktivitet blir klar.
+
 ### Återöppning
 
 Återöppning är ett särskilt behörighetsstyrt kommando. Användaren anger motivering. Systemet skapar en händelse och återaktiverar inte automatiskt tidigare aktiviteter; användaren väljer vilka nya eller tidigare aktiviteter som ska gälla.
@@ -698,6 +723,7 @@ Systemet bör automatiskt:
 - förhindra slutligt godkännande när obligatoriska steg eller avvikelser återstår,
 - markera återstående aktiviteter som ej aktuella när ett ärende avslutas,
 - logga ansvar, status, resultat, beslut och handlingar,
+- visa ett uttryckligt beslutsläge när alla tillämpliga aktiviteter är klara,
 - beräkna dashboardens antal och arbetsköer från samma ärenden och aktiviteter som visas i register och kort.
 
 Systemet bör inte automatiskt:
@@ -710,10 +736,23 @@ Systemet bör inte automatiskt:
 - kopiera stödbehov eller matchningsbedömningar till förälderns eller mentorns registerkort,
 - skriva över ett tidigare stödärende eller uppdrag när föräldern söker stöd för ett annat behov,
 - flytta en matchning eller ett uppdrag mellan stödärenden efter att de har skapats; en felkoppling ska rättas spårbart enligt beslutad rutin,
+- avsluta ett ärende enbart för att alla aktiviteter är avslutade,
+- skapa ett följdärende enbart för att alla aktiviteter är avslutade,
+- ändra en förälder- eller mentorpost när en vanlig aktivitet avslutas,
 - avsluta ett ärende enbart på grund av ett avvikande aktivitetsresultat,
 - återöppna eller radera avslutade ärenden,
 - lagra kopior av identitetshandlingar eller registerutdrag utan fastställd rutin,
 - skapa en separat statusuppsättning för dashboard, mentorflöde eller presentation.
+
+### 16.1 Administration av ärende- och aktivitetsmallar
+
+Administratören ska kunna se hur ärendetyper och aktivitetsmallar styr handläggningen. För en ärendetyp visas hjälptext, registreringsanvisning, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. För en aktivitetsmall visas handläggningsanvisning, tillåtna statuslägen, avslutsregel, snabbavslut, resultatval och vilka ärendetyper som använder mallen.
+
+Kommunen får ändra handledande texter och valbara verksamhetsinställningar. Tekniska ID:n, grundläggande statusregler och lagringsnycklar är systemstyrda. En sparad ändring skapar en ny mallversion för nya ärenden; pågående och avslutade ärenden behåller den version som användes när de skapades.
+
+En föreslagen nästa ärendetyp betyder att handläggaren får ett nästa kommando. Den innebär inte att följdärendet skapas automatiskt.
+
+**I systemet:** [Administrera ärendetyper](feature:admin.case-types) · [Administrera aktivitetsmallar](feature:admin.activity-types)
 
 ## 17. Roller och beslutspunkter
 
@@ -731,6 +770,8 @@ Systemet bör inte automatiskt:
 | Pausa eller avsluta ärende | Om delegerad | Ja | Nej |
 | Återöppna ärende | Nej | Ja | Nej som standard |
 | Administrera användare och mallar | Nej | Begränsat | Ja |
+| Välja kommunens utbildningsmaterial | Nej | Begränsat | Ja |
+| Genomföra tilldelad kurs eller kunskapstest | Nej | Nej | Nej; mentorn gör detta i mentorportalen |
 
 Rollmatrisen är ett förslag. Den slutliga behörigheten ska följa kommunens delegationsordning och organisation, inte hårdkodas utifrån titlar.
 
@@ -783,6 +824,40 @@ Föräldern har tidigare fått stöd kring skolfrånvaro och återkommer senare 
 ### Scenario 12: två samtidiga stödärenden kräver olika mentorer
 
 Föräldern har två tydligt avgränsade stödärenden där olika kompetens och tillgänglighet behövs. Systemet visar att ett annat uppdrag redan pågår och varnar för överlappning. Behörig handläggare dokumenterar varför två uppdrag behövs, vem som samordnar kontakterna och hur uppdragens syften hålls isär. Varje matchning, uppdrag, aktivitet, möte och handling registreras under rätt stödärende.
+
+### Scenario 13: sista aktiviteten i ett stödärende avslutas
+
+Handläggaren avslutar aktiviteten `Bekräfta att föräldern vill gå vidare`. Systemet sparar resultat, registrerande användare och tidpunkt i ärendet och loggen. Stödärendet ligger kvar som öppet och visar att inget matchningsärende eller registerkort har ändrats automatiskt. Handläggaren väljer därefter `Starta matchning`, `Avsluta ärendet` eller kompletterar handläggningen. Om en matchning redan finns visas en länk till den i stället för att en dubblett föreslås.
+
+### Scenario 14: snabbavslut kräver mer information
+
+Handläggaren väljer `Avsluta` för en aktivitet. Resultatlistan saknar förvalt värde. Om ett valt resultat kräver notering eller annat underlag hänvisar dialogen till den fullständiga aktivitetsvyn och sparar inget. För ett tillåtet enkelt resultat visar dialogen vad som registreras och avslutar aktiviteten med ett uttryckligt kommando.
+
+## 18A. Utbildningsmaterial och rollstyrda ingångar
+
+Systemet skiljer mellan referensmaterial, kurser och kunskapstester:
+
+- **Referensmaterial** är läsbart innehåll som kan visas för mentorer och, om kommunen väljer det, publikt för föräldrar.
+- **Kurs** består av ordnade moduler och kan innehålla enklare interaktiva moment samt länkar till referensmaterial och test.
+- **Kunskapstest** innehåller strukturerade frågor, svarsalternativ, rättning och godkändgräns.
+
+Kommunens administratör väljer vilka publicerade innehållspaket som ingår i kommunens urval. Ett separat val avgör vilka referensmaterial som exponeras publikt. Kurser och kunskapstest är inte publika för oinloggade föräldrar. Om en kurs väljs ska systemet visa och bevara dess beroenden till material och test så att kommunen inte kan publicera en ofullständig kurs av misstag.
+
+Mentorn använder mentorportalen för att:
+
+1. se sina uppdrag och kontaktperson,
+2. öppna kommunens valda material och kurser,
+3. fortsätta ett påbörjat genomförande,
+4. genomföra kunskapstest och få resultat,
+5. återrapportera planerade kontakter i ett mentoruppdrag.
+
+Genomförande, innehållsversion, testförsök och resultat lagras separat från själva innehållet. Handläggaren ska använda denna registrering som underlag i rätt aktivitet och inte skapa en parallell manuell utbildningsstatus. Ett testresultat fattar inte automatiskt beslut om att godkänna eller underkänna en mentor.
+
+En oinloggad förälder kan läsa det referensmaterial som kommunen uttryckligen har markerat som publikt och skicka en förfrågan om stöd. En förfrågan är inte ett beslut och startar inte ett mentoruppdrag. Kommunen kontaktar föräldern och tar ställning till fortsatt registrering och stödärende enligt avsnitt 10.
+
+Valet av testanvändartyp i prototypen simulerar olika behörigheter. Det är inte en produktionsmässig inloggnings- eller behörighetslösning.
+
+**I systemet:** [Öppna utbildningsbiblioteket](feature:learning.library) · [Administrera kommunens urval](feature:admin.learning) · [Öppna den publika sidan](feature:public.home)
 
 ## 19. Frågor som måste beslutas före pilot
 

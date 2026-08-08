@@ -107,6 +107,9 @@ interface CaseRecord {
   title: string;
   description: string;
   mentorId: string | null;
+  parentId: string | null;
+  supportCaseId: string | null;
+  sourceMatchingCaseId: string | null;
   status: CaseStatus;
   priority: "low" | "normal" | "high";
   dueDate: string | null;
@@ -159,8 +162,10 @@ interface CaseTypeDefinition {
   mentorMode: "required" | "optional" | "none";
   helpText: string;
   registrationHint: string;
+  workInstruction: string;
   detailFieldIds: string[];
   activityTemplateRefs: Array<{ templateId: string; version: number }>;
+  nextCaseTypeId: string | null;
 }
 
 interface ActivityTemplateDefinition {
@@ -170,6 +175,10 @@ interface ActivityTemplateDefinition {
   status: "draft" | "published" | "retired";
   title: string;
   sortOrder: number;
+  workInstruction: string;
+  allowedStatuses: ActivityStatus[];
+  requiresResultOnCompletion: boolean;
+  quickCompletionResultCodes: string[];
   resultDefinitions: ResultDefinition[];
 }
 
@@ -180,6 +189,21 @@ interface ResultDefinition {
   requiresNote: boolean;
 }
 ```
+
+`nextCaseTypeId` är ett valfritt förslag till nästa registrering. Det skapar inte ett följdärende och uttrycker inte alla domänrelationer. Systemstyrda relationer, exempelvis att en matchning måste tillhöra ett stödärende eller att ett mentoruppdrag måste referera till en accepterad matchning, valideras separat.
+
+```ts
+interface CaseTypeRelationshipDefinition {
+  id: string;
+  fromCaseTypeId: string;
+  toCaseTypeId: string;
+  kind: "suggested_successor" | "linked_successor" | "prerequisite" | "process_step";
+  description: string;
+  systemManaged: boolean;
+}
+```
+
+Administrationsvyn ska skilja på kommunens valbara nästa ärendetyp och systemstyrda relationer. Kommunens val får vara högst en föreslagen efterföljare per ärendetyp och får inte skapa en cykel. En systemstyrd relation får visas men inte ändras genom den förenklade administrationsvyn.
 
 Administrationsvyn för ärendetyper är avsiktligt begränsad. Administratören kan ändra hjälptext, registreringsanvisning, mentorkoppling och välja kompletterande fält ur en centralt definierad fältkatalog. Namn, tekniskt ID, datatyp och lagringsnyckel kan inte ändras i denna vy. Därmed kan verksamheten anpassa formulären utan att skapa egna inkompatibla datamodeller.
 
@@ -224,6 +248,27 @@ interface CaseActivity {
 Även en manuellt tillagd aktivitet ska referera till en versionsstyrd standardmall för ad hoc-aktiviteter. Rubriken kan vara fri, men status- och resultatreglerna är därmed alltid definierade.
 
 Aktivitetens effektiva ansvariga är `handlerIdOverride` när det är satt, annars ärendets aktiva ansvariga assignment. Om båda saknas visas `Ej tilldelad`. Ett byte av ärendets ansvariga slår därför igenom på alla aktiviteter som inte är särskilt tilldelade, utan att aktivitetsraderna behöver skrivas om.
+
+`quickCompletionResultCodes` är en uttrycklig tillåtelselista. Ett resultat får bara snabbregistreras när det finns i listan och inte kräver tjänsteanteckning, möte, handling eller andra strukturerade uppgifter. Resultatfältet får aldrig förväljas. Om kompletterande information krävs ska klienten öppna den fullständiga aktivitetsvyn utan att skriva data.
+
+När alla tillämpliga aktiviteter är `completed` eller `not_applicable`, inga öppna avvikelser finns och ärendet inte är avslutat eller pausat, är ärendet redo för ett uttryckligt nästa beslut. Detta är en härledd läsmodell och inte en ny lagrad ärendestatus.
+
+```ts
+interface CaseCompletionReadModel {
+  caseId: string;
+  activitiesCompleted: boolean;
+  caseStillOpen: boolean;
+  openDeviationCount: number;
+  suggestedAction:
+    | { type: "open_linked_case"; caseId: string }
+    | { type: "create_successor"; caseTypeId: string }
+    | { type: "review_case" }
+    | { type: "close_case" };
+  automaticEffects: [];
+}
+```
+
+`automaticEffects` är tom för ett vanligt aktivitetsavslut. Ett sammansatt verksamhetskommando, exempelvis ett godkännandebeslut, ska i stället ha ett eget kontrakt som deklarerar och loggar samtliga effekter.
 
 ### 4.3 Avvikelser och ställningstaganden
 
@@ -433,7 +478,7 @@ Dublettkontrollen ska vara rådgivande när verksamhetsreglerna tillåter parall
 
 ## 7. Komplettering av ett ärende
 
-Efter sparandet visas ärendets sammanfattning och kommandot `Komplettera ärendet`.
+Efter sparandet visas ärendets sammanfattning och kommandot `Redigera ärendeuppgifter`.
 
 Komplettering kan ske stegvis genom separata kommandon:
 
@@ -448,6 +493,17 @@ Komplettering kan ske stegvis genom separata kommandon:
 
 Det ska inte finnas ett globalt fält som heter `Avancerat läge`. Användaren aktiverar i stället den komponent som behövs. När strukturerad information finns ska den fortsätta visas på ärendekortet.
 
+Ett vanligt `CompleteActivityCommand` får endast ändra aktiviteten, registrera eventuell tjänsteanteckning eller möteskoppling, skapa nödvändig avvikelse och skriva händelser. Kommandot får inte stänga ärendet, skapa ett följdärende eller ändra en personpost som en dold bieffekt.
+
+När `CaseCompletionReadModel.activitiesCompleted` blir `true` väljer användaren ett separat kommando:
+
+- `CreateSuccessorCaseCommand` skapar ett uttryckligen valt och länkat följdärende,
+- `CloseCaseCommand` avslutar ärendet med strukturerad orsak,
+- `AddActivityCommand` fortsätter handläggningen i samma ärende,
+- ett typbundet domänkommando, exempelvis `ApproveMentorCommand`, utför en dokumenterad sammansatt övergång.
+
+Alla kommandon ska vara idempotenta och returnera vilka poster som skapades eller ändrades. Klienten visar svaret som bekräftelse och får inte härleda genomförda effekter enbart från den föreslagna nästa ärendetypen.
+
 ## 8. Validering efter användarens avsikt
 
 Validering ska ske när informationen behövs, inte vid första registreringen.
@@ -457,7 +513,8 @@ Validering ska ske när informationen behövs, inte vid första registreringen.
 | Snabbregistrera | Typ och rubrik. Tenant, aktör, tidpunkt och idempotensnyckel sätts eller valideras av systemet. |
 | Tilldela aktivitet | Giltig handläggare |
 | Ange förfallodatum | Giltigt datum |
-| Avsluta aktivitet | Resultatkod |
+| Avsluta aktivitet | Uttryckligen vald resultatkod; notering, möte eller handling när resultatdefinitionen kräver det |
+| Snabbavsluta aktivitet | Resultatkod i mallens `quickCompletionResultCodes`; inga ytterligare uppgifter får krävas |
 | Registrera avvikelse | Notering |
 | Begära komplettering | Ansvarig och beskrivning av nästa steg |
 | Pausa ärende | Orsak, beslutsfattare och valfritt bevakningsdatum |
@@ -474,7 +531,7 @@ Validering ska ske när informationen behövs, inte vid första registreringen.
 1. `closed` när ett giltigt avslut finns.
 2. `paused` när ärendet uttryckligen har pausats.
 3. `decision_required` när minst en öppen avvikelse saknar aktivt ställningstagande.
-4. `in_progress` när minst en aktivitet eller annan handläggningsåtgärd kan utföras nu.
+4. `in_progress` när minst en aktivitet eller annan handläggningsåtgärd kan utföras nu, eller när alla aktiviteter är klara men ett uttryckligt nästa verksamhetsbeslut återstår.
 5. `waiting` när inget steg kan utföras nu och minst en öppen aktivitet inväntar mentor eller extern part.
 6. `new` i övriga fall.
 
@@ -549,7 +606,7 @@ Första vyn för en registrering ska vara ett kort formulär. Efter sparandet vi
 - Mentor och ansvarig, om de finns.
 - Senaste registrering.
 - Ett primärt rekommenderat nästa steg.
-- Kommandot `Komplettera ärendet`.
+- Kommandot `Redigera ärendeuppgifter`.
 
 Tomma sektioner för aktiviteter, handlingar och medhandläggare ska inte dominera standardvyn.
 
@@ -583,6 +640,24 @@ Exempel:
 - `Ärendet har flera steg. Lägg till föreslagna aktiviteter?`
 
 Förslag ska kunna avböjas när ingen verksamhetsregel kräver uppgiften.
+
+### 10.5 Slutläge för aktivitetsflödet
+
+När alla tillämpliga aktiviteter är klara och inga öppna avvikelser finns ska aktivitetsvyn visa en särskild beslutsyta. Den ska ange:
+
+- att ärendet fortfarande är öppet,
+- att aktivitetsresultat, aktör och tidpunkt har sparats,
+- att inget följdärende eller registerkort har ändrats automatiskt,
+- om ett länkat följdärende redan finns,
+- nästa rekommenderade kommando och ett separat kommando för att avsluta ärendet.
+
+Förslaget beräknas från länkat följdärende, ärendetyp och `nextCaseTypeId` i den ordningen. En befintlig efterföljare ska alltid öppnas i stället för att en dubblett skapas.
+
+### 10.6 Administration av definitioner
+
+Ärendetypsvyn ska visa och versionshantera hjälptext, registreringsanvisning, handläggningsanvisning, mentorkoppling, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallsvyn ska visa handläggningsanvisning, statusregler, avslutsregel, snabbresultat, resultatdefinitioner och användande ärendetyper.
+
+Kommunen får redigera de fält som uttryckligen är verksamhetskonfiguration. Tekniskt ID, lagringsnycklar och systemstyrda relationer är skrivskyddade. Varje sparad ändring skapar en ny publicerad version och pensionerar den föregående; historiska ärenden behåller sina versionsreferenser.
 
 ## 11. API och transaktioner i SaaS-versionen
 
@@ -762,6 +837,16 @@ interface CaseRepository {
 - En handling som läggs till från en aktivitet kopplas både till ärendet och aktiviteten och visas från båda sammanhangen.
 - Ett möte kan registreras utan handling och kan senare kompletteras med tjänsteanteckning eller handling.
 
+### Avslutade aktiviteter och nästa steg
+
+- Resultatfältet är tomt tills användaren väljer ett resultat.
+- Snabbavslut visas endast för resultat som aktivitetsmallen uttryckligen tillåter och som inte kräver kompletterande uppgifter.
+- När alla aktiviteter är klara ligger ärendet kvar som öppet tills ett separat kommando avslutar eller för processen vidare.
+- Beslutsytan visar vad som sparades och att inget följdärende eller registerkort ändrades automatiskt.
+- Ett befintligt länkat följdärende öppnas i stället för att en dubblett föreslås.
+- Ett följdärende skapas endast efter ett uttryckligt användarkommando och länkas till ursprungsärendet.
+- Ett sammansatt typbundet beslut visar och loggar alla effekter atomärt.
+
 ### Avvikelse
 
 - Ett avvikande resultat visas som `Ställningstagande krävs`, inte som det otydliga `Kräver åtgärd`.
@@ -789,11 +874,12 @@ interface CaseRepository {
 1. Inför tenantavgränsning, versionsfält, gemensamma domänkommandon och repository-gränssnitt ovanpå IndexedDB.
 2. Inför versionsstyrda ärende-, aktivitets- och resultatdefinitioner samt migrera befintlig exempeldata.
 3. Inför `Snabbregistrera` med idempotens, kontroll av kompatibla öppna ärenden och ett minimalt giltigt ärende utan tomma underposter.
-4. Lägg till `Komplettera ärendet` på ärendekortets översikt samt separata kommandon för ansvar, aktivitet, handling och möte.
+4. Lägg till `Redigera ärendeuppgifter` på ärendekortets översikt samt separata kommandon för ansvar, aktivitet, handling och möte.
 5. Ersätt `Kräver åtgärd` med `Ställningstagande krävs` och inför `ActivityDeviation` samt versionsbevarande `DeviationDecision`.
 6. Inför fullständiga kommandon för paus, avslut och behörighetsstyrd återöppning.
 7. Lägg till IndexedDB-migreringar, atomära transaktioner och automatiska integritetskontroller.
 8. Testa tenantisolering, samtidiga ändringar, idempotens, snabbregistrering och successiv komplettering med 1, 10 och 250 mentorer.
+9. Testa slutläget efter sista aktiviteten för varje ärendetyp, inklusive befintligt följdärende, avvikelse, paus och sammansatt godkännandebeslut.
 
 ## 18. Avgränsningar
 

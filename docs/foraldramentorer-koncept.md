@@ -124,7 +124,7 @@ Den första prototypen ska visa administratörens vy för introduktion och godk�
 
 Prioriterade funktioner:
 
-- Enkel pipeline över kandidater.
+- Enkel pipeline över mentorer i processen för godkännande.
 - Status för varje steg i prövningen för godkännande.
 - Mentordetaljer.
 - Centralt ärenderegister.
@@ -142,7 +142,7 @@ Denna prototyp är avsiktligt enkel. Målet är att tidigt kunna känna på arbe
 
 ### Ärendemodell
 
-Ärendet är den sammanhållande handläggningsakten. Ett ärende kan vara kopplat till högst en mentor, medan en mentor kan ha flera ärenden över tid. Generella verksamhetsärenden kan sakna mentorkoppling.
+Ärendet är den sammanhållande handläggningsakten. Ett ärende kan vara kopplat till högst en mentor och, för stöd till förälder, högst en förälder. En person kan ha flera avgränsade ärenden över tid. Generella verksamhetsärenden kan sakna personkoppling. Matchningar och mentoruppdrag hör alltid till ett bestämt stödärende och skapar inte en permanent direktrelation mellan en förälder och en mentor.
 
 Handläggaren arbetar normalt med aktiviteter. När en aktivitet ändras eller slutförs skapar systemet en händelse i loggen med tidpunkt och användare. Ett dokument, meddelande eller annat underlag registreras som en handling och kan kopplas till den aktivitet där underlaget användes.
 
@@ -150,7 +150,7 @@ Minnesregel:
 
 > Aktivitet = att göra. Händelse = gjort. Handling = underlaget.
 
-Ett ärende om godkännande skapas automatiskt för varje ny mentor med aktiviteter för identitet, belastningsregister, referenser, e-learning, kunskapsavstämning, kallelse, intervju och beslut. Handläggaren kan även lägga till fria uppföljningsaktiviteter, exempelvis att kontakta mentorn när en referens inte går att nå.
+När en ny mentor registreras är `Skapa ärende om godkännande` förvalt, men användaren kan välja bort det. Godkännandeärendet använder aktiviteter för identitet, belastningsregister, referenser, utbildning, kunskapsavstämning, kallelse, intervju och beslut. Handläggaren kan även lägga till fria uppföljningsaktiviteter, exempelvis att kontakta mentorn när en referens inte går att nå.
 
 ### Aktiviteter och kommunal handläggningsrutin
 
@@ -161,7 +161,9 @@ Aktivitetens status och resultat är två skilda uppgifter:
 - Status beskriver arbetet: Ej påbörjad, Pågår, Väntar, Avslutad eller Ej aktuell.
 - Resultat beskriver utfallet och anpassas efter aktivitetstypen.
 
-När en aktivitet avslutas måste handläggaren välja resultat. Ett resultat som inte är godtagbart markerar ärendet som Kräver åtgärd och ligger kvar i arbetskön tills avvikelsen har hanterats. En kort tjänsteanteckning krävs för resultat som behöver följas upp.
+När en aktivitet avslutas måste handläggaren välja resultat. Ett avvikande resultat markerar ärendet som `Ställningstagande krävs` och ligger kvar i arbetskön tills avvikelsen har hanterats. En kort tjänsteanteckning krävs för resultat som behöver följas upp.
+
+Att den sista aktiviteten avslutas stänger inte ett vanligt ärende och skapar inte automatiskt ett nytt ärende. Systemet visar vad som har sparats och låter handläggaren uttryckligen välja nästa verksamhetssteg. Sammansatta beslut, exempelvis att godkänna en mentor, ska visa och logga samtliga effekter innan de genomförs.
 
 För belastningsregister registreras endast neutrala resultat som Visat och kontrollerat, Inte visat eller Äkthet inte bekräftad. Prototypen ska inte uppmana handläggaren att dokumentera innehållet i ett registerutdrag eller att ladda upp en kopia. Den slutliga rutinen måste fastställas utifrån kommunens verksamhet och tillämpligt lagstöd.
 
@@ -174,5 +176,6 @@ Dashboardens arbetsköer utgår från den inloggade användaren:
 - Mina aktiviteter.
 - Otilldelade aktiviteter.
 - Försenade aktiviteter.
+- Ställningstaganden.
 
 Varje ärende bidrar normalt med nästa relevanta aktivitet. En avslutad aktivitet med ett resultat som kräver uppföljning prioriteras framför senare aktiviteter.

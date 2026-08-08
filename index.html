@@ -648,13 +648,34 @@
                         <dl id="caseTypeDetailsFacts" class="record-fields mb-0"></dl>
                       </section>
                     </div>
-                    <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
-                      <button id="completeCaseButton" type="button" class="btn btn-outline-primary btn-sm">Komplettera ärendet</button>
-                      <button id="pauseCaseButton" type="button" class="btn btn-outline-warning btn-sm">Pausa</button>
-                      <button id="resumeCaseButton" type="button" class="btn btn-outline-primary btn-sm" hidden>Återuppta</button>
-                      <button id="closeCaseButton" type="button" class="btn btn-outline-danger btn-sm">Avsluta</button>
-                      <button id="reopenCaseButton" type="button" class="btn btn-outline-primary btn-sm" hidden>Återöppna</button>
-                    </div>
+                    <section class="case-actions-panel" aria-labelledby="caseActionsTitle">
+                      <div class="case-actions-heading">
+                        <h3 id="caseActionsTitle" class="record-section-title mb-1">Ärendeåtgärder</h3>
+                        <p class="small text-secondary mb-0">Välj vad som ska hända med själva ärendet. Aktiviteter, handlingar och möten hanteras i respektive flik.</p>
+                      </div>
+                      <div class="case-actions-list">
+                        <div id="editCaseAction" class="case-action-row">
+                          <div class="case-action-copy"><strong>Redigera ärendeuppgifter</strong><p>Ändra ärendets grunduppgifter och kopplingar. Aktiviteter och historik ligger kvar.</p></div>
+                          <button id="completeCaseButton" type="button" class="btn btn-outline-primary btn-sm">Redigera ärendeuppgifter</button>
+                        </div>
+                        <div id="pauseCaseAction" class="case-action-row">
+                          <div class="case-action-copy"><strong>Pausa handläggningen</strong><p>Ärendet ligger kvar, men öppna aktiviteter ska inte handläggas förrän ärendet återupptas.</p></div>
+                          <button id="pauseCaseButton" type="button" class="btn btn-outline-secondary btn-sm">Pausa handläggningen</button>
+                        </div>
+                        <div id="resumeCaseAction" class="case-action-row" hidden>
+                          <div class="case-action-copy"><strong>Återuppta handläggningen</strong><p>Gör det pausade ärendet aktivt igen. Pausorsaken ligger kvar i loggen.</p></div>
+                          <button id="resumeCaseButton" type="button" class="btn btn-outline-primary btn-sm">Återuppta handläggningen</button>
+                        </div>
+                        <div id="closeCaseAction" class="case-action-row">
+                          <div class="case-action-copy"><strong>Avsluta ärendet</strong><p>Stänger ärendet. Öppna aktiviteter blir ej aktuella och historiken bevaras. Avslutsorsak krävs.</p></div>
+                          <button id="closeCaseButton" type="button" class="btn btn-outline-danger btn-sm">Avsluta ärendet</button>
+                        </div>
+                        <div id="reopenCaseAction" class="case-action-row" hidden>
+                          <div class="case-action-copy"><strong>Återöppna ärendet</strong><p>Gör ärendet aktivt igen efter motivering. Tidigare aktiviteter återaktiveras inte automatiskt.</p></div>
+                          <button id="reopenCaseButton" type="button" class="btn btn-outline-primary btn-sm">Återöppna ärendet</button>
+                        </div>
+                      </div>
+                    </section>
                   </section>
                   <section class="tab-pane fade card-body" id="case-activities-pane">
                     <section id="activityDetailPanel" class="activity-record" hidden>
@@ -1812,6 +1833,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260808-activity-completion-guidance-v50"></script>
+    <script type="module" src="app.js?v=20260808-case-actions-v52"></script>
   </body>
 </html>

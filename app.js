@@ -750,10 +750,15 @@ const els = {
   editCaseButton: document.querySelector("#editCaseButton"),
   newCaseActivityButton: document.querySelector("#newCaseActivityButton"),
   completeCaseButton: document.querySelector("#completeCaseButton"),
+  editCaseAction: document.querySelector("#editCaseAction"),
   pauseCaseButton: document.querySelector("#pauseCaseButton"),
+  pauseCaseAction: document.querySelector("#pauseCaseAction"),
   resumeCaseButton: document.querySelector("#resumeCaseButton"),
+  resumeCaseAction: document.querySelector("#resumeCaseAction"),
   closeCaseButton: document.querySelector("#closeCaseButton"),
+  closeCaseAction: document.querySelector("#closeCaseAction"),
   reopenCaseButton: document.querySelector("#reopenCaseButton"),
+  reopenCaseAction: document.querySelector("#reopenCaseAction"),
   caseActivityCount: document.querySelector("#caseActivityCount"),
   caseDocumentCount: document.querySelector("#caseDocumentCount"),
   caseMeetingCount: document.querySelector("#caseMeetingCount"),
@@ -3514,7 +3519,7 @@ async function loadRoutinesDocument(sectionKey = "") {
   els.routinesContent.innerHTML = '<p class="text-secondary">Läser in rutindokumentet...</p>';
 
   try {
-    const response = await fetch("./docs/verksamhetsfloden-och-handlaggningsrutiner.md?v=20260806-guided-transitions-v3");
+    const response = await fetch("./docs/verksamhetsfloden-och-handlaggningsrutiner.md?v=20260808-completion-and-learning-v4");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const markdown = await response.text();
     els.routinesContent.innerHTML = marked.parse(markdown, { gfm: true });
@@ -4704,11 +4709,11 @@ function renderCaseDetail() {
     renderCaseTypeGuidance(caseRecord);
     els.caseCreateForm.dataset.route = `edit-${caseRecord.id}-${caseRecord.updatedAt}`;
   }
-  els.pauseCaseButton.hidden = ["paused", "closed"].includes(caseRecord.status);
-  els.resumeCaseButton.hidden = caseRecord.status !== "paused";
-  els.closeCaseButton.hidden = caseRecord.status === "closed";
-  els.reopenCaseButton.hidden = caseRecord.status !== "closed";
-  els.completeCaseButton.hidden = caseRecord.status === "closed";
+  els.pauseCaseAction.hidden = ["paused", "closed"].includes(caseRecord.status);
+  els.resumeCaseAction.hidden = caseRecord.status !== "paused";
+  els.closeCaseAction.hidden = caseRecord.status === "closed";
+  els.reopenCaseAction.hidden = caseRecord.status !== "closed";
+  els.editCaseAction.hidden = caseRecord.status === "closed";
 }
 
 function activityCompletionDecision(caseRecord) {

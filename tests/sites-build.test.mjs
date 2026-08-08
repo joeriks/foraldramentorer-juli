@@ -23,6 +23,11 @@ test("serves the application shell", async () => {
   assert.match(html, /id="activityCaseClosedNotice"/);
   assert.match(html, /id="activityCaseReadyNotice"/);
   assert.match(html, /id="activityCaseReadyPrimaryButton"/);
+  assert.match(html, /id="editCaseAction"/);
+  assert.match(html, /id="pauseCaseAction"/);
+  assert.match(html, /id="closeCaseAction"/);
+  assert.match(html, /Redigera ärendeuppgifter/);
+  assert.match(html, /Öppna aktiviteter blir ej aktuella och historiken bevaras/);
   assert.match(html, /id="presentationStepPoints"/);
   assert.match(html, />Nytt ärende</);
   assert.match(html, /id="caseTypeDetailPanel"/);
