@@ -117,8 +117,8 @@ export const SUPPORT_AREAS = [
 ].map((area, sortOrder) => ({ ...area, version: SUPPORT_AREA_CATALOG_VERSION, sortOrder }));
 
 export const MENTOR_EXPERIENCE_LEVELS = [
-  ["lived", "Egen erfarenhet"],
-  ["practical", "Praktisk erfarenhet"],
+  ["lived", "Egen eller närståendes erfarenhet"],
+  ["practical", "Erfarenhet av att stödja andra"],
   ["trained", "Utbildning eller yrkeserfarenhet"]
 ];
 

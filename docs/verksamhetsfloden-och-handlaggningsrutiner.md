@@ -560,6 +560,8 @@ Katalogen ska beskriva sådant en föräldermentor faktiskt kan stödja i vardag
 
 **I systemet:** [Administrera stödområden](feature:admin.support-areas)
 
+För varje område som en mentor kan ge stöd inom registreras en eller flera erfarenhetsgrunder: **egen eller närståendes erfarenhet**, **erfarenhet av att stödja andra** och **utbildning eller yrkeserfarenhet**. Alternativen kan kombineras. Handläggaren ska inte tolka ett valt område som en formell behörighet; verifiering och lämplighetsbedömning görs separat.
+
 ## 11. Flöde F: mentoruppdrag och uppföljning
 
 När en matchning accepterats erbjuder systemet att skapa ett uppdragsärende kopplat till exakt ett stödärende, en förälder och en mentor, med startdatum, ansvarig samordnare, planerade uppföljningar och förväntat slutdatum. Uppdragets syfte hämtas från stödärendet men kan preciseras i uppdragets ramar.

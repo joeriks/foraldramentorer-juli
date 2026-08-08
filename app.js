@@ -59,7 +59,7 @@ import {
   selectedSupportAreas,
   supportAreaById,
   supportAreaOverlap
-} from "./support-area-domain.js?v=20260808-support-areas-v1";
+} from "./support-area-domain.js?v=20260808-support-areas-v2";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
 const DB_VERSION = 5;
@@ -1550,15 +1550,19 @@ function selectedSupportAreaIdsFrom(host, name = "supportArea") {
 function normalizeMentorSupportAreas(entries) {
   const validLevels = new Set(MENTOR_EXPERIENCE_LEVELS.map(([id]) => id));
   return (Array.isArray(entries) ? entries : [])
-    .map((entry) => typeof entry === "string" ? { areaId: entry, experienceLevel: "practical", verified: false } : entry)
+    .map((entry) => typeof entry === "string" ? { areaId: entry, experienceLevels: ["practical"], verified: false } : entry)
     .filter((entry) => supportAreaById(entry.areaId))
-    .map((entry) => ({
-      areaId: entry.areaId,
-      experienceLevel: validLevels.has(entry.experienceLevel) ? entry.experienceLevel : "practical",
-      verified: Boolean(entry.verified),
-      verifiedAt: entry.verifiedAt || null,
-      verifiedBy: entry.verifiedBy || null
-    }));
+    .map((entry) => {
+      const storedLevels = Array.isArray(entry.experienceLevels) ? entry.experienceLevels : [entry.experienceLevel];
+      const experienceLevels = [...new Set(storedLevels.filter((level) => validLevels.has(level)))];
+      return {
+        areaId: entry.areaId,
+        experienceLevels: experienceLevels.length ? experienceLevels : ["practical"],
+        verified: Boolean(entry.verified),
+        verifiedAt: entry.verifiedAt || null,
+        verifiedBy: entry.verifiedBy || null
+      };
+    });
 }
 
 function renderMentorSupportAreaEditor(candidate = null) {
@@ -1570,7 +1574,7 @@ function renderMentorSupportAreaEditor(candidate = null) {
     if (!areas.length) return "";
     return `<fieldset class="mentor-support-area-group"><legend>${escapeHtml(category.label)}</legend>${areas.map((area) => {
       const entry = selected.get(area.id);
-      return `<div class="mentor-support-area-row"><label><input class="form-check-input" type="checkbox" data-mentor-support-area="${escapeHtml(area.id)}" ${entry ? "checked" : ""}><span>${escapeHtml(area.title)}${enabledIds.has(area.id) ? "" : ' <small class="text-secondary">(inte längre i kommunens urval)</small>'}</span></label><select class="form-select form-select-sm" data-mentor-experience-level="${escapeHtml(area.id)}" aria-label="Erfarenhet för ${escapeHtml(area.title)}" ${entry ? "" : "disabled"}>${MENTOR_EXPERIENCE_LEVELS.map(([id, label]) => `<option value="${id}" ${entry?.experienceLevel === id ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select></div>`;
+      return `<div class="mentor-support-area-row"><label><input class="form-check-input" type="checkbox" data-mentor-support-area="${escapeHtml(area.id)}" ${entry ? "checked" : ""}><span>${escapeHtml(area.title)}${enabledIds.has(area.id) ? "" : ' <small class="text-secondary">(inte längre i kommunens urval)</small>'}</span></label><fieldset class="mentor-experience-bases" data-mentor-experience-bases="${escapeHtml(area.id)}" ${entry ? "" : "hidden"}><legend>Erfarenheten grundar sig på</legend>${MENTOR_EXPERIENCE_LEVELS.map(([id, label]) => `<label><input class="form-check-input" type="checkbox" value="${id}" data-mentor-experience-level="${escapeHtml(area.id)}" ${entry?.experienceLevels.includes(id) ? "checked" : ""} ${entry ? "" : "disabled"}><span>${escapeHtml(label)}</span></label>`).join("")}</fieldset></div>`;
     }).join("")}</fieldset>`;
   }).join("");
 }
@@ -1580,11 +1584,22 @@ function mentorSupportAreasFromEditor() {
   const previous = new Map(normalizeMentorSupportAreas(selectedCandidate()?.supportAreas).map((entry) => [entry.areaId, entry]));
   return [...els.mentorSupportAreasEdit.querySelectorAll("[data-mentor-support-area]:checked")].map((input) => ({
     areaId: input.dataset.mentorSupportArea,
-    experienceLevel: els.mentorSupportAreasEdit.querySelector(`[data-mentor-experience-level="${input.dataset.mentorSupportArea}"]`)?.value || "practical",
+    experienceLevels: [...els.mentorSupportAreasEdit.querySelectorAll(`[data-mentor-experience-level="${input.dataset.mentorSupportArea}"]:checked`)].map((levelInput) => levelInput.value),
     verified: Boolean(previous.get(input.dataset.mentorSupportArea)?.verified),
     verifiedAt: previous.get(input.dataset.mentorSupportArea)?.verifiedAt || null,
     verifiedBy: previous.get(input.dataset.mentorSupportArea)?.verifiedBy || null
   }));
+}
+
+function validateMentorSupportAreaEditor() {
+  if (!els.mentorSupportAreasEdit) return true;
+  const areaInputs = [...els.mentorSupportAreasEdit.querySelectorAll("[data-mentor-support-area]")];
+  areaInputs.forEach((input) => input.setCustomValidity(""));
+  const missingBasis = areaInputs.find((input) => input.checked && !els.mentorSupportAreasEdit.querySelector(`[data-mentor-experience-level="${input.dataset.mentorSupportArea}"]:checked`));
+  if (!missingBasis) return true;
+  missingBasis.setCustomValidity("Välj minst en grund för erfarenheten inom området.");
+  missingBasis.reportValidity();
+  return false;
 }
 
 function renderMentorSupportAreas(candidate) {
@@ -1592,7 +1607,7 @@ function renderMentorSupportAreas(candidate) {
   const levelLabels = Object.fromEntries(MENTOR_EXPERIENCE_LEVELS);
   const entries = normalizeMentorSupportAreas(candidate?.supportAreas);
   els.mentorSupportAreasRead.innerHTML = entries.length
-    ? entries.map((entry) => `<div class="support-area-fact"><strong>${escapeHtml(supportAreaById(entry.areaId)?.title || entry.areaId)}</strong><span>${escapeHtml(levelLabels[entry.experienceLevel])}${entry.verified ? " · Verifierad" : " · Egen uppgift"}</span></div>`).join("")
+    ? entries.map((entry) => `<div class="support-area-fact"><strong>${escapeHtml(supportAreaById(entry.areaId)?.title || entry.areaId)}</strong><span>${escapeHtml(entry.experienceLevels.map((level) => levelLabels[level]).filter(Boolean).join(" · "))}${entry.verified ? " · Verifierad" : " · Egen uppgift"}</span></div>`).join("")
     : '<p class="text-secondary mb-0">Inga erfarenhetsområden är registrerade.</p>';
 }
 
@@ -3014,7 +3029,7 @@ function renderMentorProfile() {
   if (!mentor) return renderMentorHome();
   const owner = handlers.find((handler) => handler.id === mentor.coordinatorId);
   const experienceAreas = normalizeMentorSupportAreas(mentor.supportAreas);
-  els.mentorPortalView.innerHTML = `<section class="card mentor-profile-card"><div class="card-header record-header bg-white"><div class="record-type">Mentorprofil</div><h2 class="h5 mb-1">${escapeHtml(mentor.name)}</h2><p class="text-secondary mb-0">De uppgifter kommunen använder vid matchning och kontakt.</p></div><div class="card-body"><dl class="mentor-profile-facts"><div><dt>Kontaktuppgift</dt><dd>${escapeHtml(mentor.contactDetails || mentor.contact || "Ej angivet")}</dd></div><div><dt>Område</dt><dd>${escapeHtml(mentor.area || "Ej angivet")}</dd></div><div><dt>Språk</dt><dd>${escapeHtml(mentor.languages || "Ej angivet")}</dd></div><div><dt>Tillgänglighet</dt><dd>${escapeHtml(mentor.availability || "Ej angivet")}</dd></div><div><dt>Status</dt><dd><span class="${statusClass(mentor)}">${escapeHtml(mentor.status)}</span></dd></div><div><dt>Kontaktperson</dt><dd>${escapeHtml(owner?.name || mentor.coordinator || "Ej tilldelad")}</dd></div></dl><section class="record-section mt-4"><h3 class="record-section-title">Mina erfarenhetsområden</h3><p class="small text-secondary">Uppgifterna används som underlag när kommunen bedömer en möjlig matchning.</p><div class="support-area-facts">${experienceAreas.length ? experienceAreas.map((entry) => `<div class="support-area-fact"><strong>${escapeHtml(supportAreaById(entry.areaId)?.title || entry.areaId)}</strong><span>${escapeHtml(Object.fromEntries(MENTOR_EXPERIENCE_LEVELS)[entry.experienceLevel] || "Erfarenhet registrerad")}</span></div>`).join("") : '<p class="text-secondary mb-0">Inga erfarenhetsområden är registrerade.</p>'}</div></section><div class="alert alert-light border mt-4 mb-0"><strong>Behöver något ändras?</strong><p class="mb-0 mt-1">Kontakta din handläggare. Känsliga register- och identitetsuppgifter visas inte i mentorportalen.</p></div></div></section>`;
+  els.mentorPortalView.innerHTML = `<section class="card mentor-profile-card"><div class="card-header record-header bg-white"><div class="record-type">Mentorprofil</div><h2 class="h5 mb-1">${escapeHtml(mentor.name)}</h2><p class="text-secondary mb-0">De uppgifter kommunen använder vid matchning och kontakt.</p></div><div class="card-body"><dl class="mentor-profile-facts"><div><dt>Kontaktuppgift</dt><dd>${escapeHtml(mentor.contactDetails || mentor.contact || "Ej angivet")}</dd></div><div><dt>Område</dt><dd>${escapeHtml(mentor.area || "Ej angivet")}</dd></div><div><dt>Språk</dt><dd>${escapeHtml(mentor.languages || "Ej angivet")}</dd></div><div><dt>Tillgänglighet</dt><dd>${escapeHtml(mentor.availability || "Ej angivet")}</dd></div><div><dt>Status</dt><dd><span class="${statusClass(mentor)}">${escapeHtml(mentor.status)}</span></dd></div><div><dt>Kontaktperson</dt><dd>${escapeHtml(owner?.name || mentor.coordinator || "Ej tilldelad")}</dd></div></dl><section class="record-section mt-4"><h3 class="record-section-title">Mina erfarenhetsområden</h3><p class="small text-secondary">Uppgifterna används som underlag när kommunen bedömer en möjlig matchning.</p><div class="support-area-facts">${experienceAreas.length ? experienceAreas.map((entry) => `<div class="support-area-fact"><strong>${escapeHtml(supportAreaById(entry.areaId)?.title || entry.areaId)}</strong><span>${escapeHtml(entry.experienceLevels.map((level) => Object.fromEntries(MENTOR_EXPERIENCE_LEVELS)[level]).filter(Boolean).join(" · ") || "Erfarenhet registrerad")}</span></div>`).join("") : '<p class="text-secondary mb-0">Inga erfarenhetsområden är registrerade.</p>'}</div></section><div class="alert alert-light border mt-4 mb-0"><strong>Behöver något ändras?</strong><p class="mb-0 mt-1">Kontakta din handläggare. Känsliga register- och identitetsuppgifter visas inte i mentorportalen.</p></div></div></section>`;
 }
 
 function renderMentorPortal() {
@@ -9223,6 +9238,7 @@ els.cancelPersonEditButton.addEventListener("click", () => {
 });
 els.personEditForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!validateMentorSupportAreaEditor()) return;
   if (isCreatingMentor()) {
     if (renderMentorEditorDuplicateCheck().blocked) {
       showFeedback("Kontrollera den möjliga dubbletten innan mentorn sparas.");
@@ -9269,9 +9285,16 @@ els.editNameInput.addEventListener("input", () => {
 });
 els.mentorSupportAreasEdit.addEventListener("change", (event) => {
   const input = event.target.closest("[data-mentor-support-area]");
-  if (!input) return;
-  const levelInput = els.mentorSupportAreasEdit.querySelector(`[data-mentor-experience-level="${input.dataset.mentorSupportArea}"]`);
-  if (levelInput) levelInput.disabled = !input.checked;
+  if (input) {
+    input.setCustomValidity("");
+    const levelInputs = els.mentorSupportAreasEdit.querySelectorAll(`[data-mentor-experience-level="${input.dataset.mentorSupportArea}"]`);
+    levelInputs.forEach((levelInput) => { levelInput.disabled = !input.checked; });
+    const basisGroup = els.mentorSupportAreasEdit.querySelector(`[data-mentor-experience-bases="${input.dataset.mentorSupportArea}"]`);
+    if (basisGroup) basisGroup.hidden = !input.checked;
+    return;
+  }
+  const levelInput = event.target.closest("[data-mentor-experience-level]");
+  if (levelInput) els.mentorSupportAreasEdit.querySelector(`[data-mentor-support-area="${levelInput.dataset.mentorExperienceLevel}"]`)?.setCustomValidity("");
 });
 els.mentorEditorDuplicatePanel.addEventListener("click", (event) => {
   if (!event.target.closest("[data-create-editor-duplicate]")) return;

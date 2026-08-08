@@ -232,12 +232,14 @@ interface MentorSupportArea {
   tenantId: string;
   mentorId: string;
   supportAreaId: string;
-  experienceLevel: "lived" | "practical" | "trained";
+  experienceLevels: Array<"lived" | "practical" | "trained">;
   verified: boolean;
   verifiedAt: string | null;
   verifiedBy: string | null;
 }
 ```
+
+En mentor kan ange flera erfarenhetsgrunder för samma stödområde. `lived` betyder egen eller närståendes erfarenhet, `practical` betyder erfarenhet av att stödja andra och `trained` betyder utbildning eller yrkeserfarenhet. Minst en grund krävs för ett valt område. Äldre poster med ett ensamt `experienceLevel` normaliseras till en lista vid läsning.
 
 `CaseRecord.details.supportAreaIds` innehåller valda områden för ett stödärende. Om området ännu inte är känt används inga påhittade standardvärden; ärendet markeras för komplettering. När ett mentoruppdrag skapas kopieras områdena som en ögonblicksbild till uppdragets detaljer, medan uppdraget samtidigt behåller sin oföränderliga referens till stödärendet.
 

@@ -1,12 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  MENTOR_EXPERIENCE_LEVELS,
   SUPPORT_AREAS,
   defaultTenantSupportAreaSelections,
   normalizeSupportAreaIds,
   selectedSupportAreas,
   supportAreaOverlap
 } from "../support-area-domain.js";
+
+test("mentor experience bases use explicit non-overlapping labels", () => {
+  assert.deepEqual(MENTOR_EXPERIENCE_LEVELS, [
+    ["lived", "Egen eller närståendes erfarenhet"],
+    ["practical", "Erfarenhet av att stödja andra"],
+    ["trained", "Utbildning eller yrkeserfarenhet"]
+  ]);
+});
 
 test("support area ids are stable and unique", () => {
   assert.equal(new Set(SUPPORT_AREAS.map((area) => area.id)).size, SUPPORT_AREAS.length);
