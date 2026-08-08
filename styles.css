@@ -2136,6 +2136,33 @@ body {
   color: var(--app-muted);
 }
 
+.case-ready-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--app-space-4);
+  margin-bottom: var(--app-space-4);
+  padding: var(--app-space-4);
+  border: 1px solid #b8cad6;
+  border-left: 4px solid var(--app-primary);
+  background: #eef4f7;
+}
+
+.case-ready-notice-content {
+  min-width: 0;
+}
+
+.case-ready-notice-content > p {
+  max-width: 70rem;
+  color: #344553;
+}
+
+.case-ready-notice-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--app-space-2);
+}
+
 .activity-mobile-result {
   display: none;
 }
@@ -3060,8 +3087,18 @@ body {
     border-bottom: 0;
   }
 
-  .case-closed-notice {
+  .case-closed-notice,
+  .case-ready-notice {
     flex-direction: column;
+  }
+
+  .case-ready-notice-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .case-ready-notice-actions .btn {
+    width: 100%;
   }
 
   .activity-record-header,

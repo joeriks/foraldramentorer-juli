@@ -778,6 +778,12 @@ const els = {
   activityCaseClosedNotice: document.querySelector("#activityCaseClosedNotice"),
   activityCaseClosedText: document.querySelector("#activityCaseClosedText"),
   showCaseClosureButton: document.querySelector("#showCaseClosureButton"),
+  activityCaseReadyNotice: document.querySelector("#activityCaseReadyNotice"),
+  activityCaseReadyTitle: document.querySelector("#activityCaseReadyTitle"),
+  activityCaseReadyText: document.querySelector("#activityCaseReadyText"),
+  activityCaseReadyNextText: document.querySelector("#activityCaseReadyNextText"),
+  activityCaseReadyPrimaryButton: document.querySelector("#activityCaseReadyPrimaryButton"),
+  activityCaseReadyCloseButton: document.querySelector("#activityCaseReadyCloseButton"),
   caseWorkGuidance: document.querySelector("#caseWorkGuidance"),
   caseWorkGuidanceText: document.querySelector("#caseWorkGuidanceText"),
   caseTransitionPanel: document.querySelector("#caseTransitionPanel"),
@@ -4705,12 +4711,78 @@ function renderCaseDetail() {
   els.completeCaseButton.hidden = caseRecord.status === "closed";
 }
 
+function activityCompletionDecision(caseRecord) {
+  const linkedCases = successorCases(caseRecord);
+  if (linkedCases.length) {
+    const linkedCase = linkedCases[0];
+    return {
+      primaryLabel: `Öppna ${linkedCase.number}`,
+      primaryAction: "open_case",
+      targetId: linkedCase.id,
+      nextText: `Det finns redan ett länkat följdärende (${linkedCase.type}). Granska det innan det aktuella ärendet avslutas.`
+    };
+  }
+  if (caseRecord.caseTypeId === "parent-support") {
+    return {
+      primaryLabel: "Starta matchning",
+      primaryAction: "start_matching",
+      nextText: "Starta en matchning om föräldern vill gå vidare. Avsluta i stället stödärendet om behovet inte längre ska handläggas."
+    };
+  }
+  if (caseRecord.caseTypeId === "matching") {
+    return {
+      primaryLabel: "Registrera parternas svar",
+      primaryAction: "review_overview",
+      nextText: "Registrera förälderns och mentorns svar. Ett mentoruppdrag skapas bara efter ett uttryckligt val när båda accepterar."
+    };
+  }
+  if (caseRecord.caseTypeId === "mentor-assignment") {
+    return {
+      primaryLabel: "Granska uppdraget",
+      primaryAction: "review_overview",
+      nextText: "Granska rapporter, uppföljning och ersättningsunderlag. Avsluta därefter uppdraget uttryckligen om handläggningen är klar."
+    };
+  }
+  const nextTypeId = caseTypeById(caseRecord.caseTypeId)?.nextCaseTypeId || "";
+  if (nextTypeId) {
+    return {
+      primaryLabel: `Registrera ${caseTypeRelationshipName(nextTypeId).toLocaleLowerCase("sv-SE")}`,
+      primaryAction: "create_next_case",
+      targetId: nextTypeId,
+      nextText: `Ta ställning till om ${caseTypeRelationshipName(nextTypeId).toLocaleLowerCase("sv-SE")} ska registreras. Det sker inte automatiskt.`
+    };
+  }
+  return {
+    primaryLabel: "Granska ärendet",
+    primaryAction: "review_overview",
+    nextText: "Granska ärendets uppgifter och avsluta ärendet uttryckligen om handläggningen är klar."
+  };
+}
+
+function renderActivityCompletionDecision(caseRecord, applicableActivities, openActivities, attentionActivities) {
+  const ready = caseRecord.status !== "closed"
+    && caseRecord.status !== "paused"
+    && applicableActivities.length > 0
+    && openActivities.length === 0
+    && attentionActivities.length === 0;
+  els.activityCaseReadyNotice.hidden = !ready;
+  if (!ready) return;
+  const decision = activityCompletionDecision(caseRecord);
+  els.activityCaseReadyTitle.textContent = "Alla aktiviteter är klara – ärendet är fortfarande öppet";
+  els.activityCaseReadyText.textContent = "Aktivitetsresultaten, tidpunkterna och registrerande användare har sparats i ärendet och dess logg. Inget följdärende skapades och ingen person- eller mentorpost ändrades när den sista aktiviteten avslutades.";
+  els.activityCaseReadyNextText.innerHTML = `<strong>Nästa steg:</strong> ${escapeHtml(decision.nextText)}`;
+  els.activityCaseReadyPrimaryButton.textContent = decision.primaryLabel;
+  els.activityCaseReadyPrimaryButton.dataset.action = decision.primaryAction;
+  els.activityCaseReadyPrimaryButton.dataset.targetId = decision.targetId || "";
+}
+
 function renderCaseActivities(caseRecord, activities) {
   els.caseActivityTableBody.innerHTML = "";
   const applicableActivities = activities.filter((activity) => activity.status !== "not_applicable");
   const completedActivities = applicableActivities.filter((activity) => activity.status === "completed");
   const openActivities = applicableActivities.filter((activity) => activity.status !== "completed");
   const attentionActivities = activities.filter(activityHasBlockingResult);
+  renderActivityCompletionDecision(caseRecord, applicableActivities, openActivities, attentionActivities);
   const progress = applicableActivities.length
     ? Math.round((completedActivities.length / applicableActivities.length) * 100)
     : 0;
@@ -6567,6 +6639,43 @@ function changeCaseLifecycleCommand({ caseRecord, action, reasonCode, note, resu
   });
 }
 
+function caseCloseReasonOptions(caseRecord) {
+  if (caseRecord.caseTypeId === "parent-support") return [
+    ["support_completed", "Stödbehovet är färdighandlagt"],
+    ["parent_declined", "Föräldern vill inte gå vidare"],
+    ["support_no_longer_current", "Stödbehovet är inte längre aktuellt"],
+    ["transferred", "Överfört till annan insats"],
+    ["duplicate", "Felregistrering eller dubblett"],
+    ["other", "Annan avslutsorsak"]
+  ];
+  if (caseRecord.caseTypeId === "matching") return [
+    ["assignment_created", "Matchningen har övergått i mentoruppdrag"],
+    ["party_declined", "En av parterna tackade nej"],
+    ["matching_no_longer_current", "Matchningen är inte längre aktuell"],
+    ["other", "Annan avslutsorsak"]
+  ];
+  if (caseRecord.caseTypeId === "mentor-assignment") return [
+    ["assignment_completed", "Mentoruppdraget är slutfört"],
+    ["parent_ended", "Föräldern avslutade deltagandet"],
+    ["mentor_ended", "Mentorn avslutade uppdraget"],
+    ["transferred", "Överfört till annan insats"],
+    ["other", "Annan avslutsorsak"]
+  ];
+  if (caseRecord.caseTypeId === "mentor-certification") return [
+    ["completed", "Handläggningen slutförd"],
+    ["unsuitable", "Mentorn bedöms inte lämplig"],
+    ["withdrawn", "Ansökan återkallad"],
+    ["duplicate", "Felregistrering eller dubblett"],
+    ["other", "Annan avslutsorsak"]
+  ];
+  return [
+    ["completed", "Handläggningen slutförd"],
+    ["no_longer_current", "Ärendet är inte längre aktuellt"],
+    ["duplicate", "Felregistrering eller dubblett"],
+    ["other", "Annan avslutsorsak"]
+  ];
+}
+
 function openCaseLifecycle(action) {
   const caseRecord = selectedCaseRecord();
   if (!caseRecord) return;
@@ -6585,13 +6694,7 @@ function openCaseLifecycle(action) {
       ["external_dependency", "Inväntar extern hantering"],
       ["other", "Annan tillfällig orsak"]
     ],
-    close: [
-      ["completed", "Handläggningen slutförd"],
-      ["unsuitable", "Mentorn bedöms inte lämplig"],
-      ["withdrawn", "Ansökan återkallad"],
-      ["duplicate", "Felregistrering eller dubblett"],
-      ["other", "Annan avslutsorsak"]
-    ],
+    close: caseCloseReasonOptions(caseRecord),
     resume: [
       ["conditions_met", "Förutsättningarna är uppfyllda"],
       ["new_information", "Ny information har kommit in"],
@@ -8030,6 +8133,33 @@ els.showCaseClosureButton.addEventListener("click", () => {
   bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
   requestAnimationFrame(() => els.caseClosureSummary.scrollIntoView({ behavior: "smooth", block: "start" }));
 });
+
+els.activityCaseReadyPrimaryButton.addEventListener("click", () => {
+  const caseRecord = selectedCaseRecord();
+  if (!caseRecord) return;
+  const action = els.activityCaseReadyPrimaryButton.dataset.action;
+  const targetId = els.activityCaseReadyPrimaryButton.dataset.targetId;
+  if (action === "start_matching") {
+    navigateToNewMatching(caseRecord.id);
+    return;
+  }
+  if (action === "open_case" && targetId) {
+    navigateToCase(targetId);
+    return;
+  }
+  if (action === "create_next_case" && targetId) {
+    newCaseTypePreset = targetId;
+    navigateToNewCase();
+    return;
+  }
+  bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
+  requestAnimationFrame(() => {
+    const target = !els.caseTransitionPanel.hidden ? els.caseTransitionPanel : els.caseStatusFact.closest(".record-section");
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+});
+
+els.activityCaseReadyCloseButton.addEventListener("click", () => openCaseLifecycle("close"));
 
 els.activityDetailStatusInput.addEventListener("change", () => {
   const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
