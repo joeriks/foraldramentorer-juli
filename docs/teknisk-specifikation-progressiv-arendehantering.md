@@ -770,6 +770,7 @@ caseEvents
 caseTypeDefinitions
 activityTemplateDefinitions
 tenantSupportAreaSelection
+supportTickets
 processedCommands
 mentors
 handlers
@@ -802,9 +803,13 @@ caseEvents.[tenantId+caseId]
 caseEvents.[tenantId+occurredAt]
 processedCommands.[tenantId+idempotencyKey] (unik)
 tenantSupportAreaSelection.[tenantId+supportAreaId] (unik)
+supportTickets.[tenantId+status]
+supportTickets.[tenantId+createdAt]
 ```
 
 Ändringar av schema ska göras genom versionsstyrda IndexedDB-migreringar. I prototypen pekar `storageObjectId` på en post i `caseDocumentBlobs`; i SaaS-versionen pekar det på behörighetsskyddad objektlagring. Ett kommando som berör flera stores ska köras i en enda `readwrite`-transaktion. Domänlagret ska upprätthålla invarianter som IndexedDB inte kan uttrycka som unika villkor, exempelvis högst en aktiv ansvarig assignment. Exempeldata ska använda samma kommandon, validering och relationer som användarskapad data.
+
+Demoläget är en administrativ demonstrationsyta och använder stabila funktions-ID:n för länkar till systemets riktiga vyer. Återkoppling från ett demosteg lagras i `supportTickets` med kategorin `feature_request`, källan `demo_feedback` och demostegets stabila ID. Den får inte skapa eller ändra ett verksamhetsärende och ska inte lagras i en separat parallell kommentarsmodell.
 
 ## 13. Behörighet och spårbarhet
 

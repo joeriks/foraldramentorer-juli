@@ -254,7 +254,7 @@ När alla tillämpliga aktiviteter är avslutade och inga ställningstaganden å
 - **Ärenderegister:** visar den fullständiga, sökbara listan över ärenden. Här väljer användaren vilket ärende som ska öppnas.
 - **Ärendekort:** är den primära arbetsytan för översikt, aktiviteter, handlingar, logg och beslut i ett ärende.
 - **Mentorregister och mentorkort:** visar person- och registeruppgifter samt länkar till personens ärenden. Kontroller, möten och beslut ska registreras i rätt ärende och bara sammanfattas på mentorkortet.
-- **Presentation:** demonstrerar samma funktioner och dataflöden. Kommentarer i presentationsläget är prototypåterkoppling och får inte blandas med ärenden, tjänsteanteckningar eller logghändelser.
+- **Demoläge:** finns under Systemadministration och demonstrerar aktuella funktioner i en förberedd ordning. Återkoppling från ett demosteg registreras som ett utvecklingsförslag i supportkön och får inte blandas med verksamhetsärenden, tjänsteanteckningar eller logghändelser.
 
 Samma status ska aldrig registreras separat i flera vyer. Dashboard, listor och mentorkort ska härleda sina sammanfattningar från ärenden och aktiviteter.
 

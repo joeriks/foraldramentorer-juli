@@ -32,7 +32,7 @@ import {
   stableHash
 } from "./case-domain.js?v=20260808-assignment-quick-finish-v25";
 import { marked } from "./vendor/marked/marked.esm.js";
-import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260806-assignment-followup-v21";
+import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260809-demo-v1";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
 import {
   DEFAULT_TENANT_LEARNING_SELECTION,
@@ -49,7 +49,7 @@ import {
   findSupportKnowledge,
   localSupportResponse,
   supportCategoryLabel
-} from "./support-domain.js?v=20260808-ai-support-v1";
+} from "./support-domain.js?v=20260809-demo-v1";
 import {
   MENTOR_EXPERIENCE_LEVELS,
   SUPPORT_AREA_CATEGORIES,
@@ -400,70 +400,84 @@ const PRESENTATION_STEPS = [
   {
     id: "overview",
     title: "Dashboard och arbetskö",
-    route: "#/dashboard",
+    featureId: "dashboard.work-queue",
     summary: "Börja i handläggarens dagliga vy med ärendeläge, arbetskö och tydliga avvikelser.",
     points: ["Ärendestatus visar kommunens samlade handläggningsläge", "Arbetskön skiljer på egna, otilldelade och försenade aktiviteter", "Mentorflödet är en sekundär registeröversikt"]
   },
   {
     id: "cases",
     title: "Ärenderegister",
-    route: "#/cases",
+    featureId: "cases.list",
     summary: "Visa att all strukturerad handläggning utgår från ärenden, oavsett om de gäller en mentor eller ett generellt behov.",
     points: ["Sök och filtrera på status", "Se ansvarig, kopplad mentor och nästa aktivitet", "Öppna både ärenden om godkännande och generella ärenden"]
   },
   {
     id: "case-work",
     title: "Ärendekort och aktiviteter",
-    route: "#/case",
+    featureId: "cases.list",
     summary: "Följ ett ärende från nästa åtgärd till aktivitet, underlag, ställningstagande och avslut.",
     points: ["Ärendet samlar ansvar, tidsfrister och historik", "Aktiviteter kan tilldelas och kompletteras med underlag", "Avvikande resultat kan pausa eller avsluta ärendet"]
   },
   {
     id: "new-mentor",
     title: "Registrera ny mentor",
-    route: "#/mentor/new",
+    featureId: "mentor.create",
     summary: "Visa den enkla standardvägen där en mentorpost och ett ärende om godkännande skapas i ett sammanhang.",
     points: ["Grunduppgifter registreras en gång", "Dubblettkontroll sker före sparande", "Ärendet om godkännande skapas och kopplas automatiskt"]
   },
   {
-    id: "new-case",
-    title: "Registrera ett generellt ärende",
-    route: "#/case/new",
-    summary: "Visa att behovsanalys, rekrytering och andra kommunala arbetsuppgifter kan registreras utan mentorkoppling.",
-    points: ["Välj ärendetyp och följ dess hjälptext", "Mentorkoppling visas bara när den är relevant", "Kompletterande fält styrs av ärendetypen"]
-  },
-  {
     id: "parent-support",
     title: "Förälder och stödärende",
-    route: "#/parents",
+    featureId: "parent.list",
     summary: "Visa hur en förälder registreras en gång medan varje avgränsat stödbehov får ett eget ärende.",
     points: ["Föräldrakortet innehåller stabila person- och kontaktuppgifter", "Stödområden, syfte och önskat resultat hör till stödärendet", "Kommunens publika urval hjälper föräldern att beskriva behovet utan krav på diagnos"]
   },
   {
-    id: "matching-assignment",
-    title: "Matchning och mentoruppdrag",
-    route: "#/matchings",
-    summary: "Visa den spårbara kedjan från ett stödärende till matchningsförsök och ett accepterat mentoruppdrag.",
-    points: ["Varje matchning gäller ett bestämt stödärende och en mentor", "Överlappande stödområden visas som beslutsunderlag, aldrig som automatiskt beslut", "Uppdraget följs upp med plan, mentorrapporter, föräldraavstämningar och ersättningsperioder"]
+    id: "matching",
+    title: "Matchning",
+    featureId: "matching.list",
+    summary: "Visa den spårbara kedjan från ett bestämt stödärende till ett matchningsförsök.",
+    points: ["Varje matchning gäller ett stödärende och en mentor", "Överlappande stödområden visas som beslutsunderlag, aldrig som automatiskt beslut", "Båda parternas svar registreras innan ett uppdrag kan skapas"]
+  },
+  {
+    id: "assignment",
+    title: "Mentoruppdrag och uppföljning",
+    featureId: "assignment.list",
+    summary: "Visa hur ett accepterat uppdrag planeras, återrapporteras och följs upp.",
+    points: ["Uppdraget behåller kopplingen till stödärendet och matchningen", "Mentorn återrapporterar kontakter", "Handläggaren följer upp med föräldern och granskar ersättningsunderlag"]
   },
   {
     id: "mentor-record",
     title: "Mentorkort och kopplade ärenden",
-    route: "#/mentor",
+    featureId: "mentor.list",
     summary: "Visa mentorn som en personpost med grunduppgifter, beslut, logg och en samlad lista över personens ärenden.",
     points: ["Personuppgifter hålls åtskilda från handläggningen", "Alla ärenden för mentorn visas samlat", "Kontroller och möten hanteras i respektive ärende"]
   },
   {
-    id: "case-types",
-    title: "Administrera ärendetyper",
-    route: "#/case-types",
-    summary: "Visa den begränsade administrationen för hjälptexter, mentorkoppling och standardiserade kompletterande fält.",
-    points: ["Tekniska ID och fältkatalog är fasta", "Verksamheten kan ändra vägledning utan kodändring", "Nya versioner påverkar inte redan registrerade ärenden"]
+    id: "support-areas",
+    title: "Stödområden och matchningsunderlag",
+    featureId: "admin.support-areas",
+    summary: "Visa hur kommunen väljer stödområden för föräldrar, mentorer och matchning.",
+    points: ["Kommunen väljer vilka områden som används och visas publikt", "Mentorn kan ange flera erfarenhetsgrunder per område", "Områden ger transparent matchningsstöd men fattar inga beslut"]
+  },
+  {
+    id: "learning",
+    title: "Utbildning och kunskapstest",
+    featureId: "learning.library",
+    summary: "Visa kommunens valda referensmaterial, interaktiva kurser och kunskapstest.",
+    points: ["Kommunen väljer innehåll i systemadministrationen", "Mentorn kan genomföra kursmoment och test", "Publikt material kan visas separat för föräldrar"]
+  },
+  {
+    id: "configuration",
+    title: "Ärendetyper och aktivitetsmallar",
+    featureId: "admin.case-types",
+    summary: "Visa den avgränsade administrationen av vägledning, fält och processmallar.",
+    points: ["Tekniska ID och systemregler är fasta", "Verksamheten kan redigera hjälptexter och tillåtna fält", "Aktivitetsmallarnas instruktioner och resultatregler kan granskas"]
   },
   {
     id: "routines",
     title: "Rutiner och systemadministration",
-    route: "#/routines",
+    featureId: "routines.view",
     summary: "Avsluta med lathunden, funktionslänkarna och administrationen som stödjer en enhetlig kommunal rutin.",
     points: ["Rutinerna beskriver vad som ska göras i vanliga situationer", "Funktionslänkar leder till motsvarande vy", "Handläggare och ärendetyper administreras i separata register"]
   }
@@ -474,7 +488,6 @@ let candidates = [];
 let parents = [];
 let handlers = [];
 let meetings = [];
-let presentationComments = [];
 let cases = [];
 let caseAssignments = [];
 let caseActivities = [];
@@ -1890,22 +1903,6 @@ function clearMeetings() {
   });
 }
 
-function getAllPresentationComments() {
-  return new Promise((resolve, reject) => {
-    const request = presentationCommentTx().getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-function savePresentationComment(comment) {
-  return new Promise((resolve, reject) => {
-    const request = presentationCommentTx("readwrite").put(comment);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-}
-
 function clearPresentationComments() {
   return new Promise((resolve, reject) => {
     const request = presentationCommentTx("readwrite").clear();
@@ -2631,7 +2628,6 @@ async function refresh() {
       || candidate.status !== storedCandidates[index].status)
     .map(saveCandidate));
   meetings = await getAllMeetings();
-  presentationComments = await getAllPresentationComments();
   await migrateSingleExampleMentor();
   await migrateExampleCoordinatorDistribution();
   await migrateCoordinatorReferences();
@@ -3173,7 +3169,9 @@ function renderSupportAdministration() {
     const type = document.createElement("td");
     type.textContent = supportCategoryLabel(ticket.category);
     const question = document.createElement("td");
-    question.textContent = ticket.question;
+    question.textContent = ticket.source === "demo_feedback" && ticket.presentationStepTitle
+      ? `${ticket.presentationStepTitle}: ${ticket.question}`
+      : ticket.question;
     const reporter = document.createElement("td");
     reporter.textContent = `${ticket.reporterName} · ${ticket.contextRole}`;
     const status = document.createElement("td");
@@ -3958,7 +3956,7 @@ function applyRoute() {
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
   els.navParents.classList.toggle("active", currentView === "parents" || currentView === "parent");
   els.navLearning.classList.toggle("active", currentView === "learning");
-  els.navAdministration.classList.toggle("active", ["administration", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "routines", "handler"].includes(currentView));
+  els.navAdministration.classList.toggle("active", ["administration", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "presentation", "routines", "handler"].includes(currentView));
   els.navHandlers.classList.toggle("active", currentView === "administration" || currentView === "handler");
   els.navCaseTypes.classList.toggle("active", currentView === "case-types");
   els.navActivityTypes.classList.toggle("active", currentView === "activity-types");
@@ -3978,8 +3976,8 @@ function applyRoute() {
     els.pageTitle.textContent = "Dashboard";
     els.breadcrumb.textContent = "Start / Dashboard";
   } else if (currentView === "presentation") {
-    els.pageTitle.textContent = "Presentation";
-    els.breadcrumb.textContent = "Start / Presentation";
+    els.pageTitle.textContent = "Demoläge";
+    els.breadcrumb.textContent = "Start / Systemadministration / Demoläge";
   } else if (currentView === "cases") {
     const sectionTitle = caseTypeFilter === "matching" ? "Matchningar" : caseTypeFilter === "mentor-assignment" ? "Uppdrag" : "Ärenderegister";
     els.pageTitle.textContent = sectionTitle;
@@ -4248,15 +4246,16 @@ function selectedPresentationStep() {
 }
 
 function presentationRoute(step) {
-  if (step.route === "#/mentor") {
+  const configuredRoute = resolveFeatureLink(step.featureId)?.href || "#/presentation";
+  if (step.id === "mentor-record") {
     const candidate = candidates[0];
     return candidate ? `#/mentor/${candidate.id}` : "#/mentor/new";
   }
-  if (step.route === "#/case") {
+  if (step.id === "case-work") {
     const caseRecord = cases.find((item) => item.status !== "closed") || cases[0];
     return caseRecord ? `#/case/${caseRecord.id}` : "#/cases";
   }
-  return step.route;
+  return configuredRoute;
 }
 
 function renderPresentation() {
@@ -4265,7 +4264,7 @@ function renderPresentation() {
   els.presentationStepList.innerHTML = "";
 
   for (const [index, step] of PRESENTATION_STEPS.entries()) {
-    const commentsForStep = presentationComments.filter((comment) => comment.stepId === step.id);
+    const commentsForStep = supportTickets.filter((ticket) => ticket.source === "demo_feedback" && ticket.presentationStepId === step.id);
     const button = document.createElement("button");
     button.type = "button";
     button.className = `presentation-step-button ${step.id === selectedStep.id ? "active" : ""}`;
@@ -4274,7 +4273,7 @@ function renderPresentation() {
       <span class="presentation-step-index">${index + 1}</span>
       <span>
         <strong>${escapeHtml(step.title)}</strong>
-        <small>${commentsForStep.length} ${commentsForStep.length === 1 ? "kommentar" : "kommentarer"}</small>
+        <small>${commentsForStep.length} ${commentsForStep.length === 1 ? "återkoppling" : "återkopplingar"}</small>
       </span>
     `;
     els.presentationStepList.append(button);
@@ -4291,8 +4290,8 @@ function renderPresentation() {
 }
 
 function renderPresentationComments(stepId) {
-  const comments = presentationComments
-    .filter((comment) => comment.stepId === stepId)
+  const comments = supportTickets
+    .filter((ticket) => ticket.source === "demo_feedback" && ticket.presentationStepId === stepId)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   els.presentationCommentsEmpty.hidden = comments.length > 0;
   els.presentationCommentsList.innerHTML = "";
@@ -4302,10 +4301,11 @@ function renderPresentationComments(stepId) {
     item.className = "presentation-comment border rounded";
     item.innerHTML = `
       <div class="presentation-comment-meta">
-        <strong>${escapeHtml(comment.createdBy || "Okänd")}</strong>
+        <strong>${escapeHtml(comment.reporterName || "Okänd")}</strong>
+        <span>${escapeHtml(supportTicketStatusLabel(comment.status))}</span>
         <time datetime="${escapeHtml(comment.createdAt)}">${escapeHtml(formatDateTime(comment.createdAt))}</time>
       </div>
-      <p class="mb-0">${escapeHtml(comment.text)}</p>
+      <p class="mb-0">${escapeHtml(comment.question)}</p>
     `;
     els.presentationCommentsList.append(item);
   }
@@ -8937,17 +8937,38 @@ els.presentationCommentForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const text = els.presentationCommentInput.value.trim();
   if (!text) return;
-  await savePresentationComment({
+  if (containsSensitivePersonalData(text)) {
+    els.presentationCommentInput.setCustomValidity("Ta bort personnummer eller känsliga registeruppgifter innan återkopplingen registreras.");
+    els.presentationCommentInput.reportValidity();
+    return;
+  }
+  els.presentationCommentInput.setCustomValidity("");
+  const now = new Date().toISOString();
+  const actor = currentUser();
+  const ticket = {
     id: crypto.randomUUID(),
-    stepId: selectedPresentationStep().id,
-    text,
-    createdBy: currentUserName(),
-    createdAt: new Date().toISOString()
-  });
+    tenantId: DEFAULT_TENANT_ID,
+    category: "feature_request",
+    status: "new",
+    question: text,
+    answer: "",
+    answerMode: "demo_feedback",
+    contextView: "presentation",
+    contextRoute: "#/presentation",
+    contextRole: actor.role,
+    reporterId: actor.id,
+    reporterName: actor.name,
+    presentationStepId: selectedPresentationStep().id,
+    presentationStepTitle: selectedPresentationStep().title,
+    source: "demo_feedback",
+    createdAt: now,
+    updatedAt: now
+  };
+  await saveSupportTicket(ticket);
+  supportTickets.unshift(ticket);
   els.presentationCommentInput.value = "";
   markSaved();
-  showFeedback("Kommentaren har sparats.");
-  presentationComments = await getAllPresentationComments();
+  showFeedback("Återkopplingen har registrerats i supportkön.");
   renderPresentation();
 });
 

@@ -31,6 +31,11 @@ test("the feature registry uses stable unique routes", () => {
   assert.equal(new Set(routes).size, routes.length);
 });
 
+test("demo mode and support queue use stable administration routes", () => {
+  assert.equal(resolveFeatureLink("admin.demo").href, "#/presentation");
+  assert.equal(resolveFeatureLink("admin.support").href, "#/support-admin");
+});
+
 test("numbered routine headings keep stable deep-link keys when titles change", () => {
   assert.equal(routineSectionKey("5.2 Öppna och bedöma ett ärende"), "5-2");
   assert.equal(routineSectionKey("5.2 Ny rubriktext"), "5-2");

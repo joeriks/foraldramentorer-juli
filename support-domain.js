@@ -79,6 +79,13 @@ export const SUPPORT_KNOWLEDGE = [
     href: "#/routines"
   },
   {
+    id: "demo-mode",
+    title: "Demoläge och återkoppling",
+    keywords: ["demoläge", "presentation", "demo", "återkoppling", "kommentar"],
+    answer: "Under Systemadministration > Demoläge finns en uppdaterad visningsordning för prototypens huvudflöden. Återkoppling till ett demosteg registreras som ett utvecklingsförslag och kan hanteras under Supportärenden.",
+    href: "#/presentation"
+  },
+  {
     id: "administration",
     title: "Systemadministration",
     keywords: ["administration", "ärendetyp", "aktivitetsmall", "handläggare", "konfiguration"],
