@@ -74,6 +74,7 @@ const LEARNING_SELECTION_INITIALIZED_ID = "__selection_initialized__";
 let CURRENT_USER_ID = "handler-sara";
 const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
+const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 
 const ORGANIZATION_UNIT_LABELS = {
   foraldramentorer: "FöräldraMentorer",
@@ -1535,7 +1536,11 @@ async function loadLearningData() {
     tenantLearningSelection = tenantSelectionRecords.filter((item) => item.contentId !== LEARNING_SELECTION_INITIALIZED_ID);
   }
   learningProgress = (await getAllLearningProgress()).filter((item) => item.tenantId === DEFAULT_TENANT_ID);
-  if (!selectedLearnerId || !candidates.some((candidate) => candidate.id === selectedLearnerId)) selectedLearnerId = candidates[0]?.id || "";
+  if (isMentorSession()) {
+    selectedLearnerId = currentUser().mentorId;
+  } else if (!selectedLearnerId || !candidates.some((candidate) => candidate.id === selectedLearnerId)) {
+    selectedLearnerId = candidates[0]?.id || "";
+  }
 }
 
 function selectedLearningContent() {
@@ -2852,7 +2857,7 @@ function currentUser() {
     const mentor = currentMentorUser();
     return mentor
       ? { id: mentor.id, name: mentor.name, role: "Mentor", active: true, mentorId: mentor.id }
-      : { id: "mentor-demo", name: "Ingen mentor registrerad", role: "Mentor", active: false, mentorId: null };
+      : { ...DEMO_MENTOR_USER, role: "Mentor", active: true, mentorId: DEMO_MENTOR_USER.id };
   }
   const requestedId = activeTestUserType === "handler" ? "handler-jonas" : "handler-sara";
   return handlers.find((handler) => handler.id === requestedId)

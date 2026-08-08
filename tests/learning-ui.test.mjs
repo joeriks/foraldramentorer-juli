@@ -35,6 +35,9 @@ test("offers a role-switched mentor portal with protected mentor routes", () => 
   assert.match(app, /register_mentor_self_report/);
   assert.match(app, /Du kan bara öppna uppdrag som är kopplade till din mentorprofil/);
   assert.match(app, /Känsliga register- och identitetsuppgifter visas inte i mentorportalen/);
+  assert.match(app, /DEMO_MENTOR_USER = \{ id: "mentor-demo", name: "Mentor testanvändare" \}/);
+  assert.match(app, /mentorId: DEMO_MENTOR_USER\.id/);
+  assert.match(app, /if \(isMentorSession\(\)\) \{\s*selectedLearnerId = currentUser\(\)\.mentorId;/);
 });
 
 test("offers an unauthenticated parent portal and explicit public material selection", () => {
