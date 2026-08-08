@@ -1,8 +1,8 @@
 # Verksamhetsflöden och handläggningsrutiner
 
-Status: Verksamhetsförslag 1.8
+Status: Verksamhetsförslag 1.9
 Produkt: FöräldraMentorer - Kommunportal  
-Senast uppdaterad: 2026-08-06
+Senast uppdaterad: 2026-08-08
 
 Relaterade dokument:
 
@@ -483,6 +483,8 @@ Ställningstagandet ska ligga kvar i arbetskön tills det har hanterats. Det få
 
 Föräldern registreras som en egen person. Varje avgränsat stödbehov hanteras i ett eget stödärende. Matchningar och uppdrag utgår från stödärendet och ska inte döljas som profilfält eller status på föräldern eller mentorn.
 
+Stödområden används som en gemensam, kontrollerad begreppslista genom hela flödet. Kommunen väljer vilka områden som används internt och vilka som visas i den publika stödansökan. Förälderns val hör till det aktuella stödärendet, inte till en permanent beskrivning av personen. Mentorns val beskriver relevant erfarenhet och kompetens. Överlappning mellan dessa uppgifter är ett matchningsunderlag, aldrig ett automatiskt beslut.
+
 ### 10.1 Registrera förälder och stödärende
 
 1. Handläggaren söker först efter en befintlig förälder för att undvika dubbletter.
@@ -490,7 +492,7 @@ Föräldern registreras som en egen person. Varje avgränsat stödbehov hanteras
 3. Systemet registrerar vem som skapade posten och när.
 4. Handläggaren kontrollerar om det finns ett pågående stödärende med samma syfte.
 5. Om behovet har ett nytt syfte är `Skapa stödärende för förälder` förvalt. Handläggaren kan avmarkera valet och endast spara förälderposten. Om det är en fortsättning kompletteras det befintliga stödärendet utan att historiken skrivs över.
-6. Stödbehovets syfte, språk, område, tillgänglighet och andra matchningsuppgifter registreras i stödärendet, inte som känslig fritext på föräldrakortet.
+6. Stödbehovets stödområden, syfte, språk, geografiska område, tillgänglighet och andra matchningsuppgifter registreras i stödärendet, inte som känslig fritext på föräldrakortet. Om föräldern ännu inte kan välja stödområde markeras behovet för bekräftelse i första kontakten.
 7. Stödärendet får en egen ansvarig, status, starttidpunkt och plan för nästa kontakt.
 8. Handläggaren dokumenterar om föräldern vill gå vidare till matchning och vad nästa kontakt ska vara.
 
@@ -509,6 +511,7 @@ Innan en mentor föreslås ska handläggaren avgöra om registreringen är ett n
 
 Det valda stödärendet ska därefter innehålla tillräckliga och aktuella uppgifter för urvalet:
 
+- ett eller flera bekräftade stödområden ur kommunens katalog, eller en tydlig markering att området ännu behöver bekräftas,
 - fastställda grundkriterier, exempelvis språk, område och praktisk tillgänglighet,
 - stödets avgränsade syfte och vad föräldern vill ha stöd med på en nivå som är nödvändig för matchningen,
 - kontaktstatus och om föräldern vill medverka i matchningen,
@@ -521,8 +524,8 @@ Om underlaget inte räcker skapas en aktivitet för komplettering. Matchningsär
 Matchning är ett eget ärende som alltid tillhör ett bestämt stödärende. Den ska inte döljas som en status på föräldern eller mentorn.
 
 1. Handläggaren startar matchningsärendet från det stödärende som ska få en mentorinsats.
-2. Systemet visar endast mentorer som är godkända, tillgängliga och uppfyller hårda kriterier.
-3. Handläggaren bedömer mjuka kriterier och dokumenterar kort varför en match föreslås.
+2. Systemet visar endast mentorer som är godkända och tillgängliga. Registrerad överlappning mellan stödärendets stödområden och mentorns erfarenhetsområden visas och kan användas för sortering.
+3. Handläggaren bedömer språk, geografi, tillgänglighet, erfarenhetsnivå, parternas önskemål och andra relevanta kriterier samt dokumenterar kort varför en match föreslås. Avsaknad av registrerad överlappning är en upplysning, inte ett automatiskt avslag.
 4. Föräldern och mentorn kontaktas var för sig enligt kommunens rutin.
 5. Första mötet bokas och registreras.
 6. Båda parters återkoppling dokumenteras utan onödiga samtalsdetaljer.
@@ -543,6 +546,19 @@ Ett mentoruppdrag får erbjudas först när både föräldern och mentorn har ac
 En misslyckad matchning ändrar inte automatiskt mentorns godkännandestatus. Om något framkommer som påverkar lämpligheten skapas ett separat uppföljningsärende och mentorns tillgänglighet kan pausas genom ett uttryckligt beslut.
 
 **I systemet:** [Öppna matchningsärenden](feature:matching.list)
+
+### 10.4 Förvalta stödområden
+
+Systemadministratören utgår från den centrala katalogen och väljer för varje område:
+
+1. om området ska kunna användas av kommunen,
+2. om området även ska visas för föräldrar i den publika stödansökan.
+
+Ett publikt område måste samtidigt vara aktiverat internt. När ett område inaktiveras döljs det i nya registreringar, men uppgiften ligger kvar i redan sparade stödärenden, mentorprofiler och uppdrag. Ett område får därför inte återanvända ett gammalt tekniskt ID för en ny betydelse. Ändrad benämning eller större betydelseförändring ska versionshanteras.
+
+Katalogen ska beskriva sådant en föräldermentor faktiskt kan stödja i vardagen, exempelvis skolfrånvaro, vardagsrutiner, kommunikation eller föräldraskap. Akut fara, våld, allvarlig psykisk ohälsa, missbruk eller behov av myndighetsutövning ska inte omvandlas till vanliga matchningsområden. Sådana uppgifter följer kommunens eskalerings- och skyddsrutiner.
+
+**I systemet:** [Administrera stödområden](feature:admin.support-areas)
 
 ## 11. Flöde F: mentoruppdrag och uppföljning
 

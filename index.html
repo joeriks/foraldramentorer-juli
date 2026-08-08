@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260808-ai-support-v2">
+    <link rel="stylesheet" href="styles.css?v=20260808-support-areas-v1">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -39,6 +39,7 @@
               <a id="navHandlers" class="nav-link" href="#/administration">Handläggare</a>
               <a id="navCaseTypes" class="nav-link" href="#/case-types">Ärendetyper</a>
               <a id="navActivityTypes" class="nav-link" href="#/activity-types">Aktivitetsmallar</a>
+              <a id="navSupportAreas" class="nav-link" href="#/support-areas">Stödområden</a>
               <a id="navLearningAdmin" class="nav-link" href="#/learning-admin">Utbildningsinnehåll</a>
               <a id="navSupportAdmin" class="nav-link" href="#/support-admin">Supportärenden</a>
               <a id="navRoutines" class="nav-link" href="#/routines">Rutiner</a>
@@ -74,6 +75,7 @@
                   <li><a class="dropdown-item" href="#/administration">Handläggare</a></li>
                   <li><a class="dropdown-item" href="#/case-types">Ärendetyper</a></li>
                   <li><a class="dropdown-item" href="#/activity-types">Aktivitetsmallar</a></li>
+                  <li><a class="dropdown-item" href="#/support-areas">Stödområden</a></li>
                   <li><a class="dropdown-item" href="#/learning-admin">Utbildningsinnehåll</a></li>
                   <li><a class="dropdown-item" href="#/support-admin">Supportärenden</a></li>
                   <li><a class="dropdown-item" href="#/routines">Rutiner</a></li>
@@ -411,6 +413,7 @@
                       <div class="col-md-6"><label class="form-label" for="initialSupportPurposeInput">Stödets syfte</label><input id="initialSupportPurposeInput" class="form-control form-control-sm" placeholder="Exempel: stöd kring skolfrånvaro"></div>
                       <div class="col-md-6"><label class="form-label" for="initialSupportOutcomeInput">Önskat resultat</label><input id="initialSupportOutcomeInput" class="form-control form-control-sm" placeholder="Vad ska stödet bidra till?"></div>
                       <div class="col-12"><label class="form-label" for="initialSupportDescriptionInput">Kort beskrivning</label><textarea id="initialSupportDescriptionInput" class="form-control form-control-sm" rows="3"></textarea></div>
+                      <div class="col-12"><label class="form-label mb-1">Vad vill föräldern ha stöd med?</label><p class="form-text mt-0">Välj det som är känt nu. Lämna tomt om området behöver bekräftas i första kontakten. Valen hör till stödärendet, inte till förälderns personprofil.</p><div id="initialSupportAreaChoices" class="support-area-choices"></div></div>
                     </div>
                   </div>
                 </section>
@@ -520,6 +523,7 @@
                         <div class="needs-analysis-fields">
                           <h4 class="h6 mb-1">Behovets omfattning</h4>
                           <p class="small text-secondary mb-3">Fyll i det som är känt nu. Uppgifterna kan kompletteras när analysen fortsätter.</p>
+                          <div id="caseSupportAreaField" class="mb-3"><label class="form-label mb-1">Stödområden</label><p class="form-text mt-0">Välj det som har bekräftats med föräldern. Lämna tomt om området behöver kompletteras innan matchning. Uppgiften används som beslutsunderlag, inte för automatisk matchning.</p><div id="caseSupportAreaChoices" class="support-area-choices"></div></div>
                           <div class="row g-3">
                             <div class="col-md-6">
                               <label class="form-label" for="supportPurposeInput">Stödets syfte</label>
@@ -1254,6 +1258,14 @@
             </div>
           </section>
 
+          <section id="supportAreasAdministrationView" hidden>
+            <div class="card">
+              <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-start gap-3"><div><h2 class="h5 mb-1">Stödområden</h2><p class="text-secondary mb-0">Välj vilka områden kommunen erbjuder och vilka som ska visas för föräldrar utan inloggning.</p></div><div id="supportAreaAdminSummary" class="small text-secondary"></div></div>
+              <div class="card-body border-bottom"><div class="alert alert-light border mb-0"><strong>Gemensam katalog med lokalt urval</strong><p class="mb-0 mt-1">Katalogens ID och grundbetydelse är gemensamma. Kommunens val påverkar nya registreringar, men tidigare ärenden behåller sina sparade områden.</p></div></div>
+              <div id="supportAreaAdminGroups" class="support-area-admin-groups"></div>
+            </div>
+          </section>
+
           <section id="supportAdministrationView" hidden>
             <div class="card">
               <div class="card-header bg-white d-flex flex-wrap gap-3 justify-content-between align-items-start">
@@ -1478,6 +1490,7 @@
                         <div><dt>Tillgänglighet</dt><dd id="availabilityFact"></dd></div>
                       </dl>
                     </section>
+                    <section class="record-section mt-4"><h3 class="record-section-title">Erfarenhetsområden</h3><p class="small text-secondary">Områden där mentorn uppger att hen kan ge vardagsnära stöd. Uppgifterna är matchningsunderlag, inte en behörighetsprövning.</p><div id="mentorSupportAreasRead" class="support-area-facts"></div></section>
                     <section class="record-section mt-4">
                       <h3 class="record-section-title">Ärendeuppgifter</h3>
                       <dl class="record-fields mb-0">
@@ -1503,6 +1516,7 @@
                       </dl>
                       <div id="mentorEditorDuplicatePanel" class="alert alert-warning mt-3 mb-0" hidden></div>
                     </section>
+                    <section class="record-section mt-4"><h3 class="record-section-title">Erfarenhetsområden</h3><p class="small text-secondary">Markera bara områden där mentorn bedömer att hen kan ge stöd. Ange vad erfarenheten grundar sig på; kommunen kan verifiera uppgiften separat.</p><div id="mentorSupportAreasEdit" class="mentor-support-area-editor"></div></section>
                     <section class="record-section mt-4">
                       <h3 class="record-section-title">Ärendeuppgifter</h3>
                       <dl class="record-fields record-fields-edit mb-0">
@@ -1892,6 +1906,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260808-ai-support-v2"></script>
+    <script type="module" src="app.js?v=20260808-support-areas-v1"></script>
   </body>
 </html>

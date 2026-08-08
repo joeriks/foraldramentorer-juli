@@ -28,4 +28,7 @@ test("returns relevant system routes", () => {
   assert.ok(response.sources.some((source) => source.href === "#/cases/matching"));
   const [publicAnswer] = findSupportKnowledge("Hur söker jag hjälp som förälder?", { role: "Förälder", route: "#/public-home" });
   assert.equal(publicAnswer.href, "#/public-support");
+  const [supportAreas] = findSupportKnowledge("Var väljer kommunen vilka stödområden som visas publikt?", { role: "Samordnare" });
+  assert.equal(supportAreas.href, "#/support-areas");
+  assert.match(supportAreas.answer, /automatiskt en mentor/i);
 });

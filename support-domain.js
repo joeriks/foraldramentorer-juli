@@ -47,8 +47,15 @@ export const SUPPORT_KNOWLEDGE = [
     id: "matching",
     title: "Matchning",
     keywords: ["matchning", "matcha", "lämplig mentor", "accepterar"],
-    answer: "En matchning ska vara kopplad till ett bestämt stödärende. När båda parter accepterar kan den övergå i ett mentoruppdrag; övergången bekräftas av handläggaren.",
+    answer: "En matchning ska vara kopplad till ett bestämt stödärende. Systemet visar överlappning mellan stödärendets områden och mentorns erfarenhetsområden, men handläggaren bedömer också tillgänglighet, språk och parternas önskemål. När båda parter accepterar kan matchningen övergå i ett mentoruppdrag.",
     href: "#/cases/matching"
+  },
+  {
+    id: "support-areas",
+    title: "Stödområden",
+    keywords: ["stödområde", "ämnesområde", "npf", "skolfrånvaro", "erfarenhetsområde", "publikt urval"],
+    answer: "Stödområden är en gemensam katalog för stödärenden, mentorers erfarenhet och matchningsunderlag. Under Systemadministration > Stödområden väljer kommunen vilka områden som används internt och vilka som visas för föräldrar. Ett val föreslår aldrig automatiskt en mentor.",
+    href: "#/support-areas"
   },
   {
     id: "assignments",
@@ -75,7 +82,7 @@ export const SUPPORT_KNOWLEDGE = [
     id: "administration",
     title: "Systemadministration",
     keywords: ["administration", "ärendetyp", "aktivitetsmall", "handläggare", "konfiguration"],
-    answer: "Systemadministration innehåller handläggare, ärendetyper, aktivitetsmallar, utbildningsinnehåll, rutiner och supportärenden. Ändringar ska göras i respektive post för att samma redigeringsprincip ska gälla överallt.",
+    answer: "Systemadministration innehåller handläggare, ärendetyper, aktivitetsmallar, stödområden, utbildningsinnehåll, rutiner och supportärenden. Ändringar ska göras i respektive post för att samma redigeringsprincip ska gälla överallt.",
     href: "#/administration"
   }
 ];

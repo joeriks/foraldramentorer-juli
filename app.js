@@ -50,9 +50,19 @@ import {
   localSupportResponse,
   supportCategoryLabel
 } from "./support-domain.js?v=20260808-ai-support-v1";
+import {
+  MENTOR_EXPERIENCE_LEVELS,
+  SUPPORT_AREA_CATEGORIES,
+  SUPPORT_AREAS,
+  defaultTenantSupportAreaSelections,
+  normalizeSupportAreaIds,
+  selectedSupportAreas,
+  supportAreaById,
+  supportAreaOverlap
+} from "./support-area-domain.js?v=20260808-support-areas-v1";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
 const HANDLERS_STORE = "handlers";
@@ -78,6 +88,7 @@ const TENANT_LEARNING_SELECTION_STORE = "tenantLearningSelection";
 const LEARNING_PROGRESS_STORE = "learningProgress";
 const PUBLIC_SUPPORT_REQUESTS_STORE = "publicSupportRequests";
 const SUPPORT_TICKETS_STORE = "supportTickets";
+const TENANT_SUPPORT_AREA_SELECTION_STORE = "tenantSupportAreaSelection";
 const SUPPORT_PANEL_SESSION_KEY = "foraldramentorer.supportPanelOpen";
 const LEARNING_SELECTION_INITIALIZED_ID = "__selection_initialized__";
 let CURRENT_USER_ID = "handler-sara";
@@ -426,14 +437,14 @@ const PRESENTATION_STEPS = [
     title: "Förälder och stödärende",
     route: "#/parents",
     summary: "Visa hur en förälder registreras en gång medan varje avgränsat stödbehov får ett eget ärende.",
-    points: ["Föräldrakortet innehåller stabila person- och kontaktuppgifter", "Stödets syfte och önskade resultat hör till stödärendet", "Ett första stödärende är förvalt men kan väljas bort"]
+    points: ["Föräldrakortet innehåller stabila person- och kontaktuppgifter", "Stödområden, syfte och önskat resultat hör till stödärendet", "Kommunens publika urval hjälper föräldern att beskriva behovet utan krav på diagnos"]
   },
   {
     id: "matching-assignment",
     title: "Matchning och mentoruppdrag",
     route: "#/matchings",
     summary: "Visa den spårbara kedjan från ett stödärende till matchningsförsök och ett accepterat mentoruppdrag.",
-    points: ["Varje matchning gäller ett bestämt stödärende och en mentor", "Förälderns och mentorns svar registreras var för sig", "Uppdraget följs upp med plan, mentorrapporter, föräldraavstämningar och ersättningsperioder"]
+    points: ["Varje matchning gäller ett bestämt stödärende och en mentor", "Överlappande stödområden visas som beslutsunderlag, aldrig som automatiskt beslut", "Uppdraget följs upp med plan, mentorrapporter, föräldraavstämningar och ersättningsperioder"]
   },
   {
     id: "mentor-record",
@@ -531,6 +542,7 @@ let learningMutationQueue = Promise.resolve();
 let publicSupportRequests = [];
 let lastPublicSupportRequestId = "";
 let supportTickets = [];
+let tenantSupportAreaSelection = [];
 let lastSupportExchange = null;
 let supportTicketStatusFilter = "all";
 let activeTestUserType = TEST_USER_TYPES.has(localStorage.getItem(TEST_USER_TYPE_KEY))
@@ -553,6 +565,7 @@ const els = {
   navCandidates: document.querySelector("#navCandidates"),
   navParents: document.querySelector("#navParents"),
   navLearning: document.querySelector("#navLearning"),
+  navSupportAreas: document.querySelector("#navSupportAreas"),
   navMentorHome: document.querySelector("#navMentorHome"),
   navMentorAssignments: document.querySelector("#navMentorAssignments"),
   navMentorLearning: document.querySelector("#navMentorLearning"),
@@ -610,6 +623,7 @@ const els = {
   initialSupportPurposeInput: document.querySelector("#initialSupportPurposeInput"),
   initialSupportOutcomeInput: document.querySelector("#initialSupportOutcomeInput"),
   initialSupportDescriptionInput: document.querySelector("#initialSupportDescriptionInput"),
+  initialSupportAreaChoices: document.querySelector("#initialSupportAreaChoices"),
   cancelParentButton: document.querySelector("#cancelParentButton"),
   parentNameFact: document.querySelector("#parentNameFact"),
   parentContactFact: document.querySelector("#parentContactFact"),
@@ -622,6 +636,9 @@ const els = {
   caseTypesAdministrationView: document.querySelector("#caseTypesAdministrationView"),
   activityTypesAdministrationView: document.querySelector("#activityTypesAdministrationView"),
   supportAdministrationView: document.querySelector("#supportAdministrationView"),
+  supportAreasAdministrationView: document.querySelector("#supportAreasAdministrationView"),
+  supportAreaAdminSummary: document.querySelector("#supportAreaAdminSummary"),
+  supportAreaAdminGroups: document.querySelector("#supportAreaAdminGroups"),
   supportTicketTableBody: document.querySelector("#supportTicketTableBody"),
   supportTicketStatusFilter: document.querySelector("#supportTicketStatusFilter"),
   supportLauncher: document.querySelector("#supportLauncher"),
@@ -757,6 +774,7 @@ const els = {
   needsAnalysisFields: document.querySelector("#needsAnalysisFields"),
   needsTargetGroupInput: document.querySelector("#needsTargetGroupInput"),
   supportPurposeInput: document.querySelector("#supportPurposeInput"),
+  caseSupportAreaChoices: document.querySelector("#caseSupportAreaChoices"),
   desiredOutcomeInput: document.querySelector("#desiredOutcomeInput"),
   needsAreaInput: document.querySelector("#needsAreaInput"),
   needsLanguagesInput: document.querySelector("#needsLanguagesInput"),
@@ -1023,6 +1041,8 @@ const els = {
   editContactDetailsInput: document.querySelector("#editContactDetailsInput"),
   editInformationStatusInput: document.querySelector("#editInformationStatusInput"),
   editInterestNoteInput: document.querySelector("#editInterestNoteInput"),
+  mentorSupportAreasRead: document.querySelector("#mentorSupportAreasRead"),
+  mentorSupportAreasEdit: document.querySelector("#mentorSupportAreasEdit"),
   editAreaInput: document.querySelector("#editAreaInput"),
   editLanguagesInput: document.querySelector("#editLanguagesInput"),
   editAvailabilityInput: document.querySelector("#editAvailabilityInput"),
@@ -1290,6 +1310,7 @@ function openDatabase() {
       const supportTicketStore = ensureStore(SUPPORT_TICKETS_STORE);
       ensureIndex(supportTicketStore, "tenantCreatedAt", ["tenantId", "createdAt"]);
       ensureIndex(supportTicketStore, "tenantStatus", ["tenantId", "status"]);
+      ensureStore(TENANT_SUPPORT_AREA_SELECTION_STORE, { keyPath: ["tenantId", "supportAreaId"] });
     };
 
     request.onsuccess = () => {
@@ -1398,6 +1419,10 @@ function supportTicketTx(mode = "readonly") {
   return db.transaction(SUPPORT_TICKETS_STORE, mode).objectStore(SUPPORT_TICKETS_STORE);
 }
 
+function tenantSupportAreaSelectionTx(mode = "readonly") {
+  return db.transaction(TENANT_SUPPORT_AREA_SELECTION_STORE, mode).objectStore(TENANT_SUPPORT_AREA_SELECTION_STORE);
+}
+
 function getAllFrom(storeTx) {
   return new Promise((resolve, reject) => {
     const request = storeTx().getAll();
@@ -1466,6 +1491,9 @@ const clearPublicSupportRequests = () => clearStore(publicSupportRequestTx);
 const getAllSupportTickets = () => getAllFrom(supportTicketTx);
 const saveSupportTicket = (value) => putInto(supportTicketTx, value);
 const clearSupportTickets = () => clearStore(supportTicketTx);
+const getAllTenantSupportAreaSelections = () => getAllFrom(tenantSupportAreaSelectionTx);
+const saveTenantSupportAreaSelection = (value) => putInto(tenantSupportAreaSelectionTx, value);
+const clearTenantSupportAreaSelections = () => clearStore(tenantSupportAreaSelectionTx);
 
 function caseTypeById(id, version = null) {
   return (version ? caseTypeDefinitionVersions.find((definition) => definition.id === id && Number(definition.version) === Number(version)) : null)
@@ -1476,6 +1504,96 @@ function caseTypeById(id, version = null) {
 function caseTypeByName(name) {
   return caseTypeDefinitions.find((definition) => definition.name === name)
     || domainCaseTypeByName(name);
+}
+
+async function loadSupportAreaSelection() {
+  tenantSupportAreaSelection = (await getAllTenantSupportAreaSelections())
+    .filter((selection) => selection.tenantId === DEFAULT_TENANT_ID);
+  const knownIds = new Set(tenantSupportAreaSelection.map((selection) => selection.supportAreaId));
+  const missing = defaultTenantSupportAreaSelections(DEFAULT_TENANT_ID, CURRENT_USER_ID)
+    .filter((selection) => !knownIds.has(selection.supportAreaId));
+  if (missing.length) {
+    await Promise.all(missing.map(saveTenantSupportAreaSelection));
+    tenantSupportAreaSelection = (await getAllTenantSupportAreaSelections())
+      .filter((selection) => selection.tenantId === DEFAULT_TENANT_ID);
+  }
+}
+
+function enabledSupportAreas() {
+  return selectedSupportAreas(tenantSupportAreaSelection, "enabled");
+}
+
+function publicSupportAreas() {
+  return selectedSupportAreas(tenantSupportAreaSelection, "public");
+}
+
+function supportAreaLabels(ids) {
+  return normalizeSupportAreaIds(ids).map((id) => supportAreaById(id)?.title).filter(Boolean);
+}
+
+function renderSupportAreaChoices(host, selectedIds = [], { name = "supportArea", publicOnly = false, compact = false } = {}) {
+  if (!host) return;
+  const areas = publicOnly ? publicSupportAreas() : enabledSupportAreas();
+  const selected = new Set(normalizeSupportAreaIds(selectedIds));
+  host.innerHTML = SUPPORT_AREA_CATEGORIES.map((category) => {
+    const categoryAreas = areas.filter((area) => area.categoryId === category.id);
+    if (!categoryAreas.length) return "";
+    return `<fieldset class="support-area-choice-group"><legend>${escapeHtml(category.label)}</legend><div class="support-area-choice-list">${categoryAreas.map((area) => `<label class="support-area-choice"><input class="form-check-input" type="checkbox" name="${escapeHtml(name)}" value="${escapeHtml(area.id)}" ${selected.has(area.id) ? "checked" : ""}><span><strong>${escapeHtml(area.title)}</strong>${compact ? "" : `<small>${escapeHtml(area.publicDescription)}</small>`}</span></label>`).join("")}</div></fieldset>`;
+  }).join("");
+}
+
+function selectedSupportAreaIdsFrom(host, name = "supportArea") {
+  if (!host) return [];
+  return normalizeSupportAreaIds([...host.querySelectorAll(`input[name="${name}"]:checked`)].map((input) => input.value));
+}
+
+function normalizeMentorSupportAreas(entries) {
+  const validLevels = new Set(MENTOR_EXPERIENCE_LEVELS.map(([id]) => id));
+  return (Array.isArray(entries) ? entries : [])
+    .map((entry) => typeof entry === "string" ? { areaId: entry, experienceLevel: "practical", verified: false } : entry)
+    .filter((entry) => supportAreaById(entry.areaId))
+    .map((entry) => ({
+      areaId: entry.areaId,
+      experienceLevel: validLevels.has(entry.experienceLevel) ? entry.experienceLevel : "practical",
+      verified: Boolean(entry.verified),
+      verifiedAt: entry.verifiedAt || null,
+      verifiedBy: entry.verifiedBy || null
+    }));
+}
+
+function renderMentorSupportAreaEditor(candidate = null) {
+  if (!els.mentorSupportAreasEdit) return;
+  const selected = new Map(normalizeMentorSupportAreas(candidate?.supportAreas).map((entry) => [entry.areaId, entry]));
+  els.mentorSupportAreasEdit.innerHTML = SUPPORT_AREA_CATEGORIES.map((category) => {
+    const enabledIds = new Set(enabledSupportAreas().map((area) => area.id));
+    const areas = SUPPORT_AREAS.filter((area) => area.categoryId === category.id && (enabledIds.has(area.id) || selected.has(area.id)));
+    if (!areas.length) return "";
+    return `<fieldset class="mentor-support-area-group"><legend>${escapeHtml(category.label)}</legend>${areas.map((area) => {
+      const entry = selected.get(area.id);
+      return `<div class="mentor-support-area-row"><label><input class="form-check-input" type="checkbox" data-mentor-support-area="${escapeHtml(area.id)}" ${entry ? "checked" : ""}><span>${escapeHtml(area.title)}${enabledIds.has(area.id) ? "" : ' <small class="text-secondary">(inte längre i kommunens urval)</small>'}</span></label><select class="form-select form-select-sm" data-mentor-experience-level="${escapeHtml(area.id)}" aria-label="Erfarenhet för ${escapeHtml(area.title)}" ${entry ? "" : "disabled"}>${MENTOR_EXPERIENCE_LEVELS.map(([id, label]) => `<option value="${id}" ${entry?.experienceLevel === id ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select></div>`;
+    }).join("")}</fieldset>`;
+  }).join("");
+}
+
+function mentorSupportAreasFromEditor() {
+  if (!els.mentorSupportAreasEdit) return [];
+  const previous = new Map(normalizeMentorSupportAreas(selectedCandidate()?.supportAreas).map((entry) => [entry.areaId, entry]));
+  return [...els.mentorSupportAreasEdit.querySelectorAll("[data-mentor-support-area]:checked")].map((input) => ({
+    areaId: input.dataset.mentorSupportArea,
+    experienceLevel: els.mentorSupportAreasEdit.querySelector(`[data-mentor-experience-level="${input.dataset.mentorSupportArea}"]`)?.value || "practical",
+    verified: Boolean(previous.get(input.dataset.mentorSupportArea)?.verified),
+    verifiedAt: previous.get(input.dataset.mentorSupportArea)?.verifiedAt || null,
+    verifiedBy: previous.get(input.dataset.mentorSupportArea)?.verifiedBy || null
+  }));
+}
+
+function renderMentorSupportAreas(candidate) {
+  if (!els.mentorSupportAreasRead) return;
+  const levelLabels = Object.fromEntries(MENTOR_EXPERIENCE_LEVELS);
+  const entries = normalizeMentorSupportAreas(candidate?.supportAreas);
+  els.mentorSupportAreasRead.innerHTML = entries.length
+    ? entries.map((entry) => `<div class="support-area-fact"><strong>${escapeHtml(supportAreaById(entry.areaId)?.title || entry.areaId)}</strong><span>${escapeHtml(levelLabels[entry.experienceLevel])}${entry.verified ? " · Verifierad" : " · Egen uppgift"}</span></div>`).join("")
+    : '<p class="text-secondary mb-0">Inga erfarenhetsområden är registrerade.</p>';
 }
 
 async function loadCaseTypeDefinitions() {
@@ -1860,6 +1978,11 @@ function buildExampleDataset(count) {
       identityMethod: identityVerified ? (index % 2 === 0 ? "bankid" : "physical_id") : "",
       identityVerifiedAt: identityVerified ? now : "",
       identityVerifiedBy: identityVerified ? "Sara Lind" : "",
+      supportAreas: [
+        { areaId: SUPPORT_AREAS[index % SUPPORT_AREAS.length].id, experienceLevel: index % 3 === 0 ? "trained" : "practical", verified: index % 4 === 0 },
+        { areaId: SUPPORT_AREAS[(index + 3) % SUPPORT_AREAS.length].id, experienceLevel: "lived", verified: false },
+        { areaId: SUPPORT_AREAS[(index + 7) % SUPPORT_AREAS.length].id, experienceLevel: "practical", verified: false }
+      ],
       exampleData: true,
       exampleDataVersion: 4,
       exampleDatasetSize: count,
@@ -1886,11 +2009,11 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
   const approvedMentors = exampleCandidates.filter((candidate) => candidate.status === "Godkänd");
   const parentCount = count === 1 ? 1 : count === 10 ? 5 : 60;
   const supportExamples = [
-    ["Stöd kring skolfrånvaro", "En fungerande plan för skolnärvaro och kontakt med skolan"],
-    ["Stöd i myndighetskontakter", "Ökad förståelse för kontakter och beslut"],
-    ["Stöd kring vardagsrutiner", "Hållbara rutiner som fungerar för föräldern"],
-    ["Stöd vid etablering i området", "Ökad kännedom om lokala verksamheter och nätverk"],
-    ["Stöd i föräldrarollen", "Stärkt trygghet i vardagliga föräldrasituationer"]
+    ["Stöd kring skolfrånvaro", "En fungerande plan för skolnärvaro och kontakt med skolan", ["school-absence", "school-contact"]],
+    ["Stöd i samhällskontakter", "Ökad förståelse för kontakter och beslut", ["community-services"]],
+    ["Stöd kring vardagsrutiner", "Hållbara rutiner som fungerar för föräldern", ["everyday-routines", "npf-everyday-support"]],
+    ["Stöd att hitta lokala sammanhang", "Ökad kännedom om lokala verksamheter och nätverk", ["social-network", "community-services"]],
+    ["Stöd i föräldrarollen", "Stärkt trygghet i vardagliga föräldrasituationer", ["boundaries", "understand-behavior"]]
   ];
   const parentNames = ["Nora Mahmoud", "Emil Svensson", "Leila Hassan", "Johan Berg", "Mariam Ali", "Sofia Nilsson", "Ahmed Rahimi", "Elin Karlsson"];
   const records = {
@@ -1916,12 +2039,12 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
     const needsForParent = count > 1 && parentIndex % 4 === 0 ? 2 : 1;
     for (let needIndex = 0; needIndex < needsForParent; needIndex += 1) {
       const workflowIndex = records[CASES_STORE].filter((item) => item.caseTypeId === "parent-support").length;
-      const [supportPurpose, desiredOutcome] = supportExamples[(parentIndex + needIndex) % supportExamples.length];
+      const [supportPurpose, desiredOutcome, supportAreaIds] = supportExamples[(parentIndex + needIndex) % supportExamples.length];
       const phase = count === 1 ? 0 : workflowIndex % 5;
       const supportCaseId = crypto.randomUUID();
       const supportNumber = makeCaseNumber(supportCaseId, reserved);
       reserved.add(supportNumber);
-      const supportCase = { id: supportCaseId, tenantId: DEFAULT_TENANT_ID, number: supportNumber, caseTypeId: supportType.id, caseTypeVersion: supportType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: supportType.name, title: supportPurpose, description: `Föräldern önskar ${supportPurpose.toLowerCase()}.`, details: { supportPurpose, desiredOutcome, area: parent.area, languages: parent.languages }, mentorId: null, parentId, supportCaseId: null, sourceMatchingCaseId: null, status: "in_progress", priority: "normal", dueDate: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: null, closedBy: null, exampleData: true, exampleDataVersion: 4 };
+      const supportCase = { id: supportCaseId, tenantId: DEFAULT_TENANT_ID, number: supportNumber, caseTypeId: supportType.id, caseTypeVersion: supportType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: supportType.name, title: supportPurpose, description: `Föräldern önskar ${supportPurpose.toLowerCase()}.`, details: { supportPurpose, desiredOutcome, supportAreaIds, area: parent.area, languages: parent.languages }, mentorId: null, parentId, supportCaseId: null, sourceMatchingCaseId: null, status: "in_progress", priority: "normal", dueDate: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: null, closedBy: null, exampleData: true, exampleDataVersion: 4 };
       records[CASES_STORE].push(supportCase);
       addAssignment(supportCaseId, ownerId);
       addActivities(supportCaseId, supportType, "open");
@@ -1945,7 +2068,7 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       const assignmentNumber = makeCaseNumber(assignmentCaseId, reserved);
       reserved.add(assignmentNumber);
       const concern = phase === 4;
-      const assignmentCase = { id: assignmentCaseId, tenantId: DEFAULT_TENANT_ID, number: assignmentNumber, caseTypeId: assignmentType.id, caseTypeVersion: assignmentType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: assignmentType.name, title: `Mentoruppdrag: ${supportPurpose}`, description: desiredOutcome, details: { supportPurpose, desiredOutcome, assignmentPlan: { startDate: monthStart, endDate: `${today.slice(0, 4)}-12-31`, contactFrequency: "weekly", contactMode: "physical", firstFollowUpDate: today, followUpFrequency: "monthly", reportDeadlineDays: 3, note: "Mentorn kontaktar handläggaren vid avvikelse eller oro.", updatedAt: now, updatedBy: ownerId } }, mentorId: mentor.id, parentId, supportCaseId, sourceMatchingCaseId: matchingCaseId, status: concern ? "decision_required" : "in_progress", priority: concern ? "high" : "normal", dueDate: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: null, closedBy: null, exampleData: true, exampleDataVersion: 4 };
+      const assignmentCase = { id: assignmentCaseId, tenantId: DEFAULT_TENANT_ID, number: assignmentNumber, caseTypeId: assignmentType.id, caseTypeVersion: assignmentType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: assignmentType.name, title: `Mentoruppdrag: ${supportPurpose}`, description: desiredOutcome, details: { supportPurpose, desiredOutcome, supportAreaIds: [...supportAreaIds], assignmentPlan: { startDate: monthStart, endDate: `${today.slice(0, 4)}-12-31`, contactFrequency: "weekly", contactMode: "physical", firstFollowUpDate: today, followUpFrequency: "monthly", reportDeadlineDays: 3, note: "Mentorn kontaktar handläggaren vid avvikelse eller oro.", updatedAt: now, updatedBy: ownerId } }, mentorId: mentor.id, parentId, supportCaseId, sourceMatchingCaseId: matchingCaseId, status: concern ? "decision_required" : "in_progress", priority: concern ? "high" : "normal", dueDate: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: null, closedBy: null, exampleData: true, exampleDataVersion: 4 };
       records[CASES_STORE].push(assignmentCase);
       addAssignment(assignmentCaseId, ownerId);
       addActivities(assignmentCaseId, assignmentType, "open");
@@ -2470,6 +2593,7 @@ async function ensureCertificationCases() {
 
 async function refresh() {
   const refreshStartedAt = Date.now();
+  await loadSupportAreaSelection();
   await loadCaseTypeDefinitions();
   await loadActivityTemplateDefinitions();
   handlers = await getAllHandlers();
@@ -2889,7 +3013,8 @@ function renderMentorProfile() {
   const mentor = currentMentorUser();
   if (!mentor) return renderMentorHome();
   const owner = handlers.find((handler) => handler.id === mentor.coordinatorId);
-  els.mentorPortalView.innerHTML = `<section class="card mentor-profile-card"><div class="card-header record-header bg-white"><div class="record-type">Mentorprofil</div><h2 class="h5 mb-1">${escapeHtml(mentor.name)}</h2><p class="text-secondary mb-0">De uppgifter kommunen använder vid matchning och kontakt.</p></div><div class="card-body"><dl class="mentor-profile-facts"><div><dt>Kontaktuppgift</dt><dd>${escapeHtml(mentor.contact || "Ej angivet")}</dd></div><div><dt>Område</dt><dd>${escapeHtml(mentor.area || "Ej angivet")}</dd></div><div><dt>Språk</dt><dd>${escapeHtml(mentor.languages || "Ej angivet")}</dd></div><div><dt>Tillgänglighet</dt><dd>${escapeHtml(mentor.availability || "Ej angivet")}</dd></div><div><dt>Status</dt><dd><span class="${statusClass(mentor)}">${escapeHtml(mentor.status)}</span></dd></div><div><dt>Kontaktperson</dt><dd>${escapeHtml(owner?.name || mentor.coordinator || "Ej tilldelad")}</dd></div></dl><div class="alert alert-light border mb-0"><strong>Behöver något ändras?</strong><p class="mb-0 mt-1">Kontakta din handläggare. Känsliga register- och identitetsuppgifter visas inte i mentorportalen.</p></div></div></section>`;
+  const experienceAreas = normalizeMentorSupportAreas(mentor.supportAreas);
+  els.mentorPortalView.innerHTML = `<section class="card mentor-profile-card"><div class="card-header record-header bg-white"><div class="record-type">Mentorprofil</div><h2 class="h5 mb-1">${escapeHtml(mentor.name)}</h2><p class="text-secondary mb-0">De uppgifter kommunen använder vid matchning och kontakt.</p></div><div class="card-body"><dl class="mentor-profile-facts"><div><dt>Kontaktuppgift</dt><dd>${escapeHtml(mentor.contactDetails || mentor.contact || "Ej angivet")}</dd></div><div><dt>Område</dt><dd>${escapeHtml(mentor.area || "Ej angivet")}</dd></div><div><dt>Språk</dt><dd>${escapeHtml(mentor.languages || "Ej angivet")}</dd></div><div><dt>Tillgänglighet</dt><dd>${escapeHtml(mentor.availability || "Ej angivet")}</dd></div><div><dt>Status</dt><dd><span class="${statusClass(mentor)}">${escapeHtml(mentor.status)}</span></dd></div><div><dt>Kontaktperson</dt><dd>${escapeHtml(owner?.name || mentor.coordinator || "Ej tilldelad")}</dd></div></dl><section class="record-section mt-4"><h3 class="record-section-title">Mina erfarenhetsområden</h3><p class="small text-secondary">Uppgifterna används som underlag när kommunen bedömer en möjlig matchning.</p><div class="support-area-facts">${experienceAreas.length ? experienceAreas.map((entry) => `<div class="support-area-fact"><strong>${escapeHtml(supportAreaById(entry.areaId)?.title || entry.areaId)}</strong><span>${escapeHtml(Object.fromEntries(MENTOR_EXPERIENCE_LEVELS)[entry.experienceLevel] || "Erfarenhet registrerad")}</span></div>`).join("") : '<p class="text-secondary mb-0">Inga erfarenhetsområden är registrerade.</p>'}</div></section><div class="alert alert-light border mt-4 mb-0"><strong>Behöver något ändras?</strong><p class="mb-0 mt-1">Kontakta din handläggare. Känsliga register- och identitetsuppgifter visas inte i mentorportalen.</p></div></div></section>`;
 }
 
 function renderMentorPortal() {
@@ -2913,10 +3038,11 @@ function renderPublicHome() {
 function renderPublicSupport() {
   const receipt = publicSupportRequests.find((request) => request.id === lastPublicSupportRequestId);
   if (receipt) {
-    els.publicPortalView.innerHTML = `<section class="card public-support-confirmation"><div class="card-body"><div class="public-confirmation-mark" aria-hidden="true">✓</div><div class="record-type">Förfrågan registrerad</div><h2 class="h4">Tack, ${escapeHtml(receipt.name)}</h2><p>Förfrågan är registrerad med ${escapeHtml(receipt.contactMethod === "phone" ? "telefon" : "e-post")} som önskad kontaktväg.</p><div class="alert alert-warning mt-3">I prototypmiljön sparas förfrågan endast lokalt i den här webbläsaren och skickas inte till kommunen.</div><dl><div><dt>Referens</dt><dd>${escapeHtml(receipt.reference)}</dd></div><div><dt>Registrerad</dt><dd>${escapeHtml(formatDateTime(receipt.createdAt))}</dd></div></dl><p class="small text-secondary">Skicka inte känsliga uppgifter i en ny förfrågan.</p><div class="d-flex flex-wrap gap-2"><button type="button" class="btn btn-outline-primary" data-new-public-support>Skicka en ny förfrågan</button><a class="btn btn-primary" href="#/public-home">Till startsidan</a></div></div></section>`;
+    els.publicPortalView.innerHTML = `<section class="card public-support-confirmation"><div class="card-body"><div class="public-confirmation-mark" aria-hidden="true">✓</div><div class="record-type">Förfrågan registrerad</div><h2 class="h4">Tack, ${escapeHtml(receipt.name)}</h2><p>Förfrågan är registrerad med ${escapeHtml(receipt.contactMethod === "phone" ? "telefon" : "e-post")} som önskad kontaktväg.</p><dl><div><dt>Valda stödområden</dt><dd>${escapeHtml(supportAreaLabels(receipt.supportAreaIds).join(", ") || (receipt.supportAreaUncertain ? "Behöver preciseras tillsammans med kommunen" : "Inga valda"))}</dd></div></dl><div class="alert alert-warning mt-3">I prototypmiljön sparas förfrågan endast lokalt i den här webbläsaren och skickas inte till kommunen.</div><dl><div><dt>Referens</dt><dd>${escapeHtml(receipt.reference)}</dd></div><div><dt>Registrerad</dt><dd>${escapeHtml(formatDateTime(receipt.createdAt))}</dd></div></dl><p class="small text-secondary">Skicka inte känsliga uppgifter i en ny förfrågan.</p><div class="d-flex flex-wrap gap-2"><button type="button" class="btn btn-outline-primary" data-new-public-support>Skicka en ny förfrågan</button><a class="btn btn-primary" href="#/public-home">Till startsidan</a></div></div></section>`;
     return;
   }
-  els.publicPortalView.innerHTML = `<section class="card public-support-card"><div class="card-header bg-white"><div class="record-type">Förfrågan om stöd</div><h2 class="h5 mb-1">Berätta kort hur kommunen kan hjälpa dig</h2><p class="text-secondary mb-0">Fyll bara i det som behövs för att kommunen ska kunna kontakta dig. Du får beskriva behovet närmare tillsammans med en handläggare.</p></div><form id="publicSupportForm" class="card-body public-support-form"><div><label class="form-label" for="publicSupportName">Namn</label><input id="publicSupportName" name="name" class="form-control" autocomplete="name" required></div><div><label class="form-label" for="publicSupportContactMethod">Jag vill bli kontaktad via</label><select id="publicSupportContactMethod" name="contactMethod" class="form-select"><option value="phone">Telefon</option><option value="email">E-post</option></select></div><div><label class="form-label" for="publicSupportContact">Telefonnummer eller e-post</label><input id="publicSupportContact" name="contact" class="form-control" autocomplete="tel" required></div><div><label class="form-label" for="publicSupportArea">Område eller stadsdel <span class="text-secondary">(valfritt)</span></label><input id="publicSupportArea" name="area" class="form-control"></div><div class="public-support-description"><label class="form-label" for="publicSupportDescription">Vad vill du ha hjälp med?</label><textarea id="publicSupportDescription" name="description" class="form-control" rows="4" maxlength="1000" required></textarea><div class="form-text">Beskriv situationen kort. Ange inte personnummer, journaluppgifter eller andra känsliga uppgifter.</div></div><div class="public-support-description"><label class="form-label" for="publicSupportAvailability">När passar det att kommunen kontaktar dig? <span class="text-secondary">(valfritt)</span></label><input id="publicSupportAvailability" name="availability" class="form-control" placeholder="Till exempel vardagar efter klockan 15"></div><div class="form-check public-support-consent"><input id="publicSupportConsent" name="consent" class="form-check-input" type="checkbox" required><label class="form-check-label" for="publicSupportConsent">Jag förstår att detta är en förfrågan och att kommunen kontaktar mig innan något stöd eller uppdrag startar.</label></div><div class="public-support-actions"><a class="btn btn-outline-secondary" href="#/public-home">Avbryt</a><button type="submit" class="btn btn-primary">Skicka förfrågan</button></div></form></section>`;
+  els.publicPortalView.innerHTML = `<section class="card public-support-card"><div class="card-header bg-white"><div class="record-type">Förfrågan om stöd</div><h2 class="h5 mb-1">Berätta kort hur kommunen kan hjälpa dig</h2><p class="text-secondary mb-0">Fyll bara i det som behövs för att kommunen ska kunna kontakta dig. Du får beskriva behovet närmare tillsammans med en handläggare.</p></div><form id="publicSupportForm" class="card-body public-support-form"><div><label class="form-label" for="publicSupportName">Namn</label><input id="publicSupportName" name="name" class="form-control" autocomplete="name" required></div><div><label class="form-label" for="publicSupportContactMethod">Jag vill bli kontaktad via</label><select id="publicSupportContactMethod" name="contactMethod" class="form-select"><option value="phone">Telefon</option><option value="email">E-post</option></select></div><div><label class="form-label" for="publicSupportContact">Telefonnummer eller e-post</label><input id="publicSupportContact" name="contact" class="form-control" autocomplete="tel" required></div><div><label class="form-label" for="publicSupportArea">Område eller stadsdel <span class="text-secondary">(valfritt)</span></label><input id="publicSupportArea" name="area" class="form-control"></div><div class="public-support-description"><label class="form-label mb-1">Vad vill du ha stöd med?</label><p class="form-text mt-0">Välj gärna flera områden. Du behöver inte ha en diagnos eller veta exakt vilket stöd som passar.</p><div id="publicSupportAreaChoices" class="support-area-choices public-support-area-choices"></div><label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="supportAreaUncertain" value="yes"><span class="form-check-label">Jag vet inte ännu och vill prata med kommunen</span></label></div><div class="public-support-description"><label class="form-label" for="publicSupportDescription">Beskriv kort vad du vill ha hjälp med</label><textarea id="publicSupportDescription" name="description" class="form-control" rows="4" maxlength="1000" required></textarea><div class="form-text">Ange inte personnummer, journaluppgifter eller andra känsliga uppgifter.</div></div><div class="public-support-description"><label class="form-label" for="publicSupportAvailability">När passar det att kommunen kontaktar dig? <span class="text-secondary">(valfritt)</span></label><input id="publicSupportAvailability" name="availability" class="form-control" placeholder="Till exempel vardagar efter klockan 15"></div><div class="form-check public-support-consent"><input id="publicSupportConsent" name="consent" class="form-check-input" type="checkbox" required><label class="form-check-label" for="publicSupportConsent">Jag förstår att detta är en förfrågan och att kommunen kontaktar mig innan något stöd eller uppdrag startar.</label></div><div class="public-support-actions"><a class="btn btn-outline-secondary" href="#/public-home">Avbryt</a><button type="submit" class="btn btn-primary">Skicka förfrågan</button></div></form></section>`;
+  renderSupportAreaChoices(els.publicPortalView.querySelector("#publicSupportAreaChoices"), [], { name: "publicSupportArea", publicOnly: true });
 }
 
 function renderPublicLearning() {
@@ -3055,6 +3181,20 @@ function renderSupportAdministration() {
   }
 }
 
+function renderSupportAreaAdministration() {
+  const selectionById = new Map(tenantSupportAreaSelection.map((selection) => [selection.supportAreaId, selection]));
+  const enabledCount = tenantSupportAreaSelection.filter((selection) => selection.enabled).length;
+  const publicCount = tenantSupportAreaSelection.filter((selection) => selection.enabled && selection.public).length;
+  els.supportAreaAdminSummary.textContent = `${enabledCount} används · ${publicCount} visas publikt`;
+  els.supportAreaAdminGroups.innerHTML = SUPPORT_AREA_CATEGORIES.map((category) => {
+    const areas = SUPPORT_AREAS.filter((area) => area.categoryId === category.id);
+    return `<section class="support-area-admin-group"><header><h3>${escapeHtml(category.label)}</h3><span>${areas.length} områden</span></header><div class="support-area-admin-list">${areas.map((area) => {
+      const selection = selectionById.get(area.id) || {};
+      return `<article class="support-area-admin-row"><div class="support-area-admin-description"><strong>${escapeHtml(area.title)}</strong><p>${escapeHtml(area.publicDescription)}</p><small>${escapeHtml(area.scopeNote)}</small></div><div class="support-area-admin-controls"><label class="form-check form-switch"><input class="form-check-input" type="checkbox" data-support-area-enabled="${escapeHtml(area.id)}" ${selection.enabled ? "checked" : ""}><span class="form-check-label">Används av kommunen</span></label><label class="form-check form-switch"><input class="form-check-input" type="checkbox" data-support-area-public="${escapeHtml(area.id)}" ${selection.public ? "checked" : ""} ${selection.enabled ? "" : "disabled"}><span class="form-check-label">Visas för föräldrar</span></label></div></article>`;
+    }).join("")}</div></section>`;
+  }).join("");
+}
+
 function renderAll() {
   const renderStartedAt = Date.now();
   applyRoute();
@@ -3073,6 +3213,7 @@ function renderAll() {
     administration: renderHandlers,
     "case-types": renderCaseTypeAdministration,
     "activity-types": renderActivityTypeAdministration,
+    "support-areas": renderSupportAreaAdministration,
     "learning-admin": renderLearningAdministration,
     "support-admin": renderSupportAdministration,
     "mentor-home": renderMentorPortal,
@@ -3245,6 +3386,7 @@ function normalizeCandidate(candidate, index = 0) {
     },
     personalNumber,
     identityMethod,
+    supportAreas: normalizeMentorSupportAreas(candidate.supportAreas),
     createdBy,
     updatedBy: actorId(candidate.updatedBy || createdBy),
     identityVerifiedAt: identityVerified ? candidate.identityVerifiedAt || candidate.updatedAt || candidate.createdAt : "",
@@ -3730,7 +3872,7 @@ function applyRoute() {
     route = { view: "dashboard", id: null };
   }
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-types", "activity-types", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
   selectedId = currentView === "mentor" ? route.id : selectedId;
   selectedParentId = currentView === "parent" ? route.id : selectedParentId;
   if (currentView !== "parent") parentEditMode = false;
@@ -3764,6 +3906,7 @@ function applyRoute() {
   els.administrationView.hidden = currentView !== "administration";
   els.caseTypesAdministrationView.hidden = currentView !== "case-types";
   els.activityTypesAdministrationView.hidden = currentView !== "activity-types";
+  els.supportAreasAdministrationView.hidden = currentView !== "support-areas";
   els.learningAdministrationView.hidden = currentView !== "learning-admin";
   els.supportAdministrationView.hidden = currentView !== "support-admin";
   els.routinesView.hidden = currentView !== "routines";
@@ -3800,10 +3943,11 @@ function applyRoute() {
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
   els.navParents.classList.toggle("active", currentView === "parents" || currentView === "parent");
   els.navLearning.classList.toggle("active", currentView === "learning");
-  els.navAdministration.classList.toggle("active", ["administration", "case-types", "activity-types", "learning-admin", "support-admin", "routines", "handler"].includes(currentView));
+  els.navAdministration.classList.toggle("active", ["administration", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "routines", "handler"].includes(currentView));
   els.navHandlers.classList.toggle("active", currentView === "administration" || currentView === "handler");
   els.navCaseTypes.classList.toggle("active", currentView === "case-types");
   els.navActivityTypes.classList.toggle("active", currentView === "activity-types");
+  els.navSupportAreas.classList.toggle("active", currentView === "support-areas");
   els.navLearningAdmin.classList.toggle("active", currentView === "learning-admin");
   els.navSupportAdmin.classList.toggle("active", currentView === "support-admin");
   els.navRoutines.classList.toggle("active", currentView === "routines");
@@ -3877,6 +4021,9 @@ function applyRoute() {
   } else if (currentView === "activity-types") {
     els.pageTitle.textContent = route.id ? "Aktivitetsmall" : "Aktivitetsmallar";
     els.breadcrumb.textContent = route.id ? "Start / Systemadministration / Aktivitetsmallar / Aktivitetsmall" : "Start / Systemadministration / Aktivitetsmallar";
+  } else if (currentView === "support-areas") {
+    els.pageTitle.textContent = "Stödområden";
+    els.breadcrumb.textContent = "Start / Systemadministration / Stödområden";
   } else if (currentView === "learning-admin") {
     els.pageTitle.textContent = route.id ? "Utbildningsinnehåll" : "Utbildningsbibliotek";
     els.breadcrumb.textContent = route.id ? "Start / Systemadministration / Utbildningsinnehåll / Innehåll" : "Start / Systemadministration / Utbildningsinnehåll";
@@ -4234,6 +4381,7 @@ function renderParentDetail() {
     els.parentAreaInput.value = parent?.area || "";
     els.parentLanguagesInput.value = parent?.languages || "";
     els.parentAvailabilityInput.value = parent?.availability || "";
+    renderSupportAreaChoices(els.initialSupportAreaChoices, [], { name: "initialSupportArea" });
     els.parentForm.dataset.route = routeKey;
   }
   if (creating) return;
@@ -4521,6 +4669,9 @@ function renderCaseTypeGuidance(caseRecord = null) {
   const needsAnalysis = caseType?.id === "needs-analysis";
   const detailFields = configuredDetailFields(caseType);
   els.needsAnalysisFields.hidden = detailFields.length === 0;
+  const supportAreaField = els.caseSupportAreaChoices?.closest("#caseSupportAreaField");
+  if (supportAreaField) supportAreaField.hidden = caseType?.id !== "parent-support";
+  renderSupportAreaChoices(els.caseSupportAreaChoices, caseRecord?.details?.supportAreaIds || [], { name: "caseSupportArea" });
   for (const field of CASE_DETAIL_FIELD_DEFINITIONS) {
     const input = caseDetailInput(field.id);
     if (!input) continue;
@@ -4559,7 +4710,9 @@ function renderCaseTypeDetails(caseRecord) {
   const details = caseRecord.details || {};
   const caseType = caseTypeById(caseRecord.caseTypeId, caseRecord.caseTypeVersion);
   const detailFields = configuredDetailFields(caseType);
-  if (!detailFields.length) {
+  const supportCase = caseRecord.caseTypeId === "parent-support" ? caseRecord : cases.find((item) => item.id === caseRecord.supportCaseId);
+  const supportAreaIds = normalizeSupportAreaIds(supportCase?.details?.supportAreaIds);
+  if (!detailFields.length && !supportAreaIds.length && !["parent-support", "matching"].includes(caseRecord.caseTypeId)) {
     els.caseTypeDetailsSection.hidden = true;
     els.caseTypeDetailsFacts.innerHTML = "";
     return;
@@ -4571,6 +4724,14 @@ function renderCaseTypeDetails(caseRecord) {
       : field.inputType === "date" && rawValue ? formatDate(rawValue) : rawValue;
     return [field.label, value];
   });
+  if (supportCase?.caseTypeId === "parent-support") {
+    facts.push(["Stödområden", supportAreaIds.length ? supportAreaLabels(supportAreaIds).join(", ") : "Behöver bekräftas före matchning"]);
+  }
+  if (caseRecord.caseTypeId === "matching" && caseRecord.mentorId) {
+    const mentor = caseMentor(caseRecord);
+    const overlap = supportAreaOverlap(supportAreaIds, mentor?.supportAreas);
+    facts.push(["Överlappning med mentor", overlap.length ? overlap.map((area) => area.title).join(", ") : "Ingen registrerad överlappning – handläggaren behöver bedöma matchningen"]);
+  }
   els.caseTypeDetailsSection.hidden = false;
   els.caseTypeDetailsTitle.textContent = caseRecord.caseTypeId === "needs-analysis" ? "Behovets omfattning" : "Kompletterande uppgifter";
   els.caseTypeDetailsFacts.innerHTML = facts
@@ -5861,6 +6022,7 @@ function renderDetail() {
   els.languageFact.textContent = candidate.languages || "Ej angivet";
   els.availabilityFact.textContent = candidate.availability || "Ej angivet";
   els.areaFact.textContent = candidate.area || "Ej angivet";
+  renderMentorSupportAreas(candidate);
   els.statusFact.textContent = candidate.status;
   els.coordinatorFact.textContent = candidate.coordinator || "Ej tilldelad";
   const identitySummary = candidate.checks?.identityVerified
@@ -6020,6 +6182,7 @@ function renderNewCandidateDetail() {
   els.editAreaInput.value = "";
   els.editLanguagesInput.value = "";
   els.editAvailabilityInput.value = "";
+  renderMentorSupportAreaEditor();
   els.statusSelect.innerHTML = "";
   const statusOption = document.createElement("option");
   statusOption.value = "Anmäld";
@@ -6112,6 +6275,7 @@ function setPersonEditMode(editing) {
     els.editAreaInput.value = candidate.area || "";
     els.editLanguagesInput.value = candidate.languages || "";
     els.editAvailabilityInput.value = candidate.availability || "";
+    renderMentorSupportAreaEditor(candidate);
     els.statusSelect.value = candidate.status || STATUSES[0];
     els.coordinatorInput.value = candidate.coordinatorId || "";
   }
@@ -7033,6 +7197,7 @@ function newCandidateFromEditor() {
     area: els.editAreaInput.value.trim(),
     languages: els.editLanguagesInput.value.trim(),
     availability: els.editAvailabilityInput.value.trim(),
+    supportAreas: mentorSupportAreasFromEditor(),
     coordinatorId: coordinator?.id || "",
     coordinator: coordinator?.name || "",
     status: "Anmäld",
@@ -7272,6 +7437,8 @@ els.publicPortalView.addEventListener("submit", async (event) => {
     contact: String(formData.get("contact") || "").trim(),
     area: String(formData.get("area") || "").trim(),
     description: String(formData.get("description") || "").trim(),
+    supportAreaIds: normalizeSupportAreaIds(formData.getAll("publicSupportArea")),
+    supportAreaUncertain: formData.get("supportAreaUncertain") === "yes",
     availability: String(formData.get("availability") || "").trim(),
     status: "received",
     createdAt: now,
@@ -7537,7 +7704,7 @@ els.parentForm.addEventListener("submit", async (event) => {
       id: supportCaseId, tenantId: DEFAULT_TENANT_ID, number: makeCaseNumber(supportCaseId, new Set(cases.map((item) => item.number))),
       caseTypeId: caseType.id, caseTypeVersion: caseType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID,
       type: caseType.name, title: els.initialSupportPurposeInput.value.trim(), description: els.initialSupportDescriptionInput.value.trim(),
-      details: { supportPurpose: els.initialSupportPurposeInput.value.trim(), desiredOutcome: els.initialSupportOutcomeInput.value.trim(), area: parent.area || null, languages: parent.languages || null },
+      details: { supportPurpose: els.initialSupportPurposeInput.value.trim(), desiredOutcome: els.initialSupportOutcomeInput.value.trim(), supportAreaIds: selectedSupportAreaIdsFrom(els.initialSupportAreaChoices, "initialSupportArea"), supportAreaStatus: selectedSupportAreaIdsFrom(els.initialSupportAreaChoices, "initialSupportArea").length ? "confirmed" : "to_confirm", area: parent.area || null, languages: parent.languages || null },
       mentorId: null, parentId, supportCaseId: null, sourceMatchingCaseId: null, status: "new", priority: "normal", dueDate: null,
       version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, closedAt: null, closedBy: null
     };
@@ -7615,7 +7782,7 @@ els.matchingOutcomeForm.addEventListener("submit", async (event) => {
       if (!createAssignment) return { caseId: currentCase.id, version: updated.version };
       createdAssignmentId = crypto.randomUUID();
       const assignmentType = caseTypeById("mentor-assignment");
-      const assignmentCase = { id: createdAssignmentId, tenantId: DEFAULT_TENANT_ID, number: makeCaseNumber(createdAssignmentId, new Set(cases.map((item) => item.number))), caseTypeId: assignmentType.id, caseTypeVersion: assignmentType.version, organizationUnitId: currentCase.organizationUnitId, type: assignmentType.name, title: `Mentoruppdrag: ${supportCase?.details?.supportPurpose || supportCase?.title || currentCase.title}`, description: supportCase?.details?.desiredOutcome || currentCase.description, details: { supportPurpose: supportCase?.details?.supportPurpose || null, desiredOutcome: supportCase?.details?.desiredOutcome || null }, mentorId: currentCase.mentorId, parentId: currentCase.parentId, supportCaseId: currentCase.supportCaseId, sourceMatchingCaseId: currentCase.id, status: "new", priority: currentCase.priority || "normal", dueDate: null, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, closedAt: null, closedBy: null };
+      const assignmentCase = { id: createdAssignmentId, tenantId: DEFAULT_TENANT_ID, number: makeCaseNumber(createdAssignmentId, new Set(cases.map((item) => item.number))), caseTypeId: assignmentType.id, caseTypeVersion: assignmentType.version, organizationUnitId: currentCase.organizationUnitId, type: assignmentType.name, title: `Mentoruppdrag: ${supportCase?.details?.supportPurpose || supportCase?.title || currentCase.title}`, description: supportCase?.details?.desiredOutcome || currentCase.description, details: { supportPurpose: supportCase?.details?.supportPurpose || null, desiredOutcome: supportCase?.details?.desiredOutcome || null, supportAreaIds: normalizeSupportAreaIds(supportCase?.details?.supportAreaIds) }, mentorId: currentCase.mentorId, parentId: currentCase.parentId, supportCaseId: currentCase.supportCaseId, sourceMatchingCaseId: currentCase.id, status: "new", priority: currentCase.priority || "normal", dueDate: null, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, closedAt: null, closedBy: null };
       put(CASES_STORE, assignmentCase);
       put(CASE_ASSIGNMENTS_STORE, { id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: createdAssignmentId, handlerId: ownerId, role: "responsible", version: 1, assignedAt: now, assignedBy: CURRENT_USER_ID, endedAt: null, endedBy: null });
       for (const [sortOrder, title] of (assignmentType.suggestedActivities || []).entries()) {
@@ -7945,12 +8112,14 @@ els.caseMentorInput.addEventListener("input", () => {
   const mentor = candidates.find((candidate) => candidate.name.localeCompare(value, "sv", { sensitivity: "base" }) === 0);
   els.caseMentorIdInput.value = mentor?.id || "";
   els.caseMentorInput.setCustomValidity("");
+  const supportCase = cases.find((item) => item.id === els.caseSupportCaseInput.value && item.caseTypeId === "parent-support");
+  const supportAreaIds = normalizeSupportAreaIds(supportCase?.details?.supportAreaIds);
   const matches = value.length < 2
     ? []
     : candidates
       .filter((candidate) => !["matching", "mentor-assignment"].includes(els.caseTypeInput.value) || (candidate.status === "Godkänd" && candidate.active !== false))
       .filter((candidate) => candidate.name.toLocaleLowerCase("sv-SE").includes(value.toLocaleLowerCase("sv-SE")))
-      .sort((a, b) => a.name.localeCompare(b.name, "sv"))
+      .sort((a, b) => supportAreaOverlap(supportAreaIds, b.supportAreas).length - supportAreaOverlap(supportAreaIds, a.supportAreas).length || a.name.localeCompare(b.name, "sv"))
       .slice(0, 8);
   els.caseMentorSuggestions.innerHTML = "";
   els.caseMentorSuggestions.hidden = matches.length === 0 || Boolean(mentor);
@@ -7959,7 +8128,8 @@ els.caseMentorInput.addEventListener("input", () => {
     button.type = "button";
     button.className = "list-group-item list-group-item-action";
     button.dataset.selectCaseMentor = candidate.id;
-    button.textContent = candidate.name;
+    const overlap = supportAreaOverlap(supportAreaIds, candidate.supportAreas);
+    button.innerHTML = `<span class="d-block fw-semibold">${escapeHtml(candidate.name)}</span><small class="text-secondary">${supportAreaIds.length ? overlap.length ? `${overlap.length} matchande stödområden: ${escapeHtml(overlap.map((area) => area.title).join(", "))}` : "Ingen registrerad överlappning" : "Stödområden behöver anges i stödärendet"}</small>`;
     els.caseMentorSuggestions.append(button);
   }
   renderRegistrationTargets();
@@ -8191,6 +8361,10 @@ async function submitCaseForm(event) {
     configuredDetails[field.id] = field.inputType === "number"
       ? (value ? Number(value) : null)
       : (value.trim?.() || value || null);
+  }
+  if (caseType.id === "parent-support") {
+    configuredDetails.supportAreaIds = selectedSupportAreaIdsFrom(els.caseSupportAreaChoices, "caseSupportArea");
+    configuredDetails.supportAreaStatus = configuredDetails.supportAreaIds.length ? "confirmed" : "to_confirm";
   }
   await executeCaseCommand({
     commandType: existingCase ? "update_case" : "quick_register_case",
@@ -9078,7 +9252,8 @@ els.personEditForm.addEventListener("submit", async (event) => {
     interestNote: els.editInterestNoteInput.value.trim(),
     area: els.editAreaInput.value.trim(),
     languages: els.editLanguagesInput.value.trim(),
-    availability: els.editAvailabilityInput.value.trim()
+    availability: els.editAvailabilityInput.value.trim(),
+    supportAreas: mentorSupportAreasFromEditor()
   };
   const certificationCase = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
   await updateMentorProfileCommand({ candidate, caseRecord: certificationCase, profilePatch, coordinatorId: coordinator?.id || "" });
@@ -9091,6 +9266,12 @@ els.editNameInput.addEventListener("input", () => {
   if (!isCreatingMentor()) return;
   els.mentorEditorDuplicatePanel.dataset.choice = "";
   renderMentorEditorDuplicateCheck();
+});
+els.mentorSupportAreasEdit.addEventListener("change", (event) => {
+  const input = event.target.closest("[data-mentor-support-area]");
+  if (!input) return;
+  const levelInput = els.mentorSupportAreasEdit.querySelector(`[data-mentor-experience-level="${input.dataset.mentorSupportArea}"]`);
+  if (levelInput) levelInput.disabled = !input.checked;
 });
 els.mentorEditorDuplicatePanel.addEventListener("click", (event) => {
   if (!event.target.closest("[data-create-editor-duplicate]")) return;
@@ -9330,7 +9511,7 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
 els.resetButton.addEventListener("click", async () => {
   const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata? Mentorärenden tas bort och grundhandläggarna återställs. Åtgärden kan inte ångras.");
   if (!confirmed) return;
-  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests(), clearSupportTickets()]);
+  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests(), clearSupportTickets(), clearTenantSupportAreaSelections()]);
   await ensureDefaultHandlers();
   selectedId = null;
   markSaved();
@@ -9423,6 +9604,26 @@ els.learningAdministrationView.addEventListener("change", async (event) => {
   await updateTenantLearningSelection(selectionInput.dataset.learningSelection, selectionInput.checked);
   markSaved();
   showFeedback("Kommunens utbildningsurval har uppdaterats.");
+  await refresh();
+});
+
+els.supportAreasAdministrationView.addEventListener("change", async (event) => {
+  const enabledInput = event.target.closest("[data-support-area-enabled]");
+  const publicInput = event.target.closest("[data-support-area-public]");
+  if (!enabledInput && !publicInput) return;
+  const areaId = enabledInput?.dataset.supportAreaEnabled || publicInput?.dataset.supportAreaPublic;
+  const existing = tenantSupportAreaSelection.find((selection) => selection.supportAreaId === areaId);
+  if (!existing) return;
+  const enabled = enabledInput ? enabledInput.checked : existing.enabled;
+  await saveTenantSupportAreaSelection({
+    ...existing,
+    enabled,
+    public: enabled ? (publicInput ? publicInput.checked : existing.public) : false,
+    updatedAt: new Date().toISOString(),
+    updatedBy: CURRENT_USER_ID
+  });
+  markSaved();
+  showFeedback("Kommunens urval av stödområden har uppdaterats.");
   await refresh();
 });
 

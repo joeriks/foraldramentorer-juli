@@ -10,6 +10,7 @@ export const FEATURE_LINKS = Object.freeze({
   "admin.handlers": Object.freeze({ href: "#/administration" }),
   "admin.case-types": Object.freeze({ href: "#/case-types" }),
   "admin.activity-types": Object.freeze({ href: "#/activity-types" }),
+  "admin.support-areas": Object.freeze({ href: "#/support-areas" }),
   "learning.library": Object.freeze({ href: "#/learning" }),
   "admin.learning": Object.freeze({ href: "#/learning-admin" }),
   "public.home": Object.freeze({ href: "#/public-home" }),

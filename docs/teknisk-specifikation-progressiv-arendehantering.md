@@ -110,6 +110,7 @@ interface CaseRecord {
   parentId: string | null;
   supportCaseId: string | null;
   sourceMatchingCaseId: string | null;
+  details: Record<string, unknown>;
   status: CaseStatus;
   priority: "low" | "normal" | "high";
   dueDate: string | null;
@@ -202,6 +203,47 @@ interface CaseTypeRelationshipDefinition {
   systemManaged: boolean;
 }
 ```
+
+### 4.1.1 Stödområden och matchningsunderlag
+
+Stödområden är en versionsstyrd referensdomän som återanvänds i stödärenden, mentorprofiler och matchning. Tekniska ID:n är globala och stabila. Kommunen kan välja ur katalogen men får inte skapa lokala fritext-ID:n som gör data inkompatibla mellan kommuner.
+
+```ts
+interface SupportAreaDefinition {
+  id: string;
+  catalogVersion: number;
+  categoryId: string;
+  title: string;
+  publicDescription: string;
+  scopeNote: string;
+  status: "published" | "retired";
+}
+
+interface TenantSupportAreaSelection {
+  tenantId: string;
+  supportAreaId: string;
+  enabled: boolean;
+  public: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+interface MentorSupportArea {
+  tenantId: string;
+  mentorId: string;
+  supportAreaId: string;
+  experienceLevel: "lived" | "practical" | "trained";
+  verified: boolean;
+  verifiedAt: string | null;
+  verifiedBy: string | null;
+}
+```
+
+`CaseRecord.details.supportAreaIds` innehåller valda områden för ett stödärende. Om området ännu inte är känt används inga påhittade standardvärden; ärendet markeras för komplettering. När ett mentoruppdrag skapas kopieras områdena som en ögonblicksbild till uppdragets detaljer, medan uppdraget samtidigt behåller sin oföränderliga referens till stödärendet.
+
+Matchningsläsmodellen får beräkna mängden gemensamma områden och använda antalet för sortering. Den får inte automatiskt acceptera eller neka en matchning. Godkännandestatus, tillgänglighet och behörighet är hårda filter. Stödområden, språk, geografi, erfarenhetsnivå och parternas önskemål är beslutsunderlag som visas öppet för handläggaren.
+
+Ett inaktiverat eller pensionerat område döljs i nya registreringar men ska fortfarande kunna läsas i historiska poster. En betydelseförändring får därför inte genomföras genom att återanvända samma ID för ett annat begrepp.
 
 Administrationsvyn ska skilja på kommunens valbara nästa ärendetyp och systemstyrda relationer. Kommunens val får vara högst en föreslagen efterföljare per ärendetyp och får inte skapa en cykel. En systemstyrd relation får visas men inte ändras genom den förenklade administrationsvyn.
 
@@ -405,6 +447,9 @@ Följande regler ska gälla oavsett gränssnitt eller lagringsteknik:
 4. Ärendenummer allokeras atomärt inom en tenant och återanvänds aldrig.
 5. Ett ärende har högst en aktiv assignment med rollen `responsible`.
 6. Ett ärende har högst en mentor.
+7. Ett publikt stödområde måste vara aktiverat för samma tenant.
+8. Ett stödärende får endast referera till kända stödområdes-ID:n.
+9. Ett matchningsförslag får inte automatiskt övergå till uppdrag enbart på grund av stödområdesöverlappning.
 7. Alla aktiviteter, avvikelser, handlingar, möten och händelser refererar till ett befintligt ärende.
 8. En aktivitet med status `completed` måste ha ett resultat som är giltigt för aktivitetens sparade mallversion.
 9. Ett avvikande resultat måste ha en tjänsteanteckning och skapa en `ActivityDeviation` i samma transaktion.
@@ -657,6 +702,8 @@ Förslaget beräknas från länkat följdärende, ärendetyp och `nextCaseTypeId
 
 Ärendetypsvyn ska visa och versionshantera hjälptext, registreringsanvisning, handläggningsanvisning, mentorkoppling, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallsvyn ska visa handläggningsanvisning, statusregler, avslutsregel, snabbresultat, resultatdefinitioner och användande ärendetyper.
 
+Stödområdesvyn ska visa den centrala katalogen grupperad efter kategori samt två lokala val per område: `Används av kommunen` och `Visas publikt`. Tekniskt ID, kategori och central betydelse är skrivskyddade. Om ett område inaktiveras ska gränssnittet förklara att historiska registreringar bevaras. Kommunen ska inte behöva administrera egna fält, regler eller matchningsalgoritmer för varje område.
+
 Kommunen får redigera de fält som uttryckligen är verksamhetskonfiguration. Tekniskt ID, lagringsnycklar och systemstyrda relationer är skrivskyddade. Varje sparad ändring skapar en ny publicerad version och pensionerar den föregående; historiska ärenden behåller sina versionsreferenser.
 
 ## 11. API och transaktioner i SaaS-versionen
@@ -720,6 +767,7 @@ caseMeetings
 caseEvents
 caseTypeDefinitions
 activityTemplateDefinitions
+tenantSupportAreaSelection
 processedCommands
 mentors
 handlers
@@ -751,6 +799,7 @@ caseMeetings.[tenantId+occurredAt]
 caseEvents.[tenantId+caseId]
 caseEvents.[tenantId+occurredAt]
 processedCommands.[tenantId+idempotencyKey] (unik)
+tenantSupportAreaSelection.[tenantId+supportAreaId] (unik)
 ```
 
 Ändringar av schema ska göras genom versionsstyrda IndexedDB-migreringar. I prototypen pekar `storageObjectId` på en post i `caseDocumentBlobs`; i SaaS-versionen pekar det på behörighetsskyddad objektlagring. Ett kommando som berör flera stores ska köras i en enda `readwrite`-transaktion. Domänlagret ska upprätthålla invarianter som IndexedDB inte kan uttrycka som unika villkor, exempelvis högst en aktiv ansvarig assignment. Exempeldata ska använda samma kommandon, validering och relationer som användarskapad data.

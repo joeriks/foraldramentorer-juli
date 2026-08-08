@@ -8,6 +8,7 @@ const sourceFiles = [
   ["/", "index.html", "text/html; charset=utf-8"],
   ["/index.html", "index.html", "text/html; charset=utf-8"],
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
+  ["/support-area-domain.js", "support-area-domain.js", "text/javascript; charset=utf-8"],
   ["/learning-domain.js", "learning-domain.js", "text/javascript; charset=utf-8"],
   ["/support-domain.js", "support-domain.js", "text/javascript; charset=utf-8"],
   ["/case-domain.js", "case-domain.js", "text/javascript; charset=utf-8"],

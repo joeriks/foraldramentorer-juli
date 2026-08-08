@@ -57,6 +57,8 @@ Delfunktioner:
 - Avstämning efter första mötet och efter cirka fyra veckor.
 - Odramatisk om-matchning om kemin inte fungerar.
 
+Matchningen använder en gemensam katalog med stödområden. Kommunen väljer sitt lokala och publika urval, föräldern anger vad det aktuella stödärendet gäller och mentorn anger relevanta erfarenhetsområden. Systemet visar överlappning som beslutsunderlag men fattar inte matchningsbeslut. Praktiska förutsättningar, parternas önskemål och handläggarens professionella bedömning är fortfarande avgörande.
+
 ### 3. Uppdragshantering och kommunikation
 
 Syfte: Stötta vardagen när en matchning är aktiv, utan att övervaka relationen.
@@ -143,6 +145,8 @@ Denna prototyp är avsiktligt enkel. Målet är att tidigt kunna känna på arbe
 ### Ärendemodell
 
 Ärendet är den sammanhållande handläggningsakten. Ett ärende kan vara kopplat till högst en mentor och, för stöd till förälder, högst en förälder. En person kan ha flera avgränsade ärenden över tid. Generella verksamhetsärenden kan sakna personkoppling. Matchningar och mentoruppdrag hör alltid till ett bestämt stödärende och skapar inte en permanent direktrelation mellan en förälder och en mentor.
+
+Stödområden hör till stödbehovet och lagras därför på stödärendet. De ska inte bli permanenta etiketter på föräldern. Mentorns erfarenhetsområden hör däremot till mentorprofilen och kan återanvändas i flera matchningar. När ett uppdrag skapas sparas en ögonblicksbild av de områden som uppdraget avser, så att senare katalogändringar inte skriver om historiken.
 
 Handläggaren arbetar normalt med aktiviteter. När en aktivitet ändras eller slutförs skapar systemet en händelse i loggen med tidpunkt och användare. Ett dokument, meddelande eller annat underlag registreras som en handling och kan kopplas till den aktivitet där underlaget användes.
 

@@ -42,6 +42,8 @@ test("serves the application shell", async () => {
   assert.match(html, /data-bs-backdrop="false"/);
   assert.match(html, /data-bs-scroll="true"/);
   assert.match(html, /id="supportAdministrationView"/);
+  assert.match(html, /id="supportAreasAdministrationView"/);
+  assert.match(html, /id="mentorSupportAreasEdit"/);
   assert.match(html, /Skriv inte personnummer/);
   assert.match(html, /Handläggningsanvisning/);
   assert.match(html, /<form id="personEditForm"[\s\S]*id="cancelPersonEditButton"[\s\S]*id="savePersonEditButton"[\s\S]*<\/form>/);
@@ -67,6 +69,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /if \(nextStatus === "completed"\) selectedCaseActivityId = null;/);
   assert.match(scriptText, /data-quick-finish-activity/);
   assert.match(scriptText, /registerQuickActivityResult/);
+  assert.match(scriptText, /publicSupportAreaChoices/);
   assert.match(scriptText, /quickCompletionResultCodes/);
   assert.match(scriptText, /function renderActivityTypeConfiguration/);
   assert.match(scriptText, /function renderCaseTypeActivitiesFact/);
@@ -93,6 +96,11 @@ test("serves application assets and returns 404 for unknown files", async () => 
   const supportDomain = await worker.fetch(new Request("https://example.test/support-domain.js"), {}, context);
   assert.equal(supportDomain.status, 200);
   assert.match(await supportDomain.text(), /localSupportResponse/);
+
+  const supportAreaDomain = await worker.fetch(new Request("https://example.test/support-area-domain.js"), {}, context);
+  assert.equal(supportAreaDomain.status, 200);
+  assert.match(supportAreaDomain.headers.get("content-type"), /^text\/javascript/);
+  assert.match(await supportAreaDomain.text(), /supportAreaOverlap/);
 
   const supportWithoutKey = await worker.fetch(new Request("https://example.test/api/support", {
     method: "POST",
