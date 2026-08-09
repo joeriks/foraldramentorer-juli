@@ -74,9 +74,10 @@ import {
 } from "./matching-profile-domain.js?v=20260809-matching-profiles-v1";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
+const INCOMING_CONTACTS_STORE = "incomingContacts";
 const HANDLERS_STORE = "handlers";
 const MEETINGS_STORE = "meetings";
 const PRESENTATION_COMMENTS_STORE = "presentationComments";
@@ -524,6 +525,7 @@ const PRESENTATION_STEPS = [
 let db;
 let candidates = [];
 let parents = [];
+let incomingContacts = [];
 let handlers = [];
 let meetings = [];
 let cases = [];
@@ -554,6 +556,9 @@ let selectedId = null;
 let selectedParentId = null;
 let parentSearchTerm = "";
 let parentEditMode = false;
+let activeIncomingContactId = null;
+let incomingContactParentId = null;
+let incomingContactStartedAt = null;
 let selectedCaseRecordId = null;
 let caseRouteIntent = "";
 let caseRouteTargetId = "";
@@ -702,6 +707,28 @@ const els = {
   parentSupportCaseTableBody: document.querySelector("#parentSupportCaseTableBody"),
   parentMatchingCaseTableBody: document.querySelector("#parentMatchingCaseTableBody"),
   parentAssignmentCaseTableBody: document.querySelector("#parentAssignmentCaseTableBody"),
+  dashboardIncomingContactButton: document.querySelector("#dashboardIncomingContactButton"),
+  newIncomingContactButton: document.querySelector("#newIncomingContactButton"),
+  parentIncomingContactButton: document.querySelector("#parentIncomingContactButton"),
+  incomingContactTableBody: document.querySelector("#incomingContactTableBody"),
+  incomingContactOffcanvas: document.querySelector("#incomingContactOffcanvas"),
+  incomingContactCaptureStep: document.querySelector("#incomingContactCaptureStep"),
+  incomingContactNextStep: document.querySelector("#incomingContactNextStep"),
+  incomingContactOccurredAt: document.querySelector("#incomingContactOccurredAt"),
+  incomingContactReceivedBy: document.querySelector("#incomingContactReceivedBy"),
+  incomingContactForm: document.querySelector("#incomingContactForm"),
+  incomingContactChannelInput: document.querySelector("#incomingContactChannelInput"),
+  incomingContactDetailsInput: document.querySelector("#incomingContactDetailsInput"),
+  incomingContactParentNameInput: document.querySelector("#incomingContactParentNameInput"),
+  incomingContactCallerTypeInput: document.querySelector("#incomingContactCallerTypeInput"),
+  incomingContactSummaryInput: document.querySelector("#incomingContactSummaryInput"),
+  incomingContactParentMatches: document.querySelector("#incomingContactParentMatches"),
+  incomingContactSavedSummary: document.querySelector("#incomingContactSavedSummary"),
+  incomingContactCreateParentButton: document.querySelector("#incomingContactCreateParentButton"),
+  incomingContactCreateCaseButton: document.querySelector("#incomingContactCreateCaseButton"),
+  incomingContactFollowUpButton: document.querySelector("#incomingContactFollowUpButton"),
+  incomingContactCloseButton: document.querySelector("#incomingContactCloseButton"),
+  incomingContactDoneButton: document.querySelector("#incomingContactDoneButton"),
   administrationView: document.querySelector("#administrationView"),
   caseNumberingAdministrationView: document.querySelector("#caseNumberingAdministrationView"),
   caseNumberingForm: document.querySelector("#caseNumberingForm"),
@@ -1309,6 +1336,10 @@ function openDatabase() {
       const parentStore = ensureStore(PARENTS_STORE);
       ensureIndex(parentStore, "tenantName", ["tenantId", "name"]);
       ensureIndex(parentStore, "tenantUpdatedAt", ["tenantId", "updatedAt"]);
+      const incomingContactStore = ensureStore(INCOMING_CONTACTS_STORE);
+      ensureIndex(incomingContactStore, "tenantOccurredAt", ["tenantId", "occurredAt"]);
+      ensureIndex(incomingContactStore, "parentId", "parentId");
+      ensureIndex(incomingContactStore, "caseId", "caseId");
       if (!nextDb.objectStoreNames.contains(HANDLERS_STORE)) {
         nextDb.createObjectStore(HANDLERS_STORE, { keyPath: "id" });
       }
@@ -1444,6 +1475,10 @@ function tx(mode = "readonly") {
 
 function parentTx(mode = "readonly") {
   return db.transaction(PARENTS_STORE, mode).objectStore(PARENTS_STORE);
+}
+
+function incomingContactTx(mode = "readonly") {
+  return db.transaction(INCOMING_CONTACTS_STORE, mode).objectStore(INCOMING_CONTACTS_STORE);
 }
 
 function handlerTx(mode = "readonly") {
@@ -1605,6 +1640,8 @@ const saveActivityTemplateDefinition = (value) => putInto(activityTemplateDefini
 const getAllParents = () => getAllFrom(parentTx);
 const saveParent = (value) => putInto(parentTx, value);
 const clearParents = () => clearStore(parentTx);
+const getAllIncomingContacts = () => getAllFrom(incomingContactTx);
+const saveIncomingContact = (value) => putInto(incomingContactTx, value);
 const getAllLearningContent = () => getAllFrom(learningContentTx);
 const saveLearningContent = (value) => putInto(learningContentTx, value);
 const getAllTenantLearningSelection = () => getAllFrom(tenantLearningSelectionTx);
@@ -2165,7 +2202,7 @@ function replaceCandidates(nextCandidates) {
 }
 
 function replacePrototypeDataset(exampleCandidates, workflowRecords) {
-  const storeNames = [STORE, PARENTS_STORE, MEETINGS_STORE, LEARNING_PROGRESS_STORE, ...CASE_DATA_STORES, ...MATCHING_PROFILE_STORES];
+  const storeNames = [STORE, PARENTS_STORE, INCOMING_CONTACTS_STORE, MEETINGS_STORE, LEARNING_PROGRESS_STORE, ...CASE_DATA_STORES, ...MATCHING_PROFILE_STORES];
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(storeNames, "readwrite");
     for (const storeName of storeNames) transaction.objectStore(storeName).clear();
@@ -2265,7 +2302,7 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
   ];
   const parentNames = ["Nora Mahmoud", "Emil Svensson", "Leila Hassan", "Johan Berg", "Mariam Ali", "Sofia Nilsson", "Ahmed Rahimi", "Elin Karlsson"];
   const records = {
-    [PARENTS_STORE]: [], [CASES_STORE]: [], [CASE_ASSIGNMENTS_STORE]: [], [CASE_ACTIVITIES_STORE]: [],
+    [PARENTS_STORE]: [], [INCOMING_CONTACTS_STORE]: [], [CASES_STORE]: [], [CASE_ASSIGNMENTS_STORE]: [], [CASE_ACTIVITIES_STORE]: [],
     [CASE_DOCUMENTS_STORE]: [], [CASE_EVENTS_STORE]: [], [ACTIVITY_DEVIATIONS_STORE]: [], [CASE_MEETINGS_STORE]: [],
     [MENTOR_REPORTS_STORE]: [], [PARENT_CHECK_INS_STORE]: [], [COMPENSATION_PERIODS_STORE]: []
   };
@@ -3289,6 +3326,11 @@ async function refresh() {
     createdBy: actorId(parent.createdBy),
     updatedBy: actorId(parent.updatedBy || parent.createdBy)
   }));
+  incomingContacts = (await getAllIncomingContacts()).map((contact) => ({
+    ...contact,
+    tenantId: contact.tenantId || DEFAULT_TENANT_ID,
+    status: contact.status || "registered"
+  })).sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt));
   candidates = storedCandidates.map(normalizeCandidate);
   await Promise.all(candidates
     .filter((candidate, index) => !storedCandidates[index].tenantId
@@ -4922,7 +4964,85 @@ function renderSeedButtonState() {
       : "Prototypdata";
 }
 
+const incomingContactChannelLabels = { phone: "Telefon", email: "E-post", visit: "Besök", other: "Annan" };
+const incomingContactStatusLabels = { registered: "Behöver hanteras", needs_follow_up: "Ska följas upp", linked: "Kopplad", closed: "Avslutad" };
+
+function incomingContactById(id) {
+  return incomingContacts.find((contact) => contact.id === id) || null;
+}
+
+function renderIncomingContactTable() {
+  const visible = incomingContacts.filter((contact) => !["closed", "linked"].includes(contact.status)).slice(0, 10);
+  if (!visible.length) {
+    els.incomingContactTableBody.innerHTML = '<tr><td colspan="6" class="text-secondary py-3">Inga inkommande kontakter väntar på hantering.</td></tr>';
+    return;
+  }
+  els.incomingContactTableBody.innerHTML = visible.map((contact) => {
+    const parent = parents.find((item) => item.id === contact.parentId);
+    return `<tr><td>${escapeHtml(formatDateTime(contact.occurredAt))}</td><td>${escapeHtml(incomingContactChannelLabels[contact.channel] || contact.channel)}</td><td><strong>${escapeHtml(contact.parentName || contact.contactDetails)}</strong><div class="small text-secondary">${escapeHtml(contact.summary)}</div></td><td>${parent ? `<a href="#/parent/${escapeHtml(parent.id)}">${escapeHtml(parent.name)}</a>` : '<span class="text-secondary">Inte kopplad</span>'}</td><td><span class="badge text-bg-light border">${escapeHtml(incomingContactStatusLabels[contact.status] || contact.status)}</span></td><td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-open-incoming-contact="${escapeHtml(contact.id)}">Hantera</button></td></tr>`;
+  }).join("");
+}
+
+function renderIncomingContactMatches() {
+  const term = `${els.incomingContactParentNameInput.value} ${els.incomingContactDetailsInput.value}`.trim().toLocaleLowerCase("sv-SE");
+  const matches = term.length < 2 ? [] : parents.filter((parent) => `${parent.name} ${parent.contactDetails}`.toLocaleLowerCase("sv-SE").includes(term) || term.split(/\s+/).some((part) => part.length > 2 && `${parent.name} ${parent.contactDetails}`.toLocaleLowerCase("sv-SE").includes(part))).slice(0, 5);
+  if (!matches.length) {
+    incomingContactParentId = null;
+    els.incomingContactParentMatches.innerHTML = '<div class="small text-secondary border rounded p-2">Ingen tydlig träff. Kontakten kan sparas fristående och kopplas senare.</div>';
+    return;
+  }
+  els.incomingContactParentMatches.innerHTML = matches.map((parent) => `<label class="list-group-item d-flex gap-2 align-items-start"><input class="form-check-input mt-1" type="radio" name="incomingContactParent" value="${escapeHtml(parent.id)}" ${parent.id === incomingContactParentId ? "checked" : ""}><span><strong>${escapeHtml(parent.name)}</strong><small class="d-block text-secondary">${escapeHtml(parent.contactDetails)}</small></span></label>`).join("");
+}
+
+function openIncomingContact(contactId = null, parentId = null) {
+  const existing = incomingContactById(contactId);
+  activeIncomingContactId = existing?.id || null;
+  incomingContactParentId = existing?.parentId || parentId || null;
+  incomingContactStartedAt = existing?.occurredAt || new Date().toISOString();
+  els.incomingContactForm.reset();
+  els.incomingContactChannelInput.value = existing?.channel || "phone";
+  els.incomingContactDetailsInput.value = existing?.contactDetails || parents.find((parent) => parent.id === parentId)?.contactDetails || "";
+  els.incomingContactParentNameInput.value = existing?.parentName || parents.find((parent) => parent.id === parentId)?.name || "";
+  els.incomingContactCallerTypeInput.value = existing?.callerType || "self";
+  els.incomingContactSummaryInput.value = existing?.summary || "";
+  els.incomingContactOccurredAt.textContent = formatDateTime(incomingContactStartedAt);
+  els.incomingContactReceivedBy.textContent = currentUserName();
+  els.incomingContactCaptureStep.hidden = false;
+  els.incomingContactNextStep.hidden = true;
+  renderIncomingContactMatches();
+  bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).show();
+  setTimeout(() => els.incomingContactDetailsInput.focus(), 150);
+}
+
+function showIncomingContactNextStep(contact) {
+  activeIncomingContactId = contact.id;
+  incomingContactParentId = contact.parentId || null;
+  els.incomingContactCaptureStep.hidden = true;
+  els.incomingContactNextStep.hidden = false;
+  const parent = parents.find((item) => item.id === contact.parentId);
+  els.incomingContactSavedSummary.textContent = parent ? `Kopplad till ${parent.name}.` : "Ännu inte kopplad till en förälder eller ett ärende.";
+  els.incomingContactCreateParentButton.hidden = Boolean(parent);
+  els.incomingContactCreateCaseButton.hidden = !parent;
+}
+
+async function createSupportCaseFromIncomingContact(contact, parent) {
+  const now = new Date().toISOString();
+  const caseId = crypto.randomUUID();
+  const caseType = caseTypeById("parent-support");
+  const supportCase = { id: caseId, tenantId: DEFAULT_TENANT_ID, number: await reserveCaseNumber(), caseTypeId: caseType.id, caseTypeVersion: caseType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: caseType.name, title: contact.summary.slice(0, 100), description: contact.summary, details: { supportPurpose: contact.summary, desiredOutcome: "Kompletteras i fortsatt kontakt", supportAreaIds: [], supportAreaStatus: "to_confirm", intakeContactId: contact.id }, mentorId: null, parentId: parent.id, supportCaseId: null, sourceMatchingCaseId: null, status: "new", priority: "normal", dueDate: null, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, closedAt: null, closedBy: null };
+  const owner = { id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, handlerId: CURRENT_USER_ID, role: "responsible", version: 1, assignedAt: now, assignedBy: CURRENT_USER_ID, endedAt: null, endedBy: null };
+  const activities = (caseType.suggestedActivities || []).map((title, sortOrder) => ({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1, title, status: "not_started", resultCode: null, resultClassification: null, handlerIdOverride: null, waitingForParty: null, dueDate: null, sortOrder, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, completedAt: null, completedBy: null }));
+  const updatedContact = { ...contact, parentId: parent.id, caseId, status: "linked", updatedAt: now, updatedBy: CURRENT_USER_ID };
+  await atomicPut({ [CASES_STORE]: [supportCase], [CASE_ASSIGNMENTS_STORE]: [owner], [CASE_ACTIVITIES_STORE]: activities, [CASE_EVENTS_STORE]: [caseEventRecord({ caseId, eventType: "case_created", entityType: "case", entityId: caseId, message: "Stödärende skapades från en inkommande kontakt", idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now })], [INCOMING_CONTACTS_STORE]: [updatedContact] });
+  await saveSupportMatchingProfile(supportCase);
+  await refresh();
+  bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
+  navigateToCase(caseId);
+  showFeedback("Kontakten har kopplats och ett stödärende har skapats.");
+}
+
 function renderDashboard() {
+  renderIncomingContactTable();
   els.actionTableBody.innerHTML = "";
   const openCases = cases.filter((caseRecord) => caseRecord.status !== "closed");
   els.openCaseCount.textContent = openCases.length;
@@ -8678,6 +8798,68 @@ els.dashboardMentorRegisterLink.addEventListener("click", (event) => {
   resetMentorFilters();
   navigateTo("#/mentors");
 });
+
+els.dashboardIncomingContactButton.addEventListener("click", () => openIncomingContact());
+els.newIncomingContactButton.addEventListener("click", () => openIncomingContact());
+els.parentIncomingContactButton.addEventListener("click", () => openIncomingContact(null, selectedParent()?.id));
+els.incomingContactTableBody.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-open-incoming-contact]");
+  if (button) openIncomingContact(button.dataset.openIncomingContact);
+});
+[els.incomingContactDetailsInput, els.incomingContactParentNameInput].forEach((input) => input.addEventListener("input", renderIncomingContactMatches));
+els.incomingContactParentMatches.addEventListener("change", (event) => {
+  if (event.target.name === "incomingContactParent") incomingContactParentId = event.target.value;
+});
+els.incomingContactForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const existing = incomingContactById(activeIncomingContactId);
+  const now = new Date().toISOString();
+  const contact = {
+    ...(existing || {}), id: existing?.id || crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID,
+    occurredAt: existing?.occurredAt || incomingContactStartedAt || now,
+    channel: els.incomingContactChannelInput.value, contactDetails: els.incomingContactDetailsInput.value.trim(),
+    parentName: els.incomingContactParentNameInput.value.trim(), callerType: els.incomingContactCallerTypeInput.value,
+    summary: els.incomingContactSummaryInput.value.trim(), parentId: incomingContactParentId || null,
+    caseId: existing?.caseId || null, status: existing?.status || "registered",
+    receivedBy: existing?.receivedBy || CURRENT_USER_ID, registeredBy: existing?.registeredBy || CURRENT_USER_ID,
+    createdAt: existing?.createdAt || now, createdBy: existing?.createdBy || CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID
+  };
+  await saveIncomingContact(contact);
+  await refresh();
+  showIncomingContactNextStep(incomingContactById(contact.id));
+  showFeedback("Den inkommande kontakten har sparats.");
+});
+els.incomingContactCreateParentButton.addEventListener("click", async () => {
+  const contact = incomingContactById(activeIncomingContactId);
+  if (!contact) return;
+  if (!contact.parentName) { showFeedback("Ange förälderns namn innan en preliminär förälderpost skapas."); return; }
+  const now = new Date().toISOString();
+  const parent = { id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, name: contact.parentName, contactDetails: contact.contactDetails, informationStatus: "pending", area: "", languages: "", availability: "", active: true, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID };
+  await saveParent(parent);
+  await createSupportCaseFromIncomingContact(contact, parent);
+});
+els.incomingContactCreateCaseButton.addEventListener("click", async () => {
+  const contact = incomingContactById(activeIncomingContactId);
+  const parent = parents.find((item) => item.id === contact?.parentId);
+  if (contact && parent) await createSupportCaseFromIncomingContact(contact, parent);
+});
+els.incomingContactFollowUpButton.addEventListener("click", async () => {
+  const contact = incomingContactById(activeIncomingContactId);
+  if (!contact) return;
+  await saveIncomingContact({ ...contact, status: "needs_follow_up", updatedAt: new Date().toISOString(), updatedBy: CURRENT_USER_ID });
+  await refresh();
+  bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
+  showFeedback("Kontakten ligger kvar på dashboarden för uppföljning.");
+});
+els.incomingContactCloseButton.addEventListener("click", async () => {
+  const contact = incomingContactById(activeIncomingContactId);
+  if (!contact) return;
+  await saveIncomingContact({ ...contact, status: "closed", updatedAt: new Date().toISOString(), updatedBy: CURRENT_USER_ID });
+  await refresh();
+  bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
+  showFeedback("Kontakten har avslutats utan ärende.");
+});
+els.incomingContactDoneButton.addEventListener("click", () => bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide());
 
 els.caseSearchInput.addEventListener("input", () => {
   caseSearchTerm = els.caseSearchInput.value;
