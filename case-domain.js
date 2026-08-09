@@ -131,6 +131,75 @@ export const ACTIVITY_TEMPLATES = [
     ]
   },
   {
+    id: "matchingEligibility",
+    version: 1,
+    title: "Kontrollera tillgänglighet och grundkriterier",
+    workInstruction: "Kontrollera att mentorn är godkänd, aktiv och tillgänglig för ett nytt uppdrag. Jämför stödbehov, stödområden, språk, geografiska förutsättningar och praktisk tillgänglighet. Dokumentera en kort motivering om något kriterium behöver bedömas manuellt.",
+    results: [
+      ["criteria_met", "Grundkriterier uppfyllda", "acceptable"],
+      ["mentor_unavailable", "Mentorn är inte tillgänglig", "acceptable"],
+      ["criteria_not_met", "Grundkriterier inte uppfyllda", "acceptable"],
+      ["more_information_needed", "Mer underlag behövs", "deviation"]
+    ]
+  },
+  {
+    id: "matchingProposal",
+    version: 1,
+    title: "Dokumentera matchningsförslag",
+    workInstruction: "Dokumentera varför den föreslagna mentorn bedöms passa det aktuella stödärendet. Ange vilka behov och förutsättningar som stämmer, eventuella begränsningar och vad parterna behöver bekräfta. Undvik omdömen som inte behövs för matchningen.",
+    results: [
+      ["proposal_documented", "Matchningsförslag dokumenterat", "acceptable"],
+      ["no_suitable_proposal", "Ingen lämplig matchning kunde föreslås", "acceptable"],
+      ["more_information_needed", "Mer underlag behövs", "deviation"]
+    ]
+  },
+  {
+    id: "matchingMentorContact",
+    version: 1,
+    title: "Kontakta mentorn",
+    workInstruction: "Presentera uppdragets syfte och praktiska ramar för mentorn utan att lämna fler personuppgifter än nödvändigt. Registrera mentorns svar. Sätt aktiviteten till Väntar och ange uppföljningsdatum om svar inte kan lämnas direkt.",
+    results: [
+      ["mentor_accepts", "Mentorn vill gå vidare", "acceptable"],
+      ["mentor_declines", "Mentorn tackar nej", "acceptable"],
+      ["mentor_unreachable", "Mentorn kunde inte nås", "deviation"]
+    ]
+  },
+  {
+    id: "matchingFirstMeeting",
+    version: 1,
+    title: "Boka första mötet",
+    workInstruction: "Kom överens med parterna om datum, kontaktform och praktiska förutsättningar för ett första möte. Registrera bokningen. Använd Väntar om en tid ännu inte är bekräftad; avsluta inte aktiviteten som genomförd enbart för att ett kontaktförsök har gjorts.",
+    results: [
+      ["meeting_booked", "Första mötet bokat", "acceptable"],
+      ["meeting_not_booked", "Mötet kunde inte bokas", "acceptable"],
+      ["rescheduling_needed", "Ombokning behövs", "deviation"]
+    ]
+  },
+  {
+    id: "matchingPartyResponses",
+    version: 1,
+    title: "Registrera parternas återkoppling",
+    workInstruction: "Registrera förälderns och mentorns svar var för sig under Parternas återkoppling på ärendets översikt. Sammanfatta endast det som behövs för beslutet. Uteblivet svar ska registreras som vänteläge, aldrig som ett godkännande.",
+    results: [
+      ["both_accept", "Båda parter vill gå vidare", "acceptable"],
+      ["parent_declines", "Föräldern tackar nej", "acceptable"],
+      ["mentor_declines", "Mentorn tackar nej", "acceptable"],
+      ["both_decline", "Båda parter tackar nej", "acceptable"],
+      ["new_proposal_needed", "Nytt matchningsförslag behövs", "acceptable"]
+    ]
+  },
+  {
+    id: "matchingDecision",
+    version: 1,
+    title: "Fatta beslut om matchning",
+    workInstruction: "Kontrollera matchningsunderlaget och båda parters registrerade svar. Registrera det samlade utfallet under Parternas återkoppling på ärendets översikt. Ett mentoruppdrag får skapas först när båda parter har accepterat samma förslag.",
+    results: [
+      ["match_approved", "Matchningen godkänd", "acceptable"],
+      ["match_rejected", "Matchningen avslutas utan uppdrag", "acceptable"],
+      ["new_proposal_needed", "Nytt matchningsförslag behövs", "acceptable"]
+    ]
+  },
+  {
     id: AD_HOC_ACTIVITY_TEMPLATE_ID,
     version: 1,
     title: "Annan aktivitet",
@@ -159,6 +228,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "parent-support",
     version: 1,
     name: "Stödärende för förälder",
+    creationMode: "manual",
     nextCaseTypeId: "matching",
     mentorMode: "none",
     parentMode: "required",
@@ -173,6 +243,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "mentor-certification",
     version: 1,
     name: "Godkännande av mentor",
+    creationMode: "mentor_context",
     nextCaseTypeId: null,
     mentorMode: "required",
     helpText: "Använd när en registrerad mentor ska genomgå kommunens kontroller, intervju och beslut om godkännande.",
@@ -186,6 +257,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "mentor-follow-up",
     version: 1,
     name: "Uppföljning",
+    creationMode: "manual",
     nextCaseTypeId: null,
     mentorMode: "optional",
     helpText: "Använd för en planerad eller behovsstyrd uppföljning av en mentor. Koppla mentor när uppföljningen gäller en viss person.",
@@ -199,6 +271,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "matching",
     version: 1,
     name: "Matchning",
+    creationMode: "support_case",
     nextCaseTypeId: "mentor-assignment",
     mentorMode: "required",
     parentMode: "via_support_case",
@@ -207,12 +280,13 @@ export const CASE_TYPE_DEFINITIONS = [
     workInstruction: "Kontrollera mentorens tillgänglighet, erfarenhetsområden och övriga grundkriterier. Dokumentera varför matchningen föreslås och registrera båda parters återkoppling innan beslut om matchning.",
     detailFieldIds: [],
     defaultPriority: "normal",
-    suggestedActivities: ["Kontrollera tillgänglighet och grundkriterier", "Dokumentera matchningsförslag", "Kontakta mentorn", "Boka första mötet", "Registrera parternas återkoppling", "Fatta beslut om matchning"]
+    activityTemplateIds: ["matchingEligibility", "matchingProposal", "matchingMentorContact", "matchingFirstMeeting", "matchingPartyResponses", "matchingDecision"]
   },
   {
     id: "mentor-assignment",
     version: 1,
     name: "Mentoruppdrag",
+    creationMode: "accepted_matching",
     nextCaseTypeId: "mentor-follow-up",
     mentorMode: "required",
     parentMode: "via_support_case",
@@ -227,6 +301,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "recruitment",
     version: 1,
     name: "Rekryteringsinsats",
+    creationMode: "manual",
     nextCaseTypeId: "mentor-certification",
     mentorMode: "none",
     helpText: "Använd när ett beslutat rekryteringsbehov ska omsättas i annons, informationsinsats eller annan rekryteringsåtgärd.",
@@ -240,6 +315,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "needs-analysis",
     version: 1,
     name: "Behovsanalys",
+    creationMode: "manual",
     nextCaseTypeId: "recruitment",
     mentorMode: "none",
     helpText: "Använd när verksamheten behöver beskriva och bedöma ett nytt eller förändrat behov av mentorer.",
@@ -253,6 +329,7 @@ export const CASE_TYPE_DEFINITIONS = [
     id: "other",
     version: 1,
     name: "Övrigt ärende",
+    creationMode: "manual",
     nextCaseTypeId: null,
     mentorMode: "optional",
     helpText: "Använd för en avgränsad fråga som inte hör hemma i någon av de övriga ärendetyperna.",
@@ -280,6 +357,14 @@ export function caseTypeById(id) {
 
 export function caseTypeByName(name) {
   return CASE_TYPE_DEFINITIONS.find((definition) => definition.name === name) || caseTypeById("other");
+}
+
+export function canStartCaseType(caseType, context = {}) {
+  if (!caseType) return false;
+  if (caseType.creationMode === "mentor_context") return Boolean(context.mentorId);
+  if (caseType.creationMode === "support_case") return Boolean(context.supportCaseId);
+  if (caseType.creationMode === "accepted_matching") return Boolean(context.acceptedMatchingCaseId);
+  return caseType.creationMode === "manual";
 }
 
 export function activityTemplateById(id) {
@@ -413,9 +498,8 @@ export function assessCertificationApproval({ caseRecord, activities = [], devia
   if (unresolvedDeviations.length) reasons.push("Minst ett ställningstagande återstår.");
 
   const decisionTemplateId = "decision";
-  const requiredTemplateIds = ACTIVITY_TEMPLATES
-    .map((template) => template.id)
-    .filter((id) => ![decisionTemplateId, AD_HOC_ACTIVITY_TEMPLATE_ID].includes(id));
+  const requiredTemplateIds = (caseTypeById("mentor-certification")?.activityTemplateIds || [])
+    .filter((id) => id !== decisionTemplateId);
   for (const templateId of requiredTemplateIds) {
     const activity = activities.find((item) => item.templateId === templateId);
     if (!activity) {

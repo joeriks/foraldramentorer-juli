@@ -166,6 +166,19 @@ En förälder och en mentor kan ha flera ärenden över tid. Matchningar och upp
 
 Samma hjälp visas kortfattat direkt när handläggaren väljer ärendetyp i registreringsvyn. Det minskar behovet av att lämna arbetsläget för att slå upp grundläggande vägledning.
 
+### 3.2 Hur ärendetyper får skapas
+
+Alla ärendetyper ska inte finnas i den generella funktionen **Ny registrering**. Skapandevägen är en systemregel och kontrolleras även när registreringen sparas.
+
+| Ärendetyp | Skapandeväg |
+| --- | --- |
+| Behovsanalys, Rekryteringsinsats, Stödärende för förälder, Uppföljning och Övrigt ärende | Kan skapas manuellt från ärenderegistret. |
+| Godkännande av mentor | Startas från en mentorpost. Då följer rätt mentor med och dubbelregistrering kan kontrolleras. |
+| Matchning | Startas från ett bestämt stödärende. Stödärendet behöver inte avslutas först. |
+| Mentoruppdrag | Skapas från en matchning först när både föräldern och mentorn har accepterat. |
+
+En handläggare ska alltså inte kunna skapa ett fristående matchningsärende eller mentoruppdrag och i efterhand försöka återskapa sambanden. Vid behov av ett nytt matchningsförsök startas det från samma stödärende. En systemadministratör kan se skapandevägen för varje ärendetyp men inte ändra dessa integritetsregler i prototypen.
+
 **I systemet:** [Administrera ärendetyper](feature:admin.case-types)
 
 ## 4. Övergripande livscykel
@@ -531,6 +544,19 @@ Matchning är ett eget ärende som alltid tillhör ett bestämt stödärende. De
 6. Båda parters återkoppling dokumenteras utan onödiga samtalsdetaljer.
 7. Matchningen accepteras eller avslutas utan match. Stödärendet ligger kvar och kan få ett nytt matchningsförsök.
 
+Matchningsärendets aktiviteter har var sin avgränsade uppgift och egna resultat. `Genomförd` ska inte användas som ett generellt matchningsutfall.
+
+| Aktivitet | Handläggaren gör | Exempel på registrerat utfall |
+| --- | --- | --- |
+| Kontrollera tillgänglighet och grundkriterier | Kontrollerar godkännande, aktiv status, tillgänglighet, stödområden, språk, geografi och praktiska förutsättningar. | Grundkriterier uppfyllda; mentorn är inte tillgänglig; grundkriterier inte uppfyllda; mer underlag behövs. |
+| Dokumentera matchningsförslag | Motiverar kort varför mentorn passar det aktuella stödärendet och anger begränsningar eller sådant som behöver bekräftas. | Matchningsförslag dokumenterat; ingen lämplig matchning kunde föreslås; mer underlag behövs. |
+| Kontakta mentorn | Informerar om uppdragets syfte och ramar med minsta nödvändiga personuppgifter och registrerar svaret. | Mentorn vill gå vidare; mentorn tackar nej; mentorn kunde inte nås. |
+| Boka första mötet | Kommer överens om datum, kontaktform och praktiska förutsättningar. Vid utebliven bekräftelse används vänteläge. | Första mötet bokat; mötet kunde inte bokas; ombokning behövs. |
+| Registrera parternas återkoppling | Registrerar förälderns och mentorns svar var för sig i den strukturerade återkopplingen på ärendets översikt. | Båda vill gå vidare; föräldern tackar nej; mentorn tackar nej; nytt förslag behövs. |
+| Fatta beslut om matchning | Kontrollerar underlaget och parternas svar och sparar det samlade utfallet på ärendets översikt. | Matchningen godkänd; matchningen avslutas utan uppdrag; nytt matchningsförslag behövs. |
+
+Aktivitetslistan visar den aktuella arbetsinstruktionen. När en aktivitet är avslutad visar den registrerat utfall, eventuell tjänsteanteckning, tidpunkt och registrerande användare. Parternas svar och beslut registreras i den strukturerade återkopplingen på översikten; systemet uppdaterar motsvarande aktiviteter så att samma uppgift inte behöver registreras parallellt på två ställen.
+
 Återkopplingen registreras separat för respektive part:
 
 | Part | Tillåtna utfall |
@@ -764,13 +790,13 @@ Systemet bör inte automatiskt:
 
 ### 16.1 Administration av ärende- och aktivitetsmallar
 
-Administratören ska kunna se hur ärendetyper och aktivitetsmallar styr handläggningen. För en ärendetyp visas hjälptext, registreringsanvisning, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. För en aktivitetsmall visas handläggningsanvisning, tillåtna statuslägen, avslutsregel, snabbavslut, resultatval och vilka ärendetyper som använder mallen.
+Administratören ska kunna se hur ärendetyper och aktivitetsmallar styr handläggningen. För en ärendetyp visas hjälptext, registreringsanvisning, skapandeväg, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallarna öppnas och administreras från aktivitetsflödet på respektive ärendetyp. En mall är fortfarande ett gemensamt versionshanterat objekt och kan återanvändas av flera ärendetyper. Processkartan skiljer mellan manuellt skapbara ärenden och ärenden som måste startas från en mentorpost, ett stödärende eller en accepterad matchning. För en aktivitetsmall visas handläggningsanvisning, tillåtna statuslägen, avslutsregel, snabbavslut, resultatval och vilka ärendetyper som använder mallen.
 
-Kommunen får ändra handledande texter och valbara verksamhetsinställningar. Tekniska ID:n, grundläggande statusregler och lagringsnycklar är systemstyrda. En sparad ändring skapar en ny mallversion för nya ärenden; pågående och avslutade ärenden behåller den version som användes när de skapades.
+Kommunen får ändra handledande texter och valbara verksamhetsinställningar. Tekniska ID:n, skapandevägar, grundläggande statusregler och lagringsnycklar är systemstyrda. En sparad ändring skapar en ny mallversion för nya ärenden; pågående och avslutade ärenden behåller den version som användes när de skapades.
 
 En föreslagen nästa ärendetyp betyder att handläggaren får ett nästa kommando. Den innebär inte att följdärendet skapas automatiskt.
 
-**I systemet:** [Administrera ärendetyper](feature:admin.case-types) · [Administrera aktivitetsmallar](feature:admin.activity-types)
+**I systemet:** [Administrera ärendetyper och deras aktivitetsmallar](feature:admin.case-types)
 
 ## 17. Roller och beslutspunkter
 

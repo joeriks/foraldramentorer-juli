@@ -10,6 +10,7 @@ import {
   CASE_TYPE_DEFINITIONS,
   CASE_TYPE_RELATIONSHIPS,
   canCreateMentorAssignment,
+  canStartCaseType,
   canTransitionActivity,
   deriveCaseStatus,
   findMentorDuplicates,
@@ -35,6 +36,19 @@ test("normalizes legacy statuses without changing stable values", () => {
   assert.equal(normalizeActivityStatus("waiting"), "waiting");
   assert.equal(normalizeMentorStatus("Godkänd/Certifierad"), "Godkänd");
   assert.equal(normalizeMentorStatus("Redo för intervju"), "Redo för intervju");
+});
+
+test("allows case types to start only from their configured source", () => {
+  const type = (id) => CASE_TYPE_DEFINITIONS.find((definition) => definition.id === id);
+
+  assert.equal(canStartCaseType(type("needs-analysis")), true);
+  assert.equal(canStartCaseType(type("parent-support")), true);
+  assert.equal(canStartCaseType(type("mentor-certification")), false);
+  assert.equal(canStartCaseType(type("mentor-certification"), { mentorId: "mentor-1" }), true);
+  assert.equal(canStartCaseType(type("matching")), false);
+  assert.equal(canStartCaseType(type("matching"), { supportCaseId: "support-1" }), true);
+  assert.equal(canStartCaseType(type("mentor-assignment"), { supportCaseId: "support-1" }), false);
+  assert.equal(canStartCaseType(type("mentor-assignment"), { acceptedMatchingCaseId: "matching-1" }), true);
 });
 
 test("confirms only activity saves that also close the approval case", () => {
@@ -154,8 +168,26 @@ test("finds exact personal-number duplicates and warns for equal names", () => {
 test("defines guided workflows for matching and mentor assignments", () => {
   const matching = CASE_TYPE_DEFINITIONS.find((item) => item.id === "matching");
   const assignment = CASE_TYPE_DEFINITIONS.find((item) => item.id === "mentor-assignment");
-  assert.ok(matching.suggestedActivities.includes("Fatta beslut om matchning"));
+  assert.deepEqual(matching.activityTemplateIds, [
+    "matchingEligibility",
+    "matchingProposal",
+    "matchingMentorContact",
+    "matchingFirstMeeting",
+    "matchingPartyResponses",
+    "matchingDecision"
+  ]);
   assert.ok(assignment.suggestedActivities.includes("Följ upp efter fyra veckor"));
+});
+
+test("uses business outcomes instead of generic completion for matching activities", () => {
+  const matching = CASE_TYPE_DEFINITIONS.find((item) => item.id === "matching");
+  for (const templateId of matching.activityTemplateIds) {
+    const template = ACTIVITY_TEMPLATES.find((item) => item.id === templateId);
+    assert.ok(template, `missing matching activity template ${templateId}`);
+    assert.ok(template.workInstruction.length > 40, `${templateId} should contain actionable guidance`);
+    assert.ok(template.results.length >= 3, `${templateId} should contain structured outcomes`);
+    assert.equal(template.results.some(([code]) => code === "completed"), false, `${templateId} must not use generic completion`);
+  }
 });
 
 test("defines valid relationships between case types", () => {

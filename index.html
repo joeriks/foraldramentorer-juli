@@ -36,8 +36,8 @@
             <a id="navAdministration" class="nav-link sidebar-menu-heading" href="#/administration">Systemadministration</a>
             <div class="sidebar-subnav" aria-label="Systemadministration">
               <a id="navHandlers" class="nav-link" href="#/administration">Handläggare</a>
+              <a id="navCaseNumbering" class="nav-link" href="#/case-numbering">Ärendenummer</a>
               <a id="navCaseTypes" class="nav-link" href="#/case-types">Ärendetyper</a>
-              <a id="navActivityTypes" class="nav-link" href="#/activity-types">Aktivitetsmallar</a>
               <a id="navSupportAreas" class="nav-link" href="#/support-areas">Stödområden</a>
               <a id="navLearningAdmin" class="nav-link" href="#/learning-admin">Utbildningsinnehåll</a>
               <a id="navSupportAdmin" class="nav-link" href="#/support-admin">Supportärenden</a>
@@ -72,8 +72,8 @@
                   <li><hr class="dropdown-divider"></li>
                   <li><h2 class="dropdown-header">Systemadministration</h2></li>
                   <li><a class="dropdown-item" href="#/administration">Handläggare</a></li>
+                  <li><a class="dropdown-item" href="#/case-numbering">Ärendenummer</a></li>
                   <li><a class="dropdown-item" href="#/case-types">Ärendetyper</a></li>
-                  <li><a class="dropdown-item" href="#/activity-types">Aktivitetsmallar</a></li>
                   <li><a class="dropdown-item" href="#/support-areas">Stödområden</a></li>
                   <li><a class="dropdown-item" href="#/learning-admin">Utbildningsinnehåll</a></li>
                   <li><a class="dropdown-item" href="#/support-admin">Supportärenden</a></li>
@@ -472,14 +472,6 @@
                         <label class="form-label" for="caseTypeInput">Ärendetyp</label>
                         <select id="caseTypeInput" class="form-select form-select-sm" required>
                           <option value="">Välj ärendetyp</option>
-                          <option value="parent-support">Stödärende för förälder</option>
-                          <option value="mentor-certification">Godkännande av mentor</option>
-                          <option value="mentor-follow-up">Uppföljning</option>
-                          <option value="matching">Matchning</option>
-                          <option value="mentor-assignment">Mentoruppdrag</option>
-                          <option value="recruitment">Rekryteringsinsats</option>
-                          <option value="needs-analysis">Behovsanalys</option>
-                          <option value="other">Övrigt ärende</option>
                         </select>
                       </div>
                       <div class="col-md-6">
@@ -1066,6 +1058,45 @@
             </div>
           </section>
 
+          <section id="caseNumberingAdministrationView" hidden>
+            <div class="card" aria-labelledby="caseNumberingHeading">
+              <div class="card-header bg-white">
+                <h2 id="caseNumberingHeading" class="h5 mb-1">Ärendenummer</h2>
+                <p class="text-secondary mb-0">Styr hur nya ärenden numreras i kommunen. Befintliga ärenden ändras inte.</p>
+              </div>
+              <form id="caseNumberingForm" class="card-body">
+                <fieldset class="mb-4">
+                  <legend class="form-label fw-semibold">Nummersättning</legend>
+                  <div class="case-numbering-options">
+                    <label class="case-numbering-option">
+                      <input class="form-check-input" type="radio" name="caseNumberMode" value="sequential" checked>
+                      <span><strong>Löpande nummer</strong><small>Årtal och ett femsiffrigt löpnummer, exempelvis FM-26-00001.</small></span>
+                    </label>
+                    <label class="case-numbering-option">
+                      <input class="form-check-input" type="radio" name="caseNumberMode" value="random">
+                      <span><strong>Slumpmässiga nummer</strong><small>Numret skapas utan synlig ordningsföljd, exempelvis FM-1736-315.</small></span>
+                    </label>
+                  </div>
+                </fieldset>
+                <div id="caseNumberSequenceFields" class="row g-3 align-items-end">
+                  <div class="col-sm-6 col-lg-4">
+                    <label class="form-label" for="nextCaseSequenceInput">Nästa löpnummer</label>
+                    <input id="nextCaseSequenceInput" class="form-control" type="number" min="1" max="99999" step="1" required>
+                    <div class="form-text">Gäller innevarande år. Vid ett nytt år börjar serien på 1.</div>
+                  </div>
+                  <div class="col-sm-6 col-lg-4">
+                    <span class="form-label d-block">Nästa ärendenummer</span>
+                    <output id="caseNumberPreview" class="case-number-preview"></output>
+                  </div>
+                </div>
+                <div class="border-top mt-4 pt-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                  <p id="caseNumberingUpdated" class="small text-secondary mb-0"></p>
+                  <button class="btn btn-primary" type="submit">Spara inställning</button>
+                </div>
+              </form>
+            </div>
+          </section>
+
           <section id="caseTypesAdministrationView" hidden>
             <div id="caseTypeListPanel" class="card" aria-label="Administration av ärendetyper">
               <div class="card-header bg-white">
@@ -1092,6 +1123,7 @@
                   <thead class="table-light">
                     <tr>
                       <th>Ärendetyp</th>
+                      <th>Skapas via</th>
                       <th>Mentorkoppling</th>
                       <th>Kompletterande fält</th>
                       <th>Aktiviteter</th>
@@ -1135,8 +1167,9 @@
                     <dl class="record-fields mb-0">
                       <div><dt>Hjälptext</dt><dd id="caseTypeHelpFact"></dd></div>
                       <div><dt>Registreringsanvisning</dt><dd id="caseTypeHintFact"></dd></div>
-                      <div><dt>Handläggningsanvisning</dt><dd id="caseTypeWorkInstructionFact"></dd></div>
-                      <div><dt>Mentorkoppling</dt><dd id="caseTypeMentorModeFact"></dd></div>
+                       <div><dt>Handläggningsanvisning</dt><dd id="caseTypeWorkInstructionFact"></dd></div>
+                       <div><dt>Skapas via</dt><dd id="caseTypeCreationModeFact"></dd></div>
+                       <div><dt>Mentorkoppling</dt><dd id="caseTypeMentorModeFact"></dd></div>
                       <div><dt>Nästa ärendetyp</dt><dd id="caseTypeNextTypeFact"></dd></div>
                     </dl>
                   </section>
@@ -1215,7 +1248,7 @@
             </div>
             <div id="activityTypeDetailPanel" class="card mentor-record" hidden>
               <div class="card-header record-header bg-white">
-                <a class="small" href="#/activity-types">Tillbaka till aktivitetsmallar</a>
+                <a id="activityTypeBackLink" class="small" href="#/case-types">Tillbaka till ärendetypen</a>
                 <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start mt-2">
                   <div><div class="record-type">Aktivitetsmall</div><p id="activityTypeAdminTechnicalId" class="record-id mb-1"></p><h2 id="activityTypeAdminTitle" class="h5 mb-0"></h2></div>
                   <div class="record-edit-slot">
@@ -1909,6 +1942,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260809-demo-v1"></script>
+    <script type="module" src="app.js?v=20260809-case-type-activities-v2"></script>
   </body>
 </html>

@@ -1220,6 +1220,56 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.case-number-text,
+.case-number-link,
+.record-id {
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.case-number-link {
+  color: var(--bs-secondary-color);
+}
+
+.case-numbering-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.case-numbering-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.75rem;
+  min-height: 100%;
+  padding: 1rem;
+  border: 1px solid var(--bs-border-color);
+  background: var(--bs-light-bg-subtle);
+  cursor: pointer;
+}
+
+.case-numbering-option small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--bs-secondary-color);
+}
+
+.case-number-preview {
+  display: flex;
+  align-items: center;
+  min-height: 2.375rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--bs-secondary-color);
+}
+
+@media (max-width: 575.98px) {
+  .case-numbering-options {
+    grid-template-columns: 1fr;
+  }
+}
+
 .record-actions {
   min-height: 2rem;
 }
@@ -2180,7 +2230,12 @@ body {
 }
 
 .activity-table {
-  min-width: 850px;
+  min-width: 980px;
+}
+
+.activity-table th:first-child,
+.activity-table td:first-child {
+  width: 42%;
 }
 
 .activity-table thead th {
@@ -2213,6 +2268,36 @@ body {
   grid-template-columns: 1.75rem minmax(0, 1fr);
   gap: var(--app-space-2);
   align-items: start;
+}
+
+.activity-name small {
+  display: block;
+  margin-top: 0.2rem;
+  line-height: 1.35;
+}
+
+.activity-instruction-preview {
+  display: -webkit-box !important;
+  overflow: hidden;
+  color: #52616d;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.activity-result-summary {
+  color: var(--app-text) !important;
+}
+
+.activity-note-summary {
+  display: -webkit-box !important;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.activity-completion-meta {
+  color: var(--bs-secondary-color);
+  font-size: 0.75rem;
 }
 
 .activity-step {

@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Designskiss - matchningsunderlag</title>
+    <link href="../vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="matchningsunderlag.css">
+  </head>
+  <body>
+    <header class="prototype-header">
+      <div>
+        <div class="prototype-kicker">FöräldraMentorer</div>
+        <h1>Matchningsunderlag</h1>
+      </div>
+      <div class="prototype-state"><span aria-hidden="true"></span>Fristående designskiss</div>
+    </header>
+
+    <nav class="view-switch" aria-label="Välj perspektiv">
+      <button type="button" class="active" data-view="parent" aria-pressed="true">Förälderns vy</button>
+      <button type="button" data-view="mentor" aria-pressed="false">Mentorns vy</button>
+      <button type="button" data-view="coordinator" aria-pressed="false">Handläggarens vy</button>
+    </nav>
+
+    <main>
+      <div class="prototype-notice" role="note">
+        <strong>Skissläge</strong>
+        <span>Uppgifterna används bara i den här sidan och sparas inte.</span>
+      </div>
+
+      <section id="parentView" class="prototype-view" data-view-panel="parent">
+        <div class="view-heading">
+          <div>
+            <div class="eyebrow">Förälderns perspektiv</div>
+            <h2>Vad vill du ha stöd med?</h2>
+            <p>Välj det som är viktigast just nu. Du kan välja högst tre områden.</p>
+          </div>
+          <div class="selection-counter"><strong id="parentAreaCount">2</strong><span>av 3 valda</span></div>
+        </div>
+
+        <fieldset class="form-section">
+          <legend>Stödområden</legend>
+          <p class="section-help">Områdena beskriver vardagssituationer där en mentor kan lyssna, dela erfarenheter och hjälpa till att prova praktiska steg. De innebär inte behandling eller professionell rådgivning.</p>
+          <div id="parentAreas" class="option-grid">
+            <label class="choice-tile"><input type="checkbox" value="Vardagsstruktur och planering" data-detail="Morgnar och kvällar|Planera veckan|Förändringar och övergångar"><span><strong>Vardagsstruktur och planering</strong><small>Att få vardagen mer förutsägbar. Exempel: lugnare morgnar, planera veckan eller förbereda förändringar.</small></span></label>
+            <label class="choice-tile"><input type="checkbox" value="Kontakt och relation till barnet" data-detail="Prata och lyssna|Positiv tid tillsammans|Stödja självständighet"><span><strong>Kontakt och relation till barnet</strong><small>Att stärka den vardagliga kontakten. Exempel: lyssna bättre, hitta positiv tid tillsammans eller stödja självständighet.</small></span></label>
+            <label class="choice-tile selected"><input type="checkbox" value="Konflikter, gränser och överenskommelser" data-detail="Återkommande konflikter|Sätta gränser|Göra överenskommelser" checked><span><strong>Konflikter, gränser och överenskommelser</strong><small>Att hantera återkommande vardagsbråk. Exempel: lugna ett spänt läge, sätta tydliga gränser eller göra överenskommelser.</small></span></label>
+            <label class="choice-tile"><input type="checkbox" value="Stress, återhämtning och trygghet i föräldrarollen" data-detail="Stress i vardagen|Dåligt samvete|Be om hjälp"><span><strong>Stress och trygghet i föräldrarollen</strong><small>Att stå stadigare i vardagen. Exempel: sortera det som pressar, hitta återhämtning eller våga be andra om hjälp.</small></span></label>
+            <label class="choice-tile"><input type="checkbox" value="Föräldrasamarbete och förändringar i familjen" data-detail="Samarbeta med annan förälder|Separation|Ny familjekonstellation"><span><strong>Föräldrasamarbete och familjeförändringar</strong><small>Att få vardagen att fungera vid förändring. Exempel: kommunikation mellan föräldrar, separation eller en ny familjekonstellation.</small></span></label>
+            <label class="choice-tile selected"><input type="checkbox" value="Skola, skolnärvaro och lärande" data-detail="Komma iväg till skolan|Kontakt med skolan|Läxor och studiero" checked><span><strong>Skola, skolnärvaro och lärande</strong><small>Att stödja barnets skolvardag. Exempel: komma iväg på morgonen, förbereda skolkontakt eller skapa rutiner för läxor.</small></span></label>
+            <label class="choice-tile"><input type="checkbox" value="Fritid, gemenskap och socialt nätverk" data-detail="Hitta fritidsaktivitet|Social gemenskap|Stöd från närstående"><span><strong>Fritid, gemenskap och nätverk</strong><small>Att hitta stärkande sammanhang. Exempel: söka en passande aktivitet, närma sig social gemenskap eller aktivera stöd från närstående.</small></span></label>
+            <label class="choice-tile"><input type="checkbox" value="Kontakter med skola, kommun och andra verksamheter" data-detail="Förbereda möte|Förstå vem som ansvarar|Förbereda frågor"><span><strong>Kontakter med verksamheter</strong><small>Att känna sig mer förberedd i kontakter. Exempel: formulera frågor, förbereda ett möte eller förstå vem man kan vända sig till.</small></span></label>
+          </div>
+          <p id="parentAreaLimit" class="field-message" role="status"></p>
+        </fieldset>
+
+        <div data-scope-guide></div>
+
+        <fieldset class="form-section">
+          <legend>Vad är viktigast att få att fungera bättre?</legend>
+          <div id="parentDetails" class="detail-options" aria-live="polite"></div>
+          <label class="field-block" for="parentSituation">
+            <span>Beskriv kort med egna ord</span>
+            <textarea id="parentSituation" rows="3">Morgnarna blir ofta stressiga och det slutar lätt i konflikt när mitt barn ska komma iväg till skolan.</textarea>
+            <small>Skriv inte personnummer eller detaljerade hälso- och journaluppgifter. Beskriv bara det som behövs för att förstå önskemålet om stöd.</small>
+          </label>
+        </fieldset>
+
+        <fieldset class="form-section">
+          <legend>Önskemål och praktiska förutsättningar</legend>
+          <div class="form-grid">
+            <label class="field-block"><span>Önskar du en mentor med liknande erfarenhet?</span><select id="sharedExperiencePreference"><option>Osäker</option><option selected>Ja, om möjligt</option><option>Det spelar ingen roll</option></select><small>Önskemålet vägs samman med stödområde, tillgänglighet och andra praktiska förutsättningar.</small></label>
+            <label class="field-block"><span>Språk</span><select><option selected>Svenska</option><option>Arabiska</option><option>Finska</option><option>Engelska</option></select></label>
+            <label class="field-block"><span>Kontaktform</span><select><option selected>Fysiskt eller digitalt</option><option>Helst fysiskt</option><option>Helst digitalt</option></select></label>
+            <label class="field-block"><span>Tider</span><select><option>Vardagar dagtid</option><option selected>Vardagskvällar</option><option>Helger</option></select></label>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <span>Underlaget granskas tillsammans med en handläggare.</span>
+          <button type="button" class="primary-action" data-go-view="coordinator">Visa hur underlaget används</button>
+        </div>
+      </section>
+
+      <section id="mentorView" class="prototype-view" data-view-panel="mentor" hidden>
+        <div class="view-heading">
+          <div>
+            <div class="eyebrow">Mentorns perspektiv</div>
+            <h2>Vad känner du dig trygg att vara stöd kring?</h2>
+            <p>Markera bara områden där du vill bli matchad och bedömer att du kan ge vardagsnära stöd. Du kan ändra dina val senare.</p>
+          </div>
+          <div class="selection-counter"><strong id="mentorAreaCount">3</strong><span>av 5 valda</span></div>
+        </div>
+
+        <fieldset class="form-section">
+          <legend>Områden</legend>
+          <p class="section-help">Välj bara områden där du vill använda din erfarenhet för att ge vardagsnära stöd. Exemplen visar situationer som kan ingå, men du förväntas inte vara expert eller företräda föräldern.</p>
+          <div id="mentorAreas" class="compact-options">
+            <label><input type="checkbox" value="Vardagsstruktur och planering" checked><span><strong>Vardagsstruktur och planering</strong><small>Exempel: morgonrutiner, veckoplanering och förändringar.</small></span></label>
+            <label><input type="checkbox" value="Kontakt och relation till barnet"><span><strong>Kontakt och relation till barnet</strong><small>Exempel: lyssnande, positiv tid och självständighet.</small></span></label>
+            <label><input type="checkbox" value="Konflikter, gränser och överenskommelser" checked><span><strong>Konflikter, gränser och överenskommelser</strong><small>Exempel: vardagsbråk, tydliga gränser och gemensamma överenskommelser.</small></span></label>
+            <label><input type="checkbox" value="Stress, återhämtning och trygghet i föräldrarollen"><span><strong>Stress och trygghet i föräldrarollen</strong><small>Exempel: vardagspress, återhämtning och att be om hjälp.</small></span></label>
+            <label><input type="checkbox" value="Föräldrasamarbete och förändringar i familjen"><span><strong>Föräldrasamarbete och familjeförändringar</strong><small>Exempel: samarbete, separation och nya familjeförhållanden.</small></span></label>
+            <label><input type="checkbox" value="Skola, skolnärvaro och lärande" checked><span><strong>Skola, skolnärvaro och lärande</strong><small>Exempel: skolmorgnar, skolkontakt och läxrutiner.</small></span></label>
+            <label><input type="checkbox" value="Fritid, gemenskap och socialt nätverk"><span><strong>Fritid, gemenskap och nätverk</strong><small>Exempel: aktiviteter, sociala sammanhang och stöd från närstående.</small></span></label>
+            <label><input type="checkbox" value="Kontakter med skola, kommun och andra verksamheter"><span><strong>Kontakter med verksamheter</strong><small>Exempel: förbereda frågor, möten och hitta rätt kontaktväg.</small></span></label>
+          </div>
+          <p id="mentorAreaLimit" class="field-message" role="status"></p>
+        </fieldset>
+
+        <div data-scope-guide></div>
+
+        <section class="form-section" aria-labelledby="experienceHeading">
+          <div class="section-heading-row"><h3 id="experienceHeading">Bedöm din trygghet inom valda områden</h3><span>Fylls i per valt område</span></div>
+          <p class="section-help">Bedöm hur trygg du känner dig i att lyssna, dela erfarenheter och ge vardagsnära stöd. Ange därefter vad bedömningen bygger på. Handläggaren gör alltid en samlad bedömning inför en matchning.</p>
+          <div id="mentorExperienceRows" class="experience-rows"></div>
+        </section>
+
+        <fieldset class="form-section">
+          <legend>Ytterligare erfarenheter <span class="optional-label">Valfritt</span></legend>
+          <p class="section-help">Markera bara erfarenheter som du vill att en behörig handläggare ska kunna väga in som kompletterande information.</p>
+          <div class="tag-options">
+            <label><input type="checkbox" checked> Skolfrånvaro</label>
+            <label><input type="checkbox" checked> Behov av extra tydlighet i vardagen</label>
+            <label><input type="checkbox"> Separation eller växelvist boende</label>
+            <label><input type="checkbox"> Ensamstående föräldraskap</label>
+            <label><input type="checkbox"> Ny i Sverige</label>
+            <label><input type="checkbox"> Begränsat socialt nätverk</label>
+          </div>
+          <p class="data-use-note">Uppgifterna avgör aldrig en matchning automatiskt. Handläggaren gör en samlad bedömning och stämmer av med båda parter.</p>
+        </fieldset>
+
+        <fieldset class="form-section">
+          <legend>Tillgänglighet</legend>
+          <div class="form-grid">
+            <label class="field-block"><span>Språk</span><input value="Svenska, engelska"></label>
+            <label class="field-block"><span>Mötesform</span><select><option selected>Fysiskt eller digitalt</option><option>Endast fysiskt</option><option>Endast digitalt</option></select></label>
+            <label class="field-block"><span>Tillgängliga tider</span><select><option selected>Vardagskvällar</option><option>Vardagar dagtid</option><option>Helger</option></select></label>
+            <label class="field-block"><span>Ledig kapacitet</span><select><option selected>1 nytt uppdrag</option><option>2 nya uppdrag</option><option>Inte tillgänglig</option></select></label>
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <span>Handläggaren stämmer av uppgifterna med dig innan de används i en matchning.</span>
+          <button type="button" class="primary-action" data-go-view="coordinator">Visa hur uppgifterna används</button>
+        </div>
+      </section>
+
+      <section id="coordinatorView" class="prototype-view" data-view-panel="coordinator" hidden>
+        <div class="view-heading">
+          <div>
+            <div class="eyebrow">Handläggarens perspektiv</div>
+            <h2>Bedöm matchningsförslag</h2>
+            <p>Systemet visar överlapp och praktiska villkor. Handläggaren gör helhetsbedömningen.</p>
+          </div>
+          <span class="status-badge">3 möjliga mentorer</span>
+        </div>
+
+        <section class="case-context" aria-labelledby="caseContextHeading">
+          <div><span>Stödärende</span><strong>FM-26-00128</strong></div>
+          <div><span>Förälder</span><strong>Nora Mahmoud</strong></div>
+          <div><span>Prioriterade områden</span><strong id="coordinatorParentAreas">Konflikter · Skola</strong></div>
+          <div><span>Praktiskt krav</span><strong>Svenska · kvällstid</strong></div>
+        </section>
+        <div class="parallel-support-note" role="note">
+          <div><span>Parallellt professionellt stöd</span><strong>Kontakt med barn- och ungdomspsykiatrin finns</strong></div>
+          <div><span>Mentorskapets kompletterande roll</span><strong>Vardagsstruktur, förberedelse inför kontakter och stöd mellan vårdtillfällen</strong></div>
+          <div><span>Avgränsning att bekräfta</span><strong>Mentorn ger inte vård, behandlingsråd eller akuthjälp</strong></div>
+        </div>
+
+        <div class="matching-layout">
+          <section aria-labelledby="candidateHeading">
+            <div class="section-heading-row"><h3 id="candidateHeading">Mentorer att bedöma</h3><span>Sorterat efter överlapp, inte ett automatiskt beslut</span></div>
+            <div class="candidate-list">
+              <label class="candidate-row selected">
+                <input type="radio" name="mentorCandidate" value="Elin Berg" checked>
+                <div class="candidate-main"><strong>Elin Berg</strong><span class="match-label strong">Stämmer väl med underlaget</span><small>Godkänd · 1 ledigt uppdrag</small></div>
+                <div class="candidate-reasons"><span>2 av 2 huvudområden</span><span>Mycket god trygghet inom skolområdet</span><span>Svenska · kvällstid</span></div>
+              </label>
+              <label class="candidate-row">
+                <input type="radio" name="mentorCandidate" value="Bo Karlsson">
+                <div class="candidate-main"><strong>Bo Karlsson</strong><span class="match-label">Behöver bedömas</span><small>Godkänd · 2 lediga uppdrag</small></div>
+                <div class="candidate-reasons"><span>1 av 2 prioriterade områden</span><span>Ingen erfarenhet av skolfrånvaro angiven</span><span>Svenska · kvällstid</span></div>
+              </label>
+              <label class="candidate-row">
+                <input type="radio" name="mentorCandidate" value="Samira Haddad">
+                <div class="candidate-main"><strong>Samira Haddad</strong><span class="match-label caution">Tiden stämmer inte</span><small>Godkänd · 1 ledigt uppdrag</small></div>
+                <div class="candidate-reasons"><span>2 av 2 huvudområden</span><span>Relevant vardagserfarenhet</span><span>Endast dagtid</span></div>
+              </label>
+            </div>
+          </section>
+
+          <aside class="assessment-panel" aria-labelledby="assessmentHeading">
+            <div class="eyebrow">Vald mentor</div>
+            <h3 id="assessmentHeading">Elin Berg</h3>
+            <dl>
+              <div><dt>Överlapp</dt><dd>Konflikter och skola</dd></div>
+              <div><dt>Erfarenhetsgrund</dt><dd>Egen erfarenhet samt erfarenhet av att stödja andra</dd></div>
+              <div><dt>Självskattad trygghet</dt><dd>Mycket god inom skola, god inom konflikter</dd></div>
+              <div><dt>Behöver bekräftas</dt><dd>Att fysisk mötesplats fungerar</dd></div>
+            </dl>
+            <label class="field-block"><span>Handläggarens motivering</span><textarea rows="4">Mentorn har relevant erfarenhet inom båda prioriterade områdena och uppfyller språk- och tidsönskemålen.</textarea></label>
+            <div class="decision-actions"><button type="button" class="secondary-action">Välj ingen mentor nu</button><button id="continueWithMentor" type="button" class="primary-action">Fortsätt med Elin Berg</button></div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <script src="matchningsunderlag.js"></script>
+  </body>
+</html>

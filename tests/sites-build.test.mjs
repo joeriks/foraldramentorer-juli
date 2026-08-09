@@ -49,7 +49,7 @@ test("serves the application shell", async () => {
   assert.match(html, /<form id="personEditForm"[\s\S]*id="cancelPersonEditButton"[\s\S]*id="savePersonEditButton"[\s\S]*<\/form>/);
   assert.doesNotMatch(html, /form="personEditForm"/);
   assert.doesNotMatch(html, /id="caseTypeAdminModal"/);
-  assert.match(html, /Godkännande av mentor/);
+  assert.match(html, /id="caseTypeCreationModeFact"/);
   assert.match(html, /Registrerad av/);
   assert.match(html, /krävs för detta resultat/);
   assert.doesNotMatch(html, /certifiera/i);
@@ -63,7 +63,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   const scriptText = await script.text();
   assert.match(scriptText, /CASE_ACTIVITIES_STORE/);
   assert.match(scriptText, /#\/case-types\/\$\{encodeURIComponent\(definition\.id\)\}/);
-  assert.match(scriptText, /#\/activity-types\/\$\{encodeURIComponent\(definition\.id\)\}/);
+  assert.match(scriptText, /function activityTemplateAdminRoute/);
   assert.match(scriptText, /renderRoutineFlowDiagrams/);
   assert.match(scriptText, /routineProcessLink/);
   assert.match(scriptText, /if \(nextStatus === "completed"\) selectedCaseActivityId = null;/);
@@ -135,6 +135,27 @@ test("serves application assets and returns 404 for unknown files", async () => 
     headers: { accept: "image/png" }
   }), {}, context);
   assert.equal(missing.status, 404);
+});
+
+test("serves the standalone matching prototype without changing the application shell", async () => {
+  const page = await worker.fetch(new Request("https://example.test/prototypes/matchningsunderlag.html"), {}, context);
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get("content-type"), /^text\/html/);
+  const html = await page.text();
+  assert.match(html, /Fristående designskiss/);
+  assert.match(html, /Förälderns vy/);
+  assert.match(html, /Mentorns vy/);
+  assert.match(html, /Handläggarens vy/);
+  assert.doesNotMatch(html, /id="dashboardView"/);
+
+  const stylesheet = await worker.fetch(new Request("https://example.test/prototypes/matchningsunderlag.css"), {}, context);
+  assert.equal(stylesheet.status, 200);
+  assert.match(stylesheet.headers.get("content-type"), /^text\/css/);
+
+  const script = await worker.fetch(new Request("https://example.test/prototypes/matchningsunderlag.js"), {}, context);
+  assert.equal(script.status, 200);
+  assert.match(script.headers.get("content-type"), /^text\/javascript/);
+  assert.match(await script.text(), /complexSupportTopics/);
 });
 
 test("support endpoint keeps the key server-side and disables OpenAI storage", async () => {
