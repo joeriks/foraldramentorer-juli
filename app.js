@@ -2196,15 +2196,21 @@ function exampleTemplates(count) {
   });
 }
 
+const EXAMPLE_DATA_VERSION = 5;
+
 function buildExampleDataset(count) {
   const now = new Date().toISOString();
   return exampleTemplates(count).map((candidate, index) => {
     const id = crypto.randomUUID();
     const identityVerified = Boolean(candidate.checks?.identityVerified);
-    const coordinator = count === 1 ? candidate.coordinator : index % 2 === 0 ? "" : candidate.coordinator;
+    const assignedHandler = count === 1 || index % 2 === 1
+      ? seedHandlers.find((handler) => handler.name === candidate.coordinator) || null
+      : null;
+    const coordinator = assignedHandler?.name || "";
     const checkMeta = buildCheckMeta(candidate.checks, {
       checkedAt: now,
-      checkedBy: coordinator || "System"
+      checkedBy: coordinator || "System",
+      note: "Kontrollen är registrerad som sammanhängande prototypdata."
     });
     return {
       ...candidate,
@@ -2212,7 +2218,7 @@ function buildExampleDataset(count) {
       checks: { ...candidate.checks },
       checkMeta,
       id,
-      coordinatorId: "",
+      coordinatorId: assignedHandler?.id || "",
       coordinator,
       personalNumber: makeExamplePersonalNumber(index),
       identityMethod: identityVerified ? (index % 2 === 0 ? "bankid" : "physical_id") : "",
@@ -2223,8 +2229,10 @@ function buildExampleDataset(count) {
         { areaId: SUPPORT_AREAS[(index + 3) % SUPPORT_AREAS.length].id, confidenceLevel: "good", experienceLevels: ["lived"], verified: false },
         { areaId: SUPPORT_AREAS[(index + 7) % SUPPORT_AREAS.length].id, confidenceLevel: index % 2 ? "some" : "good", experienceLevels: ["practical"], verified: false }
       ],
+      meetingModes: index % 3 === 0 ? ["physical", "digital"] : index % 3 === 1 ? ["physical"] : ["digital", "phone"],
+      availableAssignmentCapacity: candidate.status === "Godkänd" ? 1 + (index % 2) : 0,
       exampleData: true,
-      exampleDataVersion: 4,
+      exampleDataVersion: EXAMPLE_DATA_VERSION,
       exampleDatasetSize: count,
       caseNumber: formatSequentialCaseNumber(index + 1),
       history: [
@@ -2258,7 +2266,8 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
   const parentNames = ["Nora Mahmoud", "Emil Svensson", "Leila Hassan", "Johan Berg", "Mariam Ali", "Sofia Nilsson", "Ahmed Rahimi", "Elin Karlsson"];
   const records = {
     [PARENTS_STORE]: [], [CASES_STORE]: [], [CASE_ASSIGNMENTS_STORE]: [], [CASE_ACTIVITIES_STORE]: [],
-    [CASE_EVENTS_STORE]: [], [MENTOR_REPORTS_STORE]: [], [PARENT_CHECK_INS_STORE]: [], [COMPENSATION_PERIODS_STORE]: []
+    [CASE_DOCUMENTS_STORE]: [], [CASE_EVENTS_STORE]: [], [ACTIVITY_DEVIATIONS_STORE]: [], [CASE_MEETINGS_STORE]: [],
+    [MENTOR_REPORTS_STORE]: [], [PARENT_CHECK_INS_STORE]: [], [COMPENSATION_PERIODS_STORE]: []
   };
   let nextExampleSequence = count + 1;
   const nextExampleCaseNumber = () => formatSequentialCaseNumber(nextExampleSequence++);
@@ -2271,7 +2280,28 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
     matchingPartyResponses: "Parternas svar har registrerats var för sig i matchningsärendet.",
     matchingDecision: "Det samlade matchningsutfallet har registrerats i ärendet."
   };
-  const addActivities = (caseId, type, mode = "open", matchingResult = "accepted", completedBy = CURRENT_USER_ID) => {
+  const workflowDemoNotes = {
+    "Komplettera stödbehov och matchningskriterier": "Stödets syfte, önskat resultat, stödområden och praktiska förutsättningar har stämts av med föräldern.",
+    "Bekräfta att föräldern vill gå vidare": "Föräldern har bekräftat att hen vill gå vidare till matchning.",
+    "Bekräfta uppdragets ramar": "Uppdragets period, kontaktfrekvens, kontaktform och första uppföljning har överenskommits.",
+    "Genomför första avstämning": "Föräldern har kontaktats och bekräftat att kontakten med mentorn har kommit igång.",
+    "Följ upp efter fyra veckor": "Uppföljningen visar att kontakten fortsätter enligt plan.",
+    "Sammanställ mötes- och ersättningsunderlag": "Mentorns rapport och förälderns återkoppling har jämförts för aktuell ersättningsperiod.",
+    "Utvärdera och avsluta uppdraget": "Uppdragets resultat har stämts av med föräldern och mentorn."
+  };
+  const activityKey = (templateId, title) => templateId === AD_HOC_ACTIVITY_TEMPLATE_ID ? title : templateId;
+  const addServiceNote = (caseId, activity, description, createdBy) => {
+    if (!description) return;
+    records[CASE_DOCUMENTS_STORE].push({
+      id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, activityId: activity.id, meetingId: null,
+      type: "service_note", title: `Tjänsteanteckning: ${activity.title}`, description,
+      documentDate: today, storageObjectId: null, mimeType: null, sizeBytes: null, checksum: null,
+      informationClass: "normal", supersedesDocumentId: null, createdAt: now, createdBy
+    });
+  };
+  const addActivities = (caseId, type, {
+    completed = [], inProgress = [], waiting = [], notApplicable = [], resultCodes = {}, notes = {}, completedBy = CURRENT_USER_ID
+  } = {}) => {
     const configuredActivities = [
       ...(type.activityTemplateIds || []).map((templateId) => {
         const template = activityTemplateById(templateId);
@@ -2279,21 +2309,38 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       }),
       ...(type.suggestedActivities || []).map((title) => ({ templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, title }))
     ];
-    records[CASE_ACTIVITIES_STORE].push(...configuredActivities.map(({ templateId, title }, sortOrder) => {
-      const completed = mode === "closed" || sortOrder === 0;
-      let resultCode = completed ? activityTemplateById(templateId).results[0]?.[0] || "completed" : null;
-      if (completed && matchingResult === "declined" && templateId === "matchingPartyResponses") resultCode = "parent_declines";
-      if (completed && matchingResult === "declined" && templateId === "matchingDecision") resultCode = "new_proposal_needed";
-      return {
+    const completedKeys = new Set(completed);
+    const inProgressKeys = new Set(inProgress);
+    const waitingKeys = new Set(waiting);
+    const notApplicableKeys = new Set(notApplicable);
+    const activities = configuredActivities.map(({ templateId, title }, sortOrder) => {
+      const key = activityKey(templateId, title);
+      const status = completedKeys.has(key)
+        ? "completed"
+        : inProgressKeys.has(key)
+          ? "in_progress"
+          : waitingKeys.has(key)
+            ? "waiting"
+            : notApplicableKeys.has(key)
+              ? "not_applicable"
+              : "not_started";
+      const resultCode = status === "completed"
+        ? resultCodes[key] || activityTemplateById(templateId).results[0]?.[0] || "completed"
+        : null;
+      const activity = {
         id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, templateId, templateVersion: 1, title,
-        status: completed ? "completed" : "not_started", resultCode,
-        resultClassification: completed ? resultClassification(templateId, resultCode) : null,
-        handlerIdOverride: null, waitingForParty: null, dueDate: null, sortOrder, version: 1,
-        note: completed ? matchingDemoNotes[templateId] || null : null,
+        status, resultCode,
+        resultClassification: status === "completed" ? resultClassification(templateId, resultCode) : null,
+        handlerIdOverride: null, waitingForParty: status === "waiting" ? "external" : null,
+        dueDate: status === "waiting" ? today : null, sortOrder, version: 1,
         createdAt: now, createdBy: completedBy, updatedAt: now, updatedBy: completedBy,
-        completedAt: completed ? now : null, completedBy: completed ? completedBy : null
+        completedAt: status === "completed" ? now : null, completedBy: status === "completed" ? completedBy : null
       };
-    }));
+      if (status === "completed") addServiceNote(caseId, activity, notes[key] || matchingDemoNotes[key] || workflowDemoNotes[key], completedBy);
+      return activity;
+    });
+    records[CASE_ACTIVITIES_STORE].push(...activities);
+    return activities;
   };
   const addEvent = (caseId, eventType, message) => records[CASE_EVENTS_STORE].push(caseEventRecord({ caseId, eventType, entityType: "case", entityId: caseId, message, idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now }));
 
@@ -2302,7 +2349,15 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
     const ownerId = ownerIds[parentIndex % ownerIds.length];
     const baseName = parentNames[parentIndex % parentNames.length];
     const parentName = parentIndex < parentNames.length ? baseName : `${baseName} ${parentIndex + 1}`;
-    const parent = { id: parentId, tenantId: DEFAULT_TENANT_ID, name: parentName, contactDetails: `070-555 ${String(1000 + parentIndex).slice(-4)}`, informationStatus: "provided", area: ["Centrum", "Öster", "Väster", "Norr", "Söder"][parentIndex % 5], languages: parentIndex % 3 === 0 ? "Svenska, arabiska" : "Svenska", availability: parentIndex % 2 ? "Vardagskvällar" : "Dagtid", active: true, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, exampleData: true, exampleDataVersion: 4, exampleDatasetSize: count };
+    const parent = {
+      id: parentId, tenantId: DEFAULT_TENANT_ID, name: parentName,
+      contactDetails: `070-555 ${String(1000 + parentIndex).slice(-4)}`,
+      informationStatus: "provided", area: ["Centrum", "Öster", "Väster", "Norr", "Söder"][parentIndex % 5],
+      languages: parentIndex % 3 === 0 ? "Svenska, arabiska" : "Svenska",
+      availability: parentIndex % 2 ? "Vardagskvällar" : "Dagtid",
+      active: true, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId,
+      exampleData: true, exampleDataVersion: EXAMPLE_DATA_VERSION, exampleDatasetSize: count
+    };
     records[PARENTS_STORE].push(parent);
 
     const needsForParent = count > 1 && parentIndex % 4 === 0 ? 2 : 1;
@@ -2310,12 +2365,41 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       const workflowIndex = records[CASES_STORE].filter((item) => item.caseTypeId === "parent-support").length;
       const [supportPurpose, desiredOutcome, supportAreaIds] = supportExamples[(parentIndex + needIndex) % supportExamples.length];
       const phase = count === 1 ? 0 : workflowIndex % 5;
+      const supportProfileComplete = phase !== 2;
       const supportCaseId = crypto.randomUUID();
       const supportNumber = nextExampleCaseNumber();
-      const supportCase = { id: supportCaseId, tenantId: DEFAULT_TENANT_ID, number: supportNumber, caseTypeId: supportType.id, caseTypeVersion: supportType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: supportType.name, title: supportPurpose, description: `Föräldern önskar ${supportPurpose.toLowerCase()}.`, details: { supportPurpose, desiredOutcome, supportAreaIds, area: parent.area, languages: parent.languages }, mentorId: null, parentId, supportCaseId: null, sourceMatchingCaseId: null, status: "in_progress", priority: "normal", dueDate: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: null, closedBy: null, exampleData: true, exampleDataVersion: 4 };
+      const supportCase = {
+        id: supportCaseId, tenantId: DEFAULT_TENANT_ID, number: supportNumber,
+        caseTypeId: supportType.id, caseTypeVersion: supportType.version,
+        organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: supportType.name,
+        title: supportPurpose, description: `Föräldern önskar ${supportPurpose.toLowerCase()}.`,
+        details: {
+          supportPurpose,
+          desiredOutcome: supportProfileComplete ? desiredOutcome : "",
+          supportAreaIds: supportProfileComplete ? [...supportAreaIds] : [supportAreaIds[0]],
+          supportAreaStatus: supportProfileComplete ? "confirmed" : "preliminary",
+          area: parent.area,
+          languages: parent.languages,
+          availability: parent.availability,
+          preferredMeetingModes: parentIndex % 2 ? ["digital", "phone"] : ["physical", "phone"],
+          sharedExperiencePreference: parentIndex % 3 === 0 ? "important" : "helpful",
+          complementarySupport: parentIndex % 4 === 0
+            ? { active: true, area: "Skola eller vård", note: "Mentorn ska vara ett kompletterande vardagsstöd, inte ersätta professionella insatser." }
+            : { active: false, area: "", note: "" }
+        },
+        mentorId: null, parentId, supportCaseId: null, sourceMatchingCaseId: null,
+        status: supportProfileComplete ? "closed" : "in_progress", priority: "normal", dueDate: null, version: 1,
+        createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId,
+        closedAt: supportProfileComplete ? now : null, closedBy: supportProfileComplete ? ownerId : null,
+        exampleData: true, exampleDataVersion: EXAMPLE_DATA_VERSION
+      };
       records[CASES_STORE].push(supportCase);
       addAssignment(supportCaseId, ownerId);
-      addActivities(supportCaseId, supportType, "open", "accepted", ownerId);
+      addActivities(supportCaseId, supportType, {
+        completed: supportProfileComplete ? supportType.suggestedActivities : [],
+        inProgress: supportProfileComplete ? [] : [supportType.suggestedActivities[0]],
+        completedBy: ownerId
+      });
       addEvent(supportCaseId, "case_created", `Stödärendet ${supportNumber} registrerades som prototypdata`);
 
       if (phase === 2 || !approvedMentors.length) continue;
@@ -2324,24 +2408,162 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       const matchingNumber = nextExampleCaseNumber();
       const accepted = phase === 0 || phase === 4;
       const declined = phase === 3;
-      const matchingCase = { id: matchingCaseId, tenantId: DEFAULT_TENANT_ID, number: matchingNumber, caseTypeId: matchingType.id, caseTypeVersion: matchingType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: matchingType.name, title: `Matchning för ${supportPurpose}`, description: "Pröva föreslagen mentor mot det avgränsade stödbehovet.", details: { parentResponse: accepted ? "accepted" : declined ? "declined" : "pending", mentorResponse: accepted ? "accepted" : "pending", matchingOutcome: accepted ? "accepted" : declined ? "declined" : "pending", matchingNote: accepted ? "Båda parter har accepterat förslaget." : declined ? "Föräldern önskar ett annat förslag." : "Inväntar svar från parterna." }, mentorId: mentor.id, parentId, supportCaseId, sourceMatchingCaseId: null, status: accepted || declined ? "closed" : "in_progress", priority: "normal", dueDate: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: accepted || declined ? now : null, closedBy: accepted || declined ? ownerId : null, exampleData: true, exampleDataVersion: 4 };
+      const matchingCase = {
+        id: matchingCaseId, tenantId: DEFAULT_TENANT_ID, number: matchingNumber,
+        caseTypeId: matchingType.id, caseTypeVersion: matchingType.version,
+        organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: matchingType.name,
+        title: `Matchning för ${supportPurpose}`,
+        description: "Pröva föreslagen mentor mot det avgränsade stödbehovet.",
+        details: {
+          matchingProposal: `${mentor.name} föreslås eftersom registrerade stödområden och praktiska förutsättningar överlappar förälderns behov. Handläggaren ska bekräfta förslaget med båda parter.`,
+          parentResponse: accepted ? "accepted" : declined ? "declined" : "accepted",
+          mentorResponse: accepted ? "accepted" : declined ? "declined" : "waiting",
+          matchingOutcome: accepted ? "accepted" : declined ? "declined" : "pending",
+          matchingNote: accepted
+            ? "Båda parter har accepterat samma förslag."
+            : declined
+              ? "Föräldern och mentorn har tackat nej till förslaget. Ett nytt förslag kan registreras i ett nytt matchningsärende."
+              : "Föräldern har accepterat. Mentorns svar inväntas."
+        },
+        mentorId: mentor.id, parentId, supportCaseId, sourceMatchingCaseId: null,
+        status: accepted || declined ? "closed" : "waiting", priority: "normal", dueDate: accepted || declined ? null : today,
+        version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId,
+        closedAt: accepted || declined ? now : null, closedBy: accepted || declined ? ownerId : null,
+        exampleData: true, exampleDataVersion: EXAMPLE_DATA_VERSION
+      };
       records[CASES_STORE].push(matchingCase);
       addAssignment(matchingCaseId, ownerId);
-      addActivities(matchingCaseId, matchingType, accepted || declined ? "closed" : "open", declined ? "declined" : "accepted", ownerId);
+      const matchingCompleted = accepted
+        ? matchingType.activityTemplateIds
+        : declined
+          ? matchingType.activityTemplateIds.filter((templateId) => templateId !== "matchingFirstMeeting")
+          : ["matchingEligibility", "matchingProposal"];
+      const matchingActivities = addActivities(matchingCaseId, matchingType, {
+        completed: matchingCompleted,
+        waiting: accepted || declined ? [] : ["matchingMentorContact", "matchingFirstMeeting", "matchingPartyResponses", "matchingDecision"],
+        notApplicable: declined ? ["matchingFirstMeeting"] : [],
+        resultCodes: declined ? {
+          matchingMentorContact: "mentor_declines",
+          matchingPartyResponses: "both_decline",
+          matchingDecision: "match_rejected"
+        } : {},
+        completedBy: ownerId
+      });
+      const firstMeetingActivity = matchingActivities.find((activity) => activity.templateId === "matchingFirstMeeting");
+      if (accepted && firstMeetingActivity) {
+        records[CASE_MEETINGS_STORE].push({
+          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: matchingCaseId, activityId: firstMeetingActivity.id,
+          meetingType: "other", occurredAt: now, mode: parentIndex % 2 ? "digital" : "physical",
+          summary: "Första mötet är bokat och praktiska förutsättningar har bekräftats med båda parter.",
+          nextStep: "Mentoruppdraget kan planeras när matchningen har avslutats.",
+          participantHandlerIds: [ownerId], externalParticipantNames: [], supersedesMeetingId: null,
+          supersededByMeetingId: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId
+        });
+      }
       addEvent(matchingCaseId, "case_created", `Matchningen ${matchingNumber} skapades från ${supportNumber}`);
       if (!accepted) continue;
 
       const assignmentCaseId = crypto.randomUUID();
       const assignmentNumber = nextExampleCaseNumber();
       const concern = phase === 4;
-      const assignmentCase = { id: assignmentCaseId, tenantId: DEFAULT_TENANT_ID, number: assignmentNumber, caseTypeId: assignmentType.id, caseTypeVersion: assignmentType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: assignmentType.name, title: `Mentoruppdrag: ${supportPurpose}`, description: desiredOutcome, details: { supportPurpose, desiredOutcome, supportAreaIds: [...supportAreaIds], assignmentPlan: { startDate: monthStart, endDate: `${today.slice(0, 4)}-12-31`, contactFrequency: "weekly", contactMode: "physical", firstFollowUpDate: today, followUpFrequency: "monthly", reportDeadlineDays: 3, note: "Mentorn kontaktar handläggaren vid avvikelse eller oro.", updatedAt: now, updatedBy: ownerId } }, mentorId: mentor.id, parentId, supportCaseId, sourceMatchingCaseId: matchingCaseId, status: concern ? "decision_required" : "in_progress", priority: concern ? "high" : "normal", dueDate: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId, closedAt: null, closedBy: null, exampleData: true, exampleDataVersion: 4 };
+      const assignmentCase = {
+        id: assignmentCaseId, tenantId: DEFAULT_TENANT_ID, number: assignmentNumber,
+        caseTypeId: assignmentType.id, caseTypeVersion: assignmentType.version,
+        organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: assignmentType.name,
+        title: `Mentoruppdrag: ${supportPurpose}`, description: desiredOutcome,
+        details: {
+          supportPurpose, desiredOutcome, supportAreaIds: [...supportAreaIds],
+          assignmentPlan: {
+            startDate: monthStart, endDate: `${today.slice(0, 4)}-12-31`, contactFrequency: "weekly",
+            contactMode: parentIndex % 2 ? "digital" : "physical", firstFollowUpDate: today,
+            followUpFrequency: "monthly", reportDeadlineDays: 3,
+            note: "Mentorn kontaktar handläggaren vid avvikelse, oro eller tydligt förändrat stödbehov.",
+            updatedAt: now, updatedBy: ownerId
+          }
+        },
+        mentorId: mentor.id, parentId, supportCaseId, sourceMatchingCaseId: matchingCaseId,
+        status: concern ? "decision_required" : "in_progress", priority: concern ? "high" : "normal",
+        dueDate: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId,
+        closedAt: null, closedBy: null, exampleData: true, exampleDataVersion: EXAMPLE_DATA_VERSION
+      };
       records[CASES_STORE].push(assignmentCase);
       addAssignment(assignmentCaseId, ownerId);
-      addActivities(assignmentCaseId, assignmentType, "open", "accepted", ownerId);
+      const assignmentActivities = addActivities(assignmentCaseId, assignmentType, {
+        completed: concern
+          ? assignmentType.suggestedActivities.slice(0, 3)
+          : assignmentType.suggestedActivities.slice(0, 2),
+        inProgress: concern ? [] : [assignmentType.suggestedActivities[2]],
+        resultCodes: concern ? { [assignmentType.suggestedActivities[2]]: "not_completed" } : {},
+        notes: concern ? {
+          [assignmentType.suggestedActivities[2]]: "Föräldern beskriver oro kring kontakten. Uppdraget pausas i väntan på samordnarens bedömning."
+        } : {},
+        completedBy: ownerId
+      });
+      const firstCheckInActivity = assignmentActivities.find((activity) => activity.title === "Genomför första avstämning");
+      const reportActivity = assignmentActivities.find((activity) => activity.title === "Sammanställ mötes- och ersättningsunderlag");
+      const concernActivity = assignmentActivities.find((activity) => activity.title === "Följ upp efter fyra veckor");
+      if (concern && concernActivity) {
+        records[ACTIVITY_DEVIATIONS_STORE].push({
+          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId,
+          activityId: concernActivity.id, activityCompletionEventId: null, resultCode: "not_completed",
+          status: "open", version: 1, openedAt: now, openedBy: ownerId,
+          resolvedAt: null, resolvedBy: null, activeDecisionId: null
+        });
+      }
       addEvent(assignmentCaseId, "assignment_created_from_matching", `Uppdraget ${assignmentNumber} skapades från ${matchingNumber}`);
-      records[MENTOR_REPORTS_STORE].push({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, mentorId: mentor.id, occurredOn: today, durationMinutes: concern ? 45 : 90, mode: "physical", outcome: "completed", nextContactOn: null, summary: concern ? "Kontakten genomfördes men mentorn önskar stöd från handläggaren." : "Planerad kontakt genomfördes enligt uppdragsplanen.", needsHandlerSupport: concern, reportedByMentorId: mentor.id, recordedBy: ownerId, createdAt: now, createdBy: ownerId });
-      records[PARENT_CHECK_INS_STORE].push({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, parentId, occurredOn: today, mode: "phone", contactConfirmed: concern ? "partly" : "yes", collaboration: concern ? "issues" : "well", relevance: "yes", safety: concern ? "concern" : "yes", continueStatus: concern ? "pause" : "continue", note: concern ? "Föräldern beskriver oro. Samordnaren behöver bedöma fortsatt kontakt." : "Kontakten fungerar enligt uppdragsplanen.", createdAt: now, createdBy: ownerId });
+      records[MENTOR_REPORTS_STORE].push({
+        id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId,
+        activityId: reportActivity?.id || null, mentorId: mentor.id, occurredOn: today,
+        durationMinutes: concern ? 45 : 90, mode: parentIndex % 2 ? "digital" : "physical",
+        outcome: "completed", nextContactOn: null,
+        summary: concern
+          ? "Kontakten genomfördes men mentorn önskar stöd från handläggaren."
+          : "Planerad kontakt genomfördes enligt uppdragsplanen.",
+        needsHandlerSupport: concern, reportedByMentorId: mentor.id, recordedBy: ownerId,
+        createdAt: now, createdBy: ownerId
+      });
+      records[PARENT_CHECK_INS_STORE].push({
+        id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId,
+        activityId: firstCheckInActivity?.id || null, parentId, occurredOn: today, mode: "phone",
+        contactConfirmed: concern ? "partly" : "yes", collaboration: concern ? "issues" : "well",
+        relevance: "yes", safety: concern ? "concern" : "safe", continueStatus: concern ? "pause" : "continue",
+        note: concern
+          ? "Föräldern beskriver oro. Samordnaren behöver bedöma fortsatt kontakt."
+          : "Kontakten fungerar enligt uppdragsplanen.",
+        createdAt: now, createdBy: ownerId
+      });
       records[COMPENSATION_PERIODS_STORE].push({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, periodFrom: monthStart, periodTo: monthEnd, status: concern ? "needs_completion" : "under_review", version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId });
+    }
+  }
+
+  for (const mentor of exampleCandidates) {
+    const caseId = `cert-${mentor.id}`;
+    const createdBy = mentor.coordinatorId || "system";
+    for (const [key, title] of CERTIFICATION_ACTIVITIES) {
+      if (certificationActivityState(mentor, key) !== "completed") continue;
+      const activityId = `${caseId}-${key}`;
+      const meta = certificationActivityMeta(mentor, key);
+      records[CASE_DOCUMENTS_STORE].push({
+        id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, activityId, meetingId: null,
+        type: "service_note", title: `Tjänsteanteckning: ${title}`,
+        description: meta.note || `${title} har genomförts och registrerats i prototypdatan.`,
+        documentDate: (meta.completedAt || now).slice(0, 10), storageObjectId: null, mimeType: null,
+        sizeBytes: null, checksum: null, informationClass: "normal", supersedesDocumentId: null,
+        createdAt: meta.completedAt || now, createdBy
+      });
+    }
+    if (mentor.checks?.interviewDone) {
+      records[CASE_MEETINGS_STORE].push({
+        id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId,
+        activityId: `${caseId}-interviewDone`, meetingType: "certification_interview",
+        occurredAt: mentor.interviewDate || mentor.updatedAt || now,
+        mode: mentor.interviewMode || "physical",
+        summary: mentor.notes || "Intervjun har genomförts. Erfarenhet, motivation, gränsdragning och tillgänglighet har gåtts igenom.",
+        nextStep: mentor.status === "Godkänd" ? "Beslut om godkännande är registrerat." : "Slutför återstående kontroller.",
+        participantHandlerIds: mentor.coordinatorId ? [mentor.coordinatorId] : [], externalParticipantNames: [],
+        supersedesMeetingId: null, supersededByMeetingId: null, version: 1,
+        createdAt: mentor.updatedAt || now, createdBy, updatedAt: mentor.updatedAt || now, updatedBy: createdBy
+      });
     }
   }
   return records;
@@ -5119,7 +5341,8 @@ function activityWorkInputSummary(activity, caseRecord) {
     updatedBy = plan?.updatedBy;
     help = "Ange uppdragets start, kontaktfrekvens och första planerade uppföljning.";
   } else if (definition.kind === "parent_checkin") {
-    const records = parentCheckIns.filter((record) => record.caseId === caseRecord.id);
+    const records = parentCheckIns.filter((record) => record.caseId === caseRecord.id
+      && (!record.activityId || record.activityId === activity.id));
     const latest = latestRecord(records);
     started = records.length > 0;
     complete = Boolean(latest?.occurredOn && latest?.contactConfirmed && latest?.continueStatus);
@@ -5127,8 +5350,11 @@ function activityWorkInputSummary(activity, caseRecord) {
     updatedBy = latest?.updatedBy || latest?.createdBy;
     help = "Registrera handläggarens avstämning med föräldern och hur stödet ska fortsätta.";
   } else if (definition.kind === "assignment_evidence") {
-    const reports = mentorReports.filter((record) => record.caseId === caseRecord.id);
-    const meetings = caseMeetings.filter((record) => record.caseId === caseRecord.id && !record.supersededByMeetingId);
+    const reports = mentorReports.filter((record) => record.caseId === caseRecord.id
+      && (!record.activityId || record.activityId === activity.id));
+    const meetings = caseMeetings.filter((record) => record.caseId === caseRecord.id
+      && !record.supersededByMeetingId
+      && (!record.activityId || record.activityId === activity.id));
     const latest = latestRecord([...reports, ...meetings]);
     started = reports.length > 0 || meetings.length > 0;
     complete = reports.some((report) => report.outcome === "completed" && report.summary?.trim());
@@ -8756,6 +8982,9 @@ els.mentorReportForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const caseRecord = selectedCaseRecord();
   if (!caseRecord || caseRecord.caseTypeId !== "mentor-assignment") return;
+  const linkedActivity = caseActivities.find((activity) => activity.id === caseRouteTargetId
+    && activity.caseId === caseRecord.id
+    && activityWorkInputDefinition(activity, caseRecord.caseTypeId)?.kind === "assignment_evidence");
   const reportId = crypto.randomUUID();
   await executeCaseCommand({
     commandType: "register_mentor_report",
@@ -8766,6 +8995,7 @@ els.mentorReportForm.addEventListener("submit", async (event) => {
     mutate: ({ currentCase, now, put, event: recordEvent }) => {
       put(MENTOR_REPORTS_STORE, {
         id: reportId, tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id, mentorId: currentCase.mentorId,
+        activityId: linkedActivity?.id || null,
         occurredOn: els.mentorReportDateInput.value, durationMinutes: Number(els.mentorReportDurationInput.value),
         mode: els.mentorReportModeInput.value, outcome: els.mentorReportOutcomeInput.value,
         nextContactOn: els.mentorReportNextDateInput.value || null, summary: els.mentorReportSummaryInput.value.trim(),
@@ -8804,6 +9034,9 @@ els.parentCheckInForm.addEventListener("submit", async (event) => {
   const note = els.parentCheckInNoteInput.value.trim();
   els.parentCheckInNoteInput.setCustomValidity(requiresNote && !note ? "Beskriv kort vad som avviker och vad som ska hända härnäst." : "");
   if (!els.parentCheckInForm.reportValidity()) return;
+  const linkedActivity = caseActivities.find((activity) => activity.id === caseRouteTargetId
+    && activity.caseId === caseRecord.id
+    && activityWorkInputDefinition(activity, caseRecord.caseTypeId)?.kind === "parent_checkin");
   const checkInId = crypto.randomUUID();
   await executeCaseCommand({
     commandType: "register_parent_checkin",
@@ -8814,6 +9047,7 @@ els.parentCheckInForm.addEventListener("submit", async (event) => {
     mutate: ({ currentCase, now, put, event: recordEvent }) => {
       put(PARENT_CHECK_INS_STORE, {
         id: checkInId, tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id, parentId: currentCase.parentId,
+        activityId: linkedActivity?.id || null,
         occurredOn: els.parentCheckInDateInput.value, mode: els.parentCheckInModeInput.value,
         contactConfirmed: els.parentContactConfirmedInput.value, collaboration: els.parentCollaborationInput.value,
         relevance: els.parentRelevanceInput.value, safety: els.parentSafetyInput.value,
