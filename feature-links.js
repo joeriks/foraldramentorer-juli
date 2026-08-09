@@ -2,8 +2,14 @@ export const FEATURE_LINKS = Object.freeze({
   "dashboard.work-queue": Object.freeze({ href: "#/dashboard" }),
   "cases.list": Object.freeze({ href: "#/cases" }),
   "case.create": Object.freeze({ href: "#/case/new" }),
+  "case.edit": Object.freeze({ href: "#/case/:caseId/edit/:activityId" }),
+  "case.matching": Object.freeze({ href: "#/case/:caseId/matching/:activityId" }),
+  "case.meetings": Object.freeze({ href: "#/case/:caseId/meetings/:activityId" }),
+  "case.assignment-followup": Object.freeze({ href: "#/case/:caseId/assignment-followup/:activityId" }),
+  "case.activity": Object.freeze({ href: "#/case/:caseId/activities/:activityId" }),
   "mentor.list": Object.freeze({ href: "#/mentors" }),
   "mentor.create": Object.freeze({ href: "#/mentor/new" }),
+  "mentor.identity": Object.freeze({ href: "#/mentor/:mentorId/identity/:caseId/:activityId" }),
   "parent.list": Object.freeze({ href: "#/parents" }),
   "parent.create": Object.freeze({ href: "#/parent/new" }),
   "matching.list": Object.freeze({ href: "#/cases/matching" }),
@@ -25,6 +31,16 @@ export function resolveFeatureLink(featureId) {
   const canonicalId = FEATURE_LINK_ALIASES[featureId] || featureId;
   const feature = FEATURE_LINKS[canonicalId];
   return feature ? { ...feature, id: canonicalId } : null;
+}
+
+export function resolveFeatureRoute(featureId, parameters = {}) {
+  const feature = resolveFeatureLink(featureId);
+  if (!feature) return null;
+  const href = feature.href.replace(/:([a-zA-Z][a-zA-Z0-9]*)/g, (match, key) => {
+    const value = parameters[key];
+    return value === undefined || value === null || value === "" ? match : encodeURIComponent(String(value));
+  });
+  return href.includes(":") ? null : href;
 }
 
 export function extractFeatureLinkIds(markdown) {

@@ -37,31 +37,156 @@ const complexSupportTopics = [
   }
 ];
 
-function scopeGuideMarkup(headingId) {
+function scopeBoundariesMarkup(headingId) {
   return `
-  <details class="scope-guide">
-    <summary aria-labelledby="${headingId}">
-      <span class="scope-summary-copy"><span class="eyebrow">Kompletterande stöd</span><strong id="${headingId}">När familjen också får stöd från vård, skola eller myndigheter</strong><small>NPF, skolfrånvaro, myndighetskontakter eller ohälsa</small></span>
-      <span class="scope-summary-action">Visa vad mentorn kan och inte kan göra</span>
-    </summary>
-    <div class="scope-guide-body">
-      <p class="scope-intro">En mentor kan vara ett extra stöd i vardagen samtidigt som familjen får sin huvudsakliga hjälp från exempelvis vården, skolan eller socialtjänsten.</p>
-      <div class="scope-topic-list">
-        ${complexSupportTopics.map(topic => `
-          <article class="scope-topic">
-            <h4>${topic.title}</h4>
-            <div><strong>Mentorn kan</strong><p>${topic.can}</p></div>
-            <div><strong>Mentorn kan inte</strong><p>${topic.cannot}</p></div>
-          </article>`).join("")}
+    <details class="scope-boundaries">
+      <summary id="${headingId}">Se vad mentorn kan och inte kan hjälpa till med</summary>
+      <div class="scope-guide-body">
+        <div class="scope-topic-list">
+          ${complexSupportTopics.map(topic => `
+            <article class="scope-topic">
+              <h4>${topic.title}</h4>
+              <div><strong>Mentorn kan</strong><p>${topic.can}</p></div>
+              <div><strong>Mentorn kan inte</strong><p>${topic.cannot}</p></div>
+            </article>`).join("")}
+        </div>
+        <p class="scope-escalation"><strong>Vid akut oro för hälsa eller säkerhet:</strong> kontakta ansvarig professionell aktör eller akut hjälp. Mentorn ska inte ensam hantera situationen.</p>
       </div>
-      <p class="scope-escalation"><strong>Vid akut oro för hälsa eller säkerhet:</strong> kontakta ansvarig professionell aktör eller akut hjälp. Mentorn ska inte ensam hantera situationen.</p>
-    </div>
-  </details>`;
+    </details>`;
+}
+
+function parentComplementarySupportMarkup(headingId) {
+  return `
+    <section class="complementary-support" aria-labelledby="${headingId}">
+      <div class="complementary-heading">
+        <div><span class="eyebrow">Valfritt matchningsunderlag</span><h3 id="${headingId}">Kompletterande mentorstöd</h3></div>
+        <p>Mentorn kan ge vardagsnära stöd även när föräldern redan får, väntar på eller söker professionell hjälp. Uppgiften används för att avgränsa mentoruppdraget, inte för att bedöma rätten till stöd.</p>
+      </div>
+      <label class="complementary-toggle"><input id="parentComplementarySupport" type="checkbox" checked><span><strong>Jag vill ha en mentor som kompletterande stöd</strong><small>Det professionella stödet fortsätter som vanligt. Mentorn ersätter inte vård, skola eller myndighetsinsatser.</small></span></label>
+      <div id="parentComplementarySupportFields" class="complementary-fields">
+        <fieldset>
+          <legend>I vilket sammanhang önskas stödet?</legend>
+          <p>Välj bara det som hjälper handläggaren att förstå mentorrollen. Ange inga diagnos-, behandlings- eller journaluppgifter.</p>
+          <div id="parentComplementaryContexts" class="complementary-options">
+            <label><input type="checkbox" value="NPF eller behov av extra tydlighet" checked> NPF eller behov av extra tydlighet i vardagen</label>
+            <label><input type="checkbox" value="Långvarig eller återkommande skolfrånvaro"> Långvarig eller återkommande skolfrånvaro</label>
+            <label><input type="checkbox" value="Kontakter med myndigheter eller verksamheter"> Kontakter med myndigheter eller verksamheter</label>
+            <label><input type="checkbox" value="Psykisk eller fysisk ohälsa påverkar vardagen"> Psykisk eller fysisk ohälsa påverkar vardagen</label>
+          </div>
+        </fieldset>
+        <div class="complementary-grid">
+          <label class="field-block"><span>Hur ser det professionella stödet ut?</span><select id="parentProfessionalSupportStatus"><option selected>Stöd finns idag</option><option>Kontakt är tagen eller föräldern väntar på stöd</option><option>Föräldern önskar hjälp av handläggaren att hitta rätt kontakt</option><option>Vill inte ange</option></select></label>
+          <fieldset>
+            <legend>Vad önskas av mentorn?</legend>
+            <div id="parentComplementaryRoles" class="complementary-options compact">
+              <label><input type="checkbox" value="Vardagsrutiner" checked> Hjälp att få vardagsrutiner att fungera</label>
+              <label><input type="checkbox" value="Förbereda frågor och möten" checked> Förbereda frågor och möten</label>
+              <label><input type="checkbox" value="Vardagssteg mellan professionella kontakter" checked> Följa upp vardagssteg mellan professionella kontakter</label>
+              <label><input type="checkbox" value="Medmänskligt stöd"> Vara ett medmänskligt stöd</label>
+            </div>
+          </fieldset>
+        </div>
+      </div>
+      ${scopeBoundariesMarkup(`${headingId}Boundaries`)}
+    </section>`;
+}
+
+function mentorComplementarySupportMarkup(headingId) {
+  return `
+    <section class="complementary-support" aria-labelledby="${headingId}">
+      <div class="complementary-heading">
+        <div><span class="eyebrow">Valfritt matchningsunderlag</span><h3 id="${headingId}">Stöd när professionella aktörer är involverade</h3></div>
+        <p>Markera endast sammanhang där du vill bli matchad som ett kompletterande vardagsstöd.</p>
+      </div>
+      <fieldset class="mentor-complementary-contexts">
+        <legend>Jag kan tänka mig att ge kompletterande stöd kring</legend>
+        <div class="complementary-options">
+          <label><input type="checkbox" value="NPF eller behov av extra tydlighet" checked> NPF eller behov av extra tydlighet i vardagen</label>
+          <label><input type="checkbox" value="Långvarig eller återkommande skolfrånvaro" checked> Långvarig eller återkommande skolfrånvaro</label>
+          <label><input type="checkbox" value="Kontakter med myndigheter eller verksamheter"> Kontakter med myndigheter eller verksamheter</label>
+          <label><input type="checkbox" value="Psykisk eller fysisk ohälsa påverkar vardagen"> Psykisk eller fysisk ohälsa påverkar vardagen</label>
+        </div>
+        <p class="data-use-note">Valet betyder att du kan vara ett stöd i vardagen. Du tar inte över professionellt ansvar och ska inte ge vård-, behandlings- eller myndighetsråd.</p>
+      </fieldset>
+      ${scopeBoundariesMarkup(`${headingId}Boundaries`)}
+    </section>`;
 }
 
 for (const [index, guide] of [...document.querySelectorAll("[data-scope-guide]")].entries()) {
-  guide.innerHTML = scopeGuideMarkup(`scopeGuideHeading${index + 1}`);
+  const headingId = `scopeGuideHeading${index + 1}`;
+  guide.innerHTML = guide.dataset.scopeGuide === "mentor"
+    ? mentorComplementarySupportMarkup(headingId)
+    : parentComplementarySupportMarkup(headingId);
 }
+
+const parentPreferredLanguage = document.querySelector("#parentPreferredLanguage");
+const parentAlternativeLanguages = document.querySelector("#parentAlternativeLanguages");
+const coordinatorLanguageRequirements = document.querySelector("#coordinatorLanguageRequirements");
+
+function syncParentLanguages() {
+  const preferred = parentPreferredLanguage.value;
+  for (const input of parentAlternativeLanguages.querySelectorAll('input[type="checkbox"]')) {
+    const sameAsPreferred = input.value === preferred;
+    if (sameAsPreferred) input.checked = false;
+    input.disabled = sameAsPreferred;
+    input.closest("label").classList.toggle("is-unavailable", sameAsPreferred);
+  }
+  const alternatives = [...parentAlternativeLanguages.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
+  const alternativeText = alternatives.length ? `${alternatives.join(", ")} fungerar också` : "inga alternativa språk angivna";
+  coordinatorLanguageRequirements.textContent = `${preferred} helst · ${alternativeText} · kvällstid`;
+  const languageAssessment = document.querySelector("#coordinatorLanguageAssessment");
+  const selectedMentorLanguageReason = document.querySelector("#selectedMentorLanguageReason");
+  if (preferred === "Svenska") {
+    languageAssessment.textContent = "Svenska är förstahandsval och mentorn kan använda svenska obehindrat.";
+    selectedMentorLanguageReason.textContent = "Förstahandsspråk: svenska";
+  } else if (alternatives.includes("Svenska")) {
+    languageAssessment.textContent = `Svenska fungerar för föräldern; ${preferred.toLowerCase()} är förstahandsval.`;
+    selectedMentorLanguageReason.textContent = "Svenska fungerar";
+  } else {
+    languageAssessment.textContent = `Mentorn saknar angiven överensstämmelse med ${preferred.toLowerCase()}. Språkfrågan behöver lösas före matchning.`;
+    selectedMentorLanguageReason.textContent = "Språk behöver lösas";
+  }
+}
+
+parentPreferredLanguage.addEventListener("change", syncParentLanguages);
+parentAlternativeLanguages.addEventListener("change", syncParentLanguages);
+syncParentLanguages();
+
+for (const row of document.querySelectorAll(".mentor-language-list label")) {
+  const checkbox = row.querySelector('input[type="checkbox"]');
+  const level = row.querySelector("select");
+  const syncMentorLanguage = () => {
+    level.disabled = !checkbox.checked;
+    row.classList.toggle("selected", checkbox.checked);
+  };
+  checkbox.addEventListener("change", syncMentorLanguage);
+  syncMentorLanguage();
+}
+
+const parentComplementarySupport = document.querySelector("#parentComplementarySupport");
+const parentComplementarySupportFields = document.querySelector("#parentComplementarySupportFields");
+const parentComplementaryContexts = document.querySelector("#parentComplementaryContexts");
+const parentProfessionalSupportStatus = document.querySelector("#parentProfessionalSupportStatus");
+const parentComplementaryRoles = document.querySelector("#parentComplementaryRoles");
+const coordinatorComplementarySupport = document.querySelector("#coordinatorComplementarySupport");
+
+function syncComplementarySupport() {
+  const enabled = parentComplementarySupport.checked;
+  parentComplementarySupportFields.hidden = !enabled;
+  for (const input of parentComplementarySupportFields.querySelectorAll("input, select")) input.disabled = !enabled;
+  coordinatorComplementarySupport.hidden = !enabled;
+  if (!enabled) return;
+
+  const contexts = [...parentComplementaryContexts.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
+  const roles = [...parentComplementaryRoles.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
+  document.querySelector("#coordinatorProfessionalSupportContext").textContent = contexts.join(" · ") || "Sammanhang behöver förtydligas";
+  document.querySelector("#coordinatorProfessionalSupportStatus").textContent = parentProfessionalSupportStatus.value;
+  document.querySelector("#coordinatorComplementaryRole").textContent = roles.join(", ") || "Önskad mentorroll behöver förtydligas";
+}
+
+parentComplementarySupport.addEventListener("change", syncComplementarySupport);
+parentComplementarySupportFields.addEventListener("change", syncComplementarySupport);
+syncComplementarySupport();
 
 function selectedValues(container) {
   return [...container.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);

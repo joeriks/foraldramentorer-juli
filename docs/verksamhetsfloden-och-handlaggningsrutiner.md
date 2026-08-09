@@ -237,6 +237,15 @@ När handläggaren öppnar ett ärende ska översikten direkt besvara:
 
 Handläggaren går därefter till den aktuella aktiviteten, utför arbetet, registrerar relevant resultat och kompletterar med underlag endast när det behövs.
 
+Om aktiviteten hör ihop med en strukturerad registrering visar aktivitetslistan och aktivitetskortet samma block med:
+
+- registreringens namn,
+- status `Inte påbörjad`, `Påbörjad` eller `Fullständig`,
+- tidpunkt och användare för senaste ändring,
+- ett direkt kommando som öppnar rätt flik och rätt inmatning.
+
+Statusen räknas från den faktiska registreringen och anges inte separat på aktiviteten. Exempelvis hämtas identitetsstatus från mentorkortets identitetsuppgifter, intervjuunderlag från det kopplade mötet och matchningsstatus från matchningsärendets strukturerade underlag. När obligatorisk registrering inte är fullständig kan aktiviteten inte avslutas. Handläggaren ska inte behöva söka efter rätt formulär i ett annat register.
+
 **I systemet:** [Öppna ärenderegistret](feature:cases.list)
 
 ### 5.3 Avsluta arbetsmomentet
@@ -252,6 +261,8 @@ När en aktivitet avslutas i den fullständiga aktivitetsvyn ska användaren:
 Systemet registrerar automatiskt vem som gjorde ändringen och när den gjordes. Resultat får inte vara förvalt.
 
 För vanliga, väldefinierade utfall kan aktivitetslistan visa kommandot `Avsluta`. Det öppnar en kompakt dialog med aktivitetens handledande text, valbara resultat och en förklaring av vad som sparas. Dialogen ska även erbjuda `Komplettera uppgifter`, som öppnar den fullständiga aktivitetsvyn. Snabbavslut får bara användas för resultat som aktivitetsmallen uttryckligen tillåter och ska inte visas när utfallet kräver tjänsteanteckning, möte, handling eller andra kompletterande uppgifter.
+
+Om en obligatorisk kopplad registrering är `Inte påbörjad` eller `Påbörjad` visas inte snabbavslut. I den fullständiga aktivitetsvyn leder kommandot `Påbörja registrering` eller `Fortsätt registrering` direkt till rätt arbetsyta. Efter att uppgifterna sparats återgår handläggaren till aktiviteten och kan registrera dess verksamhetsresultat.
 
 När alla tillämpliga aktiviteter är avslutade och inga ställningstaganden återstår ska aktivitetsvyn visa:
 
@@ -496,7 +507,7 @@ Ställningstagandet ska ligga kvar i arbetskön tills det har hanterats. Det få
 
 Föräldern registreras som en egen person. Varje avgränsat stödbehov hanteras i ett eget stödärende. Matchningar och uppdrag utgår från stödärendet och ska inte döljas som profilfält eller status på föräldern eller mentorn.
 
-Stödområden används som en gemensam, kontrollerad begreppslista genom hela flödet. Kommunen väljer vilka områden som används internt och vilka som visas i den publika stödansökan. Förälderns val hör till det aktuella stödärendet, inte till en permanent beskrivning av personen. Mentorns val beskriver relevant erfarenhet och kompetens. Överlappning mellan dessa uppgifter är ett matchningsunderlag, aldrig ett automatiskt beslut.
+Stödområden används som en gemensam, kontrollerad begreppslista genom hela flödet. Kommunen väljer vilka områden som används internt och vilka som visas i den publika stödansökan. Förälderns val hör till det aktuella stödärendets matchningsunderlag, inte till en permanent beskrivning av personen. Mentorn har en aktiv, versionshanterad matchningsprofil och markerar endast områden där hen vill bli matchad. Självskattad trygghet att ge vardagsnära stöd är primärt underlag; erfarenhetsgrund är sekundärt. Överlappning mellan dessa uppgifter är ett öppet beslutsunderlag, aldrig ett automatiskt beslut.
 
 ### 10.1 Registrera förälder och stödärende
 
@@ -510,6 +521,8 @@ Stödområden används som en gemensam, kontrollerad begreppslista genom hela fl
 8. Handläggaren dokumenterar om föräldern vill gå vidare till matchning och vad nästa kontakt ska vara.
 
 Föräldraregistreringen ska inte skapa någon gemensam personpost. Om en annan förälder också behöver stöd registreras den personen separat. Ett nytt stödärende ska däremot inte skapa en ny förälderpost för en person som redan finns.
+
+På föräldrakortet visas de länkade posterna i den ordning handläggningen normalt följer: `Stödärenden`, `Matchningar` och `Uppdrag`. Varje flik visar status och nästa aktivitet och leder direkt till rätt ärende, så att handläggaren inte behöver söka fram nästa del av flödet i ärenderegistret.
 
 <div data-routine-illustration="parent-registration"></div>
 
@@ -535,6 +548,8 @@ Om underlaget inte räcker skapas en aktivitet för komplettering. Matchningsär
 ### 10.3 Matcha stödärende med mentor
 
 Matchning är ett eget ärende som alltid tillhör ett bestämt stödärende. Den ska inte döljas som en status på föräldern eller mentorn.
+
+När matchningen startas fryser systemet en ögonblicksbild av stödärendets och mentorns aktiva matchningsprofiler. Ändringar som görs senare ska användas i nya matchningar men får inte ändra vad den tidigare matchningen grundades på.
 
 1. Handläggaren startar matchningsärendet från det stödärende som ska få en mentorinsats.
 2. Systemet visar endast mentorer som är godkända och tillgängliga. Registrerad överlappning mellan stödärendets stödområden och mentorns erfarenhetsområden visas och kan användas för sortering.
@@ -790,7 +805,7 @@ Systemet bör inte automatiskt:
 
 ### 16.1 Administration av ärende- och aktivitetsmallar
 
-Administratören ska kunna se hur ärendetyper och aktivitetsmallar styr handläggningen. För en ärendetyp visas hjälptext, registreringsanvisning, skapandeväg, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallarna öppnas och administreras från aktivitetsflödet på respektive ärendetyp. En mall är fortfarande ett gemensamt versionshanterat objekt och kan återanvändas av flera ärendetyper. Processkartan skiljer mellan manuellt skapbara ärenden och ärenden som måste startas från en mentorpost, ett stödärende eller en accepterad matchning. För en aktivitetsmall visas handläggningsanvisning, tillåtna statuslägen, avslutsregel, snabbavslut, resultatval och vilka ärendetyper som använder mallen.
+Administratören ska kunna se hur ärendetyper och aktivitetsmallar styr handläggningen. För en ärendetyp visas hjälptext, registreringsanvisning, skapandeväg, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallarna öppnas och administreras från aktivitetsflödet på respektive ärendetyp. En mall är fortfarande ett gemensamt versionshanterat objekt och kan återanvändas av flera ärendetyper. Processkartan skiljer mellan manuellt skapbara ärenden och ärenden som måste startas från en mentorpost, ett stödärende eller en accepterad matchning. För en aktivitetsmall visas handläggningsanvisning, tillåtna statuslägen, avslutsregel, snabbavslut, kopplad strukturerad registrering, resultatval och vilka ärendetyper som använder mallen.
 
 Kommunen får ändra handledande texter och valbara verksamhetsinställningar. Tekniska ID:n, skapandevägar, grundläggande statusregler och lagringsnycklar är systemstyrda. En sparad ändring skapar en ny mallversion för nya ärenden; pågående och avslutade ärenden behåller den version som användes när de skapades.
 

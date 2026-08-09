@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260809-demo-v1">
+    <link rel="stylesheet" href="styles.css?v=20260809-activity-work-input-v1">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -424,7 +424,22 @@
               </form>
               <div id="parentReadView" class="card-body" hidden>
                 <section class="record-section"><h3 class="record-section-title">Grunduppgifter</h3><dl class="record-fields mb-0"><div><dt>Namn</dt><dd id="parentNameFact"></dd></div><div><dt>Kontaktuppgift</dt><dd id="parentContactFact"></dd></div><div><dt>Informationsstatus</dt><dd id="parentInformationStatusFact"></dd></div><div><dt>Område</dt><dd id="parentAreaFact"></dd></div><div><dt>Språk</dt><dd id="parentLanguagesFact"></dd></div><div><dt>Tillgänglighet</dt><dd id="parentAvailabilityFact"></dd></div></dl></section>
-                <section class="record-section mt-4"><div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div><h3 class="record-section-title mb-1">Stödärenden och uppdrag</h3><p class="small text-secondary mb-0">Varje avgränsat stödbehov har egen historik, matchning och uppdrag.</p></div></div><div class="table-responsive border rounded"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Ärende</th><th>Syfte</th><th>Status</th><th>Matchningar</th><th>Uppdrag</th></tr></thead><tbody id="parentSupportCaseTableBody"></tbody></table></div></section>
+                <section class="record-section mt-4">
+                  <div class="mb-3">
+                    <h3 class="record-section-title mb-1">Ärenden för föräldern</h3>
+                    <p class="small text-secondary mb-0">Följ stödbehovet från stödärende via matchning till ett aktivt mentoruppdrag.</p>
+                  </div>
+                  <ul class="nav nav-tabs record-tabs" id="parentCaseTabs" role="tablist">
+                    <li class="nav-item" role="presentation"><button class="nav-link active" id="parentSupportCasesTab" data-bs-toggle="tab" data-bs-target="#parentSupportCasesPanel" type="button" role="tab" aria-controls="parentSupportCasesPanel" aria-selected="true">Stödärenden <span id="parentSupportCaseTabCount" class="tab-count">0</span></button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="parentMatchingCasesTab" data-bs-toggle="tab" data-bs-target="#parentMatchingCasesPanel" type="button" role="tab" aria-controls="parentMatchingCasesPanel" aria-selected="false">Matchningar <span id="parentMatchingCaseTabCount" class="tab-count">0</span></button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="parentAssignmentCasesTab" data-bs-toggle="tab" data-bs-target="#parentAssignmentCasesPanel" type="button" role="tab" aria-controls="parentAssignmentCasesPanel" aria-selected="false">Uppdrag <span id="parentAssignmentCaseTabCount" class="tab-count">0</span></button></li>
+                  </ul>
+                  <div class="tab-content pt-3" id="parentCaseTabContent">
+                    <div class="tab-pane fade show active" id="parentSupportCasesPanel" role="tabpanel" aria-labelledby="parentSupportCasesTab" tabindex="0"><div class="table-responsive border rounded"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Ärende</th><th>Stödets syfte</th><th>Status</th><th>Nästa aktivitet</th></tr></thead><tbody id="parentSupportCaseTableBody"></tbody></table></div></div>
+                    <div class="tab-pane fade" id="parentMatchingCasesPanel" role="tabpanel" aria-labelledby="parentMatchingCasesTab" tabindex="0"><div class="table-responsive border rounded"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Ärende</th><th>Stödbehov</th><th>Mentor</th><th>Status</th><th>Nästa aktivitet</th></tr></thead><tbody id="parentMatchingCaseTableBody"></tbody></table></div></div>
+                    <div class="tab-pane fade" id="parentAssignmentCasesPanel" role="tabpanel" aria-labelledby="parentAssignmentCasesTab" tabindex="0"><div class="table-responsive border rounded"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Ärende</th><th>Stödbehov</th><th>Mentor</th><th>Status</th><th>Nästa aktivitet</th></tr></thead><tbody id="parentAssignmentCaseTableBody"></tbody></table></div></div>
+                  </div>
+                </section>
               </div>
             </div>
           </section>
@@ -617,7 +632,7 @@
                     <section id="caseTransitionPanel" class="record-section mb-4" hidden>
                       <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start mb-3"><div><h3 id="caseTransitionTitle" class="record-section-title mb-1"></h3><p id="caseTransitionHelp" class="small text-secondary mb-0"></p></div></div>
                       <form id="matchingOutcomeForm" hidden>
-                        <div class="row g-3"><div class="col-md-6"><label class="form-label" for="parentMatchResponseInput">Förälderns svar</label><select id="parentMatchResponseInput" class="form-select form-select-sm" required><option value="">Välj svar</option><option value="accepted">Accepterar</option><option value="declined">Tackar nej</option><option value="waiting">Vill avvakta</option></select></div><div class="col-md-6"><label class="form-label" for="mentorMatchResponseInput">Mentorns svar</label><select id="mentorMatchResponseInput" class="form-select form-select-sm" required><option value="">Välj svar</option><option value="accepted">Accepterar</option><option value="declined">Tackar nej</option><option value="waiting">Vill avvakta</option></select></div><div class="col-12"><label class="form-label" for="matchingOutcomeNoteInput">Kort notering</label><textarea id="matchingOutcomeNoteInput" class="form-control form-control-sm" rows="2"></textarea></div><div class="col-12"><div class="form-check form-switch"><input id="createAssignmentAfterMatchInput" class="form-check-input" type="checkbox" checked><label class="form-check-label" for="createAssignmentAfterMatchInput">Skapa mentoruppdrag när båda accepterar</label></div></div></div>
+                        <div class="row g-3"><div class="col-12"><label class="form-label" for="matchingProposalInput">Matchningsmotivering</label><textarea id="matchingProposalInput" class="form-control form-control-sm" rows="3" placeholder="Beskriv varför mentorn bedöms passa stödbehovet och vilka begränsningar som behöver följas upp."></textarea><div class="form-text">Kan sparas innan parterna har lämnat sina svar.</div></div><div class="col-md-6"><label class="form-label" for="parentMatchResponseInput">Förälderns svar</label><select id="parentMatchResponseInput" class="form-select form-select-sm"><option value="">Inte registrerat</option><option value="accepted">Accepterar</option><option value="declined">Tackar nej</option><option value="waiting">Vill avvakta</option></select></div><div class="col-md-6"><label class="form-label" for="mentorMatchResponseInput">Mentorns svar</label><select id="mentorMatchResponseInput" class="form-select form-select-sm"><option value="">Inte registrerat</option><option value="accepted">Accepterar</option><option value="declined">Tackar nej</option><option value="waiting">Vill avvakta</option></select></div><div class="col-12"><label class="form-label" for="matchingOutcomeNoteInput">Kort notering om svar eller beslut</label><textarea id="matchingOutcomeNoteInput" class="form-control form-control-sm" rows="2"></textarea></div><div class="col-12"><div class="form-check form-switch"><input id="createAssignmentAfterMatchInput" class="form-check-input" type="checkbox" checked><label class="form-check-label" for="createAssignmentAfterMatchInput">Skapa mentoruppdrag när båda accepterar</label></div></div></div>
                         <div class="d-flex justify-content-end mt-3"><button id="matchingOutcomeSubmitButton" type="submit" class="btn btn-primary btn-sm">Spara parternas svar</button></div>
                       </form>
                       <div id="supportCaseTransitionActions" class="d-flex flex-wrap gap-2" hidden><button id="startMatchingFromSupportButton" type="button" class="btn btn-primary btn-sm">Starta matchning</button></div>
@@ -699,6 +714,17 @@
                         </div>
                         <button id="activityDetailGuidanceButton" type="button" class="btn btn-outline-primary btn-sm"></button>
                       </aside>
+                      <section id="activityWorkInputPanel" class="activity-work-input" hidden>
+                        <div class="activity-work-input-copy">
+                          <div class="d-flex flex-wrap align-items-center gap-2">
+                            <h4 id="activityWorkInputTitle" class="h6 mb-0"></h4>
+                            <span id="activityWorkInputStatus" class="badge text-bg-secondary"></span>
+                          </div>
+                          <p id="activityWorkInputHelp" class="small mb-1"></p>
+                          <p id="activityWorkInputMeta" class="small text-secondary mb-0"></p>
+                        </div>
+                        <a id="activityWorkInputLink" class="btn btn-outline-primary btn-sm" href="#"></a>
+                      </section>
                       <form id="activityDetailForm" class="activity-record-body">
                         <div class="row g-3">
                           <div class="col-md-6">
@@ -1273,6 +1299,7 @@
                       <div><dt>Statuslägen</dt><dd id="activityTypeStatusFact"></dd></div>
                       <div><dt>Regel vid avslut</dt><dd id="activityTypeCompletionFact"></dd></div>
                       <div><dt>Snabbavslut</dt><dd id="activityTypeQuickFact"></dd></div>
+                      <div><dt>Kopplad registrering</dt><dd id="activityTypeWorkInputFact"></dd></div>
                       <div><dt>Används i ärendetyper</dt><dd id="activityTypeUsageFact"></dd></div>
                     </dl>
                   </section>
@@ -1526,7 +1553,7 @@
                         <div><dt>Tillgänglighet</dt><dd id="availabilityFact"></dd></div>
                       </dl>
                     </section>
-                    <section class="record-section mt-4"><h3 class="record-section-title">Erfarenhetsområden</h3><p class="small text-secondary">Områden där mentorn uppger att hen kan ge vardagsnära stöd. Uppgifterna är matchningsunderlag, inte en behörighetsprövning.</p><div id="mentorSupportAreasRead" class="support-area-facts"></div></section>
+                    <section class="record-section mt-4"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h3 class="record-section-title">Matchningsprofil</h3><p class="small text-secondary">Områden där mentorn vill bli matchad och bedömer att hen kan ge vardagsnära stöd. Handläggaren gör alltid den samlade bedömningen.</p></div><span id="mentorMatchingProfileMeta" class="small text-secondary"></span></div><div id="mentorSupportAreasRead" class="support-area-facts"></div></section>
                     <section class="record-section mt-4">
                       <h3 class="record-section-title">Ärendeuppgifter</h3>
                       <dl class="record-fields mb-0">
@@ -1552,7 +1579,7 @@
                       </dl>
                       <div id="mentorEditorDuplicatePanel" class="alert alert-warning mt-3 mb-0" hidden></div>
                     </section>
-                    <section class="record-section mt-4"><h3 class="record-section-title">Erfarenhetsområden</h3><p class="small text-secondary">Markera bara områden där mentorn bedömer att hen kan ge stöd. Välj en eller flera grunder: egen eller närståendes erfarenhet, erfarenhet av att stödja andra samt utbildning eller yrkeserfarenhet. Kommunen kan verifiera uppgifterna separat.</p><div id="mentorSupportAreasEdit" class="mentor-support-area-editor"></div></section>
+                    <section class="record-section mt-4"><h3 class="record-section-title">Matchningsprofil</h3><p class="small text-secondary">Markera bara områden där mentorn vill bli matchad. Självskattad trygghet är det primära underlaget; ange därefter vad bedömningen grundar sig på. Mentorn ger vardagsnära stöd, inte professionell rådgivning eller behandling.</p><div id="mentorSupportAreasEdit" class="mentor-support-area-editor"></div></section>
                     <section class="record-section mt-4">
                       <h3 class="record-section-title">Ärendeuppgifter</h3>
                       <dl class="record-fields record-fields-edit mb-0">
@@ -1942,6 +1969,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260809-case-type-activities-v2"></script>
+    <script type="module" src="app.js?v=20260809-activity-work-input-v1"></script>
   </body>
 </html>

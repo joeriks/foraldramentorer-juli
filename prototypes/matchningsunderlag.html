@@ -54,7 +54,7 @@
           <p id="parentAreaLimit" class="field-message" role="status"></p>
         </fieldset>
 
-        <div data-scope-guide></div>
+        <div data-scope-guide="parent"></div>
 
         <fieldset class="form-section">
           <legend>Vad är viktigast att få att fungera bättre?</legend>
@@ -68,9 +68,25 @@
 
         <fieldset class="form-section">
           <legend>Önskemål och praktiska förutsättningar</legend>
+          <fieldset class="language-preference" aria-labelledby="parentLanguageHeading">
+            <legend id="parentLanguageHeading">Språk i samtalen med mentorn</legend>
+            <p class="section-help">Välj vilket språk du helst vill använda och vilka andra språk som också fungerar. Det ökar möjligheten att hitta en bra matchning.</p>
+            <div class="language-preference-grid">
+              <label class="field-block"><span>Önskat samtalsspråk</span><select id="parentPreferredLanguage"><option>Svenska</option><option selected>Arabiska</option><option>Finska</option><option>Engelska</option><option>Somaliska</option></select></label>
+              <fieldset class="language-alternatives">
+                <legend>Andra språk som också fungerar</legend>
+                <div id="parentAlternativeLanguages" class="tag-options">
+                  <label><input type="checkbox" value="Svenska" checked> Svenska</label>
+                  <label><input type="checkbox" value="Arabiska"> Arabiska</label>
+                  <label><input type="checkbox" value="Finska"> Finska</label>
+                  <label><input type="checkbox" value="Engelska"> Engelska</label>
+                  <label><input type="checkbox" value="Somaliska"> Somaliska</label>
+                </div>
+              </fieldset>
+            </div>
+          </fieldset>
           <div class="form-grid">
             <label class="field-block"><span>Önskar du en mentor med liknande erfarenhet?</span><select id="sharedExperiencePreference"><option>Osäker</option><option selected>Ja, om möjligt</option><option>Det spelar ingen roll</option></select><small>Önskemålet vägs samman med stödområde, tillgänglighet och andra praktiska förutsättningar.</small></label>
-            <label class="field-block"><span>Språk</span><select><option selected>Svenska</option><option>Arabiska</option><option>Finska</option><option>Engelska</option></select></label>
             <label class="field-block"><span>Kontaktform</span><select><option selected>Fysiskt eller digitalt</option><option>Helst fysiskt</option><option>Helst digitalt</option></select></label>
             <label class="field-block"><span>Tider</span><select><option>Vardagar dagtid</option><option selected>Vardagskvällar</option><option>Helger</option></select></label>
           </div>
@@ -108,7 +124,7 @@
           <p id="mentorAreaLimit" class="field-message" role="status"></p>
         </fieldset>
 
-        <div data-scope-guide></div>
+        <div data-scope-guide="mentor"></div>
 
         <section class="form-section" aria-labelledby="experienceHeading">
           <div class="section-heading-row"><h3 id="experienceHeading">Bedöm din trygghet inom valda områden</h3><span>Fylls i per valt område</span></div>
@@ -120,8 +136,6 @@
           <legend>Ytterligare erfarenheter <span class="optional-label">Valfritt</span></legend>
           <p class="section-help">Markera bara erfarenheter som du vill att en behörig handläggare ska kunna väga in som kompletterande information.</p>
           <div class="tag-options">
-            <label><input type="checkbox" checked> Skolfrånvaro</label>
-            <label><input type="checkbox" checked> Behov av extra tydlighet i vardagen</label>
             <label><input type="checkbox"> Separation eller växelvist boende</label>
             <label><input type="checkbox"> Ensamstående föräldraskap</label>
             <label><input type="checkbox"> Ny i Sverige</label>
@@ -132,8 +146,18 @@
 
         <fieldset class="form-section">
           <legend>Tillgänglighet</legend>
+          <fieldset class="mentor-language-profile" aria-labelledby="mentorLanguageHeading">
+            <legend id="mentorLanguageHeading">Språk du kan använda i mentorsamtal</legend>
+            <p class="section-help">Markera bara språk där du kan föra ett tryggt och nyanserat vardagssamtal. Ange din samtalsnivå, inte utbildningsnivå.</p>
+            <div class="mentor-language-list">
+              <label><input type="checkbox" value="Svenska" checked><span>Svenska</span><select aria-label="Samtalsnivå i svenska"><option>Fungerar väl</option><option selected>Obehindrat</option></select></label>
+              <label><input type="checkbox" value="Arabiska"><span>Arabiska</span><select aria-label="Samtalsnivå i arabiska" disabled><option>Fungerar väl</option><option>Obehindrat</option></select></label>
+              <label><input type="checkbox" value="Finska"><span>Finska</span><select aria-label="Samtalsnivå i finska" disabled><option>Fungerar väl</option><option>Obehindrat</option></select></label>
+              <label><input type="checkbox" value="Engelska" checked><span>Engelska</span><select aria-label="Samtalsnivå i engelska"><option selected>Fungerar väl</option><option>Obehindrat</option></select></label>
+              <label><input type="checkbox" value="Somaliska"><span>Somaliska</span><select aria-label="Samtalsnivå i somaliska" disabled><option>Fungerar väl</option><option>Obehindrat</option></select></label>
+            </div>
+          </fieldset>
           <div class="form-grid">
-            <label class="field-block"><span>Språk</span><input value="Svenska, engelska"></label>
             <label class="field-block"><span>Mötesform</span><select><option selected>Fysiskt eller digitalt</option><option>Endast fysiskt</option><option>Endast digitalt</option></select></label>
             <label class="field-block"><span>Tillgängliga tider</span><select><option selected>Vardagskvällar</option><option>Vardagar dagtid</option><option>Helger</option></select></label>
             <label class="field-block"><span>Ledig kapacitet</span><select><option selected>1 nytt uppdrag</option><option>2 nya uppdrag</option><option>Inte tillgänglig</option></select></label>
@@ -160,11 +184,12 @@
           <div><span>Stödärende</span><strong>FM-26-00128</strong></div>
           <div><span>Förälder</span><strong>Nora Mahmoud</strong></div>
           <div><span>Prioriterade områden</span><strong id="coordinatorParentAreas">Konflikter · Skola</strong></div>
-          <div><span>Praktiskt krav</span><strong>Svenska · kvällstid</strong></div>
+          <div><span>Språk och tid</span><strong id="coordinatorLanguageRequirements">Arabiska helst · svenska fungerar · kvällstid</strong></div>
         </section>
-        <div class="parallel-support-note" role="note">
-          <div><span>Parallellt professionellt stöd</span><strong>Kontakt med barn- och ungdomspsykiatrin finns</strong></div>
-          <div><span>Mentorskapets kompletterande roll</span><strong>Vardagsstruktur, förberedelse inför kontakter och stöd mellan vårdtillfällen</strong></div>
+        <div id="coordinatorComplementarySupport" class="parallel-support-note" role="note">
+          <div><span>Sammanhang</span><strong id="coordinatorProfessionalSupportContext">NPF eller behov av extra tydlighet</strong></div>
+          <div><span>Professionellt stöd</span><strong id="coordinatorProfessionalSupportStatus">Stöd finns idag</strong></div>
+          <div><span>Önskad mentorroll</span><strong id="coordinatorComplementaryRole">Vardagsrutiner, förbereda frågor och vardagssteg mellan professionella kontakter</strong></div>
           <div><span>Avgränsning att bekräfta</span><strong>Mentorn ger inte vård, behandlingsråd eller akuthjälp</strong></div>
         </div>
 
@@ -175,17 +200,17 @@
               <label class="candidate-row selected">
                 <input type="radio" name="mentorCandidate" value="Elin Berg" checked>
                 <div class="candidate-main"><strong>Elin Berg</strong><span class="match-label strong">Stämmer väl med underlaget</span><small>Godkänd · 1 ledigt uppdrag</small></div>
-                <div class="candidate-reasons"><span>2 av 2 huvudområden</span><span>Mycket god trygghet inom skolområdet</span><span>Svenska · kvällstid</span></div>
+                <div class="candidate-reasons"><span>2 av 2 huvudområden</span><span>Mycket god trygghet inom skolområdet</span><span id="selectedMentorLanguageReason">Svenska fungerar</span><span>Kvällstid</span></div>
               </label>
               <label class="candidate-row">
                 <input type="radio" name="mentorCandidate" value="Bo Karlsson">
                 <div class="candidate-main"><strong>Bo Karlsson</strong><span class="match-label">Behöver bedömas</span><small>Godkänd · 2 lediga uppdrag</small></div>
-                <div class="candidate-reasons"><span>1 av 2 prioriterade områden</span><span>Ingen erfarenhet av skolfrånvaro angiven</span><span>Svenska · kvällstid</span></div>
+                <div class="candidate-reasons"><span>1 av 2 prioriterade områden</span><span>Ingen erfarenhet av skolfrånvaro angiven</span><span>Svenska fungerar · kvällstid</span></div>
               </label>
               <label class="candidate-row">
                 <input type="radio" name="mentorCandidate" value="Samira Haddad">
                 <div class="candidate-main"><strong>Samira Haddad</strong><span class="match-label caution">Tiden stämmer inte</span><small>Godkänd · 1 ledigt uppdrag</small></div>
-                <div class="candidate-reasons"><span>2 av 2 huvudområden</span><span>Relevant vardagserfarenhet</span><span>Endast dagtid</span></div>
+                <div class="candidate-reasons"><span>2 av 2 huvudområden</span><span>Arabiska obehindrat</span><span>Endast dagtid</span></div>
               </label>
             </div>
           </section>
@@ -195,6 +220,7 @@
             <h3 id="assessmentHeading">Elin Berg</h3>
             <dl>
               <div><dt>Överlapp</dt><dd>Konflikter och skola</dd></div>
+              <div><dt>Språk</dt><dd id="coordinatorLanguageAssessment">Svenska fungerar för föräldern; arabiska är förstahandsval.</dd></div>
               <div><dt>Erfarenhetsgrund</dt><dd>Egen erfarenhet samt erfarenhet av att stödja andra</dd></div>
               <div><dt>Självskattad trygghet</dt><dd>Mycket god inom skola, god inom konflikter</dd></div>
               <div><dt>Behöver bekräftas</dt><dd>Att fysisk mötesplats fungerar</dd></div>

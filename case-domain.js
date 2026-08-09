@@ -43,6 +43,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "identityVerified",
     version: 1,
     title: "Verifiera identitet",
+    workInput: { kind: "mentor_identity", featureKey: "mentor.identity", label: "Identitetsuppgifter", required: true },
     workInstruction: "Kontrollera identiteten med BankID eller genom fysisk ID-handling. Registrera personnummer och verifieringssätt på mentorkortet innan aktiviteten avslutas.",
     results: [
       ["verified", "Verifierad", "acceptable"],
@@ -113,6 +114,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "interviewDone",
     version: 1,
     title: "Genomför intervju",
+    workInput: { kind: "case_meeting", featureKey: "case.meetings", label: "Intervjuunderlag", required: true },
     workInstruction: "Genomför intervjun enligt verksamhetens rutin och registrera mötet eller protokollet som underlag. Avsluta aktiviteten först när utfallet är dokumenterat.",
     results: [
       ["completed", "Genomförd", "acceptable"],
@@ -134,6 +136,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "matchingEligibility",
     version: 1,
     title: "Kontrollera tillgänglighet och grundkriterier",
+    workInput: { kind: "matching_basis", featureKey: "case.matching", label: "Matchningsunderlag", required: true },
     workInstruction: "Kontrollera att mentorn är godkänd, aktiv och tillgänglig för ett nytt uppdrag. Jämför stödbehov, stödområden, språk, geografiska förutsättningar och praktisk tillgänglighet. Dokumentera en kort motivering om något kriterium behöver bedömas manuellt.",
     results: [
       ["criteria_met", "Grundkriterier uppfyllda", "acceptable"],
@@ -146,6 +149,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "matchingProposal",
     version: 1,
     title: "Dokumentera matchningsförslag",
+    workInput: { kind: "matching_proposal", featureKey: "case.matching", label: "Matchningsmotivering", required: true },
     workInstruction: "Dokumentera varför den föreslagna mentorn bedöms passa det aktuella stödärendet. Ange vilka behov och förutsättningar som stämmer, eventuella begränsningar och vad parterna behöver bekräfta. Undvik omdömen som inte behövs för matchningen.",
     results: [
       ["proposal_documented", "Matchningsförslag dokumenterat", "acceptable"],
@@ -168,6 +172,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "matchingFirstMeeting",
     version: 1,
     title: "Boka första mötet",
+    workInput: { kind: "case_meeting", featureKey: "case.meetings", label: "Mötesbokning", required: true },
     workInstruction: "Kom överens med parterna om datum, kontaktform och praktiska förutsättningar för ett första möte. Registrera bokningen. Använd Väntar om en tid ännu inte är bekräftad; avsluta inte aktiviteten som genomförd enbart för att ett kontaktförsök har gjorts.",
     results: [
       ["meeting_booked", "Första mötet bokat", "acceptable"],
@@ -179,6 +184,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "matchingPartyResponses",
     version: 1,
     title: "Registrera parternas återkoppling",
+    workInput: { kind: "matching_responses", featureKey: "case.matching", label: "Parternas återkoppling", required: true },
     workInstruction: "Registrera förälderns och mentorns svar var för sig under Parternas återkoppling på ärendets översikt. Sammanfatta endast det som behövs för beslutet. Uteblivet svar ska registreras som vänteläge, aldrig som ett godkännande.",
     results: [
       ["both_accept", "Båda parter vill gå vidare", "acceptable"],
@@ -192,6 +198,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "matchingDecision",
     version: 1,
     title: "Fatta beslut om matchning",
+    workInput: { kind: "matching_decision", featureKey: "case.matching", label: "Matchningsbeslut", required: true },
     workInstruction: "Kontrollera matchningsunderlaget och båda parters registrerade svar. Registrera det samlade utfallet under Parternas återkoppling på ärendets översikt. Ett mentoruppdrag får skapas först när båda parter har accepterat samma förslag.",
     results: [
       ["match_approved", "Matchningen godkänd", "acceptable"],
@@ -365,6 +372,38 @@ export function canStartCaseType(caseType, context = {}) {
   if (caseType.creationMode === "support_case") return Boolean(context.supportCaseId);
   if (caseType.creationMode === "accepted_matching") return Boolean(context.acceptedMatchingCaseId);
   return caseType.creationMode === "manual";
+}
+
+export function groupParentCases(caseRecords, parentId) {
+  const relatedCases = caseRecords.filter((caseRecord) => caseRecord.parentId === parentId);
+  return {
+    supportCases: relatedCases.filter((caseRecord) => caseRecord.caseTypeId === "parent-support"),
+    matchingCases: relatedCases.filter((caseRecord) => caseRecord.caseTypeId === "matching"),
+    assignmentCases: relatedCases.filter((caseRecord) => caseRecord.caseTypeId === "mentor-assignment")
+  };
+}
+
+const CASE_ACTIVITY_WORK_INPUTS = {
+  "parent-support": {
+    "Komplettera stödbehov och matchningskriterier": { kind: "support_profile", featureKey: "case.edit", label: "Stöd- och matchningsunderlag", required: true }
+  },
+  "mentor-assignment": {
+    "Bekräfta uppdragets ramar": { kind: "assignment_plan", featureKey: "case.assignment-followup", label: "Uppdragsplan", required: true },
+    "Genomför första avstämning": { kind: "parent_checkin", featureKey: "case.assignment-followup", label: "Föräldraavstämning", required: true },
+    "Följ upp efter fyra veckor": { kind: "parent_checkin", featureKey: "case.assignment-followup", label: "Föräldraavstämning", required: true },
+    "Sammanställ mötes- och ersättningsunderlag": { kind: "assignment_evidence", featureKey: "case.assignment-followup", label: "Uppföljnings- och ersättningsunderlag", required: true },
+    "Utvärdera och avsluta uppdraget": { kind: "parent_checkin", featureKey: "case.assignment-followup", label: "Avslutande föräldraavstämning", required: true }
+  }
+};
+
+export function activityWorkInputDefinition(activity, caseTypeId) {
+  const template = activityTemplateById(activity?.templateId);
+  return template?.workInput || CASE_ACTIVITY_WORK_INPUTS[caseTypeId]?.[activity?.title] || null;
+}
+
+export function deriveWorkInputState({ started = false, complete = false } = {}) {
+  if (complete) return "complete";
+  return started ? "in_progress" : "not_started";
 }
 
 export function activityTemplateById(id) {

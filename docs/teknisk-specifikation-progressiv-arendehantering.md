@@ -228,20 +228,100 @@ interface TenantSupportAreaSelection {
   updatedBy: string | null;
 }
 
-interface MentorSupportArea {
+interface MentorMatchingProfile {
+  id: string;
   tenantId: string;
   mentorId: string;
+  version: number;
+  status: "active" | "superseded";
+  area: string | null;
+  availability: string | null;
+  meetingModes: string[];
+  availableAssignmentCapacity: number | null;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+interface MentorMatchingSupportArea {
+  tenantId: string;
+  profileId: string;
+  mentorId: string;
   supportAreaId: string;
+  confidenceLevel: "some" | "good" | "very_good";
   experienceLevels: Array<"lived" | "practical" | "trained">;
   verified: boolean;
   verifiedAt: string | null;
   verifiedBy: string | null;
 }
+
+interface MentorMatchingLanguage {
+  tenantId: string;
+  profileId: string;
+  mentorId: string;
+  languageId: string;
+  label: string;
+  conversationLevel: "works_well" | "fluent";
+}
+
+interface SupportMatchingProfile {
+  id: string;
+  tenantId: string;
+  supportCaseId: string;
+  parentId: string;
+  version: number;
+  status: "active" | "superseded";
+  area: string | null;
+  availability: string | null;
+  preferredMeetingModes: string[];
+  sharedExperiencePreference: string | null;
+  complementarySupport: Record<string, unknown> | null;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+interface SupportMatchingSupportArea {
+  tenantId: string;
+  profileId: string;
+  supportCaseId: string;
+  supportAreaId: string;
+  priority: "primary" | "additional";
+}
+
+interface SupportMatchingLanguage {
+  tenantId: string;
+  profileId: string;
+  supportCaseId: string;
+  languageId: string;
+  label: string;
+  preference: "preferred" | "accepted";
+}
+
+interface MatchingAssessmentSnapshot {
+  id: string;
+  tenantId: string;
+  matchingCaseId: string;
+  supportCaseId: string;
+  mentorId: string;
+  parentId: string;
+  supportProfile: Record<string, unknown>;
+  mentorProfile: Record<string, unknown>;
+  overlapSupportAreaIds: string[];
+  createdAt: string;
+  createdBy: string;
+}
 ```
 
-En mentor kan ange flera erfarenhetsgrunder för samma stödområde. `lived` betyder egen eller närståendes erfarenhet, `practical` betyder erfarenhet av att stödja andra och `trained` betyder utbildning eller yrkeserfarenhet. Minst en grund krävs för ett valt område. Äldre poster med ett ensamt `experienceLevel` normaliseras till en lista vid läsning.
+En mentor har högst en aktiv matchningsprofil, men tidigare versioner bevaras. Profilen är den auktoritativa datakällan för matchningsuppgifter; mentorposten innehåller person- och godkännandeuppgifter. Stödområden och språk är underposter till profilen och får därför variera oberoende av mentorpostens livscykel.
 
-`CaseRecord.details.supportAreaIds` innehåller valda områden för ett stödärende. Om området ännu inte är känt används inga påhittade standardvärden; ärendet markeras för komplettering. När ett mentoruppdrag skapas kopieras områdena som en ögonblicksbild till uppdragets detaljer, medan uppdraget samtidigt behåller sin oföränderliga referens till stödärendet.
+Mentorn markerar endast områden där hen vill bli matchad. `confidenceLevel` är den primära självskattningen av hur trygg mentorn är att ge vardagsnära stöd inom området. Erfarenhetsgrunderna är sekundärt underlag: `lived` betyder egen eller närståendes erfarenhet, `practical` betyder erfarenhet av att stödja andra och `trained` betyder utbildning eller yrkeserfarenhet. Minst en grund krävs för ett valt område. Uppgifterna innebär inte professionell behörighet.
+
+Varje stödärende har högst en aktiv matchningsprofil. Förälderns uppgifter gäller det avgränsade stödbehovet och får inte lagras som en permanent profil på personen. Om området ännu inte är känt används inga påhittade standardvärden; ärendet markeras för komplettering.
+
+När ett matchningsärende skapas sparas en oföränderlig `MatchingAssessmentSnapshot` med de profilversioner, områden, språk och praktiska förutsättningar som handläggaren bedömde. Senare ändringar av mentor- eller stödprofilen får inte skriva om en historisk matchning. När ett mentoruppdrag skapas refererar uppdraget till denna snapshot och behåller samtidigt oföränderliga referenser till stödärendet och matchningsärendet.
 
 Matchningsläsmodellen får beräkna mängden gemensamma områden och använda antalet för sortering. Den får inte automatiskt acceptera eller neka en matchning. Godkännandestatus, tillgänglighet och behörighet är hårda filter. Stödområden, språk, geografi, erfarenhetsnivå och parternas önskemål är beslutsunderlag som visas öppet för handläggaren.
 
@@ -287,13 +367,32 @@ interface CaseActivity {
 }
 ```
 
+En aktivitetsmall kan dessutom ange en stabil koppling till en strukturerad registrering:
+
+```ts
+interface ActivityWorkInputDefinition {
+  kind: string;
+  featureKey: string;
+  label: string;
+  required: boolean;
+}
+
+type WorkInputState = "not_started" | "in_progress" | "complete";
+```
+
+`featureKey` är en stabil funktionsnyckel, exempelvis `mentor.identity`, `case.matching` eller `case.assignment-followup`. En central router löser nyckeln tillsammans med `caseId`, `activityId` och vid behov `mentorId` till aktuell adress. Aktivitetsmallar och lagrade poster får inte innehålla hårdkodade vyadresser.
+
+`WorkInputState` lagras inte på aktiviteten. Den härleds från den kanoniska verksamhetsposten, exempelvis identitetsuppgifterna på mentorn, matchningsunderlaget, mötet eller uppdragsuppföljningen. Läsmodellen ska även lämna `updatedAt` och `updatedBy` från samma post. Därmed kan aktivitetslista, aktivitetskort och målvy visa samma status utan parallella statusfält.
+
+Om `required` är sant får aktiviteten inte avslutas förrän läsmodellen ger `complete`. Snabbavslut ska då döljas och den fullständiga aktivitetsvyn ska förklara vilken registrering som saknas samt ge en direktlänk dit. Ett avvikande verksamhetsresultat och ett ofullständigt registreringsunderlag är olika tillstånd och får inte blandas ihop.
+
 `resultClassification` är en snapshot av den versionsstyrda resultatdefinitionen. Systemet ska inte räkna om historiska aktivitetsresultat mot en senare mallversion. Kombinationen `tenantId`, definitions-ID och version identifierar alltid exakt en definition. Högst en version per definitions-ID får vara `published` samtidigt.
 
 Även en manuellt tillagd aktivitet ska referera till en versionsstyrd standardmall för ad hoc-aktiviteter. Rubriken kan vara fri, men status- och resultatreglerna är därmed alltid definierade.
 
 Aktivitetens effektiva ansvariga är `handlerIdOverride` när det är satt, annars ärendets aktiva ansvariga assignment. Om båda saknas visas `Ej tilldelad`. Ett byte av ärendets ansvariga slår därför igenom på alla aktiviteter som inte är särskilt tilldelade, utan att aktivitetsraderna behöver skrivas om.
 
-`quickCompletionResultCodes` är en uttrycklig tillåtelselista. Ett resultat får bara snabbregistreras när det finns i listan och inte kräver tjänsteanteckning, möte, handling eller andra strukturerade uppgifter. Resultatfältet får aldrig förväljas. Om kompletterande information krävs ska klienten öppna den fullständiga aktivitetsvyn utan att skriva data.
+`quickCompletionResultCodes` är en uttrycklig tillåtelselista. Ett resultat får bara snabbregistreras när det finns i listan, eventuell kopplad registrering är fullständig och resultatet inte kräver tjänsteanteckning, möte, handling eller andra strukturerade uppgifter. Resultatfältet får aldrig förväljas. Om kompletterande information krävs ska klienten öppna den fullständiga aktivitetsvyn utan att skriva data.
 
 När alla tillämpliga aktiviteter är `completed` eller `not_applicable`, inga öppna avvikelser finns och ärendet inte är avslutat eller pausat, är ärendet redo för ett uttryckligt nästa beslut. Detta är en härledd läsmodell och inte en ny lagrad ärendestatus.
 

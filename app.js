@@ -9,6 +9,7 @@ import {
   DEFAULT_ORGANIZATION_UNIT_ID,
   DEFAULT_TENANT_ID,
   activitySaveRequiresConfirmation,
+  activityWorkInputDefinition,
   activityStatusLabel as domainActivityStatusLabel,
   activityTemplateById,
   assessCertificationApproval,
@@ -20,7 +21,9 @@ import {
   caseTypeById as domainCaseTypeById,
   caseTypeByName as domainCaseTypeByName,
   deriveCaseStatus as deriveDomainCaseStatus,
+  deriveWorkInputState,
   findMentorDuplicates,
+  groupParentCases,
   matchingOutcome,
   compensationReadiness,
   normalizeActivityStatus,
@@ -31,9 +34,9 @@ import {
   resultClassification,
   resultOptions,
   stableHash
-} from "./case-domain.js?v=20260809-case-creation-rules-v26";
+} from "./case-domain.js?v=20260809-activity-work-input-v28";
 import { marked } from "./vendor/marked/marked.esm.js";
-import { resolveFeatureLink, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260809-demo-v1";
+import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260809-activity-work-input-v2";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
 import {
   DEFAULT_TENANT_LEARNING_SELECTION,
@@ -61,9 +64,17 @@ import {
   supportAreaById,
   supportAreaOverlap
 } from "./support-area-domain.js?v=20260808-support-areas-v2";
+import {
+  MENTOR_SUPPORT_CONFIDENCE_LEVELS,
+  activeProfileFor,
+  buildMatchingSnapshot,
+  buildMentorMatchingProfile,
+  buildSupportMatchingProfile,
+  projectMentorMatchingProfile
+} from "./matching-profile-domain.js?v=20260809-matching-profiles-v1";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
 const HANDLERS_STORE = "handlers";
@@ -91,6 +102,13 @@ const PUBLIC_SUPPORT_REQUESTS_STORE = "publicSupportRequests";
 const SUPPORT_TICKETS_STORE = "supportTickets";
 const TENANT_SUPPORT_AREA_SELECTION_STORE = "tenantSupportAreaSelection";
 const TENANT_SETTINGS_STORE = "tenantSettings";
+const MENTOR_MATCHING_PROFILES_STORE = "mentorMatchingProfiles";
+const MENTOR_MATCHING_AREAS_STORE = "mentorMatchingSupportAreas";
+const MENTOR_MATCHING_LANGUAGES_STORE = "mentorMatchingLanguages";
+const SUPPORT_MATCHING_PROFILES_STORE = "supportMatchingProfiles";
+const SUPPORT_MATCHING_AREAS_STORE = "supportMatchingSupportAreas";
+const SUPPORT_MATCHING_LANGUAGES_STORE = "supportMatchingLanguages";
+const MATCHING_SNAPSHOTS_STORE = "matchingSnapshots";
 const SUPPORT_PANEL_SESSION_KEY = "foraldramentorer.supportPanelOpen";
 const LEARNING_SELECTION_INITIALIZED_ID = "__selection_initialized__";
 let CURRENT_USER_ID = "handler-sara";
@@ -519,6 +537,13 @@ let caseMeetings = [];
 let mentorReports = [];
 let parentCheckIns = [];
 let compensationPeriods = [];
+let mentorMatchingProfiles = [];
+let mentorMatchingAreas = [];
+let mentorMatchingLanguages = [];
+let supportMatchingProfiles = [];
+let supportMatchingAreas = [];
+let supportMatchingLanguages = [];
+let matchingSnapshots = [];
 let caseTypeDefinitions = CASE_TYPE_DEFINITIONS.map((definition) => ({ ...definition }));
 let caseTypeDefinitionVersions = [];
 let activityTemplateDefinitions = ACTIVITY_TEMPLATES.map((definition) => ({ ...definition }));
@@ -530,6 +555,11 @@ let selectedParentId = null;
 let parentSearchTerm = "";
 let parentEditMode = false;
 let selectedCaseRecordId = null;
+let caseRouteIntent = "";
+let caseRouteTargetId = "";
+let mentorRouteIntent = "";
+let mentorRouteCaseId = "";
+let mentorRouteActivityId = "";
 let searchTerm = "";
 let statusFilter = "";
 let caseSearchTerm = "";
@@ -666,7 +696,12 @@ const els = {
   parentAreaFact: document.querySelector("#parentAreaFact"),
   parentLanguagesFact: document.querySelector("#parentLanguagesFact"),
   parentAvailabilityFact: document.querySelector("#parentAvailabilityFact"),
+  parentSupportCaseTabCount: document.querySelector("#parentSupportCaseTabCount"),
+  parentMatchingCaseTabCount: document.querySelector("#parentMatchingCaseTabCount"),
+  parentAssignmentCaseTabCount: document.querySelector("#parentAssignmentCaseTabCount"),
   parentSupportCaseTableBody: document.querySelector("#parentSupportCaseTableBody"),
+  parentMatchingCaseTableBody: document.querySelector("#parentMatchingCaseTableBody"),
+  parentAssignmentCaseTableBody: document.querySelector("#parentAssignmentCaseTableBody"),
   administrationView: document.querySelector("#administrationView"),
   caseNumberingAdministrationView: document.querySelector("#caseNumberingAdministrationView"),
   caseNumberingForm: document.querySelector("#caseNumberingForm"),
@@ -742,6 +777,7 @@ const els = {
   activityTypeStatusFact: document.querySelector("#activityTypeStatusFact"),
   activityTypeCompletionFact: document.querySelector("#activityTypeCompletionFact"),
   activityTypeQuickFact: document.querySelector("#activityTypeQuickFact"),
+  activityTypeWorkInputFact: document.querySelector("#activityTypeWorkInputFact"),
   activityTypeUsageFact: document.querySelector("#activityTypeUsageFact"),
   activityTypeResultsFact: document.querySelector("#activityTypeResultsFact"),
   editActivityTypeButton: document.querySelector("#editActivityTypeButton"),
@@ -883,6 +919,7 @@ const els = {
   parentMatchResponseInput: document.querySelector("#parentMatchResponseInput"),
   mentorMatchResponseInput: document.querySelector("#mentorMatchResponseInput"),
   matchingOutcomeNoteInput: document.querySelector("#matchingOutcomeNoteInput"),
+  matchingProposalInput: document.querySelector("#matchingProposalInput"),
   createAssignmentAfterMatchInput: document.querySelector("#createAssignmentAfterMatchInput"),
   matchingOutcomeSubmitButton: document.querySelector("#matchingOutcomeSubmitButton"),
   assignmentFollowupTabItem: document.querySelector("#assignmentFollowupTabItem"),
@@ -961,6 +998,12 @@ const els = {
   activityDetailGuidanceTitle: document.querySelector("#activityDetailGuidanceTitle"),
   activityDetailGuidanceText: document.querySelector("#activityDetailGuidanceText"),
   activityDetailGuidanceButton: document.querySelector("#activityDetailGuidanceButton"),
+  activityWorkInputPanel: document.querySelector("#activityWorkInputPanel"),
+  activityWorkInputTitle: document.querySelector("#activityWorkInputTitle"),
+  activityWorkInputStatus: document.querySelector("#activityWorkInputStatus"),
+  activityWorkInputHelp: document.querySelector("#activityWorkInputHelp"),
+  activityWorkInputMeta: document.querySelector("#activityWorkInputMeta"),
+  activityWorkInputLink: document.querySelector("#activityWorkInputLink"),
   activityDetailForm: document.querySelector("#activityDetailForm"),
   activityDetailStatusInput: document.querySelector("#activityDetailStatusInput"),
   activityDetailResultInput: document.querySelector("#activityDetailResultInput"),
@@ -1085,6 +1128,7 @@ const els = {
   editInformationStatusInput: document.querySelector("#editInformationStatusInput"),
   editInterestNoteInput: document.querySelector("#editInterestNoteInput"),
   mentorSupportAreasRead: document.querySelector("#mentorSupportAreasRead"),
+  mentorMatchingProfileMeta: document.querySelector("#mentorMatchingProfileMeta"),
   mentorSupportAreasEdit: document.querySelector("#mentorSupportAreasEdit"),
   editAreaInput: document.querySelector("#editAreaInput"),
   editLanguagesInput: document.querySelector("#editLanguagesInput"),
@@ -1355,6 +1399,29 @@ function openDatabase() {
       ensureIndex(supportTicketStore, "tenantStatus", ["tenantId", "status"]);
       ensureStore(TENANT_SUPPORT_AREA_SELECTION_STORE, { keyPath: ["tenantId", "supportAreaId"] });
       ensureStore(TENANT_SETTINGS_STORE, { keyPath: "tenantId" });
+      const mentorProfileStore = ensureStore(MENTOR_MATCHING_PROFILES_STORE);
+      ensureIndex(mentorProfileStore, "mentorId", "mentorId");
+      ensureIndex(mentorProfileStore, "tenantMentor", ["tenantId", "mentorId"]);
+      ensureIndex(mentorProfileStore, "tenantStatus", ["tenantId", "status"]);
+      const mentorAreaStore = ensureStore(MENTOR_MATCHING_AREAS_STORE, { keyPath: ["profileId", "supportAreaId"] });
+      ensureIndex(mentorAreaStore, "profileId", "profileId");
+      ensureIndex(mentorAreaStore, "mentorId", "mentorId");
+      const mentorLanguageStore = ensureStore(MENTOR_MATCHING_LANGUAGES_STORE, { keyPath: ["profileId", "languageId"] });
+      ensureIndex(mentorLanguageStore, "profileId", "profileId");
+      ensureIndex(mentorLanguageStore, "mentorId", "mentorId");
+      const supportProfileStore = ensureStore(SUPPORT_MATCHING_PROFILES_STORE);
+      ensureIndex(supportProfileStore, "supportCaseId", "supportCaseId");
+      ensureIndex(supportProfileStore, "tenantSupportCase", ["tenantId", "supportCaseId"]);
+      ensureIndex(supportProfileStore, "tenantStatus", ["tenantId", "status"]);
+      const supportAreaStore = ensureStore(SUPPORT_MATCHING_AREAS_STORE, { keyPath: ["profileId", "supportAreaId"] });
+      ensureIndex(supportAreaStore, "profileId", "profileId");
+      ensureIndex(supportAreaStore, "supportCaseId", "supportCaseId");
+      const supportLanguageStore = ensureStore(SUPPORT_MATCHING_LANGUAGES_STORE, { keyPath: ["profileId", "languageId"] });
+      ensureIndex(supportLanguageStore, "profileId", "profileId");
+      ensureIndex(supportLanguageStore, "supportCaseId", "supportCaseId");
+      const snapshotStore = ensureStore(MATCHING_SNAPSHOTS_STORE);
+      ensureIndex(snapshotStore, "matchingCaseId", "matchingCaseId", { unique: true });
+      ensureIndex(snapshotStore, "tenantMatchingCase", ["tenantId", "matchingCaseId"], { unique: true });
     };
 
     request.onsuccess = () => {
@@ -1471,6 +1538,18 @@ function tenantSettingsTx(mode = "readonly") {
   return db.transaction(TENANT_SETTINGS_STORE, mode).objectStore(TENANT_SETTINGS_STORE);
 }
 
+function matchingStoreTx(storeName) {
+  return (mode = "readonly") => db.transaction(storeName, mode).objectStore(storeName);
+}
+
+const mentorMatchingProfileTx = matchingStoreTx(MENTOR_MATCHING_PROFILES_STORE);
+const mentorMatchingAreaTx = matchingStoreTx(MENTOR_MATCHING_AREAS_STORE);
+const mentorMatchingLanguageTx = matchingStoreTx(MENTOR_MATCHING_LANGUAGES_STORE);
+const supportMatchingProfileTx = matchingStoreTx(SUPPORT_MATCHING_PROFILES_STORE);
+const supportMatchingAreaTx = matchingStoreTx(SUPPORT_MATCHING_AREAS_STORE);
+const supportMatchingLanguageTx = matchingStoreTx(SUPPORT_MATCHING_LANGUAGES_STORE);
+const matchingSnapshotTx = matchingStoreTx(MATCHING_SNAPSHOTS_STORE);
+
 function getAllFrom(storeTx) {
   return new Promise((resolve, reject) => {
     const request = storeTx().getAll();
@@ -1542,6 +1621,13 @@ const clearSupportTickets = () => clearStore(supportTicketTx);
 const getAllTenantSupportAreaSelections = () => getAllFrom(tenantSupportAreaSelectionTx);
 const saveTenantSupportAreaSelection = (value) => putInto(tenantSupportAreaSelectionTx, value);
 const clearTenantSupportAreaSelections = () => clearStore(tenantSupportAreaSelectionTx);
+const getAllMentorMatchingProfiles = () => getAllFrom(mentorMatchingProfileTx);
+const getAllMentorMatchingAreas = () => getAllFrom(mentorMatchingAreaTx);
+const getAllMentorMatchingLanguages = () => getAllFrom(mentorMatchingLanguageTx);
+const getAllSupportMatchingProfiles = () => getAllFrom(supportMatchingProfileTx);
+const getAllSupportMatchingAreas = () => getAllFrom(supportMatchingAreaTx);
+const getAllSupportMatchingLanguages = () => getAllFrom(supportMatchingLanguageTx);
+const getAllMatchingSnapshots = () => getAllFrom(matchingSnapshotTx);
 const getTenantSettings = () => new Promise((resolve, reject) => {
   const request = tenantSettingsTx().get(DEFAULT_TENANT_ID);
   request.onsuccess = () => resolve(request.result || null);
@@ -1700,6 +1786,7 @@ function normalizeMentorSupportAreas(entries) {
       const experienceLevels = [...new Set(storedLevels.filter((level) => validLevels.has(level)))];
       return {
         areaId: entry.areaId,
+        confidenceLevel: MENTOR_SUPPORT_CONFIDENCE_LEVELS.some(([id]) => id === entry.confidenceLevel) ? entry.confidenceLevel : "good",
         experienceLevels: experienceLevels.length ? experienceLevels : ["practical"],
         verified: Boolean(entry.verified),
         verifiedAt: entry.verifiedAt || null,
@@ -1717,7 +1804,7 @@ function renderMentorSupportAreaEditor(candidate = null) {
     if (!areas.length) return "";
     return `<fieldset class="mentor-support-area-group"><legend>${escapeHtml(category.label)}</legend>${areas.map((area) => {
       const entry = selected.get(area.id);
-      return `<div class="mentor-support-area-row"><label><input class="form-check-input" type="checkbox" data-mentor-support-area="${escapeHtml(area.id)}" ${entry ? "checked" : ""}><span>${escapeHtml(area.title)}${enabledIds.has(area.id) ? "" : ' <small class="text-secondary">(inte längre i kommunens urval)</small>'}</span></label><fieldset class="mentor-experience-bases" data-mentor-experience-bases="${escapeHtml(area.id)}" ${entry ? "" : "hidden"}><legend>Erfarenheten grundar sig på</legend>${MENTOR_EXPERIENCE_LEVELS.map(([id, label]) => `<label><input class="form-check-input" type="checkbox" value="${id}" data-mentor-experience-level="${escapeHtml(area.id)}" ${entry?.experienceLevels.includes(id) ? "checked" : ""} ${entry ? "" : "disabled"}><span>${escapeHtml(label)}</span></label>`).join("")}</fieldset></div>`;
+      return `<div class="mentor-support-area-row"><label><input class="form-check-input" type="checkbox" data-mentor-support-area="${escapeHtml(area.id)}" ${entry ? "checked" : ""}><span>${escapeHtml(area.title)}${enabledIds.has(area.id) ? "" : ' <small class="text-secondary">(inte längre i kommunens urval)</small>'}</span></label><div class="mentor-support-assessment" data-mentor-support-assessment="${escapeHtml(area.id)}" ${entry ? "" : "hidden"}><label class="mentor-confidence-field"><span>Trygghet att ge vardagsnära stöd</span><select class="form-select form-select-sm" data-mentor-confidence="${escapeHtml(area.id)}" ${entry ? "" : "disabled"}>${MENTOR_SUPPORT_CONFIDENCE_LEVELS.map(([id, label]) => `<option value="${id}" ${(entry?.confidenceLevel || "good") === id ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select></label><fieldset class="mentor-experience-bases"><legend>Vad bedömningen grundar sig på</legend>${MENTOR_EXPERIENCE_LEVELS.map(([id, label]) => `<label><input class="form-check-input" type="checkbox" value="${id}" data-mentor-experience-level="${escapeHtml(area.id)}" ${entry?.experienceLevels.includes(id) ? "checked" : ""} ${entry ? "" : "disabled"}><span>${escapeHtml(label)}</span></label>`).join("")}</fieldset></div></div>`;
     }).join("")}</fieldset>`;
   }).join("");
 }
@@ -1727,6 +1814,7 @@ function mentorSupportAreasFromEditor() {
   const previous = new Map(normalizeMentorSupportAreas(selectedCandidate()?.supportAreas).map((entry) => [entry.areaId, entry]));
   return [...els.mentorSupportAreasEdit.querySelectorAll("[data-mentor-support-area]:checked")].map((input) => ({
     areaId: input.dataset.mentorSupportArea,
+    confidenceLevel: els.mentorSupportAreasEdit.querySelector(`[data-mentor-confidence="${input.dataset.mentorSupportArea}"]`)?.value || "good",
     experienceLevels: [...els.mentorSupportAreasEdit.querySelectorAll(`[data-mentor-experience-level="${input.dataset.mentorSupportArea}"]:checked`)].map((levelInput) => levelInput.value),
     verified: Boolean(previous.get(input.dataset.mentorSupportArea)?.verified),
     verifiedAt: previous.get(input.dataset.mentorSupportArea)?.verifiedAt || null,
@@ -1748,9 +1836,10 @@ function validateMentorSupportAreaEditor() {
 function renderMentorSupportAreas(candidate) {
   if (!els.mentorSupportAreasRead) return;
   const levelLabels = Object.fromEntries(MENTOR_EXPERIENCE_LEVELS);
+  const confidenceLabels = Object.fromEntries(MENTOR_SUPPORT_CONFIDENCE_LEVELS);
   const entries = normalizeMentorSupportAreas(candidate?.supportAreas);
   els.mentorSupportAreasRead.innerHTML = entries.length
-    ? entries.map((entry) => `<div class="support-area-fact"><strong>${escapeHtml(supportAreaById(entry.areaId)?.title || entry.areaId)}</strong><span>${escapeHtml(entry.experienceLevels.map((level) => levelLabels[level]).filter(Boolean).join(" · "))}${entry.verified ? " · Verifierad" : " · Egen uppgift"}</span></div>`).join("")
+    ? entries.map((entry) => `<div class="support-area-fact"><strong>${escapeHtml(supportAreaById(entry.areaId)?.title || entry.areaId)}</strong><span>${escapeHtml(confidenceLabels[entry.confidenceLevel] || "God trygghet")} att ge stöd</span><small>${escapeHtml(entry.experienceLevels.map((level) => levelLabels[level]).filter(Boolean).join(" · "))}${entry.verified ? " · Verifierad" : " · Egen uppgift"}</small></div>`).join("")
     : '<p class="text-secondary mb-0">Inga erfarenhetsområden är registrerade.</p>';
 }
 
@@ -1950,6 +2039,12 @@ const CASE_DATA_STORES = [
   PARENT_CHECK_INS_STORE, COMPENSATION_PERIODS_STORE, CASE_DOCUMENT_BLOBS_STORE, PROCESSED_COMMANDS_STORE
 ];
 
+const MATCHING_PROFILE_STORES = [
+  MENTOR_MATCHING_PROFILES_STORE, MENTOR_MATCHING_AREAS_STORE, MENTOR_MATCHING_LANGUAGES_STORE,
+  SUPPORT_MATCHING_PROFILES_STORE, SUPPORT_MATCHING_AREAS_STORE, SUPPORT_MATCHING_LANGUAGES_STORE,
+  MATCHING_SNAPSHOTS_STORE
+];
+
 function clearStores(storeNames) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(storeNames, "readwrite");
@@ -2070,7 +2165,7 @@ function replaceCandidates(nextCandidates) {
 }
 
 function replacePrototypeDataset(exampleCandidates, workflowRecords) {
-  const storeNames = [STORE, PARENTS_STORE, MEETINGS_STORE, LEARNING_PROGRESS_STORE, ...CASE_DATA_STORES];
+  const storeNames = [STORE, PARENTS_STORE, MEETINGS_STORE, LEARNING_PROGRESS_STORE, ...CASE_DATA_STORES, ...MATCHING_PROFILE_STORES];
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(storeNames, "readwrite");
     for (const storeName of storeNames) transaction.objectStore(storeName).clear();
@@ -2124,9 +2219,9 @@ function buildExampleDataset(count) {
       identityVerifiedAt: identityVerified ? now : "",
       identityVerifiedBy: identityVerified ? "Sara Lind" : "",
       supportAreas: [
-        { areaId: SUPPORT_AREAS[index % SUPPORT_AREAS.length].id, experienceLevel: index % 3 === 0 ? "trained" : "practical", verified: index % 4 === 0 },
-        { areaId: SUPPORT_AREAS[(index + 3) % SUPPORT_AREAS.length].id, experienceLevel: "lived", verified: false },
-        { areaId: SUPPORT_AREAS[(index + 7) % SUPPORT_AREAS.length].id, experienceLevel: "practical", verified: false }
+        { areaId: SUPPORT_AREAS[index % SUPPORT_AREAS.length].id, confidenceLevel: "very_good", experienceLevels: index % 3 === 0 ? ["trained", "practical"] : ["practical"], verified: index % 4 === 0 },
+        { areaId: SUPPORT_AREAS[(index + 3) % SUPPORT_AREAS.length].id, confidenceLevel: "good", experienceLevels: ["lived"], verified: false },
+        { areaId: SUPPORT_AREAS[(index + 7) % SUPPORT_AREAS.length].id, confidenceLevel: index % 2 ? "some" : "good", experienceLevels: ["practical"], verified: false }
       ],
       exampleData: true,
       exampleDataVersion: 4,
@@ -2266,6 +2361,170 @@ async function loadCaseData() {
     getAllParentCheckIns(),
     getAllCompensationPeriods()
   ]);
+}
+
+async function loadMatchingProfileData() {
+  [mentorMatchingProfiles, mentorMatchingAreas, mentorMatchingLanguages, supportMatchingProfiles, supportMatchingAreas, supportMatchingLanguages, matchingSnapshots] = await Promise.all([
+    getAllMentorMatchingProfiles(),
+    getAllMentorMatchingAreas(),
+    getAllMentorMatchingLanguages(),
+    getAllSupportMatchingProfiles(),
+    getAllSupportMatchingAreas(),
+    getAllSupportMatchingLanguages(),
+    getAllMatchingSnapshots()
+  ]);
+}
+
+function mentorMatchingProfile(mentorId) {
+  return activeProfileFor(mentorMatchingProfiles, "mentorId", mentorId);
+}
+
+function supportMatchingProfile(supportCaseId) {
+  return activeProfileFor(supportMatchingProfiles, "supportCaseId", supportCaseId);
+}
+
+function matchingSnapshot(matchingCaseId) {
+  return matchingSnapshots.find((snapshot) => snapshot.matchingCaseId === matchingCaseId) || null;
+}
+
+function supportAreaIdsForCase(caseRecord) {
+  if (!caseRecord) return [];
+  const profile = supportMatchingProfile(caseRecord.id);
+  const profileIds = profile
+    ? supportMatchingAreas.filter((entry) => entry.profileId === profile.id).map((entry) => entry.supportAreaId)
+    : [];
+  return normalizeSupportAreaIds(profileIds.length ? profileIds : caseRecord.details?.supportAreaIds);
+}
+
+function profileWrites(built, profileStore, areaStore, languageStore, previousProfile = null) {
+  const writes = {
+    [profileStore]: [
+      ...(previousProfile ? [{ ...previousProfile, status: "superseded", supersededAt: built.profile.createdAt, supersededBy: built.profile.id, updatedAt: built.profile.createdAt, updatedBy: built.profile.createdBy }] : []),
+      built.profile
+    ],
+    [areaStore]: built.supportAreas,
+    [languageStore]: built.languages
+  };
+  return writes;
+}
+
+async function saveMentorMatchingProfile(candidate, actor = CURRENT_USER_ID) {
+  const previousProfile = mentorMatchingProfile(candidate.id);
+  const now = new Date().toISOString();
+  const built = buildMentorMatchingProfile({
+    tenantId: DEFAULT_TENANT_ID,
+    mentor: candidate,
+    profileId: crypto.randomUUID(),
+    previousProfile,
+    actorId: actor,
+    now
+  });
+  await atomicPut(profileWrites(built, MENTOR_MATCHING_PROFILES_STORE, MENTOR_MATCHING_AREAS_STORE, MENTOR_MATCHING_LANGUAGES_STORE, previousProfile));
+  return built.profile;
+}
+
+async function saveNewMentorWithMatchingProfile(candidate, actor = CURRENT_USER_ID) {
+  const now = candidate.updatedAt || candidate.createdAt || new Date().toISOString();
+  const built = buildMentorMatchingProfile({ tenantId: DEFAULT_TENANT_ID, mentor: candidate, profileId: crypto.randomUUID(), actorId: actor, now });
+  await atomicPut({
+    [STORE]: [candidate],
+    ...profileWrites(built, MENTOR_MATCHING_PROFILES_STORE, MENTOR_MATCHING_AREAS_STORE, MENTOR_MATCHING_LANGUAGES_STORE)
+  });
+  return candidate;
+}
+
+async function saveSupportMatchingProfile(caseRecord, actor = CURRENT_USER_ID) {
+  const previousProfile = supportMatchingProfile(caseRecord.id);
+  const now = new Date().toISOString();
+  const built = buildSupportMatchingProfile({
+    tenantId: DEFAULT_TENANT_ID,
+    supportCase: caseRecord,
+    profileId: crypto.randomUUID(),
+    previousProfile,
+    actorId: actor,
+    now
+  });
+  await atomicPut(profileWrites(built, SUPPORT_MATCHING_PROFILES_STORE, SUPPORT_MATCHING_AREAS_STORE, SUPPORT_MATCHING_LANGUAGES_STORE, previousProfile));
+  return built.profile;
+}
+
+async function saveMatchingSnapshotForCase(caseRecord, actor = CURRENT_USER_ID) {
+  if (caseRecord.caseTypeId !== "matching" || matchingSnapshot(caseRecord.id)) return null;
+  const mentorProfile = mentorMatchingProfile(caseRecord.mentorId);
+  const supportProfile = supportMatchingProfile(caseRecord.supportCaseId);
+  if (!mentorProfile || !supportProfile) return null;
+  const snapshot = buildMatchingSnapshot({
+    tenantId: DEFAULT_TENANT_ID,
+    matchingCase: caseRecord,
+    mentorProfile,
+    mentorAreas: mentorMatchingAreas,
+    mentorLanguages: mentorMatchingLanguages,
+    supportProfile,
+    supportAreas: supportMatchingAreas,
+    supportLanguages: supportMatchingLanguages,
+    snapshotId: crypto.randomUUID(),
+    actorId: actor,
+    now: new Date().toISOString()
+  });
+  await putInto(matchingSnapshotTx, snapshot);
+  return snapshot;
+}
+
+async function ensureMatchingProfileRecords() {
+  const records = {};
+  const add = (storeName, values) => {
+    if (!values?.length) return;
+    records[storeName] = [...(records[storeName] || []), ...values];
+  };
+  for (const candidate of candidates) {
+    if (mentorMatchingProfile(candidate.id)) continue;
+    const built = buildMentorMatchingProfile({ tenantId: DEFAULT_TENANT_ID, mentor: candidate, profileId: crypto.randomUUID(), actorId: candidate.updatedBy || candidate.createdBy || "system", now: candidate.updatedAt || candidate.createdAt || new Date().toISOString() });
+    add(MENTOR_MATCHING_PROFILES_STORE, [built.profile]);
+    add(MENTOR_MATCHING_AREAS_STORE, built.supportAreas);
+    add(MENTOR_MATCHING_LANGUAGES_STORE, built.languages);
+  }
+  for (const supportCase of cases.filter((item) => item.caseTypeId === "parent-support")) {
+    if (supportMatchingProfile(supportCase.id)) continue;
+    const built = buildSupportMatchingProfile({ tenantId: DEFAULT_TENANT_ID, supportCase, profileId: crypto.randomUUID(), actorId: supportCase.updatedBy || supportCase.createdBy || "system", now: supportCase.updatedAt || supportCase.createdAt || new Date().toISOString() });
+    add(SUPPORT_MATCHING_PROFILES_STORE, [built.profile]);
+    add(SUPPORT_MATCHING_AREAS_STORE, built.supportAreas);
+    add(SUPPORT_MATCHING_LANGUAGES_STORE, built.languages);
+  }
+  if (Object.keys(records).length) {
+    await atomicPut(records);
+    await loadMatchingProfileData();
+  }
+  const snapshots = [];
+  for (const matchingCase of cases.filter((item) => item.caseTypeId === "matching" && !matchingSnapshot(item.id))) {
+    const mentorProfile = mentorMatchingProfile(matchingCase.mentorId);
+    const supportProfile = supportMatchingProfile(matchingCase.supportCaseId);
+    if (!mentorProfile || !supportProfile) continue;
+    snapshots.push(buildMatchingSnapshot({
+      tenantId: DEFAULT_TENANT_ID,
+      matchingCase,
+      mentorProfile,
+      mentorAreas: mentorMatchingAreas,
+      mentorLanguages: mentorMatchingLanguages,
+      supportProfile,
+      supportAreas: supportMatchingAreas,
+      supportLanguages: supportMatchingLanguages,
+      snapshotId: crypto.randomUUID(),
+      actorId: matchingCase.createdBy || "system",
+      now: matchingCase.createdAt || new Date().toISOString()
+    }));
+  }
+  if (snapshots.length) {
+    await atomicPut({ [MATCHING_SNAPSHOTS_STORE]: snapshots });
+    await loadMatchingProfileData();
+  }
+}
+
+function projectMatchingProfiles() {
+  candidates = candidates.map((candidate) => {
+    const profile = mentorMatchingProfile(candidate.id);
+    const projection = projectMentorMatchingProfile(profile, mentorMatchingAreas, mentorMatchingLanguages);
+    return projection ? { ...candidate, ...projection } : candidate;
+  });
 }
 
 function actorId(value) {
@@ -2827,6 +3086,9 @@ async function refresh() {
   await loadCaseData();
   await migrateCaseDomainV6();
   await loadCaseData();
+  await loadMatchingProfileData();
+  await ensureMatchingProfileRecords();
+  projectMatchingProfiles();
   candidates = candidates.map(projectMentorWorkflow);
   meetings = await getAllMeetings();
   meetings.sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt));
@@ -3453,8 +3715,46 @@ function renderAll() {
     handler: renderHandlerDetail
   }[currentView];
   viewRenderer?.();
+  applyCurrentRouteIntent();
   document.body.dataset.renderView = currentView;
   document.body.dataset.renderDurationMs = String(Date.now() - renderStartedAt);
+}
+
+function applyCurrentRouteIntent() {
+  if (currentView !== "case" || !caseRouteIntent) return;
+  requestAnimationFrame(() => {
+    if (caseRouteIntent === "activities") {
+      bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-activities-tab")).show();
+      els.activityDetailPanel?.scrollIntoView({ block: "start" });
+      return;
+    }
+    if (caseRouteIntent === "matching") {
+      bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
+      els.caseTransitionPanel?.scrollIntoView({ block: "start" });
+      els.matchingProposalInput?.focus({ preventScroll: true });
+      return;
+    }
+    if (caseRouteIntent === "assignment-followup") {
+      bootstrap.Tab.getOrCreateInstance(document.querySelector("#assignment-followup-tab")).show();
+      const activity = caseActivities.find((item) => item.id === caseRouteTargetId);
+      const workInput = activity ? activityWorkInputSummary(activity, selectedCaseRecord()) : null;
+      const target = workInput?.kind === "parent_checkin"
+        ? els.parentCheckInForm
+        : workInput?.kind === "assignment_evidence"
+          ? els.mentorReportsTableWrap
+          : els.assignmentPlanForm;
+      target?.scrollIntoView({ block: "start" });
+      return;
+    }
+    if (caseRouteIntent === "meetings") {
+      bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-meetings-tab")).show();
+      if (caseRouteTargetId && els.caseMeetingForm.hidden) {
+        openCaseMeetingForm();
+        els.caseMeetingActivityInput.value = caseRouteTargetId;
+        els.caseMeetingSummaryInput.focus({ preventScroll: true });
+      }
+    }
+  });
 }
 
 function currentMentorUser() {
@@ -4103,19 +4403,36 @@ function applyRoute() {
     route = { view: "case-types", id: null };
   }
   const nestedActivityRoute = route.view === "case-types" ? route.id?.match(/^([^/]+)\/activities\/([^/]+)$/) : null;
+  const nestedCaseRoute = route.view === "case" && route.id && !route.id.startsWith("new")
+    ? route.id.match(/^([^/]+)(?:\/([^/]+)(?:\/([^/]+))?)?$/)
+    : null;
+  const nestedMentorRoute = route.view === "mentor" && route.id && route.id !== "new"
+    ? route.id.match(/^([^/]+)(?:\/([^/]+)(?:\/([^/]+)(?:\/([^/]+))?)?)?$/)
+    : null;
+  const routeCaseId = nestedCaseRoute?.[1] || route.id;
+  const routeMentorId = nestedMentorRoute?.[1] || route.id;
   const previousCaseRecordId = selectedCaseRecordId;
   currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
-  selectedId = currentView === "mentor" ? route.id : selectedId;
+  selectedId = currentView === "mentor" ? routeMentorId : selectedId;
+  mentorRouteIntent = currentView === "mentor" ? nestedMentorRoute?.[2] || "" : "";
+  mentorRouteCaseId = currentView === "mentor" ? nestedMentorRoute?.[3] || "" : "";
+  mentorRouteActivityId = currentView === "mentor" ? nestedMentorRoute?.[4] || "" : "";
+  if (currentView === "mentor" && mentorRouteIntent === "identity") pendingIdentityEditorId = routeMentorId;
   selectedParentId = currentView === "parent" ? route.id : selectedParentId;
   if (currentView !== "parent") parentEditMode = false;
-  selectedCaseRecordId = currentView === "case" ? route.id : selectedCaseRecordId;
+  selectedCaseRecordId = currentView === "case" ? routeCaseId : selectedCaseRecordId;
+  caseRouteIntent = currentView === "case" ? nestedCaseRoute?.[2] || "" : "";
+  caseRouteTargetId = currentView === "case" ? nestedCaseRoute?.[3] || "" : "";
   if (currentView !== "case") {
     selectedCaseActivityId = null;
-  } else if (selectedCaseActivityId && caseActivities.find((activity) => activity.id === selectedCaseActivityId)?.caseId !== route.id) {
+  } else if (caseRouteIntent === "activities" && caseRouteTargetId) {
+    selectedCaseActivityId = caseRouteTargetId;
+  } else if (selectedCaseActivityId && caseActivities.find((activity) => activity.id === selectedCaseActivityId)?.caseId !== routeCaseId) {
     selectedCaseActivityId = null;
   }
-  if (currentView !== "case" || route.id !== previousCaseRecordId) activityListFilter = "all";
-  if (currentView !== "case" || route.id !== previousCaseRecordId) caseEditMode = false;
+  if (currentView !== "case" || routeCaseId !== previousCaseRecordId) activityListFilter = "all";
+  if (currentView !== "case" || routeCaseId !== previousCaseRecordId) caseEditMode = false;
+  if (currentView === "case" && caseRouteIntent === "edit") caseEditMode = true;
   selectedHandlerId = currentView === "handler" ? route.id : selectedHandlerId;
   selectedCaseTypeId = currentView === "case-types" ? (nestedActivityRoute?.[1] || route.id) : null;
   selectedActivityParentCaseTypeId = nestedActivityRoute?.[1] || null;
@@ -4631,14 +4948,41 @@ function renderParentDetail() {
   els.parentAreaFact.textContent = parent.area || "Ej angivet";
   els.parentLanguagesFact.textContent = parent.languages || "Ej angivet";
   els.parentAvailabilityFact.textContent = parent.availability || "Ej angivet";
-  const supportCases = supportCasesForParent(parent.id).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  els.parentSupportCaseTableBody.innerHTML = supportCases.length ? "" : '<tr><td colspan="5" class="text-secondary py-4 text-center">Inga stödärenden registrerade.</td></tr>';
+  const parentCaseGroups = groupParentCases(cases, parent.id);
+  const byNewest = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
+  const supportCases = parentCaseGroups.supportCases.sort(byNewest);
+  const matchingCases = parentCaseGroups.matchingCases.sort(byNewest);
+  const assignmentCases = parentCaseGroups.assignmentCases.sort(byNewest);
+  els.parentSupportCaseTabCount.textContent = supportCases.length;
+  els.parentMatchingCaseTabCount.textContent = matchingCases.length;
+  els.parentAssignmentCaseTabCount.textContent = assignmentCases.length;
+
+  els.parentSupportCaseTableBody.innerHTML = supportCases.length ? "" : '<tr><td colspan="4" class="text-secondary py-4 text-center">Inga stödärenden registrerade.</td></tr>';
   for (const supportCase of supportCases) {
-    const matches = matchingCasesForSupport(supportCase.id);
-    const assignments = assignmentCasesForSupport(supportCase.id);
+    const nextActivity = nextCaseActivity(supportCase);
     const row = document.createElement("tr");
-    row.innerHTML = `<td><a class="case-number-link" href="#/case/${escapeHtml(supportCase.id)}">${escapeHtml(supportCase.number)}</a></td><td>${escapeHtml(supportCase.details?.supportPurpose || supportCase.title)}</td><td><span class="${caseStatusBadge(supportCase.status)}">${escapeHtml(caseStatusLabel(supportCase.status))}</span></td><td>${matches.length}</td><td>${assignments.length}</td>`;
+    row.innerHTML = `<td><a class="case-number-link" href="#/case/${escapeHtml(supportCase.id)}">${escapeHtml(supportCase.number)}</a></td><td><a href="#/case/${escapeHtml(supportCase.id)}">${escapeHtml(supportCase.details?.supportPurpose || supportCase.title)}</a></td><td><span class="${caseStatusBadge(supportCase.status)}">${escapeHtml(caseStatusLabel(supportCase.status))}</span></td><td>${escapeHtml(nextActivity?.title || "Ingen återstående")}</td>`;
     els.parentSupportCaseTableBody.append(row);
+  }
+
+  els.parentMatchingCaseTableBody.innerHTML = matchingCases.length ? "" : '<tr><td colspan="5" class="text-secondary py-4 text-center">Inga matchningar registrerade.</td></tr>';
+  for (const matchingCase of matchingCases) {
+    const supportCase = cases.find((caseRecord) => caseRecord.id === matchingCase.supportCaseId);
+    const mentor = caseMentor(matchingCase);
+    const nextActivity = nextCaseActivity(matchingCase);
+    const row = document.createElement("tr");
+    row.innerHTML = `<td><a class="case-number-link" href="#/case/${escapeHtml(matchingCase.id)}">${escapeHtml(matchingCase.number)}</a></td><td>${escapeHtml(supportCase?.details?.supportPurpose || supportCase?.title || "Ej kopplat")}</td><td>${escapeHtml(mentor?.name || "Mentor ej vald")}</td><td><span class="${caseStatusBadge(matchingCase.status)}">${escapeHtml(caseStatusLabel(matchingCase.status))}</span></td><td>${escapeHtml(nextActivity?.title || "Ingen återstående")}</td>`;
+    els.parentMatchingCaseTableBody.append(row);
+  }
+
+  els.parentAssignmentCaseTableBody.innerHTML = assignmentCases.length ? "" : '<tr><td colspan="5" class="text-secondary py-4 text-center">Inga uppdrag registrerade.</td></tr>';
+  for (const assignmentCase of assignmentCases) {
+    const supportCase = cases.find((caseRecord) => caseRecord.id === assignmentCase.supportCaseId);
+    const mentor = caseMentor(assignmentCase);
+    const nextActivity = nextCaseActivity(assignmentCase);
+    const row = document.createElement("tr");
+    row.innerHTML = `<td><a class="case-number-link" href="#/case/${escapeHtml(assignmentCase.id)}">${escapeHtml(assignmentCase.number)}</a></td><td>${escapeHtml(supportCase?.details?.supportPurpose || supportCase?.title || "Ej kopplat")}</td><td>${escapeHtml(mentor?.name || "Mentor ej vald")}</td><td><span class="${caseStatusBadge(assignmentCase.status)}">${escapeHtml(caseStatusLabel(assignmentCase.status))}</span></td><td>${escapeHtml(nextActivity?.title || "Ingen återstående")}</td>`;
+    els.parentAssignmentCaseTableBody.append(row);
   }
 }
 
@@ -4677,6 +5021,135 @@ function activityResultOptions(activity) {
 function quickActivityResultOptions(activity) {
   const allowedCodes = new Set(activityTemplateById(activity?.templateId)?.quickCompletionResultCodes || []);
   return activityResultOptions(activity).filter(([resultCode]) => allowedCodes.has(resultCode));
+}
+
+const WORK_INPUT_STATE_LABELS = {
+  not_started: "Inte påbörjad",
+  in_progress: "Påbörjad",
+  complete: "Fullständig"
+};
+
+function workInputStateClass(state) {
+  return state === "complete"
+    ? "text-bg-success"
+    : state === "in_progress"
+      ? "text-bg-warning"
+      : "text-bg-secondary";
+}
+
+function latestRecord(records = []) {
+  return [...records].sort((left, right) => new Date(right.updatedAt || right.createdAt || right.occurredAt || right.occurredOn || 0)
+    - new Date(left.updatedAt || left.createdAt || left.occurredAt || left.occurredOn || 0))[0] || null;
+}
+
+function activityWorkInputSummary(activity, caseRecord) {
+  const definition = activityWorkInputDefinition(activity, caseRecord?.caseTypeId);
+  if (!definition || !caseRecord) return null;
+
+  let started = false;
+  let complete = false;
+  let updatedAt = null;
+  let updatedBy = null;
+  let help = "Öppna den kopplade registreringen och komplettera underlaget innan aktiviteten avslutas.";
+  const routeParameters = { caseId: caseRecord.id, activityId: activity.id, mentorId: caseRecord.mentorId };
+
+  if (definition.kind === "mentor_identity") {
+    const mentor = caseMentor(caseRecord);
+    started = Boolean(mentor?.personalNumber || mentor?.identityMethod);
+    complete = Boolean(mentor?.personalNumber && mentor?.identityMethod);
+    updatedAt = mentor?.identityVerifiedAt || mentor?.updatedAt;
+    updatedBy = mentor?.identityVerifiedBy || mentor?.updatedBy;
+    help = "Registrera personnummer och hur identiteten har kontrollerats på mentorkortet.";
+  } else if (definition.kind === "case_meeting") {
+    const records = caseMeetings.filter((meeting) => meeting.caseId === caseRecord.id
+      && !meeting.supersededByMeetingId
+      && (meeting.activityId === activity.id || activity.templateId === "interviewDone" && meeting.meetingType === "certification_interview"));
+    const latest = latestRecord(records);
+    started = records.length > 0;
+    complete = records.some((meeting) => Boolean(meeting.occurredAt && meeting.summary?.trim()));
+    updatedAt = latest?.updatedAt || latest?.createdAt;
+    updatedBy = latest?.updatedBy || latest?.createdBy;
+    help = activity.templateId === "matchingFirstMeeting"
+      ? "Registrera överenskommen tid, kontaktform och praktiska förutsättningar och koppla mötet till aktiviteten."
+      : "Registrera intervjun som ett möte och koppla den till aktiviteten. En saklig sammanfattning krävs.";
+  } else if (definition.kind === "matching_basis") {
+    const snapshot = matchingSnapshot(caseRecord.id);
+    started = Boolean(snapshot);
+    complete = Boolean(snapshot?.supportProfile && snapshot?.mentorProfile);
+    updatedAt = snapshot?.createdAt;
+    updatedBy = snapshot?.createdBy;
+    help = "Granska det frysta stöd- och mentorunderlaget som matchningen grundas på.";
+  } else if (definition.kind === "matching_proposal") {
+    const proposal = caseRecord.details?.matchingProposal?.trim();
+    started = Boolean(proposal);
+    complete = Boolean(proposal);
+    updatedAt = proposal ? caseRecord.updatedAt : null;
+    updatedBy = proposal ? caseRecord.updatedBy : null;
+    help = "Dokumentera varför mentorn bedöms passa stödbehovet och ange eventuella begränsningar.";
+  } else if (definition.kind === "matching_responses") {
+    const validResponses = new Set(["accepted", "declined"]);
+    const parentResponse = caseRecord.details?.parentResponse;
+    const mentorResponse = caseRecord.details?.mentorResponse;
+    started = validResponses.has(parentResponse) || validResponses.has(mentorResponse);
+    complete = validResponses.has(parentResponse) && validResponses.has(mentorResponse);
+    updatedAt = started ? caseRecord.updatedAt : null;
+    updatedBy = started ? caseRecord.updatedBy : null;
+    help = "Registrera förälderns och mentorns svar var för sig. Uteblivet svar är inte ett godkännande.";
+  } else if (definition.kind === "matching_decision") {
+    const outcome = caseRecord.details?.matchingOutcome;
+    started = Boolean(outcome && outcome !== "pending");
+    complete = ["accepted", "declined"].includes(outcome);
+    updatedAt = started ? caseRecord.updatedAt : null;
+    updatedBy = started ? caseRecord.updatedBy : null;
+    help = "Kontrollera underlaget och registrera det samlade utfallet. Ett uppdrag skapas inte utan båda parters godkännande.";
+  } else if (definition.kind === "support_profile") {
+    const profile = supportMatchingProfile(caseRecord.id);
+    const areaCount = profile ? supportMatchingAreas.filter((entry) => entry.profileId === profile.id).length : 0;
+    const details = caseRecord.details || {};
+    started = Boolean(details.supportPurpose?.trim() || details.desiredOutcome?.trim() || areaCount);
+    complete = Boolean(details.supportPurpose?.trim() && details.desiredOutcome?.trim() && areaCount);
+    updatedAt = started ? profile?.updatedAt || caseRecord.updatedAt : null;
+    updatedBy = started ? profile?.updatedBy || caseRecord.updatedBy : null;
+    help = "Komplettera stödets syfte, önskat resultat och minst ett bekräftat stödområde.";
+  } else if (definition.kind === "assignment_plan") {
+    const plan = caseRecord.details?.assignmentPlan;
+    started = Boolean(plan && Object.values(plan).some(Boolean));
+    complete = Boolean(plan?.startDate && plan?.contactFrequency && plan?.firstFollowUpDate);
+    updatedAt = plan?.updatedAt;
+    updatedBy = plan?.updatedBy;
+    help = "Ange uppdragets start, kontaktfrekvens och första planerade uppföljning.";
+  } else if (definition.kind === "parent_checkin") {
+    const records = parentCheckIns.filter((record) => record.caseId === caseRecord.id);
+    const latest = latestRecord(records);
+    started = records.length > 0;
+    complete = Boolean(latest?.occurredOn && latest?.contactConfirmed && latest?.continueStatus);
+    updatedAt = latest?.updatedAt || latest?.createdAt;
+    updatedBy = latest?.updatedBy || latest?.createdBy;
+    help = "Registrera handläggarens avstämning med föräldern och hur stödet ska fortsätta.";
+  } else if (definition.kind === "assignment_evidence") {
+    const reports = mentorReports.filter((record) => record.caseId === caseRecord.id);
+    const meetings = caseMeetings.filter((record) => record.caseId === caseRecord.id && !record.supersededByMeetingId);
+    const latest = latestRecord([...reports, ...meetings]);
+    started = reports.length > 0 || meetings.length > 0;
+    complete = reports.some((report) => report.outcome === "completed" && report.summary?.trim());
+    updatedAt = latest?.updatedAt || latest?.createdAt;
+    updatedBy = latest?.updatedBy || latest?.createdBy;
+    help = "Kontrollera mentorrapporter, mötesuppgifter och underlag för uppföljning och ersättning.";
+  }
+
+  const state = deriveWorkInputState({ started, complete });
+  const href = resolveFeatureRoute(definition.featureKey, routeParameters);
+  return {
+    ...definition,
+    state,
+    stateLabel: WORK_INPUT_STATE_LABELS[state],
+    stateClass: workInputStateClass(state),
+    updatedAt,
+    updatedBy,
+    help,
+    href,
+    actionLabel: state === "not_started" ? "Påbörja registrering" : state === "in_progress" ? "Fortsätt registrering" : "Öppna registrering"
+  };
 }
 
 function defaultCompletedResult(activity) {
@@ -4911,7 +5384,7 @@ function renderCaseTypeGuidance(caseRecord = null) {
   els.needsAnalysisFields.hidden = detailFields.length === 0;
   const supportAreaField = els.caseSupportAreaChoices?.closest("#caseSupportAreaField");
   if (supportAreaField) supportAreaField.hidden = caseType?.id !== "parent-support";
-  renderSupportAreaChoices(els.caseSupportAreaChoices, caseRecord?.details?.supportAreaIds || [], { name: "caseSupportArea" });
+  renderSupportAreaChoices(els.caseSupportAreaChoices, caseRecord?.caseTypeId === "parent-support" ? supportAreaIdsForCase(caseRecord) : [], { name: "caseSupportArea" });
   for (const field of CASE_DETAIL_FIELD_DEFINITIONS) {
     const input = caseDetailInput(field.id);
     if (!input) continue;
@@ -4951,7 +5424,12 @@ function renderCaseTypeDetails(caseRecord) {
   const caseType = caseTypeById(caseRecord.caseTypeId, caseRecord.caseTypeVersion);
   const detailFields = configuredDetailFields(caseType);
   const supportCase = caseRecord.caseTypeId === "parent-support" ? caseRecord : cases.find((item) => item.id === caseRecord.supportCaseId);
-  const supportAreaIds = normalizeSupportAreaIds(supportCase?.details?.supportAreaIds);
+  const activeSupportProfile = supportCase ? supportMatchingProfile(supportCase.id) : null;
+  const profileSupportAreaIds = activeSupportProfile
+    ? supportMatchingAreas.filter((entry) => entry.profileId === activeSupportProfile.id).map((entry) => entry.supportAreaId)
+    : [];
+  const supportAreaIds = normalizeSupportAreaIds(profileSupportAreaIds.length ? profileSupportAreaIds : supportCase?.details?.supportAreaIds);
+  const snapshot = caseRecord.caseTypeId === "matching" ? matchingSnapshot(caseRecord.id) : null;
   if (!detailFields.length && !supportAreaIds.length && !["parent-support", "matching"].includes(caseRecord.caseTypeId)) {
     els.caseTypeDetailsSection.hidden = true;
     els.caseTypeDetailsFacts.innerHTML = "";
@@ -4966,14 +5444,20 @@ function renderCaseTypeDetails(caseRecord) {
   });
   if (supportCase?.caseTypeId === "parent-support") {
     facts.push(["Stödområden", supportAreaIds.length ? supportAreaLabels(supportAreaIds).join(", ") : "Behöver bekräftas före matchning"]);
+    if (caseRecord.caseTypeId === "parent-support" && activeSupportProfile) facts.push(["Matchningsunderlag", `Version ${activeSupportProfile.version} · uppdaterat ${formatDateTime(activeSupportProfile.updatedAt)}`]);
   }
   if (caseRecord.caseTypeId === "matching" && caseRecord.mentorId) {
     const mentor = caseMentor(caseRecord);
-    const overlap = supportAreaOverlap(supportAreaIds, mentor?.supportAreas);
+    const overlap = snapshot
+      ? supportAreaLabels(snapshot.overlapSupportAreaIds).map((title, index) => ({ id: snapshot.overlapSupportAreaIds[index], title }))
+      : supportAreaOverlap(supportAreaIds, mentor?.supportAreas);
     facts.push(["Överlappning med mentor", overlap.length ? overlap.map((area) => area.title).join(", ") : "Ingen registrerad överlappning – handläggaren behöver bedöma matchningen"]);
+    facts.push(["Bedömningsunderlag", snapshot
+      ? `Fryst vid start · stödprofil v${snapshot.supportProfile?.version || "-"} · mentorprofil v${snapshot.mentorProfile?.version || "-"}`
+      : "Saknas · matchningen behöver kontrolleras"]);
   }
   els.caseTypeDetailsSection.hidden = false;
-  els.caseTypeDetailsTitle.textContent = caseRecord.caseTypeId === "needs-analysis" ? "Behovets omfattning" : "Kompletterande uppgifter";
+  els.caseTypeDetailsTitle.textContent = caseRecord.caseTypeId === "matching" ? "Matchningsunderlag" : caseRecord.caseTypeId === "needs-analysis" ? "Behovets omfattning" : "Kompletterande uppgifter";
   els.caseTypeDetailsFacts.innerHTML = facts
     .map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "Ej angivet")}</dd></div>`)
     .join("");
@@ -4999,11 +5483,12 @@ function renderCaseTransitionPanel(caseRecord) {
         ? "Båda parter har accepterat. Skapa uppdraget här när den interna avstämningen är klar, eller ändra svaren om förutsättningarna har ändrats."
         : "Registrera förälderns och mentorns svar separat. Ett uppdrag erbjuds först när båda accepterar.";
     els.matchingOutcomeForm.hidden = Boolean(linkedAssignment);
+    els.matchingProposalInput.value = caseRecord.details?.matchingProposal || "";
     els.parentMatchResponseInput.value = caseRecord.details?.parentResponse || "";
     els.mentorMatchResponseInput.value = caseRecord.details?.mentorResponse || "";
     els.matchingOutcomeNoteInput.value = caseRecord.details?.matchingNote || "";
     els.createAssignmentAfterMatchInput.checked = true;
-    els.matchingOutcomeSubmitButton.textContent = acceptedWithoutAssignment ? "Skapa mentoruppdrag" : "Spara parternas svar";
+    els.matchingOutcomeSubmitButton.textContent = acceptedWithoutAssignment ? "Skapa mentoruppdrag" : "Spara matchningsunderlag";
   }
 }
 
@@ -5429,6 +5914,7 @@ function renderCaseActivities(caseRecord, activities) {
 
   for (const activity of visibleActivities) {
     const documents = activityDocuments(activity.id);
+    const workInput = activityWorkInputSummary(activity, caseRecord);
     const handler = effectiveActivityHandler(activity, caseRecord);
     const ownerSource = handler
       ? activityOwnerOverrideId(activity, caseRecord) ? "Särskilt tilldelad" : "Ärendeansvarig"
@@ -5441,6 +5927,7 @@ function renderCaseActivities(caseRecord, activities) {
       : "";
     const quickResults = !["completed", "not_applicable"].includes(activity.status)
       && !["paused", "closed"].includes(caseRecord.status)
+      && (!workInput?.required || workInput.state === "complete")
       ? quickActivityResultOptions(activity)
       : [];
     const quickFinishButton = quickResults.length
@@ -5456,6 +5943,7 @@ function renderCaseActivities(caseRecord, activities) {
           <div>
             <button type="button" class="activity-title-button" data-open-activity="${escapeHtml(activity.id)}">${escapeHtml(activity.title)}</button>
             ${instruction ? `<small class="activity-instruction-preview"><strong>Gör så här:</strong> ${escapeHtml(instruction)}</small>` : ""}
+            ${workInput ? `<small class="activity-linked-input"><strong>Kopplad registrering:</strong> <a href="${escapeHtml(workInput.href || "#")}">${escapeHtml(workInput.label)}</a> <span class="badge ${escapeHtml(workInput.stateClass)}">${escapeHtml(workInput.stateLabel)}</span>${workInput.updatedAt ? `<span>Senast ändrad ${escapeHtml(formatDateTime(workInput.updatedAt))}</span>` : ""}</small>` : ""}
             ${result ? `<small class="activity-result-summary"><strong>Registrerat utfall:</strong> ${escapeHtml(result)}</small>` : ""}
             ${note ? `<small class="activity-note-summary"><strong>Tjänsteanteckning:</strong> ${escapeHtml(note)}</small>` : ""}
             ${completionMeta ? `<small class="activity-completion-meta">${escapeHtml(completionMeta)}</small>` : ""}
@@ -5491,6 +5979,7 @@ function renderActivityDetail(caseRecord) {
   if (activity.completedAt) auditParts.push(`Avslutad ${formatDateTime(activity.completedAt)} av ${handlerNameById(activity.completedBy)}`);
   els.activityDetailAudit.textContent = auditParts.join(" · ");
   renderActivityGuidance(activity, caseRecord);
+  renderActivityWorkInput(activity, caseRecord);
   els.activityDetailStatus.textContent = activityWorkStateLabel(activity);
   els.activityDetailStatus.className = activityHasBlockingResult(activity)
     ? "badge text-bg-danger"
@@ -5536,6 +6025,22 @@ function renderActivityDetail(caseRecord) {
   renderActivityDocuments(activity);
   activityDetailBaseline = activityDetailFormSnapshot();
   updateActivityDetailDirtyState();
+}
+
+function renderActivityWorkInput(activity, caseRecord) {
+  const workInput = activityWorkInputSummary(activity, caseRecord);
+  els.activityWorkInputPanel.hidden = !workInput;
+  if (!workInput) return;
+  els.activityWorkInputTitle.textContent = workInput.label;
+  els.activityWorkInputStatus.textContent = workInput.stateLabel;
+  els.activityWorkInputStatus.className = `badge ${workInput.stateClass}`;
+  els.activityWorkInputHelp.textContent = workInput.help;
+  els.activityWorkInputMeta.textContent = workInput.updatedAt
+    ? `Senast ändrad ${formatDateTime(workInput.updatedAt)} av ${actorNameById(workInput.updatedBy)}`
+    : "Ingen registrering har gjorts ännu.";
+  els.activityWorkInputLink.href = workInput.href || "#";
+  els.activityWorkInputLink.textContent = workInput.actionLabel;
+  els.activityWorkInputLink.hidden = !workInput.href;
 }
 
 function renderActivityGuidance(activity, caseRecord) {
@@ -5607,6 +6112,7 @@ function renderActivityResultInput(activity) {
 
 function updateActivityValidationState() {
   const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
+  const caseRecord = cases.find((item) => item.id === activity?.caseId);
   const completed = els.activityDetailStatusInput.value === "completed";
   const waiting = els.activityDetailStatusInput.value === "waiting";
   const requiresNote = Boolean(activity
@@ -5622,6 +6128,10 @@ function updateActivityValidationState() {
     : "");
   els.activityDetailNoteInput.setCustomValidity(requiresNote && !els.activityDetailNoteInput.value.trim()
     ? "Ange en kort notering när resultatet kräver ställningstagande."
+    : "");
+  const workInput = activity && caseRecord ? activityWorkInputSummary(activity, caseRecord) : null;
+  els.activityDetailStatusInput.setCustomValidity(completed && workInput?.required && workInput.state !== "complete"
+    ? `Komplettera ${workInput.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas.`
     : "");
 }
 
@@ -6020,6 +6530,9 @@ function renderActivityTypeConfiguration(definition) {
   els.activityTypeQuickFact.textContent = quickResults.length
     ? `Tillåtet för: ${quickResults.map(([, label]) => label).join(", ")}. Handläggaren bekräftar valet innan det sparas.`
     : "Inte tillåtet. Aktiviteten måste öppnas för att resultatet ska registreras.";
+  els.activityTypeWorkInputFact.textContent = definition.workInput
+    ? `${definition.workInput.label} · måste vara fullständig före avslut`
+    : "Ingen systemstyrd registrering";
   els.activityTypeUsageFact.innerHTML = definition.id === AD_HOC_ACTIVITY_TEMPLATE_ID
     ? "Alla ärendetyper när handläggaren lägger till en manuell aktivitet."
     : usage.length
@@ -6333,6 +6846,9 @@ function renderDetail() {
   els.availabilityFact.textContent = candidate.availability || "Ej angivet";
   els.areaFact.textContent = candidate.area || "Ej angivet";
   renderMentorSupportAreas(candidate);
+  els.mentorMatchingProfileMeta.textContent = candidate.matchingProfile
+    ? `Version ${candidate.matchingProfile.version} · uppdaterad ${formatDateTime(candidate.matchingProfile.updatedAt)}`
+    : "Matchningsprofil saknas";
   els.statusFact.textContent = candidate.status;
   els.coordinatorFact.textContent = candidate.coordinator || "Ej tilldelad";
   const identitySummary = candidate.checks?.identityVerified
@@ -7205,16 +7721,36 @@ function registerCaseMeetingCommand({ caseRecord, existing = null, meetingType, 
 }
 
 function updateMentorProfileCommand({ candidate, caseRecord, profilePatch, coordinatorId }) {
-  if (!caseRecord) return saveCandidate({ ...candidate, ...profilePatch, updatedAt: new Date().toISOString() });
+  const nextCandidate = { ...candidate, ...profilePatch };
+  const changesMatchingProfile = ["area", "languages", "availability", "supportAreas", "meetingModes", "availableAssignmentCapacity"]
+    .some((field) => Object.prototype.hasOwnProperty.call(profilePatch, field));
+  const previousProfile = changesMatchingProfile ? mentorMatchingProfile(candidate.id) : null;
+  const profileId = changesMatchingProfile ? crypto.randomUUID() : null;
+  if (!caseRecord) {
+    const now = new Date().toISOString();
+    const records = { [STORE]: [{ ...nextCandidate, updatedAt: now }] };
+    if (changesMatchingProfile) {
+      const built = buildMentorMatchingProfile({ tenantId: DEFAULT_TENANT_ID, mentor: nextCandidate, profileId, previousProfile, actorId: CURRENT_USER_ID, now });
+      Object.assign(records, profileWrites(built, MENTOR_MATCHING_PROFILES_STORE, MENTOR_MATCHING_AREAS_STORE, MENTOR_MATCHING_LANGUAGES_STORE, previousProfile));
+    }
+    return atomicPut(records);
+  }
   const currentResponsible = assignmentsForCase(caseRecord.id).find((assignment) => assignment.role === "responsible" && !assignment.endedAt);
   return executeCaseCommand({
     commandType: "update_mentor_profile",
     caseId: caseRecord.id,
     expectedVersion: caseRecord.version,
     payload: { candidateId: candidate.id, profilePatch, coordinatorId },
-    additionalStores: [STORE, CASE_ASSIGNMENTS_STORE],
+    additionalStores: [STORE, CASE_ASSIGNMENTS_STORE, ...(changesMatchingProfile ? [MENTOR_MATCHING_PROFILES_STORE, MENTOR_MATCHING_AREAS_STORE, MENTOR_MATCHING_LANGUAGES_STORE] : [])],
     mutate: ({ currentCase, now, put, event }) => {
-      put(STORE, { ...candidate, ...profilePatch, updatedAt: now });
+      put(STORE, { ...nextCandidate, updatedAt: now });
+      if (changesMatchingProfile) {
+        const built = buildMentorMatchingProfile({ tenantId: DEFAULT_TENANT_ID, mentor: nextCandidate, profileId, previousProfile, actorId: CURRENT_USER_ID, now });
+        if (previousProfile) put(MENTOR_MATCHING_PROFILES_STORE, { ...previousProfile, status: "superseded", supersededAt: now, supersededBy: profileId, updatedAt: now, updatedBy: CURRENT_USER_ID });
+        put(MENTOR_MATCHING_PROFILES_STORE, built.profile);
+        for (const area of built.supportAreas) put(MENTOR_MATCHING_AREAS_STORE, area);
+        for (const language of built.languages) put(MENTOR_MATCHING_LANGUAGES_STORE, language);
+      }
       if ((currentResponsible?.handlerId || "") !== (coordinatorId || "")) {
         if (currentResponsible) {
           put(CASE_ASSIGNMENTS_STORE, { ...currentResponsible, endedAt: now, endedBy: CURRENT_USER_ID, version: Number(currentResponsible.version || 1) + 1 });
@@ -8014,6 +8550,7 @@ els.parentForm.addEventListener("submit", async (event) => {
     records[CASE_EVENTS_STORE] = [eventRecord];
   }
   await atomicPut(records);
+  if (supportCaseId && records[CASES_STORE]?.[0]) await saveSupportMatchingProfile(records[CASES_STORE][0]);
   parentEditMode = false;
   els.parentForm.dataset.route = "";
   markSaved();
@@ -8031,8 +8568,16 @@ els.matchingOutcomeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const matchingCase = selectedCaseRecord();
   if (!matchingCase || matchingCase.caseTypeId !== "matching") return;
+  const returnActivityId = caseRouteIntent === "matching" ? caseRouteTargetId : "";
+  const matchingProposal = els.matchingProposalInput.value.trim();
   const parentResponse = els.parentMatchResponseInput.value;
   const mentorResponse = els.mentorMatchResponseInput.value;
+  if (!matchingProposal && !parentResponse && !mentorResponse) {
+    els.matchingProposalInput.setCustomValidity("Dokumentera matchningsförslaget eller registrera minst ett svar.");
+    els.matchingProposalInput.reportValidity();
+    return;
+  }
+  els.matchingProposalInput.setCustomValidity("");
   const outcome = matchingOutcome(parentResponse, mentorResponse);
   const note = els.matchingOutcomeNoteInput.value.trim();
   if (outcome === "declined" && !note) {
@@ -8064,10 +8609,10 @@ els.matchingOutcomeForm.addEventListener("submit", async (event) => {
     commandType: createAssignment ? "accept_match_and_create_assignment" : "save_matching_outcome",
     caseId: matchingCase.id,
     expectedVersion: matchingCase.version,
-    payload: { parentResponse, mentorResponse, note, createAssignment },
+    payload: { matchingProposal, parentResponse, mentorResponse, note, createAssignment },
     additionalStores: [CASE_ASSIGNMENTS_STORE, CASE_ACTIVITIES_STORE, CASE_DOCUMENTS_STORE],
     mutate: ({ currentCase, now, correlationId, idempotencyKey, put, event: recordEvent }) => {
-      const details = { ...(currentCase.details || {}), parentResponse, mentorResponse, matchingNote: note, matchingOutcome: outcome };
+      const details = { ...(currentCase.details || {}), matchingProposal, parentResponse, mentorResponse, matchingNote: note, matchingOutcome: outcome };
       const finalizesMatch = outcome === "declined" || createAssignment;
       const updated = { ...currentCase, details, status: finalizesMatch ? "closed" : outcome === "waiting" ? "waiting" : "in_progress", version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID, closedAt: finalizesMatch ? now : null, closedBy: finalizesMatch ? CURRENT_USER_ID : null };
       put(CASES_STORE, updated);
@@ -8129,7 +8674,9 @@ els.matchingOutcomeForm.addEventListener("submit", async (event) => {
       if (!createAssignment) return { caseId: currentCase.id, version: updated.version };
       createdAssignmentId = crypto.randomUUID();
       const assignmentType = caseTypeById("mentor-assignment");
-      const assignmentCase = { id: createdAssignmentId, tenantId: DEFAULT_TENANT_ID, number: assignmentCaseNumber, caseTypeId: assignmentType.id, caseTypeVersion: assignmentType.version, organizationUnitId: currentCase.organizationUnitId, type: assignmentType.name, title: `Mentoruppdrag: ${supportCase?.details?.supportPurpose || supportCase?.title || currentCase.title}`, description: supportCase?.details?.desiredOutcome || currentCase.description, details: { supportPurpose: supportCase?.details?.supportPurpose || null, desiredOutcome: supportCase?.details?.desiredOutcome || null, supportAreaIds: normalizeSupportAreaIds(supportCase?.details?.supportAreaIds) }, mentorId: currentCase.mentorId, parentId: currentCase.parentId, supportCaseId: currentCase.supportCaseId, sourceMatchingCaseId: currentCase.id, status: "new", priority: currentCase.priority || "normal", dueDate: null, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, closedAt: null, closedBy: null };
+      const frozenMatchingBasis = matchingSnapshot(currentCase.id);
+      const assignmentSupportAreaIds = frozenMatchingBasis?.supportProfile?.supportAreas?.map((entry) => entry.supportAreaId) || supportAreaIdsForCase(supportCase);
+      const assignmentCase = { id: createdAssignmentId, tenantId: DEFAULT_TENANT_ID, number: assignmentCaseNumber, caseTypeId: assignmentType.id, caseTypeVersion: assignmentType.version, organizationUnitId: currentCase.organizationUnitId, type: assignmentType.name, title: `Mentoruppdrag: ${supportCase?.details?.supportPurpose || supportCase?.title || currentCase.title}`, description: supportCase?.details?.desiredOutcome || currentCase.description, details: { supportPurpose: supportCase?.details?.supportPurpose || null, desiredOutcome: supportCase?.details?.desiredOutcome || null, supportAreaIds: normalizeSupportAreaIds(assignmentSupportAreaIds), matchingSnapshotId: frozenMatchingBasis?.id || null }, mentorId: currentCase.mentorId, parentId: currentCase.parentId, supportCaseId: currentCase.supportCaseId, sourceMatchingCaseId: currentCase.id, status: "new", priority: currentCase.priority || "normal", dueDate: null, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, closedAt: null, closedBy: null };
       put(CASES_STORE, assignmentCase);
       put(CASE_ASSIGNMENTS_STORE, { id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: createdAssignmentId, handlerId: ownerId, role: "responsible", version: 1, assignedAt: now, assignedBy: CURRENT_USER_ID, endedAt: null, endedBy: null });
       for (const [sortOrder, title] of (assignmentType.suggestedActivities || []).entries()) {
@@ -8140,8 +8687,14 @@ els.matchingOutcomeForm.addEventListener("submit", async (event) => {
     }
   });
   markSaved();
+  if (!createdAssignmentId && returnActivityId) {
+    window.history.replaceState(null, "", resolveFeatureRoute("case.activity", { caseId: matchingCase.id, activityId: returnActivityId }));
+    selectedCaseActivityId = returnActivityId;
+    caseRouteIntent = "activities";
+    caseRouteTargetId = returnActivityId;
+  }
   await refresh();
-  showFeedback(createAssignment ? "Matchningen har accepterats och mentoruppdraget har skapats." : "Parternas svar har sparats.");
+  showFeedback(createAssignment ? "Matchningen har accepterats och mentoruppdraget har skapats." : "Matchningsunderlaget har sparats.");
   if (createdAssignmentId) navigateToCase(createdAssignmentId);
 });
 
@@ -8460,7 +9013,7 @@ els.caseMentorInput.addEventListener("input", () => {
   els.caseMentorIdInput.value = mentor?.id || "";
   els.caseMentorInput.setCustomValidity("");
   const supportCase = cases.find((item) => item.id === els.caseSupportCaseInput.value && item.caseTypeId === "parent-support");
-  const supportAreaIds = normalizeSupportAreaIds(supportCase?.details?.supportAreaIds);
+  const supportAreaIds = supportAreaIdsForCase(supportCase);
   const matches = value.length < 2
     ? []
     : candidates
@@ -8589,6 +9142,7 @@ async function submitCaseForm(event) {
   event.preventDefault();
   clearCaseFormError();
   const existingCase = caseEditMode ? selectedCaseRecord() : null;
+  const returnActivityId = existingCase && caseRouteIntent === "edit" ? caseRouteTargetId : "";
   const id = existingCase?.id || crypto.randomUUID();
   const requestedMentorName = els.caseMentorInput.value.trim();
   const matchedMentor = candidates.find((candidate) => candidate.name.localeCompare(requestedMentorName, "sv", { sensitivity: "base" }) === 0);
@@ -8802,13 +9356,35 @@ async function submitCaseForm(event) {
       return { caseId: id, version: caseRecord.version };
     }
   });
+  const savedCaseForMatching = {
+    ...(existingCase || {}),
+    id,
+    tenantId: DEFAULT_TENANT_ID,
+    caseTypeId: caseType.id,
+    parentId,
+    mentorId,
+    supportCaseId,
+    details: Object.keys(configuredDetails).length ? configuredDetails : null,
+    createdAt: existingCase?.createdAt || new Date().toISOString(),
+    createdBy: existingCase?.createdBy || CURRENT_USER_ID,
+    updatedAt: new Date().toISOString(),
+    updatedBy: CURRENT_USER_ID
+  };
+  if (caseType.id === "parent-support") await saveSupportMatchingProfile(savedCaseForMatching);
+  if (caseType.id === "matching" && !existingCase) await saveMatchingSnapshotForCase(savedCaseForMatching);
   caseEditMode = false;
   newCaseTypePreset = "";
   els.caseCreateForm.dataset.route = "";
   markSaved();
   showFeedback(existingCase ? "Ärendet har uppdaterats." : "Ärendet har skapats.");
+  if (returnActivityId) {
+    window.history.replaceState(null, "", resolveFeatureRoute("case.activity", { caseId: id, activityId: returnActivityId }));
+    selectedCaseActivityId = returnActivityId;
+    caseRouteIntent = "activities";
+    caseRouteTargetId = returnActivityId;
+  }
   await refresh();
-  navigateToCase(id);
+  if (!returnActivityId) navigateToCase(id);
 }
 
 els.caseCreateForm.addEventListener("submit", (event) => {
@@ -9112,6 +9688,12 @@ async function registerQuickActivityResult(activityId) {
   const caseRecord = cases.find((item) => item.id === activity?.caseId);
   const resultOptions = activity ? quickActivityResultOptions(activity) : [];
   if (!activity || !caseRecord || !resultOptions.length) throw new Error("Aktiviteten kan inte snabbavslutas.");
+  const workInput = activityWorkInputSummary(activity, caseRecord);
+  if (workInput?.required && workInput.state !== "complete") {
+    openCaseActivity(activity.id);
+    showFeedback(`Komplettera ${workInput.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas.`);
+    return;
+  }
   const confirmation = await confirmAction({
     eyebrow: "Snabbregistrering",
     title: "Avsluta aktiviteten?",
@@ -9243,6 +9825,7 @@ els.caseMeetingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const caseRecord = selectedCaseRecord();
   if (!caseRecord) return;
+  const returnActivityId = caseRouteIntent === "meetings" ? caseRouteTargetId : "";
   const existing = caseMeetings.find((item) => item.id === els.caseMeetingForm.dataset.meetingId);
   await registerCaseMeetingCommand({
     caseRecord,
@@ -9256,6 +9839,12 @@ els.caseMeetingForm.addEventListener("submit", async (event) => {
   });
   closeCaseMeetingForm();
   markSaved();
+  if (returnActivityId) {
+    window.history.replaceState(null, "", resolveFeatureRoute("case.activity", { caseId: caseRecord.id, activityId: returnActivityId }));
+    selectedCaseActivityId = returnActivityId;
+    caseRouteIntent = "activities";
+    caseRouteTargetId = returnActivityId;
+  }
   showFeedback(existing ? "En rättad version av mötesanteckningen har sparats." : "Mötet har registrerats.");
   await refresh();
 });
@@ -9326,7 +9915,7 @@ els.candidateForm.addEventListener("submit", async (event) => {
     return;
   }
   const candidate = newCandidate(new FormData(els.candidateForm), await reserveCaseNumber());
-  await saveCandidate(candidate);
+  await saveNewMentorWithMatchingProfile(candidate);
   selectedId = candidate.id;
   els.candidateForm.reset();
   candidateModal.hide();
@@ -9633,7 +10222,7 @@ els.personEditForm.addEventListener("submit", async (event) => {
     }
     try {
       const candidate = newCandidateFromEditor(await reserveCaseNumber());
-      await saveCandidate(candidate);
+      await saveNewMentorWithMatchingProfile(candidate);
       selectedId = candidate.id;
       markSaved();
       showFeedback("Mentorn har registrerats.");
@@ -9676,8 +10265,10 @@ els.mentorSupportAreasEdit.addEventListener("change", (event) => {
     input.setCustomValidity("");
     const levelInputs = els.mentorSupportAreasEdit.querySelectorAll(`[data-mentor-experience-level="${input.dataset.mentorSupportArea}"]`);
     levelInputs.forEach((levelInput) => { levelInput.disabled = !input.checked; });
-    const basisGroup = els.mentorSupportAreasEdit.querySelector(`[data-mentor-experience-bases="${input.dataset.mentorSupportArea}"]`);
-    if (basisGroup) basisGroup.hidden = !input.checked;
+    const confidenceInput = els.mentorSupportAreasEdit.querySelector(`[data-mentor-confidence="${input.dataset.mentorSupportArea}"]`);
+    if (confidenceInput) confidenceInput.disabled = !input.checked;
+    const assessment = els.mentorSupportAreasEdit.querySelector(`[data-mentor-support-assessment="${input.dataset.mentorSupportArea}"]`);
+    if (assessment) assessment.hidden = !input.checked;
     return;
   }
   const levelInput = event.target.closest("[data-mentor-experience-level]");
@@ -9747,6 +10338,8 @@ els.cancelIdentityVerificationButton.addEventListener("click", () => {
 els.saveIdentityVerificationButton.addEventListener("click", async () => {
   const candidate = selectedCandidate();
   if (!candidate) return;
+  const returnCaseId = mentorRouteIntent === "identity" ? mentorRouteCaseId : "";
+  const returnActivityId = mentorRouteIntent === "identity" ? mentorRouteActivityId : "";
   const personalNumberValid = els.identityPersonalNumberInput.reportValidity();
   const methodValid = els.identityMethodSelect.reportValidity();
   if (!personalNumberValid || !methodValid) return;
@@ -9781,6 +10374,9 @@ els.saveIdentityVerificationButton.addEventListener("click", async () => {
     note: confirmation.note
   });
   markSaved();
+  if (returnCaseId && returnActivityId) {
+    window.history.replaceState(null, "", resolveFeatureRoute("case.activity", { caseId: returnCaseId, activityId: returnActivityId }));
+  }
   await refresh();
   showFeedback(`Identiteten har verifierats med ${identityMethodLabel(method)}.`);
 });
@@ -9935,7 +10531,7 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
 els.resetButton.addEventListener("click", async () => {
   const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata? Mentorärenden tas bort och grundhandläggarna återställs. Åtgärden kan inte ångras.");
   if (!confirmed) return;
-  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests(), clearSupportTickets(), clearTenantSupportAreaSelections()]);
+  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStores(MATCHING_PROFILE_STORES), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests(), clearSupportTickets(), clearTenantSupportAreaSelections()]);
   await ensureDefaultHandlers();
   selectedId = null;
   markSaved();

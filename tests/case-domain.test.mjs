@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   ACTIVITY_TEMPLATES,
+  activityWorkInputDefinition,
   activitySaveRequiresConfirmation,
   assessCompensationApproval,
   assessCertificationApproval,
@@ -13,7 +14,9 @@ import {
   canStartCaseType,
   canTransitionActivity,
   deriveCaseStatus,
+  deriveWorkInputState,
   findMentorDuplicates,
+  groupParentCases,
   normalizeActivityStatus,
   normalizeApprovalCaseDescription,
   normalizeCaseTypeTerminology,
@@ -24,6 +27,20 @@ import {
   resultClassification,
   stableHash
 } from "../case-domain.js";
+
+test("groups a parent's linked cases by workflow stage", () => {
+  const records = [
+    { id: "support-1", parentId: "parent-1", caseTypeId: "parent-support" },
+    { id: "matching-1", parentId: "parent-1", caseTypeId: "matching" },
+    { id: "assignment-1", parentId: "parent-1", caseTypeId: "mentor-assignment" },
+    { id: "other-parent", parentId: "parent-2", caseTypeId: "matching" }
+  ];
+
+  const grouped = groupParentCases(records, "parent-1");
+  assert.deepEqual(grouped.supportCases.map((item) => item.id), ["support-1"]);
+  assert.deepEqual(grouped.matchingCases.map((item) => item.id), ["matching-1"]);
+  assert.deepEqual(grouped.assignmentCases.map((item) => item.id), ["assignment-1"]);
+});
 
 function completedActivity(templateId) {
   return { templateId, title: templateId, status: "completed", resultClassification: "acceptable" };
@@ -36,6 +53,22 @@ test("normalizes legacy statuses without changing stable values", () => {
   assert.equal(normalizeActivityStatus("waiting"), "waiting");
   assert.equal(normalizeMentorStatus("Godkänd/Certifierad"), "Godkänd");
   assert.equal(normalizeMentorStatus("Redo för intervju"), "Redo för intervju");
+});
+
+test("links workflow activities to canonical registrations", () => {
+  assert.deepEqual(activityWorkInputDefinition({ templateId: "identityVerified" }, "mentor-certification"), {
+    kind: "mentor_identity",
+    featureKey: "mentor.identity",
+    label: "Identitetsuppgifter",
+    required: true
+  });
+  assert.equal(
+    activityWorkInputDefinition({ templateId: "ad-hoc", title: "Komplettera stödbehov och matchningskriterier" }, "parent-support")?.kind,
+    "support_profile"
+  );
+  assert.equal(deriveWorkInputState(), "not_started");
+  assert.equal(deriveWorkInputState({ started: true }), "in_progress");
+  assert.equal(deriveWorkInputState({ started: true, complete: true }), "complete");
 });
 
 test("allows case types to start only from their configured source", () => {

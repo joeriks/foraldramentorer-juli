@@ -5,6 +5,7 @@ import {
   extractFeatureLinkIds,
   FEATURE_LINKS,
   resolveFeatureLink,
+  resolveFeatureRoute,
   routineSectionKey,
   routineSectionRoute
 } from "../feature-links.js";
@@ -34,6 +35,16 @@ test("the feature registry uses stable unique routes", () => {
 test("demo mode and support queue use stable administration routes", () => {
   assert.equal(resolveFeatureLink("admin.demo").href, "#/presentation");
   assert.equal(resolveFeatureLink("admin.support").href, "#/support-admin");
+});
+
+test("dynamic feature routes resolve stable record links", () => {
+  assert.equal(resolveFeatureRoute("case.activity", { caseId: "case-1", activityId: "activity-2" }), "#/case/case-1/activities/activity-2");
+  assert.equal(resolveFeatureRoute("case.edit", { caseId: "case-1", activityId: "activity-2" }), "#/case/case-1/edit/activity-2");
+  assert.equal(resolveFeatureRoute("case.matching", { caseId: "case-1", activityId: "activity-2" }), "#/case/case-1/matching/activity-2");
+  assert.equal(resolveFeatureRoute("case.meetings", { caseId: "case-1", activityId: "activity-2" }), "#/case/case-1/meetings/activity-2");
+  assert.equal(resolveFeatureRoute("mentor.identity", { mentorId: "mentor-1", caseId: "case-1", activityId: "activity-2" }), "#/mentor/mentor-1/identity/case-1/activity-2");
+  assert.equal(resolveFeatureRoute("mentor.identity", { mentorId: "mentor-1" }), null);
+  assert.equal(resolveFeatureRoute("case.activity", { caseId: "case-1" }), null);
 });
 
 test("numbered routine headings keep stable deep-link keys when titles change", () => {
