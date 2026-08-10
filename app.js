@@ -5124,39 +5124,30 @@ async function createSupportCaseFromIncomingContact(contact, parent) {
   showFeedback("Kontakten har kopplats och ett stödärende har skapats.");
 }
 
-const CASE_FLOW_STEPS = [
-  { id: "needs-analysis", label: "Behovsanalys", description: "Identifiera område, språk och omfattning." },
-  { id: "recruitment", label: "Rekrytering", description: "Planerad eller pågående mentorrekrytering." },
-  { id: "mentor-certification", label: "Mentorprövning", description: "Kontroller, utbildning, intervju och beslut." },
-  { id: "parent-support", label: "Stödärende", description: "Förälderns behov avgränsas inför matchning." },
-  { id: "matching", label: "Matchning", description: "Föreslagen mentor, parternas svar och beslut." },
-  { id: "mentor-assignment", label: "Mentoruppdrag", description: "Aktivt uppdrag, uppföljning och ersättning." },
-  { id: "mentor-follow-up", label: "Uppföljning", description: "Avgränsade uppföljningar och fortsatta åtgärder." },
-  { id: "other", label: "Övrigt", description: "Frågor som inte hör hemma i standardflödet." }
-];
-
 function renderCaseFlowBoard(openCases) {
   if (!els.caseFlowBoard) return;
   const totalOpen = openCases.length;
-  els.caseFlowBoard.innerHTML = CASE_FLOW_STEPS.map((step, index) => {
-    const stepCases = cases.filter((caseRecord) => caseRecord.caseTypeId === step.id);
+  const { groups, standalone } = caseTypeRelationshipGroups();
+  const renderNode = (caseTypeId, position) => {
+    const definition = caseTypeById(caseTypeId);
+    const stepCases = cases.filter((caseRecord) => caseRecord.caseTypeId === caseTypeId);
     const openStepCases = stepCases.filter((caseRecord) => caseRecord.status !== "closed");
     const waitingCount = openStepCases.filter((caseRecord) => caseRecord.status === "waiting").length;
     const decisionCount = openStepCases.filter((caseRecord) => caseRecord.status === "decision_required").length;
     const overdueCount = openStepCases.filter((caseRecord) => activitiesForCase(caseRecord.id).some((activity) => activityDueState(activity) === "overdue")).length;
     const share = totalOpen ? Math.round((openStepCases.length / totalOpen) * 100) : 0;
-    const route = `#/cases/${encodeURIComponent(step.id)}?status=open`;
+    const route = `#/cases/${encodeURIComponent(caseTypeId)}?status=open`;
     const signals = [
       waitingCount ? `${waitingCount} väntar` : "",
       overdueCount ? `${overdueCount} försenade` : "",
       decisionCount ? `${decisionCount} ställningstaganden` : ""
     ].filter(Boolean);
     return `
-      <a class="case-flow-step" href="${route}" data-case-flow-type="${escapeHtml(step.id)}">
-        <span class="case-flow-index">${index + 1}</span>
+      <a class="case-flow-step" href="${route}" data-case-flow-type="${escapeHtml(caseTypeId)}">
+        <span class="case-flow-index">${position}</span>
         <span class="case-flow-copy">
-          <span class="case-flow-label">${escapeHtml(step.label)}</span>
-          <small>${escapeHtml(step.description)}</small>
+          <span class="case-flow-label">${escapeHtml(definition?.name || caseTypeId)}</span>
+          <small>${escapeHtml(caseTypeCreationModeLabel(definition?.creationMode))}</small>
         </span>
         <span class="case-flow-count">
           <strong>${openStepCases.length}</strong>
@@ -5166,7 +5157,30 @@ function renderCaseFlowBoard(openCases) {
         <span class="case-flow-signals">${signals.length ? signals.map((signal) => `<span>${escapeHtml(signal)}</span>`).join("") : "<span>Inga stopp</span>"}</span>
       </a>
     `;
-  }).join("");
+  };
+  const renderTrack = (items) => items.map((item, index) => `
+    ${item.relationship ? `<div class="case-flow-connector">
+      <span>${escapeHtml(relationshipKindLabel(item.relationship.kind))}</span>
+      <i aria-hidden="true">&rarr;</i>
+      <small>${escapeHtml(item.relationship.label)}</small>
+    </div>` : ""}
+    ${renderNode(item.caseTypeId, index + 1)}
+  `).join("");
+  els.caseFlowBoard.innerHTML = groups.map(({ title, items }) => `
+    <section class="case-flow-group" aria-label="${escapeHtml(title)}">
+      <h3>${escapeHtml(title)}</h3>
+      <div class="case-flow-track">
+        ${renderTrack(items)}
+      </div>
+    </section>
+  `).join("") + (standalone.length ? `
+    <section class="case-flow-group" aria-label="Fristående ärendetyper">
+      <h3>Fristående ärendetyper</h3>
+      <div class="case-flow-standalone">
+        ${standalone.map((definition, index) => renderNode(definition.id, index + 1)).join("")}
+      </div>
+    </section>
+  ` : "");
 }
 
 function renderDashboard() {
@@ -6928,26 +6942,58 @@ function configuredCaseTypeRelationships() {
   return [...configuredNextCaseTypeRelationships(), ...CASE_TYPE_RELATIONSHIPS];
 }
 
-function caseTypeRelationshipTrack(startId, relationships, usedKeys) {
-  const steps = [caseTypeRelationshipLink(startId)];
+function caseTypeRelationshipTrackItems(startId, relationships, usedKeys) {
+  const items = [{ caseTypeId: startId, relationship: null }];
   const visited = new Set([startId]);
   let currentId = startId;
   while (currentId) {
     const relationship = relationships.find((item) => item.from === currentId);
     if (!relationship || visited.has(relationship.to)) break;
     usedKeys.add(`${relationship.from}:${relationship.to}`);
-    steps.push(
-      `<div class="case-type-relationship-connector">
-        <span>${escapeHtml(relationshipKindLabel(relationship.kind))}</span>
-        <i aria-hidden="true">&rarr;</i>
-        <small>${escapeHtml(relationship.label)}</small>
-      </div>`,
-      caseTypeRelationshipLink(relationship.to)
-    );
+    items.push({ caseTypeId: relationship.to, relationship });
     visited.add(relationship.to);
     currentId = relationship.to;
   }
-  return steps.join("");
+  return items;
+}
+
+function caseTypeRelationshipTrack(startId, relationships, usedKeys) {
+  return caseTypeRelationshipTrackContent(caseTypeRelationshipTrackItems(startId, relationships, usedKeys));
+}
+
+function caseTypeRelationshipTrackContent(items) {
+  return items.map((item) => `
+      ${item.relationship ? `<div class="case-type-relationship-connector">
+        <span>${escapeHtml(relationshipKindLabel(item.relationship.kind))}</span>
+        <i aria-hidden="true">&rarr;</i>
+        <small>${escapeHtml(item.relationship.label)}</small>
+      </div>` : ""}
+      ${caseTypeRelationshipLink(item.caseTypeId)}
+    `).join("");
+}
+
+function caseTypeRelationshipGroups() {
+  const nextRelationships = configuredNextCaseTypeRelationships();
+  const usedKeys = new Set();
+  const groups = [];
+  for (const [rootId, title] of [["needs-analysis", "Tillgång till mentorer"], ["parent-support", "Stöd till förälder"]]) {
+    if (nextRelationships.some((relationship) => relationship.from === rootId)) {
+      groups.push({ title, items: caseTypeRelationshipTrackItems(rootId, nextRelationships, usedKeys) });
+    }
+  }
+  const remaining = () => nextRelationships.filter((relationship) => !usedKeys.has(`${relationship.from}:${relationship.to}`));
+  while (remaining().length) {
+    const pending = remaining();
+    const targets = new Set(pending.map((relationship) => relationship.to));
+    const startId = pending.find((relationship) => !targets.has(relationship.from))?.from || pending[0].from;
+    groups.push({ title: "Övrigt konfigurerat flöde", items: caseTypeRelationshipTrackItems(startId, pending, usedKeys) });
+  }
+  for (const relationship of CASE_TYPE_RELATIONSHIPS) {
+    groups.push({ title: "Tvärgående förutsättning", items: caseTypeRelationshipTrackItems(relationship.from, [relationship], new Set()) });
+  }
+  const involvedIds = new Set(nextRelationships.flatMap((relationship) => [relationship.from, relationship.to]));
+  const standalone = caseTypeDefinitions.filter((definition) => !involvedIds.has(definition.id) && !CASE_TYPE_RELATIONSHIPS.some((relationship) => relationship.from === definition.id || relationship.to === definition.id));
+  return { groups, standalone };
 }
 
 function nextCaseTypeSelectionCreatesCycle(sourceId, nextCaseTypeId) {
@@ -6966,32 +7012,12 @@ function nextCaseTypeSelectionCreatesCycle(sourceId, nextCaseTypeId) {
 
 function renderCaseTypeRelationshipMap() {
   if (!els.caseTypeRelationshipMap) return;
-  const nextRelationships = configuredNextCaseTypeRelationships();
-  const usedKeys = new Set();
-  const tracks = [];
-  for (const [rootId, title] of [["needs-analysis", "Tillgång till mentorer"], ["parent-support", "Stöd till förälder"]]) {
-    if (nextRelationships.some((relationship) => relationship.from === rootId)) {
-      tracks.push({ title, content: caseTypeRelationshipTrack(rootId, nextRelationships, usedKeys) });
-    }
-  }
-  const remaining = () => nextRelationships.filter((relationship) => !usedKeys.has(`${relationship.from}:${relationship.to}`));
-  while (remaining().length) {
-    const pending = remaining();
-    const targets = new Set(pending.map((relationship) => relationship.to));
-    const startId = pending.find((relationship) => !targets.has(relationship.from))?.from || pending[0].from;
-    tracks.push({ title: "Övrigt konfigurerat flöde", content: caseTypeRelationshipTrack(startId, pending, usedKeys) });
-  }
-  const prerequisiteGroups = CASE_TYPE_RELATIONSHIPS.map((relationship) => ({
-    title: "Tvärgående förutsättning",
-    content: caseTypeRelationshipTrack(relationship.from, [relationship], new Set())
-  }));
-  const involvedIds = new Set(nextRelationships.flatMap((relationship) => [relationship.from, relationship.to]));
-  const standalone = caseTypeDefinitions.filter((definition) => !involvedIds.has(definition.id) && !CASE_TYPE_RELATIONSHIPS.some((relationship) => relationship.from === definition.id || relationship.to === definition.id));
-  els.caseTypeRelationshipMap.innerHTML = [...tracks, ...prerequisiteGroups].map(({ title, content }) => `
+  const { groups, standalone } = caseTypeRelationshipGroups();
+  els.caseTypeRelationshipMap.innerHTML = groups.map(({ title, items }) => `
       <section class="case-type-relationship-group" aria-label="${escapeHtml(title)}">
         <h4>${escapeHtml(title)}</h4>
         <div class="case-type-relationship-track">
-          ${content}
+          ${caseTypeRelationshipTrackContent(items)}
         </div>
       </section>
     `).join("") + (standalone.length ? `

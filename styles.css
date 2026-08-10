@@ -922,8 +922,40 @@ body {
 
 .case-flow-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: .75rem;
+  gap: var(--app-space-3);
+}
+
+.case-flow-group {
+  border: 1px solid var(--app-border);
+  border-radius: var(--bs-border-radius);
+  background: #fff;
+  overflow: hidden;
+}
+
+.case-flow-group h3 {
+  margin: 0;
+  padding: var(--app-space-2) var(--app-space-3);
+  border-bottom: 1px solid var(--app-border-soft);
+  background: var(--app-surface-muted);
+  color: #344553;
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.case-flow-track {
+  display: flex;
+  align-items: stretch;
+  gap: var(--app-space-2);
+  padding: var(--app-space-3);
+  overflow-x: auto;
+}
+
+.case-flow-standalone {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--app-space-2);
+  padding: var(--app-space-3);
 }
 
 .case-flow-step {
@@ -931,7 +963,9 @@ body {
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: .7rem;
   align-items: start;
-  min-height: 9rem;
+  flex: 1 0 14rem;
+  min-width: 14rem;
+  min-height: 8.75rem;
   padding: .85rem;
   border: 1px solid var(--app-border);
   border-radius: var(--bs-border-radius);
@@ -946,6 +980,39 @@ body {
   background: var(--app-primary-soft);
   outline: 2px solid var(--app-primary);
   outline-offset: -2px;
+}
+
+.case-flow-connector {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-self: center;
+  align-items: center;
+  flex: .75 0 9rem;
+  gap: .15rem var(--app-space-2);
+  min-width: 9rem;
+  color: var(--app-text-muted);
+}
+
+.case-flow-connector span {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.case-flow-connector i {
+  height: 1px;
+  overflow: visible;
+  background: #8ca0ad;
+  color: #607988;
+  font-style: normal;
+  line-height: 0;
+  text-align: right;
+}
+
+.case-flow-connector small {
+  grid-column: 1 / -1;
+  font-size: .75rem;
+  line-height: 1.35;
 }
 
 .case-flow-index {
@@ -3439,8 +3506,7 @@ body {
     border-bottom: 1px solid var(--app-border);
   }
 
-  .pipeline-grid,
-  .case-flow-board {
+  .pipeline-grid {
     grid-template-columns: repeat(2, minmax(150px, 1fr));
   }
 
@@ -3482,8 +3548,28 @@ body {
 
   .case-summary-grid,
   .pipeline-grid,
-  .case-flow-board {
+  .case-flow-standalone {
     grid-template-columns: 1fr;
+  }
+
+  .case-flow-track {
+    display: grid;
+    overflow-x: visible;
+  }
+
+  .case-flow-step {
+    min-width: 0;
+  }
+
+  .case-flow-connector {
+    width: 100%;
+    min-width: 0;
+    padding: var(--app-space-1) 0;
+  }
+
+  .case-flow-connector i {
+    transform: rotate(90deg);
+    transform-origin: right center;
   }
 
   .case-summary-item,

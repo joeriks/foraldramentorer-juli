@@ -84,7 +84,8 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.doesNotMatch(scriptText, /resultValue:/);
   assert.match(scriptText, /if \(resolveConfirmation\("confirm"\)\) confirmActionModal\.hide\(\)/);
   assert.match(scriptText, /function renderCaseClosureSummary/);
-  assert.match(scriptText, /CASE_FLOW_STEPS/);
+  assert.doesNotMatch(scriptText, /CASE_FLOW_STEPS/);
+  assert.match(scriptText, /function caseTypeRelationshipGroups/);
   assert.match(scriptText, /function renderCaseFlowBoard/);
   assert.match(scriptText, /data-case-flow-type/);
   assert.match(scriptText, /status=open/);
