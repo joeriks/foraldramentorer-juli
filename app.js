@@ -819,6 +819,7 @@ const els = {
   totalCount: document.querySelector("#totalCount"),
   openCaseCount: document.querySelector("#openCaseCount"),
   caseSummaryBoard: document.querySelector("#caseSummaryBoard"),
+  caseFlowBoard: document.querySelector("#caseFlowBoard"),
   pipelineGrid: document.querySelector("#pipelineBoard .pipeline-grid"),
   actionTableBody: document.querySelector("#actionTableBody"),
   actionQueueSummary: document.querySelector("#actionQueueSummary"),
@@ -4742,7 +4743,7 @@ function applyRoute() {
   if (currentView !== "case-types" || !route.id || nestedActivityRoute) caseTypeEditMode = false;
   if (!selectedActivityTypeId) activityTypeEditMode = false;
   workQueueOnly = currentView === "mentors" && route.id === "action";
-  caseTypeFilter = currentView === "cases" && ["matching", "mentor-assignment"].includes(route.id) ? route.id : "";
+  caseTypeFilter = currentView === "cases" && caseTypeById(route.id) ? route.id : "";
 
   els.dashboardView.hidden = currentView !== "dashboard";
   els.presentationView.hidden = currentView !== "presentation";
@@ -4819,7 +4820,7 @@ function applyRoute() {
     els.pageTitle.textContent = "Demoläge";
     els.breadcrumb.textContent = "Start / Systemadministration / Demoläge";
   } else if (currentView === "cases") {
-    const sectionTitle = caseTypeFilter === "matching" ? "Matchningar" : caseTypeFilter === "mentor-assignment" ? "Uppdrag" : "Ärenderegister";
+    const sectionTitle = caseTypeFilter ? caseTypeRelationshipName(caseTypeFilter) : "Ärenderegister";
     els.pageTitle.textContent = sectionTitle;
     els.breadcrumb.textContent = `Start / ${sectionTitle}`;
   } else if (currentView === "case") {
@@ -5117,11 +5118,57 @@ async function createSupportCaseFromIncomingContact(contact, parent) {
   showFeedback("Kontakten har kopplats och ett stödärende har skapats.");
 }
 
+const CASE_FLOW_STEPS = [
+  { id: "needs-analysis", label: "Behovsanalys", description: "Identifiera område, språk och omfattning." },
+  { id: "recruitment", label: "Rekrytering", description: "Planerad eller pågående mentorrekrytering." },
+  { id: "mentor-certification", label: "Mentorprövning", description: "Kontroller, utbildning, intervju och beslut." },
+  { id: "parent-support", label: "Stödärende", description: "Förälderns behov avgränsas inför matchning." },
+  { id: "matching", label: "Matchning", description: "Föreslagen mentor, parternas svar och beslut." },
+  { id: "mentor-assignment", label: "Mentoruppdrag", description: "Aktivt uppdrag, uppföljning och ersättning." },
+  { id: "mentor-follow-up", label: "Uppföljning", description: "Avgränsade uppföljningar och fortsatta åtgärder." },
+  { id: "other", label: "Övrigt", description: "Frågor som inte hör hemma i standardflödet." }
+];
+
+function renderCaseFlowBoard(openCases) {
+  if (!els.caseFlowBoard) return;
+  const totalOpen = openCases.length;
+  els.caseFlowBoard.innerHTML = CASE_FLOW_STEPS.map((step, index) => {
+    const stepCases = cases.filter((caseRecord) => caseRecord.caseTypeId === step.id);
+    const openStepCases = stepCases.filter((caseRecord) => caseRecord.status !== "closed");
+    const waitingCount = openStepCases.filter((caseRecord) => caseRecord.status === "waiting").length;
+    const decisionCount = openStepCases.filter((caseRecord) => caseRecord.status === "decision_required").length;
+    const overdueCount = openStepCases.filter((caseRecord) => activitiesForCase(caseRecord.id).some((activity) => activityDueState(activity) === "overdue")).length;
+    const share = totalOpen ? Math.round((openStepCases.length / totalOpen) * 100) : 0;
+    const route = `#/cases/${encodeURIComponent(step.id)}`;
+    const signals = [
+      waitingCount ? `${waitingCount} väntar` : "",
+      overdueCount ? `${overdueCount} försenade` : "",
+      decisionCount ? `${decisionCount} ställningstaganden` : ""
+    ].filter(Boolean);
+    return `
+      <a class="case-flow-step" href="${route}" data-case-flow-type="${escapeHtml(step.id)}">
+        <span class="case-flow-index">${index + 1}</span>
+        <span class="case-flow-copy">
+          <span class="case-flow-label">${escapeHtml(step.label)}</span>
+          <small>${escapeHtml(step.description)}</small>
+        </span>
+        <span class="case-flow-count">
+          <strong>${openStepCases.length}</strong>
+          <small>${stepCases.length === openStepCases.length ? "öppna" : `${stepCases.length} totalt`}</small>
+        </span>
+        <span class="case-flow-meter" aria-hidden="true"><span style="width: ${share}%"></span></span>
+        <span class="case-flow-signals">${signals.length ? signals.map((signal) => `<span>${escapeHtml(signal)}</span>`).join("") : "<span>Inga stopp</span>"}</span>
+      </a>
+    `;
+  }).join("");
+}
+
 function renderDashboard() {
   renderIncomingContactTable();
   els.actionTableBody.innerHTML = "";
   const openCases = cases.filter((caseRecord) => caseRecord.status !== "closed");
   els.openCaseCount.textContent = openCases.length;
+  renderCaseFlowBoard(openCases);
   for (const status of ["new", "in_progress", "waiting", "decision_required", "paused"]) {
     const count = openCases.filter((caseRecord) => caseRecord.status === status).length;
     const target = els.caseSummaryBoard.querySelector(`[data-case-status-count="${status}"]`);
@@ -5705,7 +5752,7 @@ function renderCases() {
   casePage = Math.min(casePage, pageCount);
   const start = (casePage - 1) * CASE_PAGE_SIZE;
   const rows = filteredRows.slice(start, start + CASE_PAGE_SIZE);
-  els.caseRegisterTitle.textContent = caseTypeFilter === "matching" ? "Matchningsärenden" : caseTypeFilter === "mentor-assignment" ? "Mentoruppdrag" : "Ärenderegister";
+  els.caseRegisterTitle.textContent = caseTypeFilter ? caseTypeRelationshipName(caseTypeFilter) : "Ärenderegister";
   els.newGeneralCaseButton.textContent = caseTypeFilter === "matching" ? "Ny matchning" : caseTypeFilter === "mentor-assignment" ? "Nytt uppdrag" : "Ny registrering";
   els.newGeneralCaseButton.hidden = ["matching", "mentor-assignment"].includes(caseTypeFilter);
   els.caseListCount.textContent = filteredRows.length === typeRows.length
@@ -10789,6 +10836,19 @@ els.caseSummaryBoard.addEventListener("click", (event) => {
   els.caseStatusFilter.value = caseStatusFilter;
   els.caseSearchInput.value = "";
   navigateTo("#/cases");
+});
+
+els.caseFlowBoard?.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-case-flow-type]");
+  if (!link) return;
+  event.preventDefault();
+  caseTypeFilter = link.dataset.caseFlowType;
+  caseStatusFilter = "";
+  caseSearchTerm = "";
+  casePage = 1;
+  els.caseStatusFilter.value = "";
+  els.caseSearchInput.value = "";
+  navigateTo(`#/cases/${encodeURIComponent(caseTypeFilter)}`);
 });
 
 els.actionTableBody.addEventListener("click", (event) => {

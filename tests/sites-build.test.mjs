@@ -18,6 +18,7 @@ test("serves the application shell", async () => {
   assert.match(html, /FöräldraMentorer/);
   assert.match(html, /id="dashboardView"/);
   assert.match(html, /id="caseSummaryBoard"/);
+  assert.match(html, /id="caseFlowBoard"/);
   assert.match(html, /id="decisionQueueButton"/);
   assert.match(html, /id="caseClosureSummary"/);
   assert.match(html, /id="matchingDecisionSummary"/);
@@ -83,6 +84,9 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.doesNotMatch(scriptText, /resultValue:/);
   assert.match(scriptText, /if \(resolveConfirmation\("confirm"\)\) confirmActionModal\.hide\(\)/);
   assert.match(scriptText, /function renderCaseClosureSummary/);
+  assert.match(scriptText, /CASE_FLOW_STEPS/);
+  assert.match(scriptText, /function renderCaseFlowBoard/);
+  assert.match(scriptText, /data-case-flow-type/);
   assert.match(scriptText, /function renderMatchingDecisionSummary/);
   assert.match(scriptText, /function renderActivityCompletionDecision/);
   assert.match(scriptText, /function renderPublicSupportRequestQueue/);
