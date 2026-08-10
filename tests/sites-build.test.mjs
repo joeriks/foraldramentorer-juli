@@ -17,8 +17,8 @@ test("serves the application shell", async () => {
   const html = await response.text();
   assert.match(html, /FöräldraMentorer/);
   assert.match(html, /id="dashboardView"/);
-  assert.match(html, /id="caseSummaryBoard"/);
   assert.match(html, /id="caseFlowBoard"/);
+  assert.match(html, /<option value="open">Öppna<\/option>/);
   assert.match(html, /id="decisionQueueButton"/);
   assert.match(html, /id="caseClosureSummary"/);
   assert.match(html, /id="matchingDecisionSummary"/);
@@ -87,6 +87,8 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /CASE_FLOW_STEPS/);
   assert.match(scriptText, /function renderCaseFlowBoard/);
   assert.match(scriptText, /data-case-flow-type/);
+  assert.match(scriptText, /status=open/);
+  assert.match(scriptText, /caseRecord\.status !== "closed"/);
   assert.match(scriptText, /function renderMatchingDecisionSummary/);
   assert.match(scriptText, /function renderActivityCompletionDecision/);
   assert.match(scriptText, /function renderPublicSupportRequestQueue/);

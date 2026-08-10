@@ -130,47 +130,6 @@
 
         <main class="app-main">
           <section id="dashboardView" class="view-stack">
-            <section class="card" aria-label="Ärendeläge">
-              <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
-                <div>
-                  <h2 class="h5 mb-1">Ärendeläge</h2>
-                  <p class="text-secondary mb-0">Aktuellt läge i kommunens öppna handläggning.</p>
-                </div>
-                <div class="text-secondary small">
-                  <strong id="openCaseCount">0</strong> öppna ärenden
-                </div>
-              </div>
-              <div id="caseSummaryBoard" class="card-body">
-                <div class="case-summary-grid">
-                  <button type="button" class="case-summary-item" data-case-summary-status="new">
-                    <span class="case-summary-label">Nya</span>
-                    <strong data-case-status-count="new">0</strong>
-                    <span class="case-summary-description">Ännu inte påbörjade</span>
-                  </button>
-                  <button type="button" class="case-summary-item" data-case-summary-status="in_progress">
-                    <span class="case-summary-label">Pågående</span>
-                    <strong data-case-status-count="in_progress">0</strong>
-                    <span class="case-summary-description">Aktiv handläggning</span>
-                  </button>
-                  <button type="button" class="case-summary-item" data-case-summary-status="waiting">
-                    <span class="case-summary-label">Väntar</span>
-                    <strong data-case-status-count="waiting">0</strong>
-                    <span class="case-summary-description">Inväntar extern part</span>
-                  </button>
-                  <button type="button" class="case-summary-item" data-case-summary-status="decision_required">
-                    <span class="case-summary-label">Ställningstagande</span>
-                    <strong data-case-status-count="decision_required">0</strong>
-                    <span class="case-summary-description">Kräver bedömning eller beslut</span>
-                  </button>
-                  <button type="button" class="case-summary-item" data-case-summary-status="paused">
-                    <span class="case-summary-label">Pausade</span>
-                    <strong data-case-status-count="paused">0</strong>
-                    <span class="case-summary-description">Handläggning tillfälligt stoppad</span>
-                  </button>
-                </div>
-              </div>
-            </section>
-
             <section class="card" aria-label="Ärendeflöden">
               <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
                 <div>
@@ -335,6 +294,7 @@
                     <label class="form-label" for="caseStatusFilter">Status</label>
                     <select id="caseStatusFilter" class="form-select form-select-sm">
                       <option value="">Alla statusar</option>
+                      <option value="open">Öppna</option>
                       <option value="new">Nytt</option>
                       <option value="in_progress">Pågår</option>
                       <option value="waiting">Väntar</option>

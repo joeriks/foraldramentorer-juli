@@ -817,7 +817,6 @@ const els = {
   handlerDetailEmpty: document.querySelector("#handlerDetailEmpty"),
   handlerDetail: document.querySelector("#handlerDetail"),
   totalCount: document.querySelector("#totalCount"),
-  openCaseCount: document.querySelector("#openCaseCount"),
   caseSummaryBoard: document.querySelector("#caseSummaryBoard"),
   caseFlowBoard: document.querySelector("#caseFlowBoard"),
   pipelineGrid: document.querySelector("#pipelineBoard .pipeline-grid"),
@@ -4366,10 +4365,12 @@ function nextActionFor(candidate) {
 
 function parseRoute() {
   const hash = window.location.hash || "#/dashboard";
-  const [, view, id] = hash.match(/^#\/([^/]+)\/?(.+)?$/) || [];
+  const [path, query = ""] = hash.split("?");
+  const [, view, id] = path.match(/^#\/([^/]+)\/?(.+)?$/) || [];
   return {
     view: normalizeRouteView(view || "dashboard"),
-    id: id || null
+    id: id || null,
+    params: new URLSearchParams(query)
   };
 }
 
@@ -4744,6 +4745,11 @@ function applyRoute() {
   if (!selectedActivityTypeId) activityTypeEditMode = false;
   workQueueOnly = currentView === "mentors" && route.id === "action";
   caseTypeFilter = currentView === "cases" && caseTypeById(route.id) ? route.id : "";
+  if (currentView === "cases" && route.params?.has("status")) {
+    const status = route.params.get("status");
+    caseStatusFilter = ["open", "new", "in_progress", "waiting", "paused", "decision_required", "closed"].includes(status) ? status : "";
+    casePage = 1;
+  }
 
   els.dashboardView.hidden = currentView !== "dashboard";
   els.presentationView.hidden = currentView !== "presentation";
@@ -4822,7 +4828,7 @@ function applyRoute() {
   } else if (currentView === "cases") {
     const sectionTitle = caseTypeFilter ? caseTypeRelationshipName(caseTypeFilter) : "Ärenderegister";
     els.pageTitle.textContent = sectionTitle;
-    els.breadcrumb.textContent = `Start / ${sectionTitle}`;
+    els.breadcrumb.textContent = `Start / ${sectionTitle}${caseStatusFilter === "open" ? " / Öppna ärenden" : ""}`;
   } else if (currentView === "case") {
     const isNewCase = route.id?.startsWith("new");
     els.pageTitle.textContent = isNewCase ? "Ny registrering" : "Ärendekort";
@@ -5139,7 +5145,7 @@ function renderCaseFlowBoard(openCases) {
     const decisionCount = openStepCases.filter((caseRecord) => caseRecord.status === "decision_required").length;
     const overdueCount = openStepCases.filter((caseRecord) => activitiesForCase(caseRecord.id).some((activity) => activityDueState(activity) === "overdue")).length;
     const share = totalOpen ? Math.round((openStepCases.length / totalOpen) * 100) : 0;
-    const route = `#/cases/${encodeURIComponent(step.id)}`;
+    const route = `#/cases/${encodeURIComponent(step.id)}?status=open`;
     const signals = [
       waitingCount ? `${waitingCount} väntar` : "",
       overdueCount ? `${overdueCount} försenade` : "",
@@ -5167,13 +5173,7 @@ function renderDashboard() {
   renderIncomingContactTable();
   els.actionTableBody.innerHTML = "";
   const openCases = cases.filter((caseRecord) => caseRecord.status !== "closed");
-  els.openCaseCount.textContent = openCases.length;
   renderCaseFlowBoard(openCases);
-  for (const status of ["new", "in_progress", "waiting", "decision_required", "paused"]) {
-    const count = openCases.filter((caseRecord) => caseRecord.status === status).length;
-    const target = els.caseSummaryBoard.querySelector(`[data-case-status-count="${status}"]`);
-    if (target) target.textContent = count;
-  }
   const nextActivities = openCases
     .map((caseRecord) => ({ caseRecord, activity: nextCaseActivity(caseRecord) }))
     .filter((item) => item.activity);
@@ -5739,8 +5739,11 @@ function filteredCases() {
       .filter(Boolean)
       .map((handler) => handler.name);
     const text = [caseRecord.number, caseRecord.title, caseRecord.type, mentor?.name, parent?.name, ...handlerNames].join(" ").toLowerCase();
+    const matchesStatus = caseStatusFilter === "open"
+      ? caseRecord.status !== "closed"
+      : !caseStatusFilter || caseRecord.status === caseStatusFilter;
     return (!caseTypeFilter || caseRecord.caseTypeId === caseTypeFilter)
-      && (!caseStatusFilter || caseRecord.status === caseStatusFilter)
+      && matchesStatus
       && (!term || text.includes(term));
   });
 }
@@ -5755,6 +5758,7 @@ function renderCases() {
   els.caseRegisterTitle.textContent = caseTypeFilter ? caseTypeRelationshipName(caseTypeFilter) : "Ärenderegister";
   els.newGeneralCaseButton.textContent = caseTypeFilter === "matching" ? "Ny matchning" : caseTypeFilter === "mentor-assignment" ? "Nytt uppdrag" : "Ny registrering";
   els.newGeneralCaseButton.hidden = ["matching", "mentor-assignment"].includes(caseTypeFilter);
+  if (els.caseStatusFilter.value !== caseStatusFilter) els.caseStatusFilter.value = caseStatusFilter;
   els.caseListCount.textContent = filteredRows.length === typeRows.length
     ? `${typeRows.length} ${typeRows.length === 1 ? "ärende" : "ärenden"} i registret.`
     : `Visar ${filteredRows.length} av ${typeRows.length} ärenden.`;
@@ -10826,7 +10830,7 @@ for (const [mode, button] of [
   });
 }
 
-els.caseSummaryBoard.addEventListener("click", (event) => {
+els.caseSummaryBoard?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-case-summary-status]");
   if (!button) return;
   caseTypeFilter = "";
@@ -10843,12 +10847,12 @@ els.caseFlowBoard?.addEventListener("click", (event) => {
   if (!link) return;
   event.preventDefault();
   caseTypeFilter = link.dataset.caseFlowType;
-  caseStatusFilter = "";
+  caseStatusFilter = "open";
   caseSearchTerm = "";
   casePage = 1;
-  els.caseStatusFilter.value = "";
+  els.caseStatusFilter.value = "open";
   els.caseSearchInput.value = "";
-  navigateTo(`#/cases/${encodeURIComponent(caseTypeFilter)}`);
+  navigateTo(`#/cases/${encodeURIComponent(caseTypeFilter)}?status=open`);
 });
 
 els.actionTableBody.addEventListener("click", (event) => {
