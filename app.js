@@ -630,6 +630,7 @@ const els = {
   testUserTypeSelect: document.querySelector("#testUserTypeSelect"),
   navDashboard: document.querySelector("#navDashboard"),
   navPresentation: document.querySelector("#navPresentation"),
+  navIntake: document.querySelector("#navIntake"),
   navCases: document.querySelector("#navCases"),
   navMatchings: document.querySelector("#navMatchings"),
   navAssignments: document.querySelector("#navAssignments"),
@@ -708,6 +709,8 @@ const els = {
   parentSupportCaseTableBody: document.querySelector("#parentSupportCaseTableBody"),
   parentMatchingCaseTableBody: document.querySelector("#parentMatchingCaseTableBody"),
   parentAssignmentCaseTableBody: document.querySelector("#parentAssignmentCaseTableBody"),
+  navIncomingContact: document.querySelector("#navIncomingContact"),
+  mobileIncomingContact: document.querySelector("#mobileIncomingContact"),
   dashboardIncomingContactButton: document.querySelector("#dashboardIncomingContactButton"),
   newIncomingContactButton: document.querySelector("#newIncomingContactButton"),
   parentIncomingContactButton: document.querySelector("#parentIncomingContactButton"),
@@ -4775,7 +4778,7 @@ function applyRoute() {
 
   const mentorSession = isMentorSession();
   const publicSession = isPublicSession();
-  for (const navigationItem of [els.navDashboard, els.navPresentation, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navLearning, els.navAdministration]) {
+  for (const navigationItem of [els.navDashboard, els.navPresentation, els.navIntake, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navLearning, els.navAdministration]) {
     navigationItem.hidden = mentorSession || publicSession;
   }
   document.querySelectorAll(".sidebar-nav > .nav-link.disabled").forEach((navigationItem) => {
@@ -4798,6 +4801,7 @@ function applyRoute() {
 
   els.navDashboard.classList.toggle("active", currentView === "dashboard");
   els.navPresentation.classList.toggle("active", currentView === "presentation");
+  els.navIntake.classList.toggle("active", currentView === "cases" && caseTypeFilter === "incoming-contact");
   els.navCases.classList.toggle("active", (currentView === "cases" && !caseTypeFilter) || currentView === "case");
   els.navMatchings.classList.toggle("active", currentView === "cases" && caseTypeFilter === "matching");
   els.navAssignments.classList.toggle("active", currentView === "cases" && caseTypeFilter === "mentor-assignment");
@@ -5025,7 +5029,7 @@ function renderIncomingContactTable() {
   }
   els.incomingContactTableBody.innerHTML = visible.map((contact) => {
     const parent = parents.find((item) => item.id === contact.parentId);
-    return `<tr><td>${escapeHtml(formatDateTime(contact.occurredAt))}</td><td>${escapeHtml(incomingContactChannelLabels[contact.channel] || contact.channel)}</td><td><strong>${escapeHtml(contact.parentName || contact.contactDetails)}</strong><div class="small text-secondary">${escapeHtml(contact.summary)}</div></td><td>${parent ? `<a href="#/parent/${escapeHtml(parent.id)}">${escapeHtml(parent.name)}</a>` : '<span class="text-secondary">Inte kopplad</span>'}</td><td><span class="badge text-bg-light border">${escapeHtml(incomingContactStatusLabels[contact.status] || contact.status)}</span></td><td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-open-incoming-contact="${escapeHtml(contact.id)}">Hantera</button></td></tr>`;
+    return `<tr><td>${escapeHtml(formatDateTime(contact.occurredAt))}</td><td>${escapeHtml(incomingContactChannelLabels[contact.channel] || contact.channel)}</td><td><strong>${escapeHtml(contact.parentName || contact.contactDetails)}</strong><div class="small text-secondary">${escapeHtml(contact.summary)}</div></td><td>${parent ? `<a href="#/parent/${escapeHtml(parent.id)}">${escapeHtml(parent.name)}</a>` : '<span class="text-secondary">Ingen personpost vald</span>'}</td><td><span class="badge text-bg-light border">${escapeHtml(incomingContactStatusLabels[contact.status] || contact.status)}</span></td><td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-open-incoming-contact="${escapeHtml(contact.id)}">Hantera</button></td></tr>`;
   }).join("");
 }
 
@@ -5066,9 +5070,75 @@ function showIncomingContactNextStep(contact) {
   els.incomingContactCaptureStep.hidden = true;
   els.incomingContactNextStep.hidden = false;
   const parent = parents.find((item) => item.id === contact.parentId);
-  els.incomingContactSavedSummary.textContent = parent ? `Kopplad till ${parent.name}.` : "Ännu inte kopplad till en förälder eller ett ärende.";
+  els.incomingContactSavedSummary.textContent = parent ? `Kopplad till ${parent.name}.` : "Ännu inte kopplad till en personpost eller ett ärende.";
   els.incomingContactCreateParentButton.hidden = Boolean(parent);
   els.incomingContactCreateCaseButton.hidden = !parent;
+}
+
+async function createIncomingContactCase(contact, now = new Date().toISOString()) {
+  const caseType = caseTypeById("incoming-contact");
+  if (!caseType) return { contact, records: {} };
+  const caseId = crypto.randomUUID();
+  const titlePrefix = incomingContactChannelLabels[contact.channel] || "Kontakt";
+  const title = `${titlePrefix}: ${contact.parentName || contact.contactDetails}`.slice(0, 100);
+  const caseRecord = {
+    id: caseId,
+    tenantId: DEFAULT_TENANT_ID,
+    number: await reserveCaseNumber(),
+    caseTypeId: caseType.id,
+    caseTypeVersion: caseType.version,
+    organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID,
+    type: caseType.name,
+    title,
+    description: contact.summary,
+    details: {
+      contactChannel: contact.channel,
+      contactDetails: contact.contactDetails,
+      callerType: contact.callerType,
+      affectedPerson: contact.parentName
+    },
+    mentorId: null,
+    parentId: contact.parentId || null,
+    supportCaseId: null,
+    sourceMatchingCaseId: null,
+    status: "new",
+    priority: "normal",
+    dueDate: null,
+    version: 1,
+    createdAt: now,
+    createdBy: CURRENT_USER_ID,
+    updatedAt: now,
+    updatedBy: CURRENT_USER_ID,
+    closedAt: null,
+    closedBy: null
+  };
+  const owner = { id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, handlerId: CURRENT_USER_ID, role: "responsible", version: 1, assignedAt: now, assignedBy: CURRENT_USER_ID, endedAt: null, endedBy: null };
+  const activities = (caseType.suggestedActivities || []).map((title, sortOrder) => ({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1, title, status: "not_started", resultCode: null, resultClassification: null, handlerIdOverride: null, waitingForParty: null, dueDate: null, sortOrder, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, completedAt: null, completedBy: null }));
+  return {
+    contact: { ...contact, intakeCaseId: caseId },
+    records: {
+      [CASES_STORE]: [caseRecord],
+      [CASE_ASSIGNMENTS_STORE]: [owner],
+      [CASE_ACTIVITIES_STORE]: activities,
+      [CASE_EVENTS_STORE]: [caseEventRecord({ caseId, eventType: "case_created", entityType: "case", entityId: caseId, message: "Mottagningsärende skapades från registrerad kontakt", idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now })]
+    }
+  };
+}
+
+async function updateIncomingContactHandling(contact, status, { closeCase = false, feedback = "" } = {}) {
+  const now = new Date().toISOString();
+  const updatedContact = { ...contact, status, updatedAt: now, updatedBy: CURRENT_USER_ID };
+  const intakeCase = cases.find((item) => item.id === contact.intakeCaseId);
+  const caseUpdates = [];
+  const events = [];
+  if (intakeCase) {
+    const nextCase = closeCase
+      ? { ...intakeCase, status: "closed", closeNote: feedback || "Kontakten avslutades utan fortsatt ärende.", closedAt: now, closedBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID }
+      : { ...intakeCase, status: "waiting", updatedAt: now, updatedBy: CURRENT_USER_ID };
+    caseUpdates.push(nextCase);
+    events.push(caseEventRecord({ caseId: intakeCase.id, eventType: closeCase ? "case_closed" : "case_updated", entityType: "case", entityId: intakeCase.id, message: feedback || "Kontakten markerades för uppföljning", idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now }));
+  }
+  await atomicPut({ [INCOMING_CONTACTS_STORE]: [updatedContact], ...(caseUpdates.length ? { [CASES_STORE]: caseUpdates, [CASE_EVENTS_STORE]: events } : {}) });
 }
 
 async function createIncomingContactFromPublicSupportRequest(request) {
@@ -5117,7 +5187,13 @@ async function createSupportCaseFromIncomingContact(contact, parent) {
   const activities = (caseType.suggestedActivities || []).map((title, sortOrder) => ({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1, title, status: "not_started", resultCode: null, resultClassification: null, handlerIdOverride: null, waitingForParty: null, dueDate: null, sortOrder, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, completedAt: null, completedBy: null }));
   const updatedContact = { ...contact, parentId: parent.id, caseId, status: "linked", updatedAt: now, updatedBy: CURRENT_USER_ID };
   const publicRequest = publicSupportRequests.find((request) => request.id === contact.publicSupportRequestId);
-  await atomicPut({ [CASES_STORE]: [supportCase], [CASE_ASSIGNMENTS_STORE]: [owner], [CASE_ACTIVITIES_STORE]: activities, [CASE_EVENTS_STORE]: [caseEventRecord({ caseId, eventType: "case_created", entityType: "case", entityId: caseId, message: "Stödärende skapades från en inkommande kontakt", idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now })], [INCOMING_CONTACTS_STORE]: [updatedContact], ...(publicRequest ? { [PUBLIC_SUPPORT_REQUESTS_STORE]: [{ ...publicRequest, status: "closed", caseId, updatedAt: now, updatedBy: CURRENT_USER_ID }] } : {}) });
+  const intakeCase = cases.find((item) => item.id === contact.intakeCaseId);
+  const closedIntakeCase = intakeCase ? { ...intakeCase, status: "closed", closeNote: `Stödärende ${supportCase.number} skapades.`, closedAt: now, closedBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID } : null;
+  const events = [
+    caseEventRecord({ caseId, eventType: "case_created", entityType: "case", entityId: caseId, message: "Stödärende skapades från en registrerad kontakt", idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now })
+  ];
+  if (closedIntakeCase) events.push(caseEventRecord({ caseId: closedIntakeCase.id, eventType: "case_closed", entityType: "case", entityId: closedIntakeCase.id, message: `Mottagningsärendet avslutades när stödärende ${supportCase.number} skapades`, idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now }));
+  await atomicPut({ [CASES_STORE]: [supportCase, closedIntakeCase].filter(Boolean), [CASE_ASSIGNMENTS_STORE]: [owner], [CASE_ACTIVITIES_STORE]: activities, [CASE_EVENTS_STORE]: events, [INCOMING_CONTACTS_STORE]: [updatedContact], ...(publicRequest ? { [PUBLIC_SUPPORT_REQUESTS_STORE]: [{ ...publicRequest, status: "closed", caseId, updatedAt: now, updatedBy: CURRENT_USER_ID }] } : {}) });
   await saveSupportMatchingProfile(supportCase);
   await refresh();
   bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
@@ -8887,6 +8963,11 @@ els.navDashboard.addEventListener("click", (event) => {
   navigateTo("#/dashboard");
 });
 
+els.navIntake.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/cases/incoming-contact");
+});
+
 els.navPresentation.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/presentation");
@@ -9064,6 +9145,8 @@ els.dashboardMentorRegisterLink.addEventListener("click", (event) => {
   navigateTo("#/mentors");
 });
 
+els.navIncomingContact.addEventListener("click", () => openIncomingContact());
+els.mobileIncomingContact.addEventListener("click", () => openIncomingContact());
 els.dashboardIncomingContactButton.addEventListener("click", () => openIncomingContact());
 els.newIncomingContactButton.addEventListener("click", () => openIncomingContact());
 els.parentIncomingContactButton.addEventListener("click", () => openIncomingContact(null, selectedParent()?.id));
@@ -9079,7 +9162,7 @@ els.incomingContactForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const existing = incomingContactById(activeIncomingContactId);
   const now = new Date().toISOString();
-  const contact = {
+  let contact = {
     ...(existing || {}), id: existing?.id || crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID,
     occurredAt: existing?.occurredAt || incomingContactStartedAt || now,
     channel: els.incomingContactChannelInput.value, contactDetails: els.incomingContactDetailsInput.value.trim(),
@@ -9089,7 +9172,9 @@ els.incomingContactForm.addEventListener("submit", async (event) => {
     receivedBy: existing?.receivedBy || CURRENT_USER_ID, registeredBy: existing?.registeredBy || CURRENT_USER_ID,
     createdAt: existing?.createdAt || now, createdBy: existing?.createdBy || CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID
   };
-  await saveIncomingContact(contact);
+  const intakeCase = contact.intakeCaseId ? { contact, records: {} } : await createIncomingContactCase(contact, now);
+  contact = intakeCase.contact;
+  await atomicPut({ [INCOMING_CONTACTS_STORE]: [contact], ...intakeCase.records });
   await refresh();
   showIncomingContactNextStep(incomingContactById(contact.id));
   showFeedback("Den inkommande kontakten har sparats.");
@@ -9097,7 +9182,7 @@ els.incomingContactForm.addEventListener("submit", async (event) => {
 els.incomingContactCreateParentButton.addEventListener("click", async () => {
   const contact = incomingContactById(activeIncomingContactId);
   if (!contact) return;
-  if (!contact.parentName) { showFeedback("Ange förälderns namn innan en preliminär förälderpost skapas."); return; }
+  if (!contact.parentName) { showFeedback("Ange namn på den berörda personen innan en preliminär personpost skapas."); return; }
   const now = new Date().toISOString();
   const parent = { id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, name: contact.parentName, contactDetails: contact.contactDetails, informationStatus: "pending", area: "", languages: "", availability: "", active: true, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID };
   await saveParent(parent);
@@ -9111,7 +9196,7 @@ els.incomingContactCreateCaseButton.addEventListener("click", async () => {
 els.incomingContactFollowUpButton.addEventListener("click", async () => {
   const contact = incomingContactById(activeIncomingContactId);
   if (!contact) return;
-  await saveIncomingContact({ ...contact, status: "needs_follow_up", updatedAt: new Date().toISOString(), updatedBy: CURRENT_USER_ID });
+  await updateIncomingContactHandling(contact, "needs_follow_up", { feedback: "Kontakten markerades för uppföljning." });
   await refresh();
   bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
   showFeedback("Kontakten ligger kvar på dashboarden för uppföljning.");
@@ -9119,7 +9204,7 @@ els.incomingContactFollowUpButton.addEventListener("click", async () => {
 els.incomingContactCloseButton.addEventListener("click", async () => {
   const contact = incomingContactById(activeIncomingContactId);
   if (!contact) return;
-  await saveIncomingContact({ ...contact, status: "closed", updatedAt: new Date().toISOString(), updatedBy: CURRENT_USER_ID });
+  await updateIncomingContactHandling(contact, "closed", { closeCase: true, feedback: "Kontakten avslutades utan fortsatt ärende." });
   await refresh();
   bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
   showFeedback("Kontakten har avslutats utan ärende.");

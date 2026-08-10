@@ -232,6 +232,20 @@ export const CASE_DETAIL_FIELD_DEFINITIONS = [
 
 export const CASE_TYPE_DEFINITIONS = [
   {
+    id: "incoming-contact",
+    version: 1,
+    name: "Inkommande samtal/e-post",
+    creationMode: "manual",
+    nextCaseTypeId: "parent-support",
+    mentorMode: "none",
+    helpText: "Använd för en mottagen kontakt via telefon, e-post, besök eller annan kanal innan kommunen vet om kontakten ska bli ett stödärende, kopplas till en personpost eller avslutas utan fortsatt handläggning.",
+    registrationHint: "Registrera kontaktväg, kontaktuppgift, vem som kontaktar kommunen och en kort saklig anteckning. Koppla personpost först när det är tillräckligt utrett.",
+    workInstruction: "Bedöm om kontakten ska följas upp, kopplas till befintlig personpost, bli ett stödärende eller avslutas utan ärende. Dokumentera ställningstagandet innan ärendet avslutas.",
+    detailFieldIds: [],
+    defaultPriority: "normal",
+    suggestedActivities: ["Bedöm fortsatt hantering", "Koppla personpost eller ärende", "Dokumentera ställningstagande"]
+  },
+  {
     id: "parent-support",
     version: 1,
     name: "Stödärende för förälder",

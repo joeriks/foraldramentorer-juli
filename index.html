@@ -17,6 +17,8 @@
         </div>
         <nav class="sidebar-nav nav nav-pills flex-column gap-1">
           <a id="navDashboard" class="nav-link" href="#/dashboard">Dashboard</a>
+          <button id="navIncomingContact" class="nav-link sidebar-action-link" type="button">Registrera kontakt</button>
+          <a id="navIntake" class="nav-link" href="#/intake">Kontaktmottagning</a>
           <a id="navCases" class="nav-link" href="#/cases">Ärenden</a>
           <a id="navCandidates" class="nav-link" href="#/mentors">Mentorer</a>
           <a id="navParents" class="nav-link" href="#/parents">Föräldrar</a>
@@ -63,6 +65,8 @@
                   <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-support">Sök stöd</a></li>
                   <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-learning">Råd och material</a></li>
                   <li><a class="dropdown-item" href="#/dashboard">Dashboard</a></li>
+                  <li><button id="mobileIncomingContact" type="button" class="dropdown-item">Registrera kontakt</button></li>
+                  <li><a class="dropdown-item" href="#/intake">Kontaktmottagning</a></li>
                   <li><a class="dropdown-item" href="#/cases">Ärenden</a></li>
                   <li><a class="dropdown-item" href="#/mentors">Mentorer</a></li>
                   <li><a class="dropdown-item" href="#/parents">Föräldrar</a></li>
@@ -194,12 +198,12 @@
               </section>
             </div>
 
-            <section class="card" aria-label="Inkommande kontakter">
+            <section class="card" aria-label="Kontaktmottagning">
               <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
-                <div><h2 class="h5 mb-1">Inkommande kontakter</h2><p class="text-secondary mb-0">Samtal och meddelanden som behöver kopplas eller följas upp.</p></div>
-                <button id="newIncomingContactButton" type="button" class="btn btn-outline-primary btn-sm">Registrera kontakt</button>
+                <div><h2 class="h5 mb-1">Kontaktmottagning</h2><p class="text-secondary mb-0">Mottagningsärenden som behöver kopplas eller följas upp.</p></div>
+                <div class="d-flex gap-2"><a class="btn btn-outline-secondary btn-sm" href="#/cases/incoming-contact">Visa alla</a><button id="newIncomingContactButton" type="button" class="btn btn-outline-primary btn-sm">Registrera kontakt</button></div>
               </div>
-              <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Tid</th><th>Kontaktväg</th><th>Kontakt</th><th>Förälder</th><th>Läge</th><th></th></tr></thead><tbody id="incomingContactTableBody"></tbody></table></div>
+              <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Tid</th><th>Kontaktväg</th><th>Kontakt</th><th>Koppling</th><th>Läge</th><th></th></tr></thead><tbody id="incomingContactTableBody"></tbody></table></div>
             </section>
 
             <section class="card">
@@ -1807,12 +1811,12 @@
           <form id="incomingContactForm">
             <div class="row g-3">
               <div class="col-12"><label class="form-label" for="incomingContactChannelInput">Kontaktväg</label><select id="incomingContactChannelInput" class="form-select" required><option value="phone">Telefon</option><option value="email">E-post</option><option value="visit">Besök</option><option value="other">Annan</option></select></div>
-              <div class="col-12"><label class="form-label" for="incomingContactDetailsInput">Kontaktuppgift</label><input id="incomingContactDetailsInput" class="form-control" autocomplete="off" required placeholder="Telefonnummer eller e-postadress"><div class="form-text">Befintliga föräldrar söks fram automatiskt.</div></div>
-              <div class="col-12"><label class="form-label" for="incomingContactParentNameInput">Förälderns namn <span class="text-secondary fw-normal">(om känt)</span></label><input id="incomingContactParentNameInput" class="form-control" autocomplete="off"></div>
-              <div class="col-12"><label class="form-label" for="incomingContactCallerTypeInput">Vem kontaktar kommunen?</label><select id="incomingContactCallerTypeInput" class="form-select" required><option value="self">Föräldern själv</option><option value="relative">Närstående</option><option value="school">Skola</option><option value="healthcare">Hälso- och sjukvård</option><option value="social_services">Socialtjänst</option><option value="other">Annan</option></select></div>
+              <div class="col-12"><label class="form-label" for="incomingContactDetailsInput">Kontaktuppgift</label><input id="incomingContactDetailsInput" class="form-control" autocomplete="off" required placeholder="Telefonnummer eller e-postadress"><div class="form-text">Befintliga personposter söks fram automatiskt när kontaktuppgifter eller namn matchar.</div></div>
+              <div class="col-12"><label class="form-label" for="incomingContactParentNameInput">Berörd person <span class="text-secondary fw-normal">(om känd)</span></label><input id="incomingContactParentNameInput" class="form-control" autocomplete="off" placeholder="Namn på den person kontakten gäller"></div>
+              <div class="col-12"><label class="form-label" for="incomingContactCallerTypeInput">Vem kontaktar kommunen?</label><select id="incomingContactCallerTypeInput" class="form-select" required><option value="self">Personen själv</option><option value="relative">Närstående</option><option value="school">Skola</option><option value="healthcare">Hälso- och sjukvård</option><option value="social_services">Socialtjänst</option><option value="other">Annan</option></select></div>
               <div class="col-12"><label class="form-label" for="incomingContactSummaryInput">Kort anteckning</label><textarea id="incomingContactSummaryInput" class="form-control" rows="5" required placeholder="Vad gäller kontakten och hur kan personen nås?"></textarea></div>
             </div>
-            <section class="incoming-contact-match mt-3" aria-labelledby="incomingContactMatchTitle"><h3 id="incomingContactMatchTitle" class="h6">Möjlig befintlig förälder</h3><div id="incomingContactParentMatches" class="list-group"></div></section>
+            <section class="incoming-contact-match mt-3" aria-labelledby="incomingContactMatchTitle"><h3 id="incomingContactMatchTitle" class="h6">Möjlig befintlig personpost</h3><div id="incomingContactParentMatches" class="list-group"></div></section>
             <div class="d-flex justify-content-end gap-2 mt-4"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">Avbryt</button><button type="submit" class="btn btn-primary">Spara kontakten</button></div>
           </form>
         </div>

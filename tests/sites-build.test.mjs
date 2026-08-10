@@ -18,6 +18,13 @@ test("serves the application shell", async () => {
   assert.match(html, /FöräldraMentorer/);
   assert.match(html, /id="dashboardView"/);
   assert.match(html, /id="caseFlowBoard"/);
+  assert.match(html, /id="navIncomingContact"/);
+  assert.match(html, /id="navIntake"/);
+  assert.match(html, /id="mobileIncomingContact"/);
+  assert.match(html, /Kontaktmottagning/);
+  assert.match(html, /Berörd person/);
+  assert.match(html, /Möjlig befintlig personpost/);
+  assert.match(html, /Befintliga personposter/);
   assert.match(html, /id="caseTypeFilter"/);
   assert.match(html, /<option value="open">Öppna<\/option>/);
   assert.match(html, /id="decisionQueueButton"/);
@@ -86,6 +93,8 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /if \(resolveConfirmation\("confirm"\)\) confirmActionModal\.hide\(\)/);
   assert.match(scriptText, /function renderCaseClosureSummary/);
   assert.match(scriptText, /function newCaseButtonLabel/);
+  assert.match(scriptText, /function createIncomingContactCase/);
+  assert.match(scriptText, /incoming-contact/);
   assert.match(scriptText, /"mentor-assignment", "parent-support", "mentor-certification", "other"/);
   assert.doesNotMatch(scriptText, /CASE_FLOW_STEPS/);
   assert.match(scriptText, /function caseTypeRelationshipGroups/);

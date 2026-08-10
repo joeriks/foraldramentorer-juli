@@ -237,6 +237,7 @@ test("defines valid relationships between case types", () => {
     assert.ok(relationship.label);
   }
   assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "parent-support").nextCaseTypeId, "matching");
+  assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "incoming-contact").nextCaseTypeId, "parent-support");
   assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "matching").nextCaseTypeId, "mentor-assignment");
   assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "needs-analysis").nextCaseTypeId, "recruitment");
   assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "other").nextCaseTypeId, null);
