@@ -20,6 +20,7 @@ test("serves the application shell", async () => {
   assert.match(html, /id="caseSummaryBoard"/);
   assert.match(html, /id="decisionQueueButton"/);
   assert.match(html, /id="caseClosureSummary"/);
+  assert.match(html, /id="matchingDecisionSummary"/);
   assert.match(html, /id="activityCaseClosedNotice"/);
   assert.match(html, /id="activityCaseReadyNotice"/);
   assert.match(html, /id="activityCaseReadyPrimaryButton"/);
@@ -42,6 +43,7 @@ test("serves the application shell", async () => {
   assert.match(html, /data-bs-backdrop="false"/);
   assert.match(html, /data-bs-scroll="true"/);
   assert.match(html, /id="supportAdministrationView"/);
+  assert.match(html, /id="publicSupportRequestTableBody"/);
   assert.match(html, /id="supportAreasAdministrationView"/);
   assert.match(html, /id="mentorSupportAreasEdit"/);
   assert.match(html, /Skriv inte personnummer/);
@@ -52,6 +54,8 @@ test("serves the application shell", async () => {
   assert.match(html, /id="caseTypeCreationModeFact"/);
   assert.match(html, /Registrerad av/);
   assert.match(html, /krävs för detta resultat/);
+  assert.match(html, /id="compensationReadinessChecklist"/);
+  assert.match(html, /id="confirmActionSummary"/);
   assert.doesNotMatch(html, /certifiera/i);
 });
 
@@ -79,7 +83,12 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.doesNotMatch(scriptText, /resultValue:/);
   assert.match(scriptText, /if \(resolveConfirmation\("confirm"\)\) confirmActionModal\.hide\(\)/);
   assert.match(scriptText, /function renderCaseClosureSummary/);
+  assert.match(scriptText, /function renderMatchingDecisionSummary/);
   assert.match(scriptText, /function renderActivityCompletionDecision/);
+  assert.match(scriptText, /function renderPublicSupportRequestQueue/);
+  assert.match(scriptText, /function renderCompensationReadinessChecklist/);
+  assert.match(scriptText, /data-create-intake-from-public-support/);
+  assert.match(scriptText, /summaryItems:/);
   assert.match(scriptText, /function caseCloseReasonOptions/);
   assert.match(scriptText, /ingen person- eller mentorpost/i);
   assert.match(scriptText, /Inget nytt ärende skapades automatiskt/);

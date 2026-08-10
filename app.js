@@ -70,6 +70,7 @@ import {
   buildMatchingSnapshot,
   buildMentorMatchingProfile,
   buildSupportMatchingProfile,
+  normalizeLanguageEntries,
   projectMentorMatchingProfile
 } from "./matching-profile-domain.js?v=20260809-matching-profiles-v1";
 
@@ -739,6 +740,7 @@ const els = {
   caseTypesAdministrationView: document.querySelector("#caseTypesAdministrationView"),
   activityTypesAdministrationView: document.querySelector("#activityTypesAdministrationView"),
   supportAdministrationView: document.querySelector("#supportAdministrationView"),
+  publicSupportRequestTableBody: document.querySelector("#publicSupportRequestTableBody"),
   supportAreasAdministrationView: document.querySelector("#supportAreasAdministrationView"),
   supportAreaAdminSummary: document.querySelector("#supportAreaAdminSummary"),
   supportAreaAdminGroups: document.querySelector("#supportAreaAdminGroups"),
@@ -940,6 +942,7 @@ const els = {
   caseWorkGuidance: document.querySelector("#caseWorkGuidance"),
   caseWorkGuidanceText: document.querySelector("#caseWorkGuidanceText"),
   caseTransitionPanel: document.querySelector("#caseTransitionPanel"),
+  matchingDecisionSummary: document.querySelector("#matchingDecisionSummary"),
   caseTransitionTitle: document.querySelector("#caseTransitionTitle"),
   caseTransitionHelp: document.querySelector("#caseTransitionHelp"),
   matchingOutcomeForm: document.querySelector("#matchingOutcomeForm"),
@@ -990,6 +993,7 @@ const els = {
   parentCheckInsTableBody: document.querySelector("#parentCheckInsTableBody"),
   newCompensationPeriodButton: document.querySelector("#newCompensationPeriodButton"),
   compensationPeriodForm: document.querySelector("#compensationPeriodForm"),
+  compensationReadinessChecklist: document.querySelector("#compensationReadinessChecklist"),
   cancelCompensationPeriodButton: document.querySelector("#cancelCompensationPeriodButton"),
   compensationPeriodFromInput: document.querySelector("#compensationPeriodFromInput"),
   compensationPeriodToInput: document.querySelector("#compensationPeriodToInput"),
@@ -1238,6 +1242,7 @@ const els = {
   confirmActionEyebrow: document.querySelector("#confirmActionEyebrow"),
   confirmActionTitle: document.querySelector("#confirmActionTitle"),
   confirmActionBody: document.querySelector("#confirmActionBody"),
+  confirmActionSummary: document.querySelector("#confirmActionSummary"),
   confirmActionSubjectLabel: document.querySelector("#confirmActionSubjectLabel"),
   confirmActionMentor: document.querySelector("#confirmActionMentor"),
   confirmActionActor: document.querySelector("#confirmActionActor"),
@@ -1274,11 +1279,16 @@ function showCaseFormError(message, field = null) {
   field?.focus({ preventScroll: true });
 }
 
-function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, subjectLabel = "Mentor", subjectValue = "", confirmLabel = "Bekräfta", alternativeLabel = "", resultOptions = [], danger = false }) {
+function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, subjectLabel = "Mentor", subjectValue = "", confirmLabel = "Bekräfta", alternativeLabel = "", resultOptions = [], summaryItems = [], danger = false }) {
   if (!confirmActionModal) return Promise.resolve({ confirmed: window.confirm(body), note: "" });
   els.confirmActionEyebrow.textContent = eyebrow;
   els.confirmActionTitle.textContent = title;
   els.confirmActionBody.textContent = body;
+  const summaryRows = summaryItems.filter((item) => item?.label && item?.value);
+  els.confirmActionSummary.hidden = summaryRows.length === 0;
+  els.confirmActionSummary.innerHTML = summaryRows.length
+    ? `<strong>Det här sparas</strong><ul>${summaryRows.map((item) => `<li><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong></li>`).join("")}</ul>`
+    : "";
   els.confirmActionSubjectLabel.textContent = subjectLabel;
   els.confirmActionMentor.textContent = subjectValue || mentorName || "Ej angivet";
   els.confirmActionActor.textContent = currentUserName();
@@ -3863,8 +3873,36 @@ function supportTicketStatusLabel(status) {
   return { new: "Nytt", in_progress: "Pågår", resolved: "Avslutat" }[status] || "Nytt";
 }
 
+const publicSupportRequestStatusLabels = { received: "Ny", intake_created: "I mottagning", closed: "Avslutad" };
+
+function renderPublicSupportRequestQueue() {
+  if (!els.publicSupportRequestTableBody) return;
+  const rows = publicSupportRequests.filter((request) => request.status !== "closed");
+  els.publicSupportRequestTableBody.replaceChildren();
+  if (!rows.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 6;
+    cell.className = "text-center text-secondary py-4";
+    cell.textContent = "Inga publika stödförfrågningar väntar på mottagning.";
+    row.append(cell);
+    els.publicSupportRequestTableBody.append(row);
+    return;
+  }
+  for (const request of rows) {
+    const row = document.createElement("tr");
+    const existingContact = incomingContacts.find((contact) => contact.publicSupportRequestId === request.id);
+    const action = existingContact
+      ? `<button type="button" class="btn btn-outline-primary btn-sm" data-open-incoming-contact="${escapeHtml(existingContact.id)}">Öppna mottagning</button>`
+      : `<button type="button" class="btn btn-primary btn-sm" data-create-intake-from-public-support="${escapeHtml(request.id)}">Ta emot</button>`;
+    row.innerHTML = `<td>${escapeHtml(formatDateTime(request.createdAt))}<div class="small text-secondary">${escapeHtml(request.reference)}</div></td><td><strong>${escapeHtml(request.name)}</strong><div class="small text-secondary">${escapeHtml(request.area || "Område ej angivet")}</div></td><td>${escapeHtml(request.contactMethod === "email" ? "E-post" : "Telefon")}<div class="small text-secondary">${escapeHtml(request.contact)}</div></td><td>${escapeHtml(supportAreaLabels(request.supportAreaIds).join(", ") || (request.supportAreaUncertain ? "Behöver preciseras" : "Ej valt"))}</td><td><span class="badge text-bg-light border">${escapeHtml(publicSupportRequestStatusLabels[request.status] || request.status)}</span></td><td class="text-end">${action}</td>`;
+    els.publicSupportRequestTableBody.append(row);
+  }
+}
+
 function renderSupportAdministration() {
   if (!els.supportTicketTableBody) return;
+  renderPublicSupportRequestQueue();
   const visible = supportTickets.filter((ticket) => supportTicketStatusFilter === "all" || ticket.status === supportTicketStatusFilter);
   els.supportTicketTableBody.replaceChildren();
   if (!visible.length) {
@@ -5025,15 +5063,53 @@ function showIncomingContactNextStep(contact) {
   els.incomingContactCreateCaseButton.hidden = !parent;
 }
 
+async function createIncomingContactFromPublicSupportRequest(request) {
+  const now = new Date().toISOString();
+  const contactId = crypto.randomUUID();
+  const contact = {
+    id: contactId,
+    tenantId: DEFAULT_TENANT_ID,
+    occurredAt: request.createdAt || now,
+    channel: request.contactMethod === "email" ? "email" : "phone",
+    contactDetails: request.contact,
+    parentName: request.name,
+    callerType: "self",
+    summary: request.description,
+    parentId: null,
+    caseId: null,
+    status: "registered",
+    receivedBy: CURRENT_USER_ID,
+    registeredBy: CURRENT_USER_ID,
+    publicSupportRequestId: request.id,
+    supportAreaIds: normalizeSupportAreaIds(request.supportAreaIds),
+    supportAreaUncertain: Boolean(request.supportAreaUncertain),
+    availability: request.availability || "",
+    createdAt: now,
+    createdBy: CURRENT_USER_ID,
+    updatedAt: now,
+    updatedBy: CURRENT_USER_ID
+  };
+  await atomicPut({
+    [INCOMING_CONTACTS_STORE]: [contact],
+    [PUBLIC_SUPPORT_REQUESTS_STORE]: [{ ...request, status: "intake_created", incomingContactId: contactId, updatedAt: now, updatedBy: CURRENT_USER_ID }]
+  });
+  markSaved();
+  await refresh();
+  openIncomingContact(contactId);
+  showFeedback("Stödförfrågan är flyttad till mottagningen.");
+}
+
 async function createSupportCaseFromIncomingContact(contact, parent) {
   const now = new Date().toISOString();
   const caseId = crypto.randomUUID();
   const caseType = caseTypeById("parent-support");
-  const supportCase = { id: caseId, tenantId: DEFAULT_TENANT_ID, number: await reserveCaseNumber(), caseTypeId: caseType.id, caseTypeVersion: caseType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: caseType.name, title: contact.summary.slice(0, 100), description: contact.summary, details: { supportPurpose: contact.summary, desiredOutcome: "Kompletteras i fortsatt kontakt", supportAreaIds: [], supportAreaStatus: "to_confirm", intakeContactId: contact.id }, mentorId: null, parentId: parent.id, supportCaseId: null, sourceMatchingCaseId: null, status: "new", priority: "normal", dueDate: null, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, closedAt: null, closedBy: null };
+  const supportAreaIds = normalizeSupportAreaIds(contact.supportAreaIds);
+  const supportCase = { id: caseId, tenantId: DEFAULT_TENANT_ID, number: await reserveCaseNumber(), caseTypeId: caseType.id, caseTypeVersion: caseType.version, organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: caseType.name, title: contact.summary.slice(0, 100), description: contact.summary, details: { supportPurpose: contact.summary, desiredOutcome: "Kompletteras i fortsatt kontakt", supportAreaIds, supportAreaStatus: supportAreaIds.length ? "confirmed" : "to_confirm", intakeContactId: contact.id }, mentorId: null, parentId: parent.id, supportCaseId: null, sourceMatchingCaseId: null, status: "new", priority: "normal", dueDate: null, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, closedAt: null, closedBy: null };
   const owner = { id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, handlerId: CURRENT_USER_ID, role: "responsible", version: 1, assignedAt: now, assignedBy: CURRENT_USER_ID, endedAt: null, endedBy: null };
   const activities = (caseType.suggestedActivities || []).map((title, sortOrder) => ({ id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1, title, status: "not_started", resultCode: null, resultClassification: null, handlerIdOverride: null, waitingForParty: null, dueDate: null, sortOrder, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, completedAt: null, completedBy: null }));
   const updatedContact = { ...contact, parentId: parent.id, caseId, status: "linked", updatedAt: now, updatedBy: CURRENT_USER_ID };
-  await atomicPut({ [CASES_STORE]: [supportCase], [CASE_ASSIGNMENTS_STORE]: [owner], [CASE_ACTIVITIES_STORE]: activities, [CASE_EVENTS_STORE]: [caseEventRecord({ caseId, eventType: "case_created", entityType: "case", entityId: caseId, message: "Stödärende skapades från en inkommande kontakt", idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now })], [INCOMING_CONTACTS_STORE]: [updatedContact] });
+  const publicRequest = publicSupportRequests.find((request) => request.id === contact.publicSupportRequestId);
+  await atomicPut({ [CASES_STORE]: [supportCase], [CASE_ASSIGNMENTS_STORE]: [owner], [CASE_ACTIVITIES_STORE]: activities, [CASE_EVENTS_STORE]: [caseEventRecord({ caseId, eventType: "case_created", entityType: "case", entityId: caseId, message: "Stödärende skapades från en inkommande kontakt", idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now })], [INCOMING_CONTACTS_STORE]: [updatedContact], ...(publicRequest ? { [PUBLIC_SUPPORT_REQUESTS_STORE]: [{ ...publicRequest, status: "closed", caseId, updatedAt: now, updatedBy: CURRENT_USER_ID }] } : {}) });
   await saveSupportMatchingProfile(supportCase);
   await refresh();
   bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
@@ -5809,12 +5885,67 @@ function renderCaseTypeDetails(caseRecord) {
     .join("");
 }
 
+const matchResponseLabels = { accepted: "Accepterar", declined: "Tackar nej", waiting: "Vill avvakta", "": "Inte registrerat" };
+
+function renderMatchingDecisionSummary(caseRecord) {
+  if (!els.matchingDecisionSummary) return;
+  if (caseRecord.caseTypeId !== "matching") {
+    els.matchingDecisionSummary.hidden = true;
+    els.matchingDecisionSummary.innerHTML = "";
+    return;
+  }
+  const supportCase = caseSupportCase(caseRecord);
+  const mentor = caseMentor(caseRecord);
+  const snapshot = matchingSnapshot(caseRecord.id);
+  const supportAreaIds = snapshot?.supportProfile?.supportAreas?.map((entry) => entry.supportAreaId)
+    || supportAreaIdsForCase(supportCase);
+  const mentorAreaIds = snapshot?.mentorProfile?.supportAreas?.map((entry) => entry.supportAreaId)
+    || normalizeSupportAreaIds(mentor?.supportAreas?.map((entry) => entry.areaId || entry.supportAreaId));
+  const overlapIds = snapshot?.overlapSupportAreaIds
+    || supportAreaOverlap(supportAreaIds, mentor?.supportAreas).map((area) => area.id);
+  const supportLanguages = snapshot?.supportProfile?.languages?.map((entry) => entry.label)
+    || normalizeLanguageEntries(supportCase?.details?.languages).map((entry) => entry.label);
+  const mentorLanguages = snapshot?.mentorProfile?.languages?.map((entry) => entry.label)
+    || normalizeLanguageEntries(mentor?.languages).map((entry) => entry.label);
+  const sharedLanguages = supportLanguages.filter((language) => mentorLanguages.some((mentorLanguage) => mentorLanguage.localeCompare(language, "sv", { sensitivity: "base" }) === 0));
+  const responseStatus = matchingOutcome(caseRecord.details?.parentResponse, caseRecord.details?.mentorResponse);
+  const decisionText = responseStatus === "accepted"
+    ? "Redo att skapa uppdrag när intern avstämning är klar."
+    : responseStatus === "declined"
+      ? "Matchningen kan avslutas utan uppdrag."
+      : "Invänta återstående svar innan beslut.";
+  els.matchingDecisionSummary.hidden = false;
+  els.matchingDecisionSummary.innerHTML = `
+    <div class="matching-decision-card">
+      <span class="record-type">Beslutsunderlag</span>
+      <strong>${escapeHtml(supportCase?.details?.supportPurpose || supportCase?.title || "Stödärende saknas")}</strong>
+      <small>${escapeHtml(supportCase?.details?.desiredOutcome || "Önskat resultat behöver kompletteras")}</small>
+    </div>
+    <div class="matching-decision-card">
+      <span class="record-type">Föreslagen mentor</span>
+      <strong>${escapeHtml(mentor?.name || "Mentor saknas")}</strong>
+      <small>${escapeHtml([mentor?.area, mentor?.availability].filter(Boolean).join(" · ") || "Område och tillgänglighet behöver kontrolleras")}</small>
+    </div>
+    <div class="matching-decision-card">
+      <span class="record-type">Överlappning</span>
+      <strong>${escapeHtml(overlapIds.length ? supportAreaLabels(overlapIds).join(", ") : "Ingen registrerad")}</strong>
+      <small>${escapeHtml(sharedLanguages.length ? `Gemensamt språk: ${sharedLanguages.join(", ")}` : "Språk behöver bedömas")}</small>
+    </div>
+    <div class="matching-decision-card matching-decision-card-primary">
+      <span class="record-type">Svar och beslut</span>
+      <strong>${escapeHtml(decisionText)}</strong>
+      <small>Förälder: ${escapeHtml(matchResponseLabels[caseRecord.details?.parentResponse || ""] || "Inte registrerat")} · Mentor: ${escapeHtml(matchResponseLabels[caseRecord.details?.mentorResponse || ""] || "Inte registrerat")}</small>
+    </div>
+  `;
+}
+
 function renderCaseTransitionPanel(caseRecord) {
   const isSupport = caseRecord.caseTypeId === "parent-support";
   const isMatching = caseRecord.caseTypeId === "matching";
   els.caseTransitionPanel.hidden = !isSupport && !isMatching;
   els.supportCaseTransitionActions.hidden = !isSupport || caseRecord.status === "closed";
   els.matchingOutcomeForm.hidden = !isMatching;
+  renderMatchingDecisionSummary(caseRecord);
   if (isSupport) {
     els.caseTransitionTitle.textContent = "Nästa steg för stödärendet";
     els.caseTransitionHelp.textContent = "Starta en separat matchning när stödbehovet är tillräckligt avgränsat. Stödärendet och dess historik ligger kvar.";
@@ -5880,6 +6011,30 @@ function effectiveCompensationStatus(period) {
   return compensationReadiness({ completedReportCount: evidence.reports.length, latestCheckIn: evidence.latestCheckIn });
 }
 
+function renderCompensationReadinessChecklist(caseRecord, records) {
+  if (!els.compensationReadinessChecklist) return;
+  const { reports, checkIns, periods } = records;
+  const latestPeriod = periods[0] || null;
+  const latestEvidence = latestPeriod ? compensationEvidence(latestPeriod) : null;
+  const plan = caseRecord.details?.assignmentPlan || {};
+  const safeCheckIn = latestEvidence?.latestCheckIn?.contactConfirmed === "yes" && latestEvidence.latestCheckIn.safety === "yes";
+  const checklist = [
+    { label: "Uppdragsplan fastställd", done: Boolean(plan.startDate && plan.endDate && plan.firstFollowUpDate), help: "Ange start, slutdatum och första avstämning." },
+    { label: "Genomförd mentorrapport finns", done: latestPeriod ? latestEvidence.reports.length > 0 : reports.some((report) => report.outcome === "completed"), help: "Spara minst en genomförd rapport i perioden." },
+    { label: "Föräldraavstämning finns", done: latestPeriod ? Boolean(latestEvidence.latestCheckIn) : checkIns.length > 0, help: "Stäm av kontakt och fortsatt läge med föräldern." },
+    { label: "Trygg kontakt bekräftad", done: safeCheckIn || (!latestPeriod && checkIns.some((checkIn) => checkIn.contactConfirmed === "yes" && checkIn.safety === "yes")), help: "Avstämningen ska bekräfta genomförd och trygg kontakt." },
+    { label: "Ersättningsperiod skapad", done: Boolean(latestPeriod), help: "Skapa perioden som ska granskas och beslutas." }
+  ];
+  const status = latestPeriod ? effectiveCompensationStatus(latestPeriod) : "awaiting_reports";
+  els.compensationReadinessChecklist.innerHTML = `
+    <div class="compensation-readiness-header">
+      <div><strong>Saknas för ersättning</strong><p class="small text-secondary mb-0">${latestPeriod ? `Senaste period: ${formatDate(latestPeriod.periodFrom)}-${formatDate(latestPeriod.periodTo)}` : "Ingen ersättningsperiod är skapad ännu."}</p></div>
+      <span class="badge text-bg-${["approved", "paid"].includes(status) ? "success" : status === "needs_completion" ? "warning" : "secondary"}">${escapeHtml(compensationStatusLabels[status] || "Ej påbörjad")}</span>
+    </div>
+    <ul>${checklist.map((item) => `<li class="${item.done ? "is-done" : "is-missing"}"><span aria-hidden="true">${item.done ? "✓" : "!"}</span><div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.done ? "Klart" : item.help)}</small></div></li>`).join("")}</ul>
+  `;
+}
+
 function formatMinutes(minutes) {
   const value = Number(minutes || 0);
   const hours = Math.floor(value / 60);
@@ -5899,6 +6054,7 @@ function renderAssignmentFollowup(caseRecord) {
 
   const { reports, checkIns, periods } = assignmentRecords(caseRecord.id);
   els.assignmentFollowupCount.textContent = reports.length + checkIns.length + periods.length;
+  renderCompensationReadinessChecklist(caseRecord, { reports, checkIns, periods });
   const plan = caseRecord.details?.assignmentPlan || {};
   const planKey = `${caseRecord.id}-${caseRecord.updatedAt}`;
   if (els.assignmentPlanForm.dataset.caseKey !== planKey) {
@@ -8757,6 +8913,17 @@ els.supportTicketTableBody.addEventListener("change", async (event) => {
   markSaved();
 });
 
+els.publicSupportRequestTableBody?.addEventListener("click", async (event) => {
+  const intakeButton = event.target.closest("[data-create-intake-from-public-support]");
+  if (intakeButton) {
+    const request = publicSupportRequests.find((item) => item.id === intakeButton.dataset.createIntakeFromPublicSupport);
+    if (request) await createIncomingContactFromPublicSupportRequest(request);
+    return;
+  }
+  const openButton = event.target.closest("[data-open-incoming-contact]");
+  if (openButton) openIncomingContact(openButton.dataset.openIncomingContact);
+});
+
 els.navHandlers.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/administration");
@@ -9010,6 +9177,22 @@ els.matchingOutcomeForm.addEventListener("submit", async (event) => {
       const confirmation = await confirmAction({ eyebrow: "Samtidiga uppdrag", title: "Skapa ytterligare ett aktivt uppdrag?", body: `${caseParent(matchingCase)?.name || "Föräldern"} har redan uppdraget ${overlap.number}. Kontrollera att stödärendena har olika syften och dokumentera hur kontakterna ska samordnas.`, mentorName: caseMentor(matchingCase)?.name || "Mentor", confirmLabel: "Skapa ytterligare uppdrag" });
       if (!confirmation.confirmed) return;
     }
+    const supportAreaIds = supportAreaIdsForCase(supportCase);
+    const confirmation = await confirmAction({
+      eyebrow: "Matchning till uppdrag",
+      title: "Skapa mentoruppdrag?",
+      body: "Matchningen stängs som godkänd och ett nytt mentoruppdrag skapas med koppling till stödärendet, föräldern och mentorn.",
+      subjectLabel: "Matchning",
+      subjectValue: matchingCase.number,
+      confirmLabel: "Skapa uppdrag",
+      summaryItems: [
+        { label: "Förälder", value: caseParent(matchingCase)?.name || "Saknas" },
+        { label: "Mentor", value: caseMentor(matchingCase)?.name || "Saknas" },
+        { label: "Stödärende", value: supportCase ? `${supportCase.number} · ${supportCase.details?.supportPurpose || supportCase.title}` : "Saknas" },
+        { label: "Stödområden", value: supportAreaLabels(supportAreaIds).join(", ") || "Behöver kompletteras" }
+      ]
+    });
+    if (!confirmation.confirmed) return;
   }
   let createdAssignmentId = null;
   const assignmentCaseNumber = createAssignment ? await reserveCaseNumber() : null;
@@ -10118,7 +10301,12 @@ async function registerQuickActivityResult(activityId) {
     subjectValue: activity.title,
     confirmLabel: "Avsluta aktivitet",
     alternativeLabel: "Komplettera uppgifter",
-    resultOptions
+    resultOptions,
+    summaryItems: [
+      { label: "Ärende", value: `${caseRecord.number} · ${caseRecord.title}` },
+      { label: "Status", value: "Aktiviteten avslutas och loggas" },
+      { label: "Underlag", value: workInput ? `${workInput.label}: ${workInput.stateLabel}` : "Ingen kopplad registrering krävs" }
+    ]
   });
   const resultCode = confirmation.resultCode;
   if (confirmation.action === "alternative") {

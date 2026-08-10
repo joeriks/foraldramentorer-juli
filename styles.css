@@ -3824,9 +3824,118 @@ body {
   gap: .5rem;
 }
 
+.matching-decision-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.matching-decision-card,
+.confirm-action-summary,
+.compensation-readiness {
+  border: 1px solid var(--bs-border-color);
+  background: var(--app-surface-muted);
+}
+
+.matching-decision-card {
+  padding: .8rem;
+}
+
+.matching-decision-card strong,
+.matching-decision-card small {
+  display: block;
+}
+
+.matching-decision-card small {
+  margin-top: .2rem;
+  color: var(--bs-secondary-color);
+}
+
+.matching-decision-card-primary {
+  border-color: rgba(var(--bs-primary-rgb), .35);
+  background: rgba(var(--bs-primary-rgb), .06);
+}
+
+.confirm-action-summary {
+  padding: .75rem .85rem;
+}
+
+.confirm-action-summary ul,
+.compensation-readiness ul {
+  display: grid;
+  gap: .45rem;
+  margin: .5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.confirm-action-summary li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.confirm-action-summary li span {
+  color: var(--bs-secondary-color);
+}
+
+.confirm-action-summary li strong {
+  text-align: right;
+}
+
+.compensation-readiness {
+  padding: .85rem;
+}
+
+.compensation-readiness-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.compensation-readiness li {
+  display: flex;
+  gap: .6rem;
+  align-items: flex-start;
+  padding-top: .45rem;
+  border-top: 1px solid var(--bs-border-color);
+}
+
+.compensation-readiness li > span {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: .05rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.compensation-readiness li.is-done > span {
+  color: var(--bs-success-text-emphasis);
+  background: var(--bs-success-bg-subtle);
+}
+
+.compensation-readiness li.is-missing > span {
+  color: var(--bs-warning-text-emphasis);
+  background: var(--bs-warning-bg-subtle);
+}
+
+.compensation-readiness li strong,
+.compensation-readiness li small {
+  display: block;
+}
+
+.compensation-readiness li small {
+  color: var(--bs-secondary-color);
+}
+
 @media (max-width: 767.98px) {
   .support-area-choice-list,
-  .support-area-facts {
+  .support-area-facts,
+  .matching-decision-summary {
     grid-template-columns: 1fr;
   }
 

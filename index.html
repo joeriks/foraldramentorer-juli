@@ -641,6 +641,7 @@
                     </aside>
                     <section id="caseTransitionPanel" class="record-section mb-4" hidden>
                       <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start mb-3"><div><h3 id="caseTransitionTitle" class="record-section-title mb-1"></h3><p id="caseTransitionHelp" class="small text-secondary mb-0"></p></div></div>
+                      <div id="matchingDecisionSummary" class="matching-decision-summary mb-3" hidden></div>
                       <form id="matchingOutcomeForm" hidden>
                         <div class="row g-3"><div class="col-12"><label class="form-label" for="matchingProposalInput">Matchningsmotivering</label><textarea id="matchingProposalInput" class="form-control form-control-sm" rows="3" placeholder="Beskriv varför mentorn bedöms passa stödbehovet och vilka begränsningar som behöver följas upp."></textarea><div class="form-text">Kan sparas innan parterna har lämnat sina svar.</div></div><div class="col-md-6"><label class="form-label" for="parentMatchResponseInput">Förälderns svar</label><select id="parentMatchResponseInput" class="form-select form-select-sm"><option value="">Inte registrerat</option><option value="accepted">Accepterar</option><option value="declined">Tackar nej</option><option value="waiting">Vill avvakta</option></select></div><div class="col-md-6"><label class="form-label" for="mentorMatchResponseInput">Mentorns svar</label><select id="mentorMatchResponseInput" class="form-select form-select-sm"><option value="">Inte registrerat</option><option value="accepted">Accepterar</option><option value="declined">Tackar nej</option><option value="waiting">Vill avvakta</option></select></div><div class="col-12"><label class="form-label" for="matchingOutcomeNoteInput">Kort notering om svar eller beslut</label><textarea id="matchingOutcomeNoteInput" class="form-control form-control-sm" rows="2"></textarea></div><div class="col-12"><div class="form-check form-switch"><input id="createAssignmentAfterMatchInput" class="form-check-input" type="checkbox" checked><label class="form-check-label" for="createAssignmentAfterMatchInput">Skapa mentoruppdrag när båda accepterar</label></div></div></div>
                         <div class="d-flex justify-content-end mt-3"><button id="matchingOutcomeSubmitButton" type="submit" class="btn btn-primary btn-sm">Spara parternas svar</button></div>
@@ -932,6 +933,7 @@
 
                     <section class="record-section">
                       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3"><div><h3 class="record-section-title mb-1">Ersättningsperioder</h3><p class="small text-secondary mb-0">Perioden sammanställer mentorrapporter men kräver föräldraavstämning och ett uttryckligt beslut av handläggaren.</p></div><button id="newCompensationPeriodButton" type="button" class="btn btn-primary btn-sm">Ny ersättningsperiod</button></div>
+                      <div id="compensationReadinessChecklist" class="compensation-readiness mb-3"></div>
                       <form id="compensationPeriodForm" class="inline-editor border rounded mb-3" hidden><div class="row g-3"><div class="col-md-4"><label class="form-label" for="compensationPeriodFromInput">Från och med</label><input id="compensationPeriodFromInput" class="form-control form-control-sm" type="date" required></div><div class="col-md-4"><label class="form-label" for="compensationPeriodToInput">Till och med</label><input id="compensationPeriodToInput" class="form-control form-control-sm" type="date" required></div><div class="col-md-4 d-flex align-items-end"><div class="small text-secondary">Rapporter och avstämningar inom perioden sammanställs automatiskt.</div></div></div><div class="d-flex justify-content-end gap-2 mt-3"><button id="cancelCompensationPeriodButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button><button type="submit" class="btn btn-primary btn-sm">Skapa period</button></div></form>
                       <div id="compensationPeriodsEmpty" class="empty-list border rounded text-secondary">Inga ersättningsperioder har skapats.</div>
                       <div id="compensationPeriodsTableWrap" class="table-responsive border rounded" hidden><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Period</th><th>Mentorrapporter</th><th>Tid</th><th>Föräldraavstämning</th><th>Status</th><th><span class="visually-hidden">Åtgärd</span></th></tr></thead><tbody id="compensationPeriodsTableBody"></tbody></table></div>
@@ -1354,6 +1356,20 @@
                     <option value="resolved">Avslutade</option>
                   </select>
                 </label>
+              </div>
+              <div class="card-body border-bottom">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                  <div>
+                    <h3 class="h6 mb-1">Publika stödförfrågningar</h3>
+                    <p class="text-secondary mb-0">Förfrågningar från föräldravyn som behöver tas emot innan de blir förälderpost och stödärende.</p>
+                  </div>
+                </div>
+                <div class="table-responsive border rounded">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light"><tr><th>Registrerad</th><th>Förälder</th><th>Kontakt</th><th>Stödområden</th><th>Status</th><th class="text-end">Åtgärd</th></tr></thead>
+                    <tbody id="publicSupportRequestTableBody"></tbody>
+                  </table>
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
@@ -1991,6 +2007,7 @@
           </div>
           <div class="modal-body">
             <p id="confirmActionBody" class="mb-3"></p>
+            <div id="confirmActionSummary" class="confirm-action-summary mb-3" hidden></div>
             <dl class="confirm-action-facts mb-0">
               <div><dt id="confirmActionSubjectLabel">Mentor</dt><dd id="confirmActionMentor"></dd></div>
               <div><dt>Registreras av</dt><dd id="confirmActionActor"></dd></div>
