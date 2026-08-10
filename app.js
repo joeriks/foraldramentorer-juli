@@ -5768,6 +5768,13 @@ function caseListRoute(typeFilter = caseTypeFilter, statusFilter = caseStatusFil
   return statusFilter ? `${base}?status=${encodeURIComponent(statusFilter)}` : base;
 }
 
+function newCaseButtonLabel(caseTypeId) {
+  if (!caseTypeId) return "Ny registrering";
+  const name = caseTypeRelationshipName(caseTypeId);
+  const article = ["mentor-assignment", "parent-support", "mentor-certification", "other"].includes(caseTypeId) ? "Nytt" : "Ny";
+  return `${article} ${name.charAt(0).toLowerCase()}${name.slice(1)}`;
+}
+
 function syncCaseTypeFilterOptions() {
   const options = ['<option value="">Alla ärendetyper</option>']
     .concat(caseTypeDefinitions.map((definition) => `<option value="${escapeHtml(definition.id)}">${escapeHtml(definition.name)}</option>`));
@@ -5782,7 +5789,7 @@ function renderCases() {
   const start = (casePage - 1) * CASE_PAGE_SIZE;
   const rows = filteredRows.slice(start, start + CASE_PAGE_SIZE);
   els.caseRegisterTitle.textContent = caseTypeFilter ? caseTypeRelationshipName(caseTypeFilter) : "Ärenderegister";
-  els.newGeneralCaseButton.textContent = caseTypeFilter === "matching" ? "Ny matchning" : caseTypeFilter === "mentor-assignment" ? "Nytt uppdrag" : "Ny registrering";
+  els.newGeneralCaseButton.textContent = newCaseButtonLabel(caseTypeFilter);
   els.newGeneralCaseButton.hidden = ["matching", "mentor-assignment"].includes(caseTypeFilter);
   syncCaseTypeFilterOptions();
   if (els.caseTypeFilter.value !== caseTypeFilter) els.caseTypeFilter.value = caseTypeFilter;
