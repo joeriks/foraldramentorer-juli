@@ -18,6 +18,7 @@ test("serves the application shell", async () => {
   assert.match(html, /FöräldraMentorer/);
   assert.match(html, /id="dashboardView"/);
   assert.match(html, /id="caseFlowBoard"/);
+  assert.match(html, /id="caseTypeFilter"/);
   assert.match(html, /<option value="open">Öppna<\/option>/);
   assert.match(html, /id="decisionQueueButton"/);
   assert.match(html, /id="caseClosureSummary"/);

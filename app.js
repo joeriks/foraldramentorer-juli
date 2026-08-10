@@ -841,6 +841,7 @@ const els = {
   caseListCount: document.querySelector("#caseListCount"),
   caseRegisterTitle: document.querySelector("#caseRegisterTitle"),
   caseSearchInput: document.querySelector("#caseSearchInput"),
+  caseTypeFilter: document.querySelector("#caseTypeFilter"),
   caseStatusFilter: document.querySelector("#caseStatusFilter"),
   caseTableBody: document.querySelector("#caseTableBody"),
   casePageSummary: document.querySelector("#casePageSummary"),
@@ -5762,6 +5763,17 @@ function filteredCases() {
   });
 }
 
+function caseListRoute(typeFilter = caseTypeFilter, statusFilter = caseStatusFilter) {
+  const base = typeFilter ? `#/cases/${encodeURIComponent(typeFilter)}` : "#/cases";
+  return statusFilter ? `${base}?status=${encodeURIComponent(statusFilter)}` : base;
+}
+
+function syncCaseTypeFilterOptions() {
+  const options = ['<option value="">Alla ärendetyper</option>']
+    .concat(caseTypeDefinitions.map((definition) => `<option value="${escapeHtml(definition.id)}">${escapeHtml(definition.name)}</option>`));
+  els.caseTypeFilter.innerHTML = options.join("");
+}
+
 function renderCases() {
   const filteredRows = filteredCases();
   const typeRows = caseTypeFilter ? cases.filter((caseRecord) => caseRecord.caseTypeId === caseTypeFilter) : cases;
@@ -5772,6 +5784,8 @@ function renderCases() {
   els.caseRegisterTitle.textContent = caseTypeFilter ? caseTypeRelationshipName(caseTypeFilter) : "Ärenderegister";
   els.newGeneralCaseButton.textContent = caseTypeFilter === "matching" ? "Ny matchning" : caseTypeFilter === "mentor-assignment" ? "Nytt uppdrag" : "Ny registrering";
   els.newGeneralCaseButton.hidden = ["matching", "mentor-assignment"].includes(caseTypeFilter);
+  syncCaseTypeFilterOptions();
+  if (els.caseTypeFilter.value !== caseTypeFilter) els.caseTypeFilter.value = caseTypeFilter;
   if (els.caseStatusFilter.value !== caseStatusFilter) els.caseStatusFilter.value = caseStatusFilter;
   els.caseListCount.textContent = filteredRows.length === typeRows.length
     ? `${typeRows.length} ${typeRows.length === 1 ? "ärende" : "ärenden"} i registret.`
@@ -9111,10 +9125,16 @@ els.caseSearchInput.addEventListener("input", () => {
   renderCases();
 });
 
+els.caseTypeFilter.addEventListener("change", () => {
+  caseTypeFilter = els.caseTypeFilter.value;
+  casePage = 1;
+  navigateTo(caseListRoute());
+});
+
 els.caseStatusFilter.addEventListener("change", () => {
   caseStatusFilter = els.caseStatusFilter.value;
   casePage = 1;
-  renderCases();
+  navigateTo(caseListRoute());
 });
 
 els.parentSearchInput.addEventListener("input", () => {
@@ -10878,7 +10898,7 @@ els.caseFlowBoard?.addEventListener("click", (event) => {
   casePage = 1;
   els.caseStatusFilter.value = "open";
   els.caseSearchInput.value = "";
-  navigateTo(`#/cases/${encodeURIComponent(caseTypeFilter)}?status=open`);
+  navigateTo(caseListRoute());
 });
 
 els.actionTableBody.addEventListener("click", (event) => {
