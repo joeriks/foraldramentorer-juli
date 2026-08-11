@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260809-incoming-contact-v1">
+    <link rel="stylesheet" href="styles.css?v=20260811-versions-v1">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -45,6 +45,7 @@
               <a id="navSupportAdmin" class="nav-link" href="#/support-admin">Supportärenden</a>
               <a id="navPresentation" class="nav-link" href="#/presentation">Demoläge</a>
               <a id="navRoutines" class="nav-link" href="#/routines">Rutiner</a>
+              <a id="navVersions" class="nav-link" href="#/versions">Versioner</a>
             </div>
           </div>
         </nav>
@@ -83,6 +84,7 @@
                   <li><a class="dropdown-item" href="#/support-admin">Supportärenden</a></li>
                   <li><a class="dropdown-item" href="#/presentation">Demoläge</a></li>
                   <li><a class="dropdown-item" href="#/routines">Rutiner</a></li>
+                  <li><a class="dropdown-item" href="#/versions">Versioner</a></li>
                 </ul>
               </div>
               <div>
@@ -224,6 +226,19 @@
                   <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Redo för intervju"><div class="pipeline-name fw-semibold">Redo för intervju</div><div class="pipeline-count"><strong data-pipeline-count="Redo för intervju">0</strong><span>personer</span></div><div class="pipeline-description">Intervju eller beslut återstår</div><div class="pipeline-action">Visa mentorer</div></button>
                   <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Godkänd"><div class="pipeline-name fw-semibold">Godkänd</div><div class="pipeline-count"><strong data-pipeline-count="Godkänd">0</strong><span>personer</span></div><div class="pipeline-description">Tillgänglig för matchning</div><div class="pipeline-action">Visa mentorer</div></button>
                 </div>
+              </div>
+            </section>
+          </section>
+
+          <section id="versionsView" class="view-stack" hidden>
+            <section class="card">
+              <div class="card-header bg-white">
+                <div class="record-type">Systeminformation</div>
+                <h2 class="h5 mb-1">Versioner</h2>
+                <p class="text-secondary mb-0">Kort historik över publicerade ändringar i kommunportalen.</p>
+              </div>
+              <div class="card-body">
+                <div id="versionHistoryList" class="version-history-list" aria-label="Versionshistorik"></div>
               </div>
             </section>
           </section>
@@ -2012,6 +2027,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260809-incoming-contact-v1"></script>
+    <script type="module" src="app.js?v=20260811-versions-v1"></script>
   </body>
 </html>

@@ -20,8 +20,11 @@ test("serves the application shell", async () => {
   assert.match(html, /id="caseFlowBoard"/);
   assert.match(html, /id="navIncomingContact"/);
   assert.match(html, /id="navIntake"/);
+  assert.match(html, /id="navVersions"/);
   assert.match(html, /id="mobileIncomingContact"/);
   assert.match(html, /Kontaktmottagning/);
+  assert.match(html, /id="versionsView"/);
+  assert.match(html, /id="versionHistoryList"/);
   assert.match(html, /Berörd person/);
   assert.match(html, /id="incomingContactNextStepInput"/);
   assert.match(html, /Nästa steg efter kontakten/);
@@ -95,6 +98,9 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /function renderCaseClosureSummary/);
   assert.match(scriptText, /function newCaseButtonLabel/);
   assert.match(scriptText, /function createIncomingContactCase/);
+  assert.match(scriptText, /APP_VERSION_HISTORY/);
+  assert.match(scriptText, /function renderVersions/);
+  assert.match(scriptText, /Inkommande kontakt med fri nästa-steg-text/);
   assert.match(scriptText, /incoming-contact/);
   assert.match(scriptText, /"mentor-assignment", "parent-support", "mentor-certification", "other"/);
   assert.doesNotMatch(scriptText, /CASE_FLOW_STEPS/);

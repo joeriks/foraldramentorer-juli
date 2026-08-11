@@ -1165,6 +1165,46 @@ body {
   margin-top: 0.35rem;
 }
 
+.version-history-list {
+  display: grid;
+  gap: var(--app-space-3);
+}
+
+.version-history-item {
+  display: grid;
+  grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr);
+  gap: var(--app-space-3);
+  padding: var(--app-space-3);
+  border: 1px solid var(--app-border);
+  border-radius: var(--bs-border-radius);
+  background: #fff;
+}
+
+.version-history-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  color: var(--app-text-muted);
+  font-size: 0.875rem;
+}
+
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--bs-border-radius);
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.version-history-content li + li {
+  margin-top: 0.3rem;
+}
+
 .presentation-comment-form {
   padding: var(--app-space-3);
   background: var(--app-surface-muted);
@@ -3568,6 +3608,10 @@ body {
   .pipeline-grid,
   .case-flow-standalone {
     grid-template-columns: 1fr;
+  }
+
+  .version-history-item {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .case-flow-track {

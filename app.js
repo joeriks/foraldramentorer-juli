@@ -117,6 +117,37 @@ let CURRENT_USER_ID = "handler-sara";
 const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
+const APP_VERSION_HISTORY = [
+  {
+    version: "66",
+    date: "2026-08-11",
+    title: "Inkommande kontakt med fri nästa-steg-text",
+    changes: [
+      "Mottagningspanelen fokuserar på kontaktanteckning och nästa steg efter samtalet.",
+      "Personpostkoppling togs bort från mottagningspanelen.",
+      "Efter sparning kan handläggaren öppna mottagningsärendet direkt."
+    ]
+  },
+  {
+    version: "65",
+    date: "2026-08-10",
+    title: "Inkommande kontakt som ärende",
+    changes: [
+      "Kontaktmottagning öppnar ärenderegistret filtrerat på mottagningsärenden.",
+      "Sparad kontakt skapar ett mottagningsärende.",
+      "Mottagningsärenden får egen ärendetyp och kan följas i ärendeflödet."
+    ]
+  },
+  {
+    version: "64",
+    date: "2026-08-10",
+    title: "Tydligare ny-knapp i ärenderegistret",
+    changes: [
+      "Knappen följer vald ärendetyp, till exempel Ny behovsanalys eller Ny rekryteringsinsats.",
+      "Ändringen gäller när ärenderegistret öppnas filtrerat från dashboard eller navigation."
+    ]
+  }
+];
 
 const ORGANIZATION_UNIT_LABELS = {
   foraldramentorer: "FöräldraMentorer",
@@ -652,7 +683,9 @@ const els = {
   navLearningAdmin: document.querySelector("#navLearningAdmin"),
   navSupportAdmin: document.querySelector("#navSupportAdmin"),
   navRoutines: document.querySelector("#navRoutines"),
+  navVersions: document.querySelector("#navVersions"),
   dashboardView: document.querySelector("#dashboardView"),
+  versionsView: document.querySelector("#versionsView"),
   presentationView: document.querySelector("#presentationView"),
   casesView: document.querySelector("#casesView"),
   caseDetailView: document.querySelector("#caseDetailView"),
@@ -762,6 +795,7 @@ const els = {
   routinesToc: document.querySelector("#routinesToc"),
   routinesContent: document.querySelector("#routinesContent"),
   copyRoutinesLinkButton: document.querySelector("#copyRoutinesLinkButton"),
+  versionHistoryList: document.querySelector("#versionHistoryList"),
   handlerDetailView: document.querySelector("#handlerDetailView"),
   caseTypeAdminTableBody: document.querySelector("#caseTypeAdminTableBody"),
   caseTypeRelationshipMap: document.querySelector("#caseTypeRelationshipMap"),
@@ -3986,6 +4020,21 @@ function renderCaseNumberingAdministration() {
   updateCaseNumberingPreview();
 }
 
+function renderVersions() {
+  els.versionHistoryList.innerHTML = APP_VERSION_HISTORY.map((item) => `
+    <article class="version-history-item">
+      <div class="version-history-meta">
+        <span class="version-badge">v${escapeHtml(item.version)}</span>
+        <time datetime="${escapeHtml(item.date)}">${escapeHtml(formatDate(item.date))}</time>
+      </div>
+      <div class="version-history-content">
+        <h3 class="h6 mb-2">${escapeHtml(item.title)}</h3>
+        <ul class="mb-0">${item.changes.map((change) => `<li>${escapeHtml(change)}</li>`).join("")}</ul>
+      </div>
+    </article>
+  `).join("");
+}
+
 function renderAll() {
   const renderStartedAt = Date.now();
   applyRoute();
@@ -3993,6 +4042,7 @@ function renderAll() {
   renderSummary();
   const viewRenderer = {
     dashboard: () => { renderPipeline(); renderDashboard(); },
+    versions: renderVersions,
     presentation: renderPresentation,
     cases: renderCases,
     case: renderCaseDetail,
@@ -4717,7 +4767,7 @@ function applyRoute() {
   const routeCaseId = nestedCaseRoute?.[1] || route.id;
   const routeMentorId = nestedMentorRoute?.[1] || route.id;
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
   selectedId = currentView === "mentor" ? routeMentorId : selectedId;
   mentorRouteIntent = currentView === "mentor" ? nestedMentorRoute?.[2] || "" : "";
   mentorRouteCaseId = currentView === "mentor" ? nestedMentorRoute?.[3] || "" : "";
@@ -4753,6 +4803,7 @@ function applyRoute() {
   }
 
   els.dashboardView.hidden = currentView !== "dashboard";
+  els.versionsView.hidden = currentView !== "versions";
   els.presentationView.hidden = currentView !== "presentation";
   els.casesView.hidden = currentView !== "cases";
   els.caseDetailView.hidden = currentView !== "case";
@@ -4805,7 +4856,7 @@ function applyRoute() {
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
   els.navParents.classList.toggle("active", currentView === "parents" || currentView === "parent");
   els.navLearning.classList.toggle("active", currentView === "learning");
-  els.navAdministration.classList.toggle("active", ["administration", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "presentation", "routines", "handler"].includes(currentView));
+  els.navAdministration.classList.toggle("active", ["administration", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "presentation", "routines", "versions", "handler"].includes(currentView));
   els.navHandlers.classList.toggle("active", currentView === "administration" || currentView === "handler");
   els.navCaseNumbering.classList.toggle("active", currentView === "case-numbering");
   els.navCaseTypes.classList.toggle("active", ["case-types", "activity-types"].includes(currentView));
@@ -4813,6 +4864,7 @@ function applyRoute() {
   els.navLearningAdmin.classList.toggle("active", currentView === "learning-admin");
   els.navSupportAdmin.classList.toggle("active", currentView === "support-admin");
   els.navRoutines.classList.toggle("active", currentView === "routines");
+  els.navVersions.classList.toggle("active", currentView === "versions");
   els.navMentorHome.classList.toggle("active", currentView === "mentor-home");
   els.navMentorAssignments.classList.toggle("active", ["mentor-assignments", "mentor-assignment"].includes(currentView));
   els.navMentorLearning.classList.toggle("active", currentView === "learning");
@@ -4824,6 +4876,9 @@ function applyRoute() {
   if (currentView === "dashboard") {
     els.pageTitle.textContent = "Dashboard";
     els.breadcrumb.textContent = "Start / Dashboard";
+  } else if (currentView === "versions") {
+    els.pageTitle.textContent = "Versioner";
+    els.breadcrumb.textContent = "Start / Systemadministration / Versioner";
   } else if (currentView === "presentation") {
     els.pageTitle.textContent = "Demoläge";
     els.breadcrumb.textContent = "Start / Systemadministration / Demoläge";
@@ -9119,6 +9174,11 @@ els.navHandlers.addEventListener("click", (event) => {
 els.navRoutines.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/routines");
+});
+
+els.navVersions.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/versions");
 });
 
 els.copyRoutinesLinkButton.addEventListener("click", async () => {
