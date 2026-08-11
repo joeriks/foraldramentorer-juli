@@ -1811,24 +1811,21 @@
           <form id="incomingContactForm">
             <div class="row g-3">
               <div class="col-12"><label class="form-label" for="incomingContactChannelInput">Kontaktväg</label><select id="incomingContactChannelInput" class="form-select" required><option value="phone">Telefon</option><option value="email">E-post</option><option value="visit">Besök</option><option value="other">Annan</option></select></div>
-              <div class="col-12"><label class="form-label" for="incomingContactDetailsInput">Kontaktuppgift</label><input id="incomingContactDetailsInput" class="form-control" autocomplete="off" required placeholder="Telefonnummer eller e-postadress"><div class="form-text">Befintliga personposter söks fram automatiskt när kontaktuppgifter eller namn matchar.</div></div>
+              <div class="col-12"><label class="form-label" for="incomingContactDetailsInput">Kontaktuppgift</label><input id="incomingContactDetailsInput" class="form-control" autocomplete="off" required placeholder="Telefonnummer eller e-postadress"><div class="form-text">Skriv hur personen eller verksamheten kan nås igen.</div></div>
               <div class="col-12"><label class="form-label" for="incomingContactParentNameInput">Berörd person <span class="text-secondary fw-normal">(om känd)</span></label><input id="incomingContactParentNameInput" class="form-control" autocomplete="off" placeholder="Namn på den person kontakten gäller"></div>
               <div class="col-12"><label class="form-label" for="incomingContactCallerTypeInput">Vem kontaktar kommunen?</label><select id="incomingContactCallerTypeInput" class="form-select" required><option value="self">Personen själv</option><option value="relative">Närstående</option><option value="school">Skola</option><option value="healthcare">Hälso- och sjukvård</option><option value="social_services">Socialtjänst</option><option value="other">Annan</option></select></div>
               <div class="col-12"><label class="form-label" for="incomingContactSummaryInput">Kort anteckning</label><textarea id="incomingContactSummaryInput" class="form-control" rows="5" required placeholder="Vad gäller kontakten och hur kan personen nås?"></textarea></div>
+              <div class="col-12"><label class="form-label" for="incomingContactNextStepInput">Nästa steg efter kontakten</label><textarea id="incomingContactNextStepInput" class="form-control" rows="3" required placeholder="Skriv i ord vad som ska göras när samtalet eller mejlet är hanterat."></textarea></div>
             </div>
-            <section class="incoming-contact-match mt-3" aria-labelledby="incomingContactMatchTitle"><h3 id="incomingContactMatchTitle" class="h6">Möjlig befintlig personpost</h3><div id="incomingContactParentMatches" class="list-group"></div></section>
             <div class="d-flex justify-content-end gap-2 mt-4"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">Avbryt</button><button type="submit" class="btn btn-primary">Spara kontakten</button></div>
           </form>
         </div>
         <div id="incomingContactNextStep" hidden>
           <div class="alert alert-success"><strong>Kontakten är sparad.</strong><div id="incomingContactSavedSummary" class="small mt-1"></div></div>
           <h3 class="h6">Vad ska hända nu?</h3>
-          <p class="text-secondary small">Välj ett nästa steg. Kontakten finns kvar i mottagningslistan tills den är färdighanterad.</p>
+          <p class="text-secondary small">Nästa steg finns sparat i mottagningsärendet. Öppna ärendet om du vill tilldela, komplettera eller avsluta det.</p>
           <div class="d-grid gap-2">
-            <button id="incomingContactCreateParentButton" type="button" class="btn btn-primary text-start">Skapa preliminär förälder och stödärende</button>
-            <button id="incomingContactCreateCaseButton" type="button" class="btn btn-outline-primary text-start">Skapa stödärende för vald förälder</button>
-            <button id="incomingContactFollowUpButton" type="button" class="btn btn-outline-secondary text-start">Markera för uppföljning</button>
-            <button id="incomingContactCloseButton" type="button" class="btn btn-outline-secondary text-start">Avsluta utan ärende</button>
+            <button id="incomingContactOpenCaseButton" type="button" class="btn btn-primary text-start">Öppna mottagningsärendet</button>
           </div>
           <button id="incomingContactDoneButton" type="button" class="btn btn-link px-0 mt-3">Stäng och hantera senare</button>
         </div>

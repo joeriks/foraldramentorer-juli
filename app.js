@@ -726,12 +726,9 @@ const els = {
   incomingContactParentNameInput: document.querySelector("#incomingContactParentNameInput"),
   incomingContactCallerTypeInput: document.querySelector("#incomingContactCallerTypeInput"),
   incomingContactSummaryInput: document.querySelector("#incomingContactSummaryInput"),
-  incomingContactParentMatches: document.querySelector("#incomingContactParentMatches"),
+  incomingContactNextStepInput: document.querySelector("#incomingContactNextStepInput"),
   incomingContactSavedSummary: document.querySelector("#incomingContactSavedSummary"),
-  incomingContactCreateParentButton: document.querySelector("#incomingContactCreateParentButton"),
-  incomingContactCreateCaseButton: document.querySelector("#incomingContactCreateCaseButton"),
-  incomingContactFollowUpButton: document.querySelector("#incomingContactFollowUpButton"),
-  incomingContactCloseButton: document.querySelector("#incomingContactCloseButton"),
+  incomingContactOpenCaseButton: document.querySelector("#incomingContactOpenCaseButton"),
   incomingContactDoneButton: document.querySelector("#incomingContactDoneButton"),
   administrationView: document.querySelector("#administrationView"),
   caseNumberingAdministrationView: document.querySelector("#caseNumberingAdministrationView"),
@@ -5033,17 +5030,6 @@ function renderIncomingContactTable() {
   }).join("");
 }
 
-function renderIncomingContactMatches() {
-  const term = `${els.incomingContactParentNameInput.value} ${els.incomingContactDetailsInput.value}`.trim().toLocaleLowerCase("sv-SE");
-  const matches = term.length < 2 ? [] : parents.filter((parent) => `${parent.name} ${parent.contactDetails}`.toLocaleLowerCase("sv-SE").includes(term) || term.split(/\s+/).some((part) => part.length > 2 && `${parent.name} ${parent.contactDetails}`.toLocaleLowerCase("sv-SE").includes(part))).slice(0, 5);
-  if (!matches.length) {
-    incomingContactParentId = null;
-    els.incomingContactParentMatches.innerHTML = '<div class="small text-secondary border rounded p-2">Ingen tydlig träff. Kontakten kan sparas fristående och kopplas senare.</div>';
-    return;
-  }
-  els.incomingContactParentMatches.innerHTML = matches.map((parent) => `<label class="list-group-item d-flex gap-2 align-items-start"><input class="form-check-input mt-1" type="radio" name="incomingContactParent" value="${escapeHtml(parent.id)}" ${parent.id === incomingContactParentId ? "checked" : ""}><span><strong>${escapeHtml(parent.name)}</strong><small class="d-block text-secondary">${escapeHtml(parent.contactDetails)}</small></span></label>`).join("");
-}
-
 function openIncomingContact(contactId = null, parentId = null) {
   const existing = incomingContactById(contactId);
   activeIncomingContactId = existing?.id || null;
@@ -5055,11 +5041,11 @@ function openIncomingContact(contactId = null, parentId = null) {
   els.incomingContactParentNameInput.value = existing?.parentName || parents.find((parent) => parent.id === parentId)?.name || "";
   els.incomingContactCallerTypeInput.value = existing?.callerType || "self";
   els.incomingContactSummaryInput.value = existing?.summary || "";
+  els.incomingContactNextStepInput.value = existing?.nextStep || "";
   els.incomingContactOccurredAt.textContent = formatDateTime(incomingContactStartedAt);
   els.incomingContactReceivedBy.textContent = currentUserName();
   els.incomingContactCaptureStep.hidden = false;
   els.incomingContactNextStep.hidden = true;
-  renderIncomingContactMatches();
   bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).show();
   setTimeout(() => els.incomingContactDetailsInput.focus(), 150);
 }
@@ -5069,10 +5055,9 @@ function showIncomingContactNextStep(contact) {
   incomingContactParentId = contact.parentId || null;
   els.incomingContactCaptureStep.hidden = true;
   els.incomingContactNextStep.hidden = false;
-  const parent = parents.find((item) => item.id === contact.parentId);
-  els.incomingContactSavedSummary.textContent = parent ? `Kopplad till ${parent.name}.` : "Ännu inte kopplad till en personpost eller ett ärende.";
-  els.incomingContactCreateParentButton.hidden = Boolean(parent);
-  els.incomingContactCreateCaseButton.hidden = !parent;
+  els.incomingContactSavedSummary.textContent = contact.intakeCaseId
+    ? "Ett mottagningsärende har skapats med anteckning och nästa steg."
+    : "Kontakten är sparad.";
 }
 
 async function createIncomingContactCase(contact, now = new Date().toISOString()) {
@@ -5081,6 +5066,7 @@ async function createIncomingContactCase(contact, now = new Date().toISOString()
   const caseId = crypto.randomUUID();
   const titlePrefix = incomingContactChannelLabels[contact.channel] || "Kontakt";
   const title = `${titlePrefix}: ${contact.parentName || contact.contactDetails}`.slice(0, 100);
+  const description = [contact.summary, contact.nextStep ? `Nästa steg: ${contact.nextStep}` : ""].filter(Boolean).join("\n\n");
   const caseRecord = {
     id: caseId,
     tenantId: DEFAULT_TENANT_ID,
@@ -5090,12 +5076,13 @@ async function createIncomingContactCase(contact, now = new Date().toISOString()
     organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID,
     type: caseType.name,
     title,
-    description: contact.summary,
+    description,
     details: {
       contactChannel: contact.channel,
       contactDetails: contact.contactDetails,
       callerType: contact.callerType,
-      affectedPerson: contact.parentName
+      affectedPerson: contact.parentName,
+      nextStep: contact.nextStep
     },
     mentorId: null,
     parentId: contact.parentId || null,
@@ -5139,6 +5126,27 @@ async function updateIncomingContactHandling(contact, status, { closeCase = fals
     events.push(caseEventRecord({ caseId: intakeCase.id, eventType: closeCase ? "case_closed" : "case_updated", entityType: "case", entityId: intakeCase.id, message: feedback || "Kontakten markerades för uppföljning", idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now }));
   }
   await atomicPut({ [INCOMING_CONTACTS_STORE]: [updatedContact], ...(caseUpdates.length ? { [CASES_STORE]: caseUpdates, [CASE_EVENTS_STORE]: events } : {}) });
+}
+
+function incomingContactCasePatch(contact, now) {
+  const intakeCase = cases.find((item) => item.id === contact.intakeCaseId);
+  if (!intakeCase) return null;
+  const description = [contact.summary, contact.nextStep ? `Nästa steg: ${contact.nextStep}` : ""].filter(Boolean).join("\n\n");
+  return {
+    ...intakeCase,
+    title: `${incomingContactChannelLabels[contact.channel] || "Kontakt"}: ${contact.parentName || contact.contactDetails}`.slice(0, 100),
+    description,
+    details: {
+      ...(intakeCase.details || {}),
+      contactChannel: contact.channel,
+      contactDetails: contact.contactDetails,
+      callerType: contact.callerType,
+      affectedPerson: contact.parentName,
+      nextStep: contact.nextStep
+    },
+    updatedAt: now,
+    updatedBy: CURRENT_USER_ID
+  };
 }
 
 async function createIncomingContactFromPublicSupportRequest(request) {
@@ -9154,10 +9162,6 @@ els.incomingContactTableBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-incoming-contact]");
   if (button) openIncomingContact(button.dataset.openIncomingContact);
 });
-[els.incomingContactDetailsInput, els.incomingContactParentNameInput].forEach((input) => input.addEventListener("input", renderIncomingContactMatches));
-els.incomingContactParentMatches.addEventListener("change", (event) => {
-  if (event.target.name === "incomingContactParent") incomingContactParentId = event.target.value;
-});
 els.incomingContactForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const existing = incomingContactById(activeIncomingContactId);
@@ -9172,42 +9176,20 @@ els.incomingContactForm.addEventListener("submit", async (event) => {
     receivedBy: existing?.receivedBy || CURRENT_USER_ID, registeredBy: existing?.registeredBy || CURRENT_USER_ID,
     createdAt: existing?.createdAt || now, createdBy: existing?.createdBy || CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID
   };
-  const intakeCase = contact.intakeCaseId ? { contact, records: {} } : await createIncomingContactCase(contact, now);
+  contact.nextStep = els.incomingContactNextStepInput.value.trim();
+  contact.parentId = existing?.parentId || incomingContactParentId || null;
+  const existingIntakeCase = contact.intakeCaseId ? incomingContactCasePatch(contact, now) : null;
+  const intakeCase = contact.intakeCaseId ? { contact, records: existingIntakeCase ? { [CASES_STORE]: [existingIntakeCase] } : {} } : await createIncomingContactCase(contact, now);
   contact = intakeCase.contact;
   await atomicPut({ [INCOMING_CONTACTS_STORE]: [contact], ...intakeCase.records });
   await refresh();
   showIncomingContactNextStep(incomingContactById(contact.id));
   showFeedback("Den inkommande kontakten har sparats.");
 });
-els.incomingContactCreateParentButton.addEventListener("click", async () => {
+els.incomingContactOpenCaseButton.addEventListener("click", () => {
   const contact = incomingContactById(activeIncomingContactId);
-  if (!contact) return;
-  if (!contact.parentName) { showFeedback("Ange namn på den berörda personen innan en preliminär personpost skapas."); return; }
-  const now = new Date().toISOString();
-  const parent = { id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, name: contact.parentName, contactDetails: contact.contactDetails, informationStatus: "pending", area: "", languages: "", availability: "", active: true, version: 1, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID };
-  await saveParent(parent);
-  await createSupportCaseFromIncomingContact(contact, parent);
-});
-els.incomingContactCreateCaseButton.addEventListener("click", async () => {
-  const contact = incomingContactById(activeIncomingContactId);
-  const parent = parents.find((item) => item.id === contact?.parentId);
-  if (contact && parent) await createSupportCaseFromIncomingContact(contact, parent);
-});
-els.incomingContactFollowUpButton.addEventListener("click", async () => {
-  const contact = incomingContactById(activeIncomingContactId);
-  if (!contact) return;
-  await updateIncomingContactHandling(contact, "needs_follow_up", { feedback: "Kontakten markerades för uppföljning." });
-  await refresh();
   bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
-  showFeedback("Kontakten ligger kvar på dashboarden för uppföljning.");
-});
-els.incomingContactCloseButton.addEventListener("click", async () => {
-  const contact = incomingContactById(activeIncomingContactId);
-  if (!contact) return;
-  await updateIncomingContactHandling(contact, "closed", { closeCase: true, feedback: "Kontakten avslutades utan fortsatt ärende." });
-  await refresh();
-  bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
-  showFeedback("Kontakten har avslutats utan ärende.");
+  if (contact?.intakeCaseId) navigateToCase(contact.intakeCaseId);
 });
 els.incomingContactDoneButton.addEventListener("click", () => bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide());
 

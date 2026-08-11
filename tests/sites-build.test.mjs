@@ -23,8 +23,9 @@ test("serves the application shell", async () => {
   assert.match(html, /id="mobileIncomingContact"/);
   assert.match(html, /Kontaktmottagning/);
   assert.match(html, /Berörd person/);
-  assert.match(html, /Möjlig befintlig personpost/);
-  assert.match(html, /Befintliga personposter/);
+  assert.match(html, /id="incomingContactNextStepInput"/);
+  assert.match(html, /Nästa steg efter kontakten/);
+  assert.doesNotMatch(html, /Möjlig befintlig personpost/);
   assert.match(html, /id="caseTypeFilter"/);
   assert.match(html, /<option value="open">Öppna<\/option>/);
   assert.match(html, /id="decisionQueueButton"/);

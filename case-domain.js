@@ -238,9 +238,9 @@ export const CASE_TYPE_DEFINITIONS = [
     creationMode: "manual",
     nextCaseTypeId: "parent-support",
     mentorMode: "none",
-    helpText: "Använd för en mottagen kontakt via telefon, e-post, besök eller annan kanal innan kommunen vet om kontakten ska bli ett stödärende, kopplas till en personpost eller avslutas utan fortsatt handläggning.",
-    registrationHint: "Registrera kontaktväg, kontaktuppgift, vem som kontaktar kommunen och en kort saklig anteckning. Koppla personpost först när det är tillräckligt utrett.",
-    workInstruction: "Bedöm om kontakten ska följas upp, kopplas till befintlig personpost, bli ett stödärende eller avslutas utan ärende. Dokumentera ställningstagandet innan ärendet avslutas.",
+    helpText: "Använd för en mottagen kontakt via telefon, e-post, besök eller annan kanal innan kommunen vet vad fortsatt handläggning ska bli.",
+    registrationHint: "Registrera kontaktväg, kontaktuppgift, vem som kontaktar kommunen, en kort saklig anteckning och vad nästa steg ska vara när kontakten är avslutad.",
+    workInstruction: "Följ det angivna nästa steget, komplettera med fler aktiviteter vid behov och avsluta mottagningsärendet när det är tydligt om kontakten kräver fortsatt handläggning.",
     detailFieldIds: [],
     defaultPriority: "normal",
     suggestedActivities: ["Bedöm fortsatt hantering", "Koppla personpost eller ärende", "Dokumentera ställningstagande"]
