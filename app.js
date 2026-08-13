@@ -119,6 +119,18 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "75",
+    date: "2026-08-13",
+    title: "Ett nästa steg i ersättningshanteringen",
+    flow: "Ersättningsperiod → komplettera, godkänn eller markera utbetald",
+    simplified: "Ersättningsvyn visar en aktuell status och den åtgärd som för processen vidare. Kontrollistan, periodformuläret och äldre perioder ligger samlade under underlag och historik.",
+    retained: "Mentorrapporter och föräldraavstämning krävs fortfarande som separata underlag. Godkännande och markering som utbetald är fortsatt uttryckliga, spårbara beslut.",
+    changes: [
+      "Nästa knapp anpassas efter om rapport, avstämning, granskning eller utbetalning återstår.",
+      "Komplett kontrollista och alla tidigare ersättningsperioder kan öppnas när de behövs."
+    ]
+  },
+  {
     version: "74",
     date: "2026-08-13",
     title: "Handlingsstyrd uppföljning av mentoruppdrag",
@@ -1144,6 +1156,9 @@ const els = {
   parentCheckInsEmpty: document.querySelector("#parentCheckInsEmpty"),
   parentCheckInsTableWrap: document.querySelector("#parentCheckInsTableWrap"),
   parentCheckInsTableBody: document.querySelector("#parentCheckInsTableBody"),
+  compensationNextStepStatus: document.querySelector("#compensationNextStepStatus"),
+  compensationNextStepActions: document.querySelector("#compensationNextStepActions"),
+  compensationDetails: document.querySelector("#compensationDetails"),
   newCompensationPeriodButton: document.querySelector("#newCompensationPeriodButton"),
   compensationPeriodForm: document.querySelector("#compensationPeriodForm"),
   compensationReadinessChecklist: document.querySelector("#compensationReadinessChecklist"),
@@ -6712,6 +6727,48 @@ function renderCompensationReadinessChecklist(caseRecord, records) {
   `;
 }
 
+function renderCompensationNextSteps(caseRecord, records) {
+  const latestPeriod = records.periods[0] || null;
+  const status = latestPeriod ? effectiveCompensationStatus(latestPeriod) : "not_started";
+  const evidence = latestPeriod ? compensationEvidence(latestPeriod) : null;
+  if (els.compensationDetails.dataset.caseId !== caseRecord.id) {
+    els.compensationDetails.open = false;
+    els.compensationDetails.dataset.caseId = caseRecord.id;
+  }
+  let message = "Skapa en ersättningsperiod när mentorrapport och föräldraavstämning ska sammanställas.";
+  let primaryAction = ["new_period", "Skapa ersättningsperiod", "btn-primary", ""];
+  if (status === "awaiting_reports") {
+    message = `Perioden ${formatDate(latestPeriod.periodFrom)}-${formatDate(latestPeriod.periodTo)} saknar en genomförd mentorrapport.`;
+    primaryAction = ["new_report", "Registrera mentorrapport", "btn-primary", ""];
+  } else if (status === "awaiting_parent_checkin") {
+    message = `Perioden ${formatDate(latestPeriod.periodFrom)}-${formatDate(latestPeriod.periodTo)} saknar en föräldraavstämning.`;
+    primaryAction = ["new_checkin", "Registrera föräldraavstämning", "btn-primary", ""];
+  } else if (status === "under_review") {
+    message = `${evidence.reports.length} rapporter och ${formatMinutes(evidence.minutes)} är redo att granskas för ersättning.`;
+    primaryAction = ["approve_period", "Godkänn ersättningsperiod", "btn-primary", latestPeriod.id];
+  } else if (status === "needs_completion") {
+    const assessment = assessCompensationApproval({ completedReportCount: evidence.reports.length, latestCheckIn: evidence.latestCheckIn });
+    const needsReport = evidence.reports.length < 1;
+    message = assessment.reasons.join(" ") || "Kompletteringen är registrerad. Perioden kan granskas på nytt.";
+    primaryAction = needsReport
+      ? ["new_report", "Komplettera med mentorrapport", "btn-primary", ""]
+      : assessment.reasons.length
+        ? ["new_checkin", "Komplettera med föräldraavstämning", "btn-primary", ""]
+        : ["approve_period", "Godkänn ersättningsperiod", "btn-primary", latestPeriod.id];
+  } else if (status === "approved") {
+    message = `Perioden ${formatDate(latestPeriod.periodFrom)}-${formatDate(latestPeriod.periodTo)} är godkänd och väntar på registrerad utbetalning.`;
+    primaryAction = ["mark_paid", "Markera som utbetald", "btn-primary", latestPeriod.id];
+  } else if (status === "paid") {
+    message = `Perioden ${formatDate(latestPeriod.periodFrom)}-${formatDate(latestPeriod.periodTo)} är utbetald.`;
+    primaryAction = ["new_period", "Skapa nästa period", "btn-primary", ""];
+  }
+  els.compensationNextStepStatus.textContent = message;
+  const actions = [primaryAction, ["open_details", "Visa underlag och historik", "btn-outline-secondary", ""]];
+  els.compensationNextStepActions.innerHTML = actions
+    .map(([action, label, className, targetId]) => `<button type="button" class="btn ${className}" data-compensation-next-action="${action}" data-target-id="${escapeHtml(targetId)}">${escapeHtml(label)}</button>`)
+    .join("");
+}
+
 function formatMinutes(minutes) {
   const value = Number(minutes || 0);
   const hours = Math.floor(value / 60);
@@ -6762,6 +6819,7 @@ function renderAssignmentFollowup(caseRecord) {
   const { reports, checkIns, periods } = assignmentRecords(caseRecord.id);
   els.assignmentFollowupCount.textContent = reports.length + checkIns.length + periods.length;
   renderAssignmentNextSteps(caseRecord, { reports, checkIns, periods });
+  renderCompensationNextSteps(caseRecord, { reports, checkIns, periods });
   renderCompensationReadinessChecklist(caseRecord, { reports, checkIns, periods });
   const plan = caseRecord.details?.assignmentPlan || {};
   const planKey = `${caseRecord.id}-${caseRecord.updatedAt}`;
@@ -10281,6 +10339,29 @@ els.newCompensationPeriodButton.addEventListener("click", () => {
   els.compensationPeriodFromInput.focus();
 });
 els.cancelCompensationPeriodButton.addEventListener("click", () => { els.compensationPeriodForm.hidden = true; });
+
+els.compensationNextStepActions.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-compensation-next-action]");
+  if (!button) return;
+  const action = button.dataset.compensationNextAction;
+  if (["open_details", "new_period", "approve_period", "mark_paid"].includes(action)) els.compensationDetails.open = true;
+  if (action === "new_period") {
+    els.newCompensationPeriodButton.click();
+    return;
+  }
+  if (action === "new_report" || action === "new_checkin") {
+    els.assignmentFollowupDetails.open = true;
+    if (action === "new_report") els.newMentorReportButton.click();
+    else els.newParentCheckInButton.click();
+    return;
+  }
+  if (["approve_period", "mark_paid"].includes(action) && button.dataset.targetId) {
+    const datasetKey = action === "approve_period" ? "compensationApprove" : "compensationPaid";
+    const target = [...els.compensationPeriodsTableBody.querySelectorAll("button")]
+      .find((item) => item.dataset[datasetKey] === button.dataset.targetId);
+    target?.click();
+  }
+});
 
 els.compensationPeriodForm.addEventListener("submit", async (event) => {
   event.preventDefault();

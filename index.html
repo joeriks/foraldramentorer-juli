@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260813-flow-v74">
+    <link rel="stylesheet" href="styles.css?v=20260813-flow-v75">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -947,12 +947,20 @@
                       </div>
                     </details>
 
-                    <section class="record-section">
-                      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3"><div><h3 class="record-section-title mb-1">Ersättningsperioder</h3><p class="small text-secondary mb-0">Perioden sammanställer mentorrapporter men kräver föräldraavstämning och ett uttryckligt beslut av handläggaren.</p></div><button id="newCompensationPeriodButton" type="button" class="btn btn-primary btn-sm">Ny ersättningsperiod</button></div>
-                      <div id="compensationReadinessChecklist" class="compensation-readiness mb-3"></div>
-                      <form id="compensationPeriodForm" class="inline-editor border rounded mb-3" hidden><div class="row g-3"><div class="col-md-4"><label class="form-label" for="compensationPeriodFromInput">Från och med</label><input id="compensationPeriodFromInput" class="form-control form-control-sm" type="date" required></div><div class="col-md-4"><label class="form-label" for="compensationPeriodToInput">Till och med</label><input id="compensationPeriodToInput" class="form-control form-control-sm" type="date" required></div><div class="col-md-4 d-flex align-items-end"><div class="small text-secondary">Rapporter och avstämningar inom perioden sammanställs automatiskt.</div></div></div><div class="d-flex justify-content-end gap-2 mt-3"><button id="cancelCompensationPeriodButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button><button type="submit" class="btn btn-primary btn-sm">Skapa period</button></div></form>
-                      <div id="compensationPeriodsEmpty" class="empty-list border rounded text-secondary">Inga ersättningsperioder har skapats.</div>
-                      <div id="compensationPeriodsTableWrap" class="table-responsive border rounded" hidden><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Period</th><th>Mentorrapporter</th><th>Tid</th><th>Föräldraavstämning</th><th>Status</th><th><span class="visually-hidden">Åtgärd</span></th></tr></thead><tbody id="compensationPeriodsTableBody"></tbody></table></div>
+                    <section id="compensationNextStepPanel" class="record-section">
+                      <h3 class="record-section-title mb-1">Nästa steg för ersättning</h3>
+                      <p id="compensationNextStepStatus" class="case-transition-status"></p>
+                      <div id="compensationNextStepActions" class="case-transition-choices"></div>
+                      <details id="compensationDetails" class="case-transition-details mt-3">
+                        <summary>Visa underlag och historik</summary>
+                        <div class="case-transition-details-content">
+                          <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3"><div><h3 class="record-section-title mb-1">Ersättningsperioder</h3><p class="small text-secondary mb-0">Perioden sammanställer mentorrapporter men kräver föräldraavstämning och ett uttryckligt beslut av handläggaren.</p></div><button id="newCompensationPeriodButton" type="button" class="btn btn-primary btn-sm">Ny ersättningsperiod</button></div>
+                          <div id="compensationReadinessChecklist" class="compensation-readiness mb-3"></div>
+                          <form id="compensationPeriodForm" class="inline-editor border rounded mb-3" hidden><div class="row g-3"><div class="col-md-4"><label class="form-label" for="compensationPeriodFromInput">Från och med</label><input id="compensationPeriodFromInput" class="form-control form-control-sm" type="date" required></div><div class="col-md-4"><label class="form-label" for="compensationPeriodToInput">Till och med</label><input id="compensationPeriodToInput" class="form-control form-control-sm" type="date" required></div><div class="col-md-4 d-flex align-items-end"><div class="small text-secondary">Rapporter och avstämningar inom perioden sammanställs automatiskt.</div></div></div><div class="d-flex justify-content-end gap-2 mt-3"><button id="cancelCompensationPeriodButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button><button type="submit" class="btn btn-primary btn-sm">Skapa period</button></div></form>
+                          <div id="compensationPeriodsEmpty" class="empty-list border rounded text-secondary">Inga ersättningsperioder har skapats.</div>
+                          <div id="compensationPeriodsTableWrap" class="table-responsive border rounded" hidden><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Period</th><th>Mentorrapporter</th><th>Tid</th><th>Föräldraavstämning</th><th>Status</th><th><span class="visually-hidden">Åtgärd</span></th></tr></thead><tbody id="compensationPeriodsTableBody"></tbody></table></div>
+                        </div>
+                      </details>
                     </section>
                   </section>
                   <section class="tab-pane fade card-body" id="case-documents-pane">
@@ -2061,6 +2069,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260813-flow-v74"></script>
+    <script type="module" src="app.js?v=20260813-flow-v75"></script>
   </body>
 </html>
