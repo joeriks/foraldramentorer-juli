@@ -119,6 +119,18 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "73",
+    date: "2026-08-13",
+    title: "Behovsanalys som leder vidare",
+    flow: "Behovsanalys → komplettera, skapa rekryteringsinsats eller avsluta",
+    simplified: "Analysen visar vilka kärnuppgifter som saknas och erbjuder ett direkt val att skapa rekryteringsinsatsen när underlaget är användbart.",
+    retained: "Alla analysfält, aktiviteter och möjligheten att avsluta utan insats finns kvar. Det nya ärendet länkas till analysen och får dess beskrivning förifylld.",
+    changes: [
+      "Målgrupp, område, omfattning och önskat datum används som enkel beredskapskontroll.",
+      "Skapad rekryteringsinsats kan öppnas direkt från analysen."
+    ]
+  },
+  {
     version: "72",
     date: "2026-08-13",
     title: "En kontroll i taget vid mentorgodkännande",
@@ -673,6 +685,7 @@ let activeIncomingContactId = null;
 let incomingContactParentId = null;
 let incomingContactStartedAt = null;
 let pendingIncomingContactId = null;
+let pendingSourceCaseId = null;
 let selectedCaseRecordId = null;
 let caseRouteIntent = "";
 let caseRouteTargetId = "";
@@ -3193,6 +3206,12 @@ function successorCases(caseRecord) {
   if (caseRecord.caseTypeId === "matching") {
     return cases.filter((item) => item.caseTypeId === "mentor-assignment" && item.sourceMatchingCaseId === caseRecord.id);
   }
+  if (caseRecord.caseTypeId === "needs-analysis") {
+    return cases.filter((item) => item.caseTypeId === "recruitment" && item.details?.sourceCaseId === caseRecord.id);
+  }
+  if (caseRecord.caseTypeId === "mentor-assignment") {
+    return cases.filter((item) => item.caseTypeId === "mentor-follow-up" && item.details?.sourceCaseId === caseRecord.id);
+  }
   return [];
 }
 
@@ -5237,6 +5256,36 @@ function prefillCaseFromIncomingContact(contact) {
   }
 }
 
+function prefillCaseFromSourceCase(sourceCase) {
+  if (!sourceCase) return;
+  const targetTypeId = els.caseTypeInput.value;
+  const titlePrefix = targetTypeId === "recruitment" ? "Rekrytering" : targetTypeId === "mentor-follow-up" ? "Uppföljning" : "Fortsatt ärende";
+  els.caseTitleInput.value = `${titlePrefix}: ${sourceCase.title}`.slice(0, 100);
+  els.caseDescriptionInput.value = [
+    sourceCase.description,
+    `Skapat från ${sourceCase.number} · ${sourceCase.type}.`
+  ].filter(Boolean).join("\n\n");
+}
+
+async function registerSuccessorLink(sourceCase, successorCaseId, successorNumber, successorType) {
+  const now = new Date().toISOString();
+  const updatedSource = { ...sourceCase, version: sourceCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
+  await atomicPut({
+    [CASES_STORE]: [updatedSource],
+    [CASE_EVENTS_STORE]: [caseEventRecord({
+      caseId: sourceCase.id,
+      eventType: "successor_case_created",
+      entityType: "case",
+      entityId: successorCaseId,
+      message: `${successorType} ${successorNumber} skapades från ärendet`,
+      idempotencyKey: crypto.randomUUID(),
+      correlationId: crypto.randomUUID(),
+      now
+    })]
+  });
+  pendingSourceCaseId = null;
+}
+
 async function createIncomingContactCase(contact, now = new Date().toISOString()) {
   const caseType = caseTypeById("incoming-contact");
   if (!caseType) return { contact, records: {} };
@@ -6446,11 +6495,51 @@ function renderCertificationCaseChoices(caseRecord) {
     .join("");
 }
 
+function needsAnalysisReadiness(caseRecord) {
+  const details = caseRecord.details || {};
+  const missing = [];
+  if (!caseRecord.description?.trim()) missing.push("behovsbeskrivning");
+  if (!details.targetGroup?.trim()) missing.push("målgrupp");
+  if (!details.area?.trim()) missing.push("område");
+  if (!Number(details.desiredCount)) missing.push("önskat antal mentorer");
+  if (!details.desiredDate) missing.push("önskat datum");
+  return { ready: missing.length === 0, missing };
+}
+
+function renderNeedsAnalysisChoices(caseRecord) {
+  const readiness = needsAnalysisReadiness(caseRecord);
+  const recruitmentCase = successorCases(caseRecord).find((item) => item.caseTypeId === "recruitment");
+  els.caseTransitionStatus.hidden = false;
+  els.caseTransitionStatus.textContent = recruitmentCase
+    ? `Rekryteringsinsats ${recruitmentCase.number} har skapats från analysen.`
+    : readiness.ready
+      ? "Analysen innehåller målgrupp, område, omfattning och önskat datum. En rekryteringsinsats kan skapas."
+      : `Komplettera ${readiness.missing.join(", ")} innan analysen omsätts i en rekryteringsinsats.`;
+  const actions = recruitmentCase
+    ? [
+        ["open_case", `Öppna ${recruitmentCase.number}`, "btn-primary", recruitmentCase.id],
+        ["edit_case", "Uppdatera analysen", "btn-outline-primary"],
+        ...(caseRecord.status === "closed" ? [] : [["close_case", "Avsluta analysen", "btn-outline-secondary"]])
+      ]
+    : caseRecord.status === "closed"
+      ? [["expand_secondary", "Visa analysunderlaget", "btn-primary"]]
+      : [
+          ["edit_case", "Komplettera analysen", readiness.ready ? "btn-outline-primary" : "btn-primary"],
+          ["create_successor", "Skapa rekryteringsinsats", readiness.ready ? "btn-primary" : "btn-outline-primary", "recruitment"],
+          ["close_case", "Avsluta utan insats", "btn-outline-secondary"]
+        ];
+  els.caseTransitionChoices.hidden = false;
+  els.caseTransitionChoices.innerHTML = actions
+    .map(([action, label, className, targetId = ""]) => `<button type="button" class="btn ${className}" data-case-flow-action="${action}" data-target-id="${escapeHtml(targetId)}">${escapeHtml(label)}</button>`)
+    .join("");
+}
+
 function renderCaseTransitionPanel(caseRecord) {
   const isSupport = caseRecord.caseTypeId === "parent-support";
   const isMatching = caseRecord.caseTypeId === "matching";
   const isCertification = caseRecord.caseTypeId === "mentor-certification";
-  els.caseTransitionPanel.hidden = !isSupport && !isMatching && !isCertification;
+  const isNeedsAnalysis = caseRecord.caseTypeId === "needs-analysis";
+  els.caseTransitionPanel.hidden = !isSupport && !isMatching && !isCertification && !isNeedsAnalysis;
   els.caseTransitionStatus.hidden = true;
   els.caseTransitionChoices.hidden = true;
   els.caseTransitionChoices.innerHTML = "";
@@ -6461,7 +6550,7 @@ function renderCaseTransitionPanel(caseRecord) {
   }
   els.matchingOutcomeForm.hidden = !isMatching || caseRecord.status === "closed";
   renderMatchingDecisionSummary(caseRecord);
-  renderCaseSecondaryDetails(caseRecord, isSupport || isMatching || isCertification);
+  renderCaseSecondaryDetails(caseRecord, isSupport || isMatching || isCertification || isNeedsAnalysis);
   if (isSupport) {
     els.caseWorkGuidance.hidden = true;
     els.caseTransitionTitle.textContent = "Vad ska hända med stödärendet?";
@@ -6488,6 +6577,12 @@ function renderCaseTransitionPanel(caseRecord) {
     els.caseTransitionTitle.textContent = "Vad är nästa steg i mentorprövningen?";
     els.caseTransitionHelp.textContent = "Arbeta med nästa kontroll eller avvikelse. Hela kontrollkedjan, underlaget och loggen finns kvar i sina flikar.";
     renderCertificationCaseChoices(caseRecord);
+  }
+  if (isNeedsAnalysis) {
+    els.caseWorkGuidance.hidden = true;
+    els.caseTransitionTitle.textContent = "Vad ska hända med behovsanalysen?";
+    els.caseTransitionHelp.textContent = "Komplettera analysen, skapa en rekryteringsinsats eller avsluta. Analysunderlaget förs vidare när en insats skapas.";
+    renderNeedsAnalysisChoices(caseRecord);
   }
 }
 
@@ -6738,6 +6833,9 @@ function renderCaseDetail() {
       renderCaseTypeGuidance();
       if (selectedCaseRecordId === "new" && pendingIncomingContactId) {
         prefillCaseFromIncomingContact(incomingContactById(pendingIncomingContactId));
+      }
+      if (selectedCaseRecordId === "new" && pendingSourceCaseId) {
+        prefillCaseFromSourceCase(cases.find((item) => item.id === pendingSourceCaseId));
       }
       els.caseCreateForm.dataset.route = selectedCaseRecordId;
     }
@@ -9723,6 +9821,18 @@ els.caseTransitionChoices.addEventListener("click", (event) => {
     els.matchingOutcomeForm.requestSubmit();
     return;
   }
+  if (action === "create_successor" && button.dataset.targetId) {
+    pendingSourceCaseId = caseRecord.id;
+    newCaseTypePreset = button.dataset.targetId;
+    els.caseCreateForm.dataset.route = "";
+    navigateTo("#/case/new");
+    return;
+  }
+  if (action === "expand_secondary") {
+    els.caseSecondaryDetails.open = true;
+    requestAnimationFrame(() => els.caseSecondaryDetails.scrollIntoView({ behavior: "smooth", block: "start" }));
+    return;
+  }
   if (action === "open_activities") {
     const firstOpenActivity = activitiesForCase(caseRecord.id).find((activity) => !["completed", "not_applicable"].includes(activity.status));
     if (firstOpenActivity) openCaseActivity(firstOpenActivity.id);
@@ -10194,7 +10304,7 @@ function compatibleRegistrationTargets(mentorId, caseTypeId, excludeCaseId = nul
 }
 
 function renderRegistrationTargets() {
-  if (caseEditMode || !selectedCaseRecordId?.startsWith("new")) {
+  if (caseEditMode || pendingSourceCaseId || !selectedCaseRecordId?.startsWith("new")) {
     els.caseDuplicatePanel.hidden = true;
     return;
   }
@@ -10336,6 +10446,7 @@ els.editCaseButton.addEventListener("click", () => {
 els.cancelCaseCreateButton.addEventListener("click", () => {
   newCaseTypePreset = "";
   pendingIncomingContactId = null;
+  pendingSourceCaseId = null;
   if (caseEditMode) {
     caseEditMode = false;
     renderCaseDetail();
@@ -10349,6 +10460,7 @@ async function submitCaseForm(event) {
   clearCaseFormError();
   const existingCase = caseEditMode ? selectedCaseRecord() : null;
   const sourceIncomingContact = existingCase ? null : incomingContactById(pendingIncomingContactId);
+  const sourceCase = existingCase ? null : cases.find((item) => item.id === pendingSourceCaseId);
   const returnActivityId = existingCase && caseRouteIntent === "edit" ? caseRouteTargetId : "";
   const id = existingCase?.id || crypto.randomUUID();
   const requestedMentorName = els.caseMentorInput.value.trim();
@@ -10401,7 +10513,7 @@ async function submitCaseForm(event) {
   }
 
   if (!existingCase) {
-    const targets = compatibleRegistrationTargets(mentorId, caseType.id);
+    const targets = sourceCase ? [] : compatibleRegistrationTargets(mentorId, caseType.id);
     const choice = els.caseDuplicatePanel.dataset.choice;
     if (targets.length && !choice) {
       renderRegistrationTargets();
@@ -10483,6 +10595,7 @@ async function submitCaseForm(event) {
     configuredDetails.supportAreaStatus = configuredDetails.supportAreaIds.length ? "confirmed" : "to_confirm";
   }
   if (sourceIncomingContact) configuredDetails.intakeContactId = sourceIncomingContact.id;
+  if (sourceCase) configuredDetails.sourceCaseId = sourceCase.id;
   const allocatedCaseNumber = existingCase?.number || await reserveCaseNumber();
   await executeCaseCommand({
     commandType: existingCase ? "update_case" : "quick_register_case",
@@ -10569,6 +10682,9 @@ async function submitCaseForm(event) {
   });
   if (sourceIncomingContact) {
     await completeIncomingContactWithCase(sourceIncomingContact, id, allocatedCaseNumber);
+  }
+  if (sourceCase) {
+    await registerSuccessorLink(sourceCase, id, allocatedCaseNumber, caseType.name);
   }
   const savedCaseForMatching = {
     ...(existingCase || {}),
@@ -11954,6 +12070,7 @@ document.addEventListener("click", (event) => {
 
 window.addEventListener("hashchange", () => {
   if (pendingIncomingContactId && window.location.hash !== "#/case/new") pendingIncomingContactId = null;
+  if (pendingSourceCaseId && window.location.hash !== "#/case/new") pendingSourceCaseId = null;
   renderAll();
 });
 
