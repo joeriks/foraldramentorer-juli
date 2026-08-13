@@ -1603,6 +1603,45 @@ body {
   padding-top: var(--app-space-3);
 }
 
+.case-transition-status {
+  margin: 0 0 var(--app-space-3);
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--app-primary);
+  background: var(--app-primary-soft);
+}
+
+.case-transition-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--app-space-2);
+  margin-bottom: var(--app-space-3);
+}
+
+.case-transition-choices .btn {
+  min-height: 2.75rem;
+}
+
+.case-secondary-details.is-guided {
+  border-top: 1px solid var(--app-border);
+}
+
+.case-secondary-details > summary {
+  padding: var(--app-space-3) 0;
+  color: var(--app-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.case-secondary-content {
+  padding-top: var(--app-space-2);
+}
+
+@media (max-width: 767.98px) {
+  .case-transition-choices {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .case-actions-heading {
   margin-bottom: var(--app-space-2);
 }

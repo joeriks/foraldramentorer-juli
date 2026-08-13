@@ -119,6 +119,18 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "70",
+    date: "2026-08-13",
+    title: "Vägledda val i stödärendet",
+    flow: "Stödärende → komplettera, starta matchning eller avsluta",
+    simplified: "Stödärendet visar tre tydliga nästa steg och talar om vilka centrala uppgifter som saknas innan matchning. Övriga ärendeuppgifter och sällan använda åtgärder är samlade under en utfällbar rubrik.",
+    retained: "Stödprofil, aktiviteter, ärendehistorik, redigering, paus och avslut finns kvar.",
+    changes: [
+      "Matchningsberedskap visas direkt i ärendeöversikten.",
+      "Start av matchning använder samma ordinarie matchningsregistrering som tidigare."
+    ]
+  },
+  {
     version: "69",
     date: "2026-08-13",
     title: "Tre tydliga vägar efter inkommande kontakt",
@@ -1029,6 +1041,10 @@ const els = {
   matchingDecisionSummary: document.querySelector("#matchingDecisionSummary"),
   caseTransitionTitle: document.querySelector("#caseTransitionTitle"),
   caseTransitionHelp: document.querySelector("#caseTransitionHelp"),
+  caseTransitionStatus: document.querySelector("#caseTransitionStatus"),
+  caseTransitionChoices: document.querySelector("#caseTransitionChoices"),
+  caseSecondaryDetails: document.querySelector("#caseSecondaryDetails"),
+  caseSecondarySummary: document.querySelector("#caseSecondarySummary"),
   matchingOutcomeForm: document.querySelector("#matchingOutcomeForm"),
   parentMatchResponseInput: document.querySelector("#parentMatchResponseInput"),
   mentorMatchResponseInput: document.querySelector("#mentorMatchResponseInput"),
@@ -1084,8 +1100,6 @@ const els = {
   compensationPeriodsEmpty: document.querySelector("#compensationPeriodsEmpty"),
   compensationPeriodsTableWrap: document.querySelector("#compensationPeriodsTableWrap"),
   compensationPeriodsTableBody: document.querySelector("#compensationPeriodsTableBody"),
-  supportCaseTransitionActions: document.querySelector("#supportCaseTransitionActions"),
-  startMatchingFromSupportButton: document.querySelector("#startMatchingFromSupportButton"),
   caseTypeDetailsSection: document.querySelector("#caseTypeDetailsSection"),
   caseTypeDetailsTitle: document.querySelector("#caseTypeDetailsTitle"),
   caseTypeDetailsFacts: document.querySelector("#caseTypeDetailsFacts"),
@@ -6294,16 +6308,55 @@ function renderMatchingDecisionSummary(caseRecord) {
   `;
 }
 
+function supportCaseReadiness(caseRecord) {
+  const details = caseRecord.details || {};
+  const missing = [];
+  if (!details.supportPurpose?.trim()) missing.push("stödets syfte");
+  if (!details.desiredOutcome?.trim()) missing.push("önskat resultat");
+  if (!supportAreaIdsForCase(caseRecord).length) missing.push("stödområde");
+  return { ready: missing.length === 0, missing };
+}
+
+function renderCaseSecondaryDetails(caseRecord, guided) {
+  els.caseSecondarySummary.hidden = !guided;
+  if (els.caseSecondaryDetails.dataset.caseId !== caseRecord.id) {
+    els.caseSecondaryDetails.open = !guided;
+    els.caseSecondaryDetails.dataset.caseId = caseRecord.id;
+  } else if (!guided) {
+    els.caseSecondaryDetails.open = true;
+  }
+  els.caseSecondaryDetails.classList.toggle("is-guided", guided);
+}
+
+function renderSupportCaseChoices(caseRecord) {
+  const readiness = supportCaseReadiness(caseRecord);
+  els.caseTransitionStatus.hidden = false;
+  els.caseTransitionStatus.textContent = readiness.ready
+    ? "Underlaget innehåller syfte, önskat resultat och stödområde. Matchning kan startas."
+    : `Komplettera ${readiness.missing.join(", ")} innan matchningen startas.`;
+  els.caseTransitionChoices.hidden = caseRecord.status === "closed";
+  els.caseTransitionChoices.innerHTML = caseRecord.status === "closed" ? "" : `
+    <button type="button" class="btn ${readiness.ready ? "btn-outline-primary" : "btn-primary"}" data-case-flow-action="edit_case">Komplettera stödbehovet</button>
+    <button type="button" class="btn ${readiness.ready ? "btn-primary" : "btn-outline-primary"}" data-case-flow-action="start_matching">Starta matchning</button>
+    <button type="button" class="btn btn-outline-secondary" data-case-flow-action="close_case">Avsluta stödärendet</button>
+  `;
+}
+
 function renderCaseTransitionPanel(caseRecord) {
   const isSupport = caseRecord.caseTypeId === "parent-support";
   const isMatching = caseRecord.caseTypeId === "matching";
   els.caseTransitionPanel.hidden = !isSupport && !isMatching;
-  els.supportCaseTransitionActions.hidden = !isSupport || caseRecord.status === "closed";
+  els.caseTransitionStatus.hidden = true;
+  els.caseTransitionChoices.hidden = true;
+  els.caseTransitionChoices.innerHTML = "";
   els.matchingOutcomeForm.hidden = !isMatching;
   renderMatchingDecisionSummary(caseRecord);
+  renderCaseSecondaryDetails(caseRecord, isSupport);
   if (isSupport) {
-    els.caseTransitionTitle.textContent = "Nästa steg för stödärendet";
-    els.caseTransitionHelp.textContent = "Starta en separat matchning när stödbehovet är tillräckligt avgränsat. Stödärendet och dess historik ligger kvar.";
+    els.caseWorkGuidance.hidden = true;
+    els.caseTransitionTitle.textContent = "Vad ska hända med stödärendet?";
+    els.caseTransitionHelp.textContent = "Välj nästa steg. Uppgifter, aktiviteter och historik finns kvar under Ärendeuppgifter och fler åtgärder.";
+    renderSupportCaseChoices(caseRecord);
   }
   if (isMatching) {
     const linkedAssignment = cases.find((item) => item.sourceMatchingCaseId === caseRecord.id && item.caseTypeId === "mentor-assignment");
@@ -9530,9 +9583,19 @@ els.parentForm.addEventListener("submit", async (event) => {
   if (supportCaseId) navigateToCase(supportCaseId); else navigateToParent(parentId);
 });
 
-els.startMatchingFromSupportButton.addEventListener("click", () => {
-  const supportCase = selectedCaseRecord();
-  if (supportCase?.caseTypeId === "parent-support") navigateToNewMatching(supportCase.id);
+els.caseTransitionChoices.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-case-flow-action]");
+  const caseRecord = selectedCaseRecord();
+  if (!button || !caseRecord) return;
+  const action = button.dataset.caseFlowAction;
+  if (action === "edit_case") {
+    caseEditMode = true;
+    els.caseCreateForm.dataset.route = "";
+    renderCaseDetail();
+    requestAnimationFrame(() => els.caseDescriptionInput.focus());
+  }
+  if (action === "start_matching" && caseRecord.caseTypeId === "parent-support") navigateToNewMatching(caseRecord.id);
+  if (action === "close_case") openCaseLifecycle("close");
 });
 
 els.matchingOutcomeForm.addEventListener("submit", async (event) => {

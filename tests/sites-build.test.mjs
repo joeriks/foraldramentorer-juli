@@ -40,6 +40,8 @@ test("serves the application shell", async () => {
   assert.match(html, /id="decisionQueueButton"/);
   assert.match(html, /id="caseClosureSummary"/);
   assert.match(html, /id="matchingDecisionSummary"/);
+  assert.match(html, /id="caseTransitionChoices"/);
+  assert.match(html, /id="caseSecondaryDetails"/);
   assert.match(html, /id="activityCaseClosedNotice"/);
   assert.match(html, /id="activityCaseReadyNotice"/);
   assert.match(html, /id="activityCaseReadyPrimaryButton"/);
@@ -119,6 +121,8 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.doesNotMatch(scriptText, /CASE_FLOW_STEPS/);
   assert.match(scriptText, /function caseTypeRelationshipGroups/);
   assert.match(scriptText, /function renderCaseFlowBoard/);
+  assert.match(scriptText, /function renderSupportCaseChoices/);
+  assert.match(scriptText, /Vägledda val i stödärendet/);
   assert.match(scriptText, /data-case-flow-type/);
   assert.match(scriptText, /status=open/);
   assert.match(scriptText, /caseRecord\.status !== "closed"/);
