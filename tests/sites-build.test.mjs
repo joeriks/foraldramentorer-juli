@@ -100,6 +100,10 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /function createIncomingContactCase/);
   assert.match(scriptText, /APP_VERSION_HISTORY/);
   assert.match(scriptText, /function renderVersions/);
+  assert.match(scriptText, /Versionshistorik och återställningspunkt/);
+  assert.match(scriptText, /Berört flöde/);
+  assert.match(scriptText, /Förenklat/);
+  assert.match(scriptText, /Bevarat/);
   assert.match(scriptText, /Inkommande kontakt med fri nästa-steg-text/);
   assert.match(scriptText, /incoming-contact/);
   assert.match(scriptText, /"mentor-assignment", "parent-support", "mentor-certification", "other"/);

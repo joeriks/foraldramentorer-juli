@@ -119,9 +119,24 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "67",
+    date: "2026-08-11",
+    title: "Versionshistorik och återställningspunkt",
+    flow: "Systemadministration / Versioner",
+    simplified: "Publicerade ändringar samlas i en kort, kronologisk historik i stället för att behöva sökas fram i Git-historiken.",
+    retained: "Versionsnummer, publiceringsdatum och de viktigaste ändringarna finns kvar som separata uppgifter.",
+    changes: [
+      "En egen versionssida lades till under Systemadministration.",
+      "Version 67 är märkt i Git som stabil baslinje före kommande flödesförenklingar."
+    ]
+  },
+  {
     version: "66",
     date: "2026-08-11",
     title: "Inkommande kontakt med fri nästa-steg-text",
+    flow: "Inkommande kontakt → nästa steg → mottagningsärende",
+    simplified: "Mottagaren behöver inte längre söka fram eller koppla en personpost under kontakten. Nästa steg skrivs med egna ord direkt efter samtalet eller meddelandet.",
+    retained: "Kontaktanteckning, uppföljning och möjligheten att öppna det skapade mottagningsärendet finns kvar.",
     changes: [
       "Mottagningspanelen fokuserar på kontaktanteckning och nästa steg efter samtalet.",
       "Personpostkoppling togs bort från mottagningspanelen.",
@@ -132,6 +147,9 @@ const APP_VERSION_HISTORY = [
     version: "65",
     date: "2026-08-10",
     title: "Inkommande kontakt som ärende",
+    flow: "Inkommande kontakt → ärenderegister",
+    simplified: "Tidigare kontakter hittas i samma ärenderegister som övriga ärenden, filtrerat på mottagningsärenden, i stället för i ett separat anteckningsflöde.",
+    retained: "Varje kontakt får ett spårbart ärende med ärendetyp, status och fortsatt handläggning.",
     changes: [
       "Kontaktmottagning öppnar ärenderegistret filtrerat på mottagningsärenden.",
       "Sparad kontakt skapar ett mottagningsärende.",
@@ -142,6 +160,9 @@ const APP_VERSION_HISTORY = [
     version: "64",
     date: "2026-08-10",
     title: "Tydligare ny-knapp i ärenderegistret",
+    flow: "Dashboard → vald ärendetyp → ny registrering",
+    simplified: "Den generella knappen Ny registrering ersattes av en knapp som direkt säger vilken typ av ärende som skapas.",
+    retained: "Samma registreringsfunktion och vald filtrering används fortfarande.",
     changes: [
       "Knappen följer vald ärendetyp, till exempel Ny behovsanalys eller Ny rekryteringsinsats.",
       "Ändringen gäller när ärenderegistret öppnas filtrerat från dashboard eller navigation."
@@ -4029,6 +4050,20 @@ function renderVersions() {
       </div>
       <div class="version-history-content">
         <h3 class="h6 mb-2">${escapeHtml(item.title)}</h3>
+        <dl class="version-flow-summary">
+          <div>
+            <dt>Berört flöde</dt>
+            <dd>${escapeHtml(item.flow)}</dd>
+          </div>
+          <div>
+            <dt>Förenklat</dt>
+            <dd>${escapeHtml(item.simplified)}</dd>
+          </div>
+          <div>
+            <dt>Bevarat</dt>
+            <dd>${escapeHtml(item.retained)}</dd>
+          </div>
+        </dl>
         <ul class="mb-0">${item.changes.map((change) => `<li>${escapeHtml(change)}</li>`).join("")}</ul>
       </div>
     </article>
