@@ -119,6 +119,18 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "71",
+    date: "2026-08-13",
+    title: "Matchning med tydligt beslutsläge",
+    flow: "Matchning → registrera svar, skapa mentoruppdrag eller avsluta",
+    simplified: "Första vyn visar parternas aktuella svar och den åtgärd som är möjlig nu. Det fullständiga matchningsunderlaget och formuläret visas först när handläggaren öppnar dem.",
+    retained: "Matchningsmotivering, båda parters separata svar, överlappning, språkunderlag, bekräftelse och skapande av mentoruppdrag finns kvar.",
+    changes: [
+      "Accepterad matchning erbjuder Skapa mentoruppdrag direkt.",
+      "Avböjd matchning visar beslutet utan att dölja historiken."
+    ]
+  },
+  {
     version: "70",
     date: "2026-08-13",
     title: "Vägledda val i stödärendet",
@@ -1043,6 +1055,7 @@ const els = {
   caseTransitionHelp: document.querySelector("#caseTransitionHelp"),
   caseTransitionStatus: document.querySelector("#caseTransitionStatus"),
   caseTransitionChoices: document.querySelector("#caseTransitionChoices"),
+  matchingDetails: document.querySelector("#matchingDetails"),
   caseSecondaryDetails: document.querySelector("#caseSecondaryDetails"),
   caseSecondarySummary: document.querySelector("#caseSecondarySummary"),
   matchingOutcomeForm: document.querySelector("#matchingOutcomeForm"),
@@ -6342,6 +6355,48 @@ function renderSupportCaseChoices(caseRecord) {
   `;
 }
 
+function renderMatchingCaseChoices(caseRecord) {
+  const linkedAssignment = cases.find((item) => item.sourceMatchingCaseId === caseRecord.id && item.caseTypeId === "mentor-assignment");
+  const outcome = matchingOutcome(caseRecord.details?.parentResponse, caseRecord.details?.mentorResponse);
+  const parentResponse = matchResponseLabels[caseRecord.details?.parentResponse || ""] || "Inte registrerat";
+  const mentorResponse = matchResponseLabels[caseRecord.details?.mentorResponse || ""] || "Inte registrerat";
+  els.caseTransitionStatus.hidden = false;
+  els.caseTransitionStatus.textContent = linkedAssignment
+    ? `Mentoruppdrag ${linkedAssignment.number} har skapats.`
+    : outcome === "accepted"
+      ? "Båda parter accepterar. Matchningen är redo att bli ett mentoruppdrag."
+      : outcome === "declined"
+        ? `Matchningen avslutades. Förälder: ${parentResponse}. Mentor: ${mentorResponse}.`
+        : `Förälder: ${parentResponse}. Mentor: ${mentorResponse}.`;
+  const actions = linkedAssignment
+    ? [
+        ["open_case", `Öppna ${linkedAssignment.number}`, "btn-primary", linkedAssignment.id],
+        ["open_matching_details", "Visa matchningsunderlaget", "btn-outline-primary"],
+        ["open_support_case", "Öppna stödärendet", "btn-outline-secondary", caseRecord.supportCaseId]
+      ]
+    : outcome === "accepted" && caseRecord.status !== "closed"
+      ? [
+          ["create_assignment", "Skapa mentoruppdrag", "btn-primary"],
+          ["open_matching_details", "Ändra parternas svar", "btn-outline-primary"],
+          ["close_case", "Avsluta utan uppdrag", "btn-outline-secondary"]
+        ]
+      : caseRecord.status === "closed"
+        ? [
+            ["open_matching_details", "Visa beslut och underlag", "btn-primary"],
+            ["open_support_case", "Öppna stödärendet", "btn-outline-secondary", caseRecord.supportCaseId]
+          ]
+        : [
+            ["open_matching_details", "Registrera parternas svar", "btn-primary"],
+            ["open_activities", "Fortsätt aktiviteterna", "btn-outline-primary"],
+            ["close_case", "Avsluta matchningen", "btn-outline-secondary"]
+          ];
+  els.caseTransitionChoices.hidden = false;
+  els.caseTransitionChoices.innerHTML = actions
+    .filter(([, , , targetId]) => targetId !== null)
+    .map(([action, label, className, targetId = ""]) => `<button type="button" class="btn ${className}" data-case-flow-action="${action}" data-target-id="${escapeHtml(targetId)}">${escapeHtml(label)}</button>`)
+    .join("");
+}
+
 function renderCaseTransitionPanel(caseRecord) {
   const isSupport = caseRecord.caseTypeId === "parent-support";
   const isMatching = caseRecord.caseTypeId === "matching";
@@ -6349,9 +6404,14 @@ function renderCaseTransitionPanel(caseRecord) {
   els.caseTransitionStatus.hidden = true;
   els.caseTransitionChoices.hidden = true;
   els.caseTransitionChoices.innerHTML = "";
-  els.matchingOutcomeForm.hidden = !isMatching;
+  els.matchingDetails.hidden = !isMatching;
+  if (isMatching && els.matchingDetails.dataset.caseId !== caseRecord.id) {
+    els.matchingDetails.open = false;
+    els.matchingDetails.dataset.caseId = caseRecord.id;
+  }
+  els.matchingOutcomeForm.hidden = !isMatching || caseRecord.status === "closed";
   renderMatchingDecisionSummary(caseRecord);
-  renderCaseSecondaryDetails(caseRecord, isSupport);
+  renderCaseSecondaryDetails(caseRecord, isSupport || isMatching);
   if (isSupport) {
     els.caseWorkGuidance.hidden = true;
     els.caseTransitionTitle.textContent = "Vad ska hända med stödärendet?";
@@ -6361,19 +6421,17 @@ function renderCaseTransitionPanel(caseRecord) {
   if (isMatching) {
     const linkedAssignment = cases.find((item) => item.sourceMatchingCaseId === caseRecord.id && item.caseTypeId === "mentor-assignment");
     const acceptedWithoutAssignment = !linkedAssignment && matchingOutcome(caseRecord.details?.parentResponse, caseRecord.details?.mentorResponse) === "accepted";
-    els.caseTransitionTitle.textContent = linkedAssignment ? "Matchningen har blivit ett uppdrag" : acceptedWithoutAssignment ? "Accepterad, uppdrag ej skapat" : "Parternas återkoppling";
-    els.caseTransitionHelp.innerHTML = linkedAssignment
-      ? `Uppdraget finns i <a href="#/case/${escapeHtml(linkedAssignment.id)}">${escapeHtml(linkedAssignment.number)}</a>.`
-      : acceptedWithoutAssignment
-        ? "Båda parter har accepterat. Skapa uppdraget här när den interna avstämningen är klar, eller ändra svaren om förutsättningarna har ändrats."
-        : "Registrera förälderns och mentorns svar separat. Ett uppdrag erbjuds först när båda accepterar.";
-    els.matchingOutcomeForm.hidden = Boolean(linkedAssignment);
+    els.caseWorkGuidance.hidden = true;
+    els.caseTransitionTitle.textContent = "Vad ska hända med matchningen?";
+    els.caseTransitionHelp.textContent = "Välj nästa steg. Underlag och separata svar från båda parter finns kvar under den utfällbara rubriken.";
+    els.matchingOutcomeForm.hidden = Boolean(linkedAssignment) || caseRecord.status === "closed";
     els.matchingProposalInput.value = caseRecord.details?.matchingProposal || "";
     els.parentMatchResponseInput.value = caseRecord.details?.parentResponse || "";
     els.mentorMatchResponseInput.value = caseRecord.details?.mentorResponse || "";
     els.matchingOutcomeNoteInput.value = caseRecord.details?.matchingNote || "";
     els.createAssignmentAfterMatchInput.checked = true;
     els.matchingOutcomeSubmitButton.textContent = acceptedWithoutAssignment ? "Skapa mentoruppdrag" : "Spara matchningsunderlag";
+    renderMatchingCaseChoices(caseRecord);
   }
 }
 
@@ -9593,8 +9651,32 @@ els.caseTransitionChoices.addEventListener("click", (event) => {
     els.caseCreateForm.dataset.route = "";
     renderCaseDetail();
     requestAnimationFrame(() => els.caseDescriptionInput.focus());
+    return;
   }
-  if (action === "start_matching" && caseRecord.caseTypeId === "parent-support") navigateToNewMatching(caseRecord.id);
+  if (action === "start_matching" && caseRecord.caseTypeId === "parent-support") {
+    navigateToNewMatching(caseRecord.id);
+    return;
+  }
+  if (action === "open_matching_details") {
+    els.matchingDetails.open = true;
+    requestAnimationFrame(() => els.matchingProposalInput.focus());
+    return;
+  }
+  if (action === "create_assignment") {
+    els.createAssignmentAfterMatchInput.checked = true;
+    els.matchingOutcomeForm.requestSubmit();
+    return;
+  }
+  if (action === "open_activities") {
+    const firstOpenActivity = activitiesForCase(caseRecord.id).find((activity) => !["completed", "not_applicable"].includes(activity.status));
+    if (firstOpenActivity) openCaseActivity(firstOpenActivity.id);
+    else bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-activities-tab")).show();
+    return;
+  }
+  if (action === "open_case" || action === "open_support_case") {
+    if (button.dataset.targetId) navigateToCase(button.dataset.targetId);
+    return;
+  }
   if (action === "close_case") openCaseLifecycle("close");
 });
 

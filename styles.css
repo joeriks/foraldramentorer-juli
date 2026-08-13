@@ -1621,6 +1621,21 @@ body {
   min-height: 2.75rem;
 }
 
+.case-transition-details {
+  border-top: 1px solid var(--app-border);
+}
+
+.case-transition-details > summary {
+  padding: var(--app-space-3) 0;
+  color: var(--app-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.case-transition-details-content {
+  padding-top: var(--app-space-2);
+}
+
 .case-secondary-details.is-guided {
   border-top: 1px solid var(--app-border);
 }
