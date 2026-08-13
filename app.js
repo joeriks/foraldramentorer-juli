@@ -119,15 +119,39 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "69",
+    date: "2026-08-13",
+    title: "Tre tydliga vägar efter inkommande kontakt",
+    flow: "Inkommande kontakt → bedöm nästa steg → följ upp, skapa ärende eller avsluta",
+    simplified: "Efter sparning väljer handläggaren en av tre tydliga vägar. Berörd person och kontakttyp ligger under Fler uppgifter och behöver inte hanteras under själva kontakten.",
+    retained: "Den fria nästa-steg-texten, kontaktanteckningen, mottagningsärendet och möjligheten att starta en annan ärendetyp finns kvar.",
+    changes: [
+      "Följ upp senare markerar mottagningsärendet som väntande.",
+      "Skapa nytt ärende öppnar ordinarie registrering med vald ärendetyp och kontaktuppgifterna förifyllda.",
+      "Avsluta kontakten stänger mottagningsärendet men bevarar historiken."
+    ]
+  },
+  {
+    version: "68",
+    date: "2026-08-13",
+    title: "Förenklingar dokumenteras per flöde",
+    flow: "Systemadministration / Versioner",
+    simplified: "Varje versionspost visar direkt vilket flöde som berörts, vad som förenklats och vilken viktig funktionalitet som bevarats.",
+    retained: "Den kronologiska ändringshistoriken, versionsnumren och publiceringsdatumen finns kvar.",
+    changes: [
+      "Version 67 märktes i Git som stabil baslinje före flödesförenklingarna.",
+      "Versionsbeskrivningarna fick en gemensam och jämförbar struktur."
+    ]
+  },
+  {
     version: "67",
     date: "2026-08-11",
-    title: "Versionshistorik och återställningspunkt",
+    title: "Versionshistorik",
     flow: "Systemadministration / Versioner",
     simplified: "Publicerade ändringar samlas i en kort, kronologisk historik i stället för att behöva sökas fram i Git-historiken.",
     retained: "Versionsnummer, publiceringsdatum och de viktigaste ändringarna finns kvar som separata uppgifter.",
     changes: [
-      "En egen versionssida lades till under Systemadministration.",
-      "Version 67 är märkt i Git som stabil baslinje före kommande flödesförenklingar."
+      "En egen versionssida lades till under Systemadministration."
     ]
   },
   {
@@ -612,6 +636,7 @@ let parentEditMode = false;
 let activeIncomingContactId = null;
 let incomingContactParentId = null;
 let incomingContactStartedAt = null;
+let pendingIncomingContactId = null;
 let selectedCaseRecordId = null;
 let caseRouteIntent = "";
 let caseRouteTargetId = "";
@@ -782,8 +807,11 @@ const els = {
   incomingContactSummaryInput: document.querySelector("#incomingContactSummaryInput"),
   incomingContactNextStepInput: document.querySelector("#incomingContactNextStepInput"),
   incomingContactSavedSummary: document.querySelector("#incomingContactSavedSummary"),
+  incomingContactFollowUpButton: document.querySelector("#incomingContactFollowUpButton"),
+  incomingContactCaseTypeInput: document.querySelector("#incomingContactCaseTypeInput"),
+  incomingContactCreateCaseButton: document.querySelector("#incomingContactCreateCaseButton"),
+  incomingContactCloseButton: document.querySelector("#incomingContactCloseButton"),
   incomingContactOpenCaseButton: document.querySelector("#incomingContactOpenCaseButton"),
-  incomingContactDoneButton: document.querySelector("#incomingContactDoneButton"),
   administrationView: document.querySelector("#administrationView"),
   caseNumberingAdministrationView: document.querySelector("#caseNumberingAdministrationView"),
   caseNumberingForm: document.querySelector("#caseNumberingForm"),
@@ -1971,7 +1999,7 @@ async function loadCaseTypeDefinitions() {
     ...(storedById.get(fallback.id) || {}),
     name: fallback.name,
     creationMode: fallback.creationMode,
-    ...(["parent-support", "matching", "mentor-assignment"].includes(fallback.id) ? {
+    ...(["incoming-contact", "parent-support", "matching", "mentor-assignment"].includes(fallback.id) ? {
       parentMode: fallback.parentMode,
       helpText: fallback.helpText,
       registrationHint: fallback.registrationHint,
@@ -5145,9 +5173,29 @@ function showIncomingContactNextStep(contact) {
   incomingContactParentId = contact.parentId || null;
   els.incomingContactCaptureStep.hidden = true;
   els.incomingContactNextStep.hidden = false;
-  els.incomingContactSavedSummary.textContent = contact.intakeCaseId
-    ? "Ett mottagningsärende har skapats med anteckning och nästa steg."
+  els.incomingContactSavedSummary.textContent = contact.nextStep
+    ? `Nästa steg: ${contact.nextStep}`
     : "Kontakten är sparad.";
+  const options = caseTypeDefinitions
+    .filter((definition) => definition.creationMode === "manual" && definition.id !== "incoming-contact")
+    .map((definition) => `<option value="${escapeHtml(definition.id)}">${escapeHtml(definition.name)}</option>`);
+  els.incomingContactCaseTypeInput.innerHTML = ['<option value="">Välj ärendetyp</option>', ...options].join("");
+  els.incomingContactCaseTypeInput.setCustomValidity("");
+}
+
+function prefillCaseFromIncomingContact(contact) {
+  if (!contact) return;
+  const firstLine = contact.summary.split(/[.!?\n]/)[0].trim();
+  els.caseTitleInput.value = (firstLine || contact.parentName || contact.contactDetails).slice(0, 100);
+  els.caseDescriptionInput.value = [
+    contact.summary,
+    contact.nextStep ? `Nästa steg: ${contact.nextStep}` : "",
+    `Kontaktväg: ${incomingContactChannelLabels[contact.channel] || contact.channel}`,
+    `Kontaktuppgift: ${contact.contactDetails}`
+  ].filter(Boolean).join("\n\n");
+  if (els.caseTypeInput.value === "parent-support" && els.supportPurposeInput) {
+    els.supportPurposeInput.value = contact.summary;
+  }
 }
 
 async function createIncomingContactCase(contact, now = new Date().toISOString()) {
@@ -5207,15 +5255,62 @@ async function updateIncomingContactHandling(contact, status, { closeCase = fals
   const updatedContact = { ...contact, status, updatedAt: now, updatedBy: CURRENT_USER_ID };
   const intakeCase = cases.find((item) => item.id === contact.intakeCaseId);
   const caseUpdates = [];
+  const activityUpdates = [];
   const events = [];
   if (intakeCase) {
     const nextCase = closeCase
-      ? { ...intakeCase, status: "closed", closeNote: feedback || "Kontakten avslutades utan fortsatt ärende.", closedAt: now, closedBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID }
-      : { ...intakeCase, status: "waiting", updatedAt: now, updatedBy: CURRENT_USER_ID };
+      ? { ...intakeCase, status: "closed", closeNote: feedback || "Kontakten avslutades utan fortsatt ärende.", closedAt: now, closedBy: CURRENT_USER_ID, version: intakeCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID }
+      : { ...intakeCase, status: "waiting", version: intakeCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
     caseUpdates.push(nextCase);
+    if (closeCase) {
+      for (const activity of activitiesForCase(intakeCase.id)) {
+        if (["completed", "not_applicable"].includes(activity.status)) continue;
+        activityUpdates.push({ ...activity, status: "not_applicable", version: activity.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID });
+      }
+    }
     events.push(caseEventRecord({ caseId: intakeCase.id, eventType: closeCase ? "case_closed" : "case_updated", entityType: "case", entityId: intakeCase.id, message: feedback || "Kontakten markerades för uppföljning", idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now }));
   }
-  await atomicPut({ [INCOMING_CONTACTS_STORE]: [updatedContact], ...(caseUpdates.length ? { [CASES_STORE]: caseUpdates, [CASE_EVENTS_STORE]: events } : {}) });
+  await atomicPut({
+    [INCOMING_CONTACTS_STORE]: [updatedContact],
+    ...(caseUpdates.length ? { [CASES_STORE]: caseUpdates, [CASE_EVENTS_STORE]: events } : {}),
+    ...(activityUpdates.length ? { [CASE_ACTIVITIES_STORE]: activityUpdates } : {})
+  });
+}
+
+async function completeIncomingContactWithCase(contact, caseId, caseNumber) {
+  const now = new Date().toISOString();
+  const intakeCase = cases.find((item) => item.id === contact.intakeCaseId);
+  const linkedContact = { ...contact, caseId, status: "linked", updatedAt: now, updatedBy: CURRENT_USER_ID };
+  const closedIntakeCase = intakeCase
+    ? {
+        ...intakeCase,
+        status: "closed",
+        closeNote: `Ärende ${caseNumber || caseId} skapades från kontakten.`,
+        closedAt: now,
+        closedBy: CURRENT_USER_ID,
+        version: intakeCase.version + 1,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_ID
+      }
+    : null;
+  const events = [
+    caseEventRecord({ caseId, eventType: "case_updated", entityType: "incoming_contact", entityId: contact.id, message: "Ärendet skapades från en inkommande kontakt", idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now })
+  ];
+  if (closedIntakeCase) {
+    events.push(caseEventRecord({ caseId: closedIntakeCase.id, eventType: "case_closed", entityType: "case", entityId: closedIntakeCase.id, message: `Mottagningsärendet avslutades när ärende ${caseNumber || caseId} skapades`, idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now }));
+  }
+  const activityUpdates = intakeCase
+    ? activitiesForCase(intakeCase.id)
+        .filter((activity) => !["completed", "not_applicable"].includes(activity.status))
+        .map((activity) => ({ ...activity, status: "not_applicable", version: activity.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID }))
+    : [];
+  await atomicPut({
+    [INCOMING_CONTACTS_STORE]: [linkedContact],
+    ...(closedIntakeCase ? { [CASES_STORE]: [closedIntakeCase] } : {}),
+    ...(activityUpdates.length ? { [CASE_ACTIVITIES_STORE]: activityUpdates } : {}),
+    [CASE_EVENTS_STORE]: events
+  });
+  pendingIncomingContactId = null;
 }
 
 function incomingContactCasePatch(contact, now) {
@@ -6474,6 +6569,9 @@ function renderCaseDetail() {
       if (supportCaseId) els.caseTypeInput.value = "matching";
       if (parentId) els.caseTypeInput.value = "parent-support";
       renderCaseTypeGuidance();
+      if (selectedCaseRecordId === "new" && pendingIncomingContactId) {
+        prefillCaseFromIncomingContact(incomingContactById(pendingIncomingContactId));
+      }
       els.caseCreateForm.dataset.route = selectedCaseRecordId;
     }
     return;
@@ -9286,7 +9384,39 @@ els.incomingContactOpenCaseButton.addEventListener("click", () => {
   bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
   if (contact?.intakeCaseId) navigateToCase(contact.intakeCaseId);
 });
-els.incomingContactDoneButton.addEventListener("click", () => bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide());
+els.incomingContactFollowUpButton.addEventListener("click", async () => {
+  const contact = incomingContactById(activeIncomingContactId);
+  if (!contact) return;
+  await updateIncomingContactHandling(contact, "needs_follow_up", { feedback: `Nästa steg: ${contact.nextStep}` });
+  bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
+  await refresh();
+  showFeedback("Kontakten är markerad för uppföljning.");
+});
+els.incomingContactCreateCaseButton.addEventListener("click", () => {
+  const contact = incomingContactById(activeIncomingContactId);
+  const caseTypeId = els.incomingContactCaseTypeInput.value;
+  if (!contact) return;
+  if (!caseTypeId) {
+    els.incomingContactCaseTypeInput.setCustomValidity("Välj vilken ärendetyp som ska skapas.");
+    els.incomingContactCaseTypeInput.reportValidity();
+    return;
+  }
+  els.incomingContactCaseTypeInput.setCustomValidity("");
+  pendingIncomingContactId = contact.id;
+  newCaseTypePreset = caseTypeId;
+  els.caseCreateForm.dataset.route = "";
+  bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
+  navigateTo("#/case/new");
+});
+els.incomingContactCaseTypeInput.addEventListener("change", () => els.incomingContactCaseTypeInput.setCustomValidity(""));
+els.incomingContactCloseButton.addEventListener("click", async () => {
+  const contact = incomingContactById(activeIncomingContactId);
+  if (!contact) return;
+  await updateIncomingContactHandling(contact, "closed", { closeCase: true, feedback: "Kontakten avslutades utan fortsatt handläggning." });
+  bootstrap.Offcanvas.getOrCreateInstance(els.incomingContactOffcanvas).hide();
+  await refresh();
+  showFeedback("Kontakten har avslutats. Historiken finns kvar.");
+});
 
 els.caseSearchInput.addEventListener("input", () => {
   caseSearchTerm = els.caseSearchInput.value;
@@ -9995,6 +10125,7 @@ els.editCaseButton.addEventListener("click", () => {
 
 els.cancelCaseCreateButton.addEventListener("click", () => {
   newCaseTypePreset = "";
+  pendingIncomingContactId = null;
   if (caseEditMode) {
     caseEditMode = false;
     renderCaseDetail();
@@ -10007,6 +10138,7 @@ async function submitCaseForm(event) {
   event.preventDefault();
   clearCaseFormError();
   const existingCase = caseEditMode ? selectedCaseRecord() : null;
+  const sourceIncomingContact = existingCase ? null : incomingContactById(pendingIncomingContactId);
   const returnActivityId = existingCase && caseRouteIntent === "edit" ? caseRouteTargetId : "";
   const id = existingCase?.id || crypto.randomUUID();
   const requestedMentorName = els.caseMentorInput.value.trim();
@@ -10096,6 +10228,9 @@ async function submitCaseForm(event) {
           return { caseId: currentCase.id, version: updated.version };
         }
       });
+      if (sourceIncomingContact) {
+        await completeIncomingContactWithCase(sourceIncomingContact, targetCase.id, targetCase.number);
+      }
       markSaved();
       await refresh();
       navigateToCase(targetCase.id);
@@ -10137,6 +10272,7 @@ async function submitCaseForm(event) {
     configuredDetails.supportAreaIds = selectedSupportAreaIdsFrom(els.caseSupportAreaChoices, "caseSupportArea");
     configuredDetails.supportAreaStatus = configuredDetails.supportAreaIds.length ? "confirmed" : "to_confirm";
   }
+  if (sourceIncomingContact) configuredDetails.intakeContactId = sourceIncomingContact.id;
   const allocatedCaseNumber = existingCase?.number || await reserveCaseNumber();
   await executeCaseCommand({
     commandType: existingCase ? "update_case" : "quick_register_case",
@@ -10221,6 +10357,9 @@ async function submitCaseForm(event) {
       return { caseId: id, version: caseRecord.version };
     }
   });
+  if (sourceIncomingContact) {
+    await completeIncomingContactWithCase(sourceIncomingContact, id, allocatedCaseNumber);
+  }
   const savedCaseForMatching = {
     ...(existingCase || {}),
     id,
@@ -11603,7 +11742,10 @@ document.addEventListener("click", (event) => {
   navigateTo(link.getAttribute("href"));
 });
 
-window.addEventListener("hashchange", renderAll);
+window.addEventListener("hashchange", () => {
+  if (pendingIncomingContactId && window.location.hash !== "#/case/new") pendingIncomingContactId = null;
+  renderAll();
+});
 
 openDatabase()
   .then(async (database) => {

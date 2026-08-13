@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260813-versions-v2">
+    <link rel="stylesheet" href="styles.css?v=20260813-contact-flow-v1">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -1827,10 +1827,17 @@
             <div class="row g-3">
               <div class="col-12"><label class="form-label" for="incomingContactChannelInput">Kontaktväg</label><select id="incomingContactChannelInput" class="form-select" required><option value="phone">Telefon</option><option value="email">E-post</option><option value="visit">Besök</option><option value="other">Annan</option></select></div>
               <div class="col-12"><label class="form-label" for="incomingContactDetailsInput">Kontaktuppgift</label><input id="incomingContactDetailsInput" class="form-control" autocomplete="off" required placeholder="Telefonnummer eller e-postadress"><div class="form-text">Skriv hur personen eller verksamheten kan nås igen.</div></div>
-              <div class="col-12"><label class="form-label" for="incomingContactParentNameInput">Berörd person <span class="text-secondary fw-normal">(om känd)</span></label><input id="incomingContactParentNameInput" class="form-control" autocomplete="off" placeholder="Namn på den person kontakten gäller"></div>
-              <div class="col-12"><label class="form-label" for="incomingContactCallerTypeInput">Vem kontaktar kommunen?</label><select id="incomingContactCallerTypeInput" class="form-select" required><option value="self">Personen själv</option><option value="relative">Närstående</option><option value="school">Skola</option><option value="healthcare">Hälso- och sjukvård</option><option value="social_services">Socialtjänst</option><option value="other">Annan</option></select></div>
               <div class="col-12"><label class="form-label" for="incomingContactSummaryInput">Kort anteckning</label><textarea id="incomingContactSummaryInput" class="form-control" rows="5" required placeholder="Vad gäller kontakten och hur kan personen nås?"></textarea></div>
               <div class="col-12"><label class="form-label" for="incomingContactNextStepInput">Nästa steg efter kontakten</label><textarea id="incomingContactNextStepInput" class="form-control" rows="3" required placeholder="Skriv i ord vad som ska göras när samtalet eller mejlet är hanterat."></textarea></div>
+              <div class="col-12">
+                <details class="incoming-contact-more">
+                  <summary>Fler uppgifter</summary>
+                  <div class="row g-3 pt-3">
+                    <div class="col-12"><label class="form-label" for="incomingContactParentNameInput">Berörd person <span class="text-secondary fw-normal">(om känd)</span></label><input id="incomingContactParentNameInput" class="form-control" autocomplete="off" placeholder="Namn på den person kontakten gäller"></div>
+                    <div class="col-12"><label class="form-label" for="incomingContactCallerTypeInput">Vem kontaktar kommunen?</label><select id="incomingContactCallerTypeInput" class="form-select"><option value="self">Personen själv</option><option value="relative">Närstående</option><option value="school">Skola</option><option value="healthcare">Hälso- och sjukvård</option><option value="social_services">Socialtjänst</option><option value="other">Annan</option></select></div>
+                  </div>
+                </details>
+              </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-4"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">Avbryt</button><button type="submit" class="btn btn-primary">Spara kontakten</button></div>
           </form>
@@ -1838,11 +1845,20 @@
         <div id="incomingContactNextStep" hidden>
           <div class="alert alert-success"><strong>Kontakten är sparad.</strong><div id="incomingContactSavedSummary" class="small mt-1"></div></div>
           <h3 class="h6">Vad ska hända nu?</h3>
-          <p class="text-secondary small">Nästa steg finns sparat i mottagningsärendet. Öppna ärendet om du vill tilldela, komplettera eller avsluta det.</p>
-          <div class="d-grid gap-2">
-            <button id="incomingContactOpenCaseButton" type="button" class="btn btn-primary text-start">Öppna mottagningsärendet</button>
+          <p class="text-secondary small">Välj hur kontakten ska tas vidare. Anteckningen och nästa steg finns kvar i mottagningsärendet.</p>
+          <div class="incoming-contact-actions">
+            <button id="incomingContactFollowUpButton" type="button" class="btn btn-primary text-start">Följ upp senare</button>
+            <div class="incoming-contact-case-choice">
+              <label class="form-label" for="incomingContactCaseTypeInput">Skapa ett nytt ärende</label>
+              <select id="incomingContactCaseTypeInput" class="form-select"><option value="">Välj ärendetyp</option></select>
+              <button id="incomingContactCreateCaseButton" type="button" class="btn btn-outline-primary">Fortsätt till ärendet</button>
+            </div>
+            <button id="incomingContactCloseButton" type="button" class="btn btn-outline-secondary text-start">Avsluta kontakten</button>
           </div>
-          <button id="incomingContactDoneButton" type="button" class="btn btn-link px-0 mt-3">Stäng och hantera senare</button>
+          <details class="incoming-contact-more mt-3">
+            <summary>Fler alternativ</summary>
+            <button id="incomingContactOpenCaseButton" type="button" class="btn btn-link px-0 mt-2">Öppna mottagningsärendet</button>
+          </details>
         </div>
       </div>
     </aside>
@@ -2027,6 +2043,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260813-versions-v2"></script>
+    <script type="module" src="app.js?v=20260813-contact-flow-v1"></script>
   </body>
 </html>

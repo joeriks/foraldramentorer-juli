@@ -28,6 +28,12 @@ test("serves the application shell", async () => {
   assert.match(html, /Berörd person/);
   assert.match(html, /id="incomingContactNextStepInput"/);
   assert.match(html, /Nästa steg efter kontakten/);
+  assert.match(html, /id="incomingContactFollowUpButton"/);
+  assert.match(html, /id="incomingContactCaseTypeInput"/);
+  assert.match(html, /id="incomingContactCreateCaseButton"/);
+  assert.match(html, /id="incomingContactCloseButton"/);
+  assert.match(html, /Fler uppgifter/);
+  assert.doesNotMatch(html, /id="incomingContactDoneButton"/);
   assert.doesNotMatch(html, /Möjlig befintlig personpost/);
   assert.match(html, /id="caseTypeFilter"/);
   assert.match(html, /<option value="open">Öppna<\/option>/);
@@ -98,9 +104,12 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /function renderCaseClosureSummary/);
   assert.match(scriptText, /function newCaseButtonLabel/);
   assert.match(scriptText, /function createIncomingContactCase/);
+  assert.match(scriptText, /function completeIncomingContactWithCase/);
+  assert.match(scriptText, /function prefillCaseFromIncomingContact/);
   assert.match(scriptText, /APP_VERSION_HISTORY/);
   assert.match(scriptText, /function renderVersions/);
-  assert.match(scriptText, /Versionshistorik och återställningspunkt/);
+  assert.match(scriptText, /Tre tydliga vägar efter inkommande kontakt/);
+  assert.match(scriptText, /Förenklingar dokumenteras per flöde/);
   assert.match(scriptText, /Berört flöde/);
   assert.match(scriptText, /Förenklat/);
   assert.match(scriptText, /Bevarat/);

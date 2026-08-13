@@ -73,6 +73,36 @@
   cursor: pointer;
 }
 
+.incoming-contact-more {
+  border-top: 1px solid var(--bs-border-color);
+}
+
+.incoming-contact-more summary {
+  padding-top: 0.75rem;
+  color: var(--bs-secondary-color);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.incoming-contact-actions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.incoming-contact-case-choice {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 4px;
+  background: var(--bs-tertiary-bg);
+}
+
+.incoming-contact-case-choice .form-label {
+  margin: 0;
+  font-weight: 600;
+}
+
 .support-panel .offcanvas-body {
   min-height: 0;
   overflow: hidden;

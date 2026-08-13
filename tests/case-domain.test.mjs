@@ -284,6 +284,12 @@ test("defines registration guidance and mentor rules for every case type", () =>
   assert.equal(CASE_TYPE_DEFINITIONS.find((item) => item.id === "mentor-certification").mentorMode, "required");
 });
 
+test("keeps incoming contact handling focused on the recorded next step", () => {
+  const incomingContact = CASE_TYPE_DEFINITIONS.find((item) => item.id === "incoming-contact");
+  assert.deepEqual(incomingContact.suggestedActivities, ["Följ angivet nästa steg", "Dokumentera ställningstagande"]);
+  assert.doesNotMatch(incomingContact.registrationHint, /måste koppla|personpost/i);
+});
+
 test("defines handling guidance for every activity template", () => {
   for (const template of ACTIVITY_TEMPLATES) {
     assert.ok(template.workInstruction, `${template.id} should explain how to perform the activity`);

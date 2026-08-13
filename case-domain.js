@@ -239,11 +239,11 @@ export const CASE_TYPE_DEFINITIONS = [
     nextCaseTypeId: "parent-support",
     mentorMode: "none",
     helpText: "Använd för en mottagen kontakt via telefon, e-post, besök eller annan kanal innan kommunen vet vad fortsatt handläggning ska bli.",
-    registrationHint: "Registrera kontaktväg, kontaktuppgift, vem som kontaktar kommunen, en kort saklig anteckning och vad nästa steg ska vara när kontakten är avslutad.",
-    workInstruction: "Följ det angivna nästa steget, komplettera med fler aktiviteter vid behov och avsluta mottagningsärendet när det är tydligt om kontakten kräver fortsatt handläggning.",
+    registrationHint: "Registrera kontaktväg, kontaktuppgift, en kort saklig anteckning och vad nästa steg ska vara. Uppgifter om berörd person och vem som kontaktar kommunen kan läggas till om de behövs.",
+    workInstruction: "Välj om kontakten ska följas upp senare, bli ett nytt ärende eller avslutas. Mottagningsärendet bevarar anteckningen och ställningstagandet.",
     detailFieldIds: [],
     defaultPriority: "normal",
-    suggestedActivities: ["Bedöm fortsatt hantering", "Koppla personpost eller ärende", "Dokumentera ställningstagande"]
+    suggestedActivities: ["Följ angivet nästa steg", "Dokumentera ställningstagande"]
   },
   {
     id: "parent-support",
