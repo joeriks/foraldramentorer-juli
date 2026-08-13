@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260813-flow-v73">
+    <link rel="stylesheet" href="styles.css?v=20260813-flow-v74">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -882,10 +882,15 @@
                     </div>
                   </section>
                   <section class="tab-pane fade card-body" id="assignment-followup-pane">
-                    <aside class="activity-guidance mb-4">
-                      <div><strong>Uppföljning och ersättning</strong><p class="mb-0">Mentorns rapport, förälderns återkoppling och handläggarens bedömning sparas som separata underlag. En rapporterad kontakt blir inte automatiskt godkänd för ersättning.</p></div>
-                    </aside>
+                    <section id="assignmentNextStepPanel" class="record-section mb-4">
+                      <h3 class="record-section-title mb-1">Nästa steg i uppföljningen</h3>
+                      <p id="assignmentNextStepStatus" class="case-transition-status"></p>
+                      <div id="assignmentNextStepActions" class="case-transition-choices"></div>
+                    </section>
 
+                    <details id="assignmentFollowupDetails" class="case-transition-details">
+                      <summary>Uppdragsplan, rapporter och tidigare avstämningar</summary>
+                      <div class="case-transition-details-content">
                     <section class="record-section mb-4">
                       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3"><div><h3 class="record-section-title mb-1">Uppdragsplan</h3><p id="assignmentPlanStatus" class="small text-secondary mb-0"></p></div></div>
                       <form id="assignmentPlanForm">
@@ -939,6 +944,8 @@
                       <div id="parentCheckInsEmpty" class="empty-list border rounded text-secondary">Inga föräldraavstämningar har registrerats.</div>
                       <div id="parentCheckInsTableWrap" class="table-responsive border rounded" hidden><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Datum</th><th>Genomförande</th><th>Samarbete</th><th>Relevans</th><th>Trygghet</th><th>Fortsatt läge</th><th>Handläggare</th></tr></thead><tbody id="parentCheckInsTableBody"></tbody></table></div>
                     </section>
+                      </div>
+                    </details>
 
                     <section class="record-section">
                       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3"><div><h3 class="record-section-title mb-1">Ersättningsperioder</h3><p class="small text-secondary mb-0">Perioden sammanställer mentorrapporter men kräver föräldraavstämning och ett uttryckligt beslut av handläggaren.</p></div><button id="newCompensationPeriodButton" type="button" class="btn btn-primary btn-sm">Ny ersättningsperiod</button></div>
@@ -2054,6 +2061,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260813-flow-v73"></script>
+    <script type="module" src="app.js?v=20260813-flow-v74"></script>
   </body>
 </html>

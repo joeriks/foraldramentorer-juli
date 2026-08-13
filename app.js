@@ -119,6 +119,18 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "74",
+    date: "2026-08-13",
+    title: "Handlingsstyrd uppföljning av mentoruppdrag",
+    flow: "Mentoruppdrag → rapport, föräldraavstämning eller uppföljningsärende",
+    simplified: "Uppföljningsvyn börjar med tre konkreta åtgärder. Uppdragsplan, tidigare rapporter och avstämningar visas först när handläggaren öppnar dem.",
+    retained: "Uppdragsplanen, mentorrapporterna, föräldraavstämningarna, aktiviteterna och möjligheten att skapa ett separat uppföljningsärende finns kvar.",
+    changes: [
+      "Vyn uppmärksammar ofullständig plan och rapporter där mentorn behöver stöd.",
+      "Separata uppföljningsärenden länkas till mentoruppdraget och förifylls."
+    ]
+  },
+  {
     version: "73",
     date: "2026-08-13",
     title: "Behovsanalys som leder vidare",
@@ -1092,6 +1104,9 @@ const els = {
   matchingOutcomeSubmitButton: document.querySelector("#matchingOutcomeSubmitButton"),
   assignmentFollowupTabItem: document.querySelector("#assignmentFollowupTabItem"),
   assignmentFollowupCount: document.querySelector("#assignmentFollowupCount"),
+  assignmentNextStepStatus: document.querySelector("#assignmentNextStepStatus"),
+  assignmentNextStepActions: document.querySelector("#assignmentNextStepActions"),
+  assignmentFollowupDetails: document.querySelector("#assignmentFollowupDetails"),
   assignmentPlanForm: document.querySelector("#assignmentPlanForm"),
   assignmentPlanStatus: document.querySelector("#assignmentPlanStatus"),
   assignmentStartDateInput: document.querySelector("#assignmentStartDateInput"),
@@ -5265,6 +5280,11 @@ function prefillCaseFromSourceCase(sourceCase) {
     sourceCase.description,
     `Skapat från ${sourceCase.number} · ${sourceCase.type}.`
   ].filter(Boolean).join("\n\n");
+  if (targetTypeId === "mentor-follow-up") {
+    const mentor = caseMentor(sourceCase);
+    els.caseMentorInput.value = mentor?.name || "";
+    els.caseMentorIdInput.value = mentor?.id || "";
+  }
 }
 
 async function registerSuccessorLink(sourceCase, successorCaseId, successorNumber, successorType) {
@@ -6534,12 +6554,46 @@ function renderNeedsAnalysisChoices(caseRecord) {
     .join("");
 }
 
+function renderAssignmentCaseChoices(caseRecord) {
+  const records = assignmentRecords(caseRecord.id);
+  const plan = caseRecord.details?.assignmentPlan || {};
+  const planReady = Boolean(plan.startDate && plan.endDate && plan.firstFollowUpDate);
+  const followUpCase = successorCases(caseRecord).find((item) => item.caseTypeId === "mentor-follow-up");
+  const latestReport = records.reports[0];
+  els.caseTransitionStatus.hidden = false;
+  els.caseTransitionStatus.textContent = caseRecord.status === "closed"
+    ? "Mentoruppdraget är avslutat. Rapporter, avstämningar och ersättningsunderlag finns kvar."
+    : latestReport?.needsHandlerSupport
+      ? "Den senaste mentorrapporten anger att mentorn behöver stöd från handläggaren."
+      : !planReady
+        ? "Uppdragsplanen behöver kompletteras innan den löpande uppföljningen börjar."
+        : `${records.reports.length} mentorrapporter och ${records.checkIns.length} föräldraavstämningar är registrerade.`;
+  const actions = followUpCase
+    ? [
+        ["open_followup", "Öppna uppföljningen", "btn-primary"],
+        ["open_case", `Öppna ${followUpCase.number}`, "btn-outline-primary", followUpCase.id],
+        ...(caseRecord.status === "closed" ? [] : [["close_case", "Avsluta uppdraget", "btn-outline-secondary"]])
+      ]
+    : caseRecord.status === "closed"
+      ? [["open_followup", "Visa uppföljningshistoriken", "btn-primary"]]
+      : [
+          ["open_followup", planReady ? "Registrera uppföljning" : "Komplettera uppdragsplanen", "btn-primary"],
+          ["create_successor", "Skapa uppföljningsärende", "btn-outline-primary", "mentor-follow-up"],
+          ["close_case", "Avsluta uppdraget", "btn-outline-secondary"]
+        ];
+  els.caseTransitionChoices.hidden = false;
+  els.caseTransitionChoices.innerHTML = actions
+    .map(([action, label, className, targetId = ""]) => `<button type="button" class="btn ${className}" data-case-flow-action="${action}" data-target-id="${escapeHtml(targetId)}">${escapeHtml(label)}</button>`)
+    .join("");
+}
+
 function renderCaseTransitionPanel(caseRecord) {
   const isSupport = caseRecord.caseTypeId === "parent-support";
   const isMatching = caseRecord.caseTypeId === "matching";
   const isCertification = caseRecord.caseTypeId === "mentor-certification";
   const isNeedsAnalysis = caseRecord.caseTypeId === "needs-analysis";
-  els.caseTransitionPanel.hidden = !isSupport && !isMatching && !isCertification && !isNeedsAnalysis;
+  const isAssignment = caseRecord.caseTypeId === "mentor-assignment";
+  els.caseTransitionPanel.hidden = !isSupport && !isMatching && !isCertification && !isNeedsAnalysis && !isAssignment;
   els.caseTransitionStatus.hidden = true;
   els.caseTransitionChoices.hidden = true;
   els.caseTransitionChoices.innerHTML = "";
@@ -6550,7 +6604,7 @@ function renderCaseTransitionPanel(caseRecord) {
   }
   els.matchingOutcomeForm.hidden = !isMatching || caseRecord.status === "closed";
   renderMatchingDecisionSummary(caseRecord);
-  renderCaseSecondaryDetails(caseRecord, isSupport || isMatching || isCertification || isNeedsAnalysis);
+  renderCaseSecondaryDetails(caseRecord, isSupport || isMatching || isCertification || isNeedsAnalysis || isAssignment);
   if (isSupport) {
     els.caseWorkGuidance.hidden = true;
     els.caseTransitionTitle.textContent = "Vad ska hända med stödärendet?";
@@ -6583,6 +6637,12 @@ function renderCaseTransitionPanel(caseRecord) {
     els.caseTransitionTitle.textContent = "Vad ska hända med behovsanalysen?";
     els.caseTransitionHelp.textContent = "Komplettera analysen, skapa en rekryteringsinsats eller avsluta. Analysunderlaget förs vidare när en insats skapas.";
     renderNeedsAnalysisChoices(caseRecord);
+  }
+  if (isAssignment) {
+    els.caseWorkGuidance.hidden = true;
+    els.caseTransitionTitle.textContent = "Vad ska hända med mentoruppdraget?";
+    els.caseTransitionHelp.textContent = "Öppna den löpande uppföljningen, skapa ett separat uppföljningsärende vid behov eller avsluta uppdraget.";
+    renderAssignmentCaseChoices(caseRecord);
   }
 }
 
@@ -6659,6 +6719,36 @@ function formatMinutes(minutes) {
   return hours ? `${hours} h${rest ? ` ${rest} min` : ""}` : `${rest} min`;
 }
 
+function renderAssignmentNextSteps(caseRecord, records) {
+  const plan = caseRecord.details?.assignmentPlan || {};
+  const planReady = Boolean(plan.startDate && plan.endDate && plan.firstFollowUpDate);
+  const latestReport = records.reports[0];
+  const followUpCase = successorCases(caseRecord).find((item) => item.caseTypeId === "mentor-follow-up");
+  if (els.assignmentFollowupDetails.dataset.caseId !== caseRecord.id) {
+    els.assignmentFollowupDetails.open = false;
+    els.assignmentFollowupDetails.dataset.caseId = caseRecord.id;
+  }
+  els.assignmentNextStepStatus.textContent = caseRecord.status === "closed"
+    ? "Uppdraget är avslutat. Underlagen är låsta men finns kvar för granskning."
+    : latestReport?.needsHandlerSupport
+      ? "Mentorn har efterfrågat stöd. Registrera handläggarens fortsatta uppföljning."
+      : !planReady
+        ? "Börja med att komplettera uppdragsplanen."
+        : "Registrera nästa mentorrapport och föräldraavstämning när kontakterna har genomförts.";
+  const actions = caseRecord.status === "closed"
+    ? [["expand_history", "Visa uppföljningshistoriken", "btn-primary"]]
+    : [
+        [planReady ? "new_report" : "open_plan", planReady ? "Registrera mentorrapport" : "Komplettera uppdragsplanen", "btn-primary"],
+        ["new_checkin", "Registrera föräldraavstämning", "btn-outline-primary"],
+        followUpCase
+          ? ["open_case", `Öppna ${followUpCase.number}`, "btn-outline-secondary", followUpCase.id]
+          : ["create_followup", "Skapa uppföljningsärende", "btn-outline-secondary", "mentor-follow-up"]
+      ];
+  els.assignmentNextStepActions.innerHTML = actions
+    .map(([action, label, className, targetId = ""]) => `<button type="button" class="btn ${className}" data-assignment-followup-action="${action}" data-target-id="${escapeHtml(targetId)}">${escapeHtml(label)}</button>`)
+    .join("");
+}
+
 function renderAssignmentFollowup(caseRecord) {
   const isAssignment = caseRecord.caseTypeId === "mentor-assignment";
   els.assignmentFollowupTabItem.hidden = !isAssignment;
@@ -6671,6 +6761,7 @@ function renderAssignmentFollowup(caseRecord) {
 
   const { reports, checkIns, periods } = assignmentRecords(caseRecord.id);
   els.assignmentFollowupCount.textContent = reports.length + checkIns.length + periods.length;
+  renderAssignmentNextSteps(caseRecord, { reports, checkIns, periods });
   renderCompensationReadinessChecklist(caseRecord, { reports, checkIns, periods });
   const plan = caseRecord.details?.assignmentPlan || {};
   const planKey = `${caseRecord.id}-${caseRecord.updatedAt}`;
@@ -9828,6 +9919,10 @@ els.caseTransitionChoices.addEventListener("click", (event) => {
     navigateTo("#/case/new");
     return;
   }
+  if (action === "open_followup") {
+    bootstrap.Tab.getOrCreateInstance(document.querySelector("#assignment-followup-tab")).show();
+    return;
+  }
   if (action === "expand_secondary") {
     els.caseSecondaryDetails.open = true;
     requestAnimationFrame(() => els.caseSecondaryDetails.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -9853,6 +9948,36 @@ els.caseTransitionChoices.addEventListener("click", (event) => {
     return;
   }
   if (action === "close_case") openCaseLifecycle("close");
+});
+
+els.assignmentNextStepActions.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-assignment-followup-action]");
+  const caseRecord = selectedCaseRecord();
+  if (!button || !caseRecord || caseRecord.caseTypeId !== "mentor-assignment") return;
+  const action = button.dataset.assignmentFollowupAction;
+  if (["expand_history", "open_plan", "new_report", "new_checkin"].includes(action)) {
+    els.assignmentFollowupDetails.open = true;
+  }
+  if (action === "open_plan") {
+    requestAnimationFrame(() => els.assignmentStartDateInput.focus());
+    return;
+  }
+  if (action === "new_report") {
+    els.newMentorReportButton.click();
+    return;
+  }
+  if (action === "new_checkin") {
+    els.newParentCheckInButton.click();
+    return;
+  }
+  if (action === "create_followup") {
+    pendingSourceCaseId = caseRecord.id;
+    newCaseTypePreset = button.dataset.targetId || "mentor-follow-up";
+    els.caseCreateForm.dataset.route = "";
+    navigateTo("#/case/new");
+    return;
+  }
+  if (action === "open_case" && button.dataset.targetId) navigateToCase(button.dataset.targetId);
 });
 
 els.matchingOutcomeForm.addEventListener("submit", async (event) => {
@@ -10110,7 +10235,7 @@ els.parentCheckInForm.addEventListener("submit", async (event) => {
   const requiresNote = els.parentContactConfirmedInput.value !== "yes"
     || els.parentCollaborationInput.value !== "well"
     || els.parentRelevanceInput.value !== "yes"
-    || els.parentSafetyInput.value !== "safe"
+    || els.parentSafetyInput.value !== "yes"
     || els.parentContinueInput.value !== "continue";
   const note = els.parentCheckInNoteInput.value.trim();
   els.parentCheckInNoteInput.setCustomValidity(requiresNote && !note ? "Beskriv kort vad som avviker och vad som ska hända härnäst." : "");
