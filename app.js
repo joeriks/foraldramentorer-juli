@@ -119,6 +119,18 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "72",
+    date: "2026-08-13",
+    title: "En kontroll i taget vid mentorgodkännande",
+    flow: "Godkännande av mentor → nästa kontroll, beslut eller avslut",
+    simplified: "Ärendeöversikten lyfter nästa ofärdiga kontroll eller en avvikelse som måste hanteras, i stället för att visa hela kontrollkedjan som första arbetsyta.",
+    retained: "Samtliga kontroller, handlingar, intervjuer, avvikelser, beslutsvillkor och revisionshistorik finns kvar i aktiviteterna och mentorposten.",
+    changes: [
+      "När alla krav är klara leder huvudknappen till beslutet.",
+      "Blockerande avvikelser prioriteras före nästa ordinarie kontroll."
+    ]
+  },
+  {
     version: "71",
     date: "2026-08-13",
     title: "Matchning med tydligt beslutsläge",
@@ -6397,10 +6409,48 @@ function renderMatchingCaseChoices(caseRecord) {
     .join("");
 }
 
+function renderCertificationCaseChoices(caseRecord) {
+  const candidate = caseMentor(caseRecord);
+  const activities = activitiesForCase(caseRecord.id);
+  const applicable = activities.filter((activity) => activity.status !== "not_applicable");
+  const completed = applicable.filter((activity) => activity.status === "completed");
+  const attentionActivity = activities.find(activityHasBlockingResult);
+  const approval = certificationApprovalAssessment(candidate);
+  const projectedCandidate = candidate ? projectMentorWorkflow(candidate) : null;
+  const nextAction = projectedCandidate ? nextActionFor(projectedCandidate) : null;
+  const nextActivity = attentionActivity
+    || activities.find((activity) => activity.templateId === nextAction?.key)
+    || activities.find((activity) => !["completed", "not_applicable"].includes(activity.status));
+  els.caseTransitionStatus.hidden = false;
+  els.caseTransitionStatus.textContent = caseRecord.status === "closed"
+    ? `Prövningen är avslutad. ${completed.length} av ${applicable.length} kontroller slutfördes.`
+    : attentionActivity
+      ? `En avvikelse i ${attentionActivity.title.toLocaleLowerCase("sv-SE")} måste hanteras innan prövningen går vidare.`
+      : approval.allowed
+        ? "Alla krav är klara. Handläggaren kan fatta beslut om godkännande."
+        : `${completed.length} av ${applicable.length} kontroller är klara. Nästa steg: ${nextAction?.label || nextActivity?.title || "granska prövningen"}.`;
+  const primary = caseRecord.status === "closed"
+    ? ["view_mentor", "Öppna mentorposten", "btn-primary", candidate?.id]
+    : nextActivity
+      ? ["open_activity", attentionActivity ? "Hantera avvikelsen" : approval.allowed ? "Fatta beslut" : `Fortsätt: ${nextActivity.title}`, "btn-primary", nextActivity.id]
+      : ["open_mentor_next", "Granska prövningen", "btn-primary", candidate?.id];
+  const actions = [
+    primary,
+    ["open_activities", "Visa alla kontroller", "btn-outline-primary"],
+    ...(caseRecord.status === "closed" ? [] : [["close_case", "Avsluta utan godkännande", "btn-outline-secondary"]])
+  ];
+  els.caseTransitionChoices.hidden = false;
+  els.caseTransitionChoices.innerHTML = actions
+    .filter(([, , , targetId]) => targetId !== null)
+    .map(([action, label, className, targetId = ""]) => `<button type="button" class="btn ${className}" data-case-flow-action="${action}" data-target-id="${escapeHtml(targetId)}">${escapeHtml(label)}</button>`)
+    .join("");
+}
+
 function renderCaseTransitionPanel(caseRecord) {
   const isSupport = caseRecord.caseTypeId === "parent-support";
   const isMatching = caseRecord.caseTypeId === "matching";
-  els.caseTransitionPanel.hidden = !isSupport && !isMatching;
+  const isCertification = caseRecord.caseTypeId === "mentor-certification";
+  els.caseTransitionPanel.hidden = !isSupport && !isMatching && !isCertification;
   els.caseTransitionStatus.hidden = true;
   els.caseTransitionChoices.hidden = true;
   els.caseTransitionChoices.innerHTML = "";
@@ -6411,7 +6461,7 @@ function renderCaseTransitionPanel(caseRecord) {
   }
   els.matchingOutcomeForm.hidden = !isMatching || caseRecord.status === "closed";
   renderMatchingDecisionSummary(caseRecord);
-  renderCaseSecondaryDetails(caseRecord, isSupport || isMatching);
+  renderCaseSecondaryDetails(caseRecord, isSupport || isMatching || isCertification);
   if (isSupport) {
     els.caseWorkGuidance.hidden = true;
     els.caseTransitionTitle.textContent = "Vad ska hända med stödärendet?";
@@ -6432,6 +6482,12 @@ function renderCaseTransitionPanel(caseRecord) {
     els.createAssignmentAfterMatchInput.checked = true;
     els.matchingOutcomeSubmitButton.textContent = acceptedWithoutAssignment ? "Skapa mentoruppdrag" : "Spara matchningsunderlag";
     renderMatchingCaseChoices(caseRecord);
+  }
+  if (isCertification) {
+    els.caseWorkGuidance.hidden = true;
+    els.caseTransitionTitle.textContent = "Vad är nästa steg i mentorprövningen?";
+    els.caseTransitionHelp.textContent = "Arbeta med nästa kontroll eller avvikelse. Hela kontrollkedjan, underlaget och loggen finns kvar i sina flikar.";
+    renderCertificationCaseChoices(caseRecord);
   }
 }
 
@@ -9671,6 +9727,15 @@ els.caseTransitionChoices.addEventListener("click", (event) => {
     const firstOpenActivity = activitiesForCase(caseRecord.id).find((activity) => !["completed", "not_applicable"].includes(activity.status));
     if (firstOpenActivity) openCaseActivity(firstOpenActivity.id);
     else bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-activities-tab")).show();
+    return;
+  }
+  if (action === "open_activity" && button.dataset.targetId) {
+    openCaseActivity(button.dataset.targetId);
+    return;
+  }
+  if ((action === "open_mentor_next" || action === "view_mentor") && button.dataset.targetId) {
+    if (action === "open_mentor_next") pendingNextActionId = button.dataset.targetId;
+    navigateToCandidate(button.dataset.targetId);
     return;
   }
   if (action === "open_case" || action === "open_support_case") {
