@@ -43,6 +43,10 @@ test("serves the application shell", async () => {
   assert.match(html, /id="matchingDetails"/);
   assert.match(html, /id="caseTransitionChoices"/);
   assert.match(html, /id="caseSecondaryDetails"/);
+  assert.match(html, /id="matchingMentorPicker"/);
+  assert.match(html, /id="matchingMentorSearchInput"/);
+  assert.match(html, /id="matchingMentorAreaFilter"/);
+  assert.match(html, /id="matchingMentorResults"/);
   assert.match(html, /id="assignmentNextStepPanel"/);
   assert.match(html, /id="assignmentFollowupDetails"/);
   assert.match(html, /id="compensationNextStepPanel"/);
@@ -131,6 +135,9 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /Ingen nästa ärendetyp/);
   assert.match(scriptText, /function renderSupportCaseChoices/);
   assert.match(scriptText, /function renderMatchingCaseChoices/);
+  assert.match(scriptText, /function matchingCaseTitle/);
+  assert.match(scriptText, /function renderMatchingMentorPicker/);
+  assert.match(scriptText, /data-select-matching-mentor/);
   assert.match(scriptText, /function renderCertificationCaseChoices/);
   assert.match(scriptText, /function renderNeedsAnalysisChoices/);
   assert.match(scriptText, /function renderAssignmentCaseChoices/);
@@ -144,6 +151,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /Handlingsstyrd uppföljning av mentoruppdrag/);
   assert.match(scriptText, /Ett nästa steg i ersättningshanteringen/);
   assert.match(scriptText, /Tydligare riktning i ärendeflöden/);
+  assert.match(scriptText, /Matchning börjar med rätt mentorurval/);
   assert.match(scriptText, /data-case-flow-type/);
   assert.match(scriptText, /status=open/);
   assert.match(scriptText, /caseRecord\.status !== "closed"/);

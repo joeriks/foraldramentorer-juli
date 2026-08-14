@@ -119,6 +119,18 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "77",
+    date: "2026-08-14",
+    title: "Matchning börjar med rätt mentorurval",
+    flow: "Stödärende → ny matchning → välj mentor",
+    simplified: "Matchningsärendets rubrik hämtas från stödärendet och mentor väljs i en samlad sök- och filterlista i stället för genom ett litet namnfält.",
+    retained: "Endast godkända, aktiva mentorer kan väljas. Överlappande stödområden är fortsatt beslutsstöd och ersätter inte handläggarens bedömning eller parternas svar.",
+    changes: [
+      "Rubriken förifylls som Matchning följt av stödärendets syfte eller rubrik.",
+      "Mentorlistan kan sökas på namn, område, språk och tillgänglighet samt filtreras på stödärendets stödområden."
+    ]
+  },
+  {
     version: "76",
     date: "2026-08-14",
     title: "Tydligare riktning i ärendeflöden",
@@ -1040,6 +1052,12 @@ const els = {
   caseMentorInput: document.querySelector("#caseMentorInput"),
   caseMentorIdInput: document.querySelector("#caseMentorIdInput"),
   caseMentorSuggestions: document.querySelector("#caseMentorSuggestions"),
+  matchingMentorPicker: document.querySelector("#matchingMentorPicker"),
+  matchingMentorSearchInput: document.querySelector("#matchingMentorSearchInput"),
+  matchingMentorAreaFilter: document.querySelector("#matchingMentorAreaFilter"),
+  matchingMentorPickerSummary: document.querySelector("#matchingMentorPickerSummary"),
+  matchingMentorResults: document.querySelector("#matchingMentorResults"),
+  matchingMentorClearButton: document.querySelector("#matchingMentorClearButton"),
   caseParentField: document.querySelector("#caseParentField"),
   caseParentInput: document.querySelector("#caseParentInput"),
   caseParentIdInput: document.querySelector("#caseParentIdInput"),
@@ -5314,6 +5332,21 @@ function prefillCaseFromSourceCase(sourceCase) {
   }
 }
 
+function matchingCaseTitle(supportCase) {
+  const basis = supportCase?.details?.supportPurpose?.trim() || supportCase?.title?.trim() || "stödärende";
+  return `Matchning: ${basis}`.slice(0, 100);
+}
+
+function prefillMatchingFromSupportCase(supportCase) {
+  if (!supportCase) return;
+  const previousAutoTitle = els.caseTitleInput.dataset.autoMatchingTitle || "";
+  const nextTitle = matchingCaseTitle(supportCase);
+  if (!els.caseTitleInput.value.trim() || els.caseTitleInput.value === previousAutoTitle) {
+    els.caseTitleInput.value = nextTitle;
+  }
+  els.caseTitleInput.dataset.autoMatchingTitle = nextTitle;
+}
+
 async function registerSuccessorLink(sourceCase, successorCaseId, successorNumber, successorType) {
   const now = new Date().toISOString();
   const updatedSource = { ...sourceCase, version: sourceCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
@@ -6276,8 +6309,10 @@ function renderCaseTypeGuidance(caseRecord = null) {
   els.caseTypeRegistrationHint.textContent = caseType ? `Registrera: ${caseType.registrationHint}` : "";
 
   const mentorMode = caseType?.mentorMode || "optional";
-  els.caseMentorField.hidden = mentorMode === "none";
-  els.caseMentorInput.required = mentorMode === "required";
+  const usesMatchingMentorPicker = caseType?.id === "matching" && selectedCaseRecordId?.startsWith("new");
+  els.caseMentorField.hidden = mentorMode === "none" || usesMatchingMentorPicker;
+  els.matchingMentorPicker.hidden = !usesMatchingMentorPicker;
+  els.caseMentorInput.required = mentorMode === "required" && !usesMatchingMentorPicker;
   els.caseMentorLabel.innerHTML = mentorMode === "required"
     ? "Mentor"
     : 'Mentor <span class="text-secondary fw-normal">(valfritt)</span>';
@@ -6288,6 +6323,7 @@ function renderCaseTypeGuidance(caseRecord = null) {
     els.caseMentorSuggestions.innerHTML = "";
     els.caseDuplicatePanel.hidden = true;
   }
+  if (usesMatchingMentorPicker) renderMatchingMentorPicker();
 
   const parentMode = caseType?.parentMode || "none";
   els.caseParentField.hidden = parentMode !== "required";
@@ -6927,6 +6963,8 @@ function populateCaseForm(mentorId = "", caseRecord = null, parentId = "", suppo
   els.caseMentorIdInput.value = selectedMentor?.id || "";
   els.caseMentorSuggestions.hidden = true;
   els.caseMentorSuggestions.innerHTML = "";
+  els.matchingMentorSearchInput.value = "";
+  els.matchingMentorAreaFilter.dataset.supportCaseId = "";
   const selectedParent = parents.find((parent) => parent.id === (parentId || caseRecord?.parentId));
   els.caseParentInput.value = selectedParent?.name || "";
   els.caseParentIdInput.value = selectedParent?.id || "";
@@ -6998,6 +7036,10 @@ function renderCaseDetail() {
       if (supportCaseId) els.caseTypeInput.value = "matching";
       if (parentId) els.caseTypeInput.value = "parent-support";
       renderCaseTypeGuidance();
+      if (supportCaseId) {
+        prefillMatchingFromSupportCase(supportCase);
+        renderMatchingMentorPicker();
+      }
       if (selectedCaseRecordId === "new" && pendingIncomingContactId) {
         prefillCaseFromIncomingContact(incomingContactById(pendingIncomingContactId));
       }
@@ -10574,6 +10616,58 @@ els.caseMentorInput.addEventListener("input", () => {
   renderRegistrationTargets();
 });
 
+function matchingMentorSearchText(candidate) {
+  return [candidate.name, candidate.area, candidate.languages, candidate.availability]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase("sv-SE");
+}
+
+function matchingMentorRows(supportCase, searchTerm = "", supportAreaId = "") {
+  const supportAreaIds = supportAreaIdsForCase(supportCase);
+  const normalizedSearch = searchTerm.trim().toLocaleLowerCase("sv-SE");
+  return candidates
+    .filter((candidate) => candidate.status === "Godkänd" && candidate.active !== false)
+    .map((candidate) => ({ candidate, overlap: supportAreaOverlap(supportAreaIds, candidate.supportAreas) }))
+    .filter(({ candidate, overlap }) => !normalizedSearch || matchingMentorSearchText(candidate).includes(normalizedSearch))
+    .filter(({ overlap }) => !supportAreaId || overlap.some((area) => area.id === supportAreaId))
+    .sort((a, b) => b.overlap.length - a.overlap.length || a.candidate.name.localeCompare(b.candidate.name, "sv"));
+}
+
+function renderMatchingMentorPicker() {
+  if (!els.matchingMentorPicker || els.matchingMentorPicker.hidden) return;
+  const supportCase = cases.find((item) => item.id === els.caseSupportCaseInput.value && item.caseTypeId === "parent-support");
+  const supportAreaIds = supportAreaIdsForCase(supportCase);
+  if (els.matchingMentorAreaFilter.dataset.supportCaseId !== (supportCase?.id || "")) {
+    els.matchingMentorAreaFilter.innerHTML = '<option value="">Alla stödområden</option>';
+    for (const areaId of supportAreaIds) {
+      const option = document.createElement("option");
+      option.value = areaId;
+      option.textContent = supportAreaById(areaId)?.title || areaId;
+      els.matchingMentorAreaFilter.append(option);
+    }
+    els.matchingMentorAreaFilter.dataset.supportCaseId = supportCase?.id || "";
+  }
+  const rows = matchingMentorRows(supportCase, els.matchingMentorSearchInput.value, els.matchingMentorAreaFilter.value);
+  const selectedMentorId = els.caseMentorIdInput.value;
+  const selectedMentor = candidates.find((candidate) => candidate.id === selectedMentorId);
+  els.matchingMentorClearButton.hidden = !selectedMentor;
+  els.matchingMentorPickerSummary.textContent = selectedMentor
+    ? `Vald mentor: ${selectedMentor.name}. Visar ${rows.length} mentorer i urvalet.`
+    : `Visar ${rows.length} godkända, aktiva mentorer${supportAreaIds.length ? ", sorterade efter matchande stödområden" : ""}.`;
+  els.matchingMentorResults.innerHTML = rows.length ? rows.map(({ candidate, overlap }) => {
+    const selected = candidate.id === selectedMentorId;
+    const overlapText = supportAreaIds.length
+      ? overlap.length ? overlap.map((area) => area.title).join(", ") : "Ingen registrerad överlappning"
+      : "Stödområden behöver anges i stödärendet";
+    return `<div class="matching-mentor-result${selected ? " is-selected" : ""}">
+      <div><strong>${escapeHtml(candidate.name)}</strong><small>${escapeHtml([candidate.area, candidate.languages].filter(Boolean).join(" · ") || "Område och språk ej angivet")}</small></div>
+      <div><span class="matching-mentor-overlap">${escapeHtml(overlapText)}</span><small>${escapeHtml(candidate.availability || "Tillgänglighet behöver kontrolleras")}</small></div>
+      <button type="button" class="btn ${selected ? "btn-primary" : "btn-outline-primary"} btn-sm" data-select-matching-mentor="${escapeHtml(candidate.id)}" aria-pressed="${selected}">${selected ? "Vald" : "Välj"}</button>
+    </div>`;
+  }).join("") : '<div class="empty-list border rounded text-secondary">Inga mentorer matchar sökningen och filtret.</div>';
+}
+
 els.caseParentInput.addEventListener("input", () => {
   const value = els.caseParentInput.value.trim();
   const parent = parents.find((item) => item.name.localeCompare(value, "sv", { sensitivity: "base" }) === 0);
@@ -10608,9 +10702,8 @@ els.caseSupportCaseInput.addEventListener("change", () => {
   const parent = caseParent(supportCase);
   els.caseParentInput.value = parent?.name || "";
   els.caseParentIdInput.value = parent?.id || "";
-  if (supportCase && !els.caseTitleInput.value.trim()) {
-    els.caseTitleInput.value = `Matchning: ${supportCase.details?.supportPurpose || supportCase.title}`;
-  }
+  if (supportCase && els.caseTypeInput.value === "matching") prefillMatchingFromSupportCase(supportCase);
+  renderMatchingMentorPicker();
 });
 
 els.caseTypeInput.addEventListener("change", () => {
@@ -10628,6 +10721,26 @@ els.caseMentorSuggestions.addEventListener("click", (event) => {
   els.caseMentorIdInput.value = mentor.id;
   els.caseMentorSuggestions.hidden = true;
   els.caseMentorSuggestions.innerHTML = "";
+  renderRegistrationTargets();
+});
+
+els.matchingMentorSearchInput.addEventListener("input", renderMatchingMentorPicker);
+els.matchingMentorAreaFilter.addEventListener("change", renderMatchingMentorPicker);
+els.matchingMentorResults.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-select-matching-mentor]");
+  if (!button) return;
+  const mentor = candidates.find((candidate) => candidate.id === button.dataset.selectMatchingMentor);
+  if (!mentor) return;
+  els.caseMentorInput.value = mentor.name;
+  els.caseMentorIdInput.value = mentor.id;
+  els.caseMentorInput.setCustomValidity("");
+  renderMatchingMentorPicker();
+  renderRegistrationTargets();
+});
+els.matchingMentorClearButton.addEventListener("click", () => {
+  els.caseMentorInput.value = "";
+  els.caseMentorIdInput.value = "";
+  renderMatchingMentorPicker();
   renderRegistrationTargets();
 });
 

@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260814-flow-v76">
+    <link rel="stylesheet" href="styles.css?v=20260814-flow-v77">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -522,6 +522,29 @@
                         <label class="form-label" for="caseSupportCaseInput">Stödärende</label>
                         <select id="caseSupportCaseInput" class="form-select form-select-sm"><option value="">Välj stödärende</option></select>
                         <div class="form-text">Matchning och uppdrag kopplas till ett bestämt stödärende.</div>
+                      </div>
+                      <div id="matchingMentorPicker" class="col-12" hidden>
+                        <section class="matching-mentor-picker" aria-labelledby="matchingMentorPickerTitle">
+                          <div class="matching-mentor-picker-header">
+                            <div>
+                              <h4 id="matchingMentorPickerTitle" class="h6 mb-1">Hitta rätt mentor</h4>
+                              <p class="small text-secondary mb-0">Sök bland godkända, aktiva mentorer. Matchande stödområden visas som stöd för handläggarens bedömning.</p>
+                            </div>
+                            <button id="matchingMentorClearButton" type="button" class="btn btn-outline-secondary btn-sm" hidden>Rensa val</button>
+                          </div>
+                          <div class="matching-mentor-toolbar">
+                            <div>
+                              <label class="form-label" for="matchingMentorSearchInput">Sök mentor</label>
+                              <input id="matchingMentorSearchInput" class="form-control form-control-sm" autocomplete="off" placeholder="Namn, område, språk eller tillgänglighet">
+                            </div>
+                            <div>
+                              <label class="form-label" for="matchingMentorAreaFilter">Filtrera på stödområde</label>
+                              <select id="matchingMentorAreaFilter" class="form-select form-select-sm"><option value="">Alla stödområden</option></select>
+                            </div>
+                          </div>
+                          <p id="matchingMentorPickerSummary" class="small text-secondary mb-2" role="status"></p>
+                          <div id="matchingMentorResults" class="matching-mentor-results"></div>
+                        </section>
                       </div>
                       <div class="col-md-6">
                         <label class="form-label" for="caseOrganizationUnitInput">Ansvarig enhet</label>
@@ -2069,6 +2092,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260814-flow-v76"></script>
+    <script type="module" src="app.js?v=20260814-flow-v77"></script>
   </body>
 </html>
