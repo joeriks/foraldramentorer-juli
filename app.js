@@ -119,6 +119,18 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "76",
+    date: "2026-08-14",
+    title: "Tydligare riktning i ärendeflöden",
+    flow: "Dashboardens ärendeflöden",
+    simplified: "Varje ärendetypsruta visar nu själv om flödet fortsätter eller slutar, i stället för att förlita sig på en separat roterad pil mellan rutorna.",
+    retained: "Sambandstexterna, ordningen, ärendeantalet och länkarna till öppna ärenden finns kvar.",
+    changes: [
+      "En högerställd pil längst ned visar att ärendetypen har en nästa ärendetyp.",
+      "En kryssruteikon markerar att ärendetypen saknar ett nästa steg."
+    ]
+  },
+  {
     version: "75",
     date: "2026-08-13",
     title: "Ett nästa steg i ersättningshanteringen",
@@ -5523,6 +5535,7 @@ function renderCaseFlowBoard(openCases) {
   const { groups, standalone } = caseTypeRelationshipGroups();
   const renderNode = (caseTypeId, position) => {
     const definition = caseTypeById(caseTypeId);
+    const nextType = definition?.nextCaseTypeId ? caseTypeById(definition.nextCaseTypeId) : null;
     const stepCases = cases.filter((caseRecord) => caseRecord.caseTypeId === caseTypeId);
     const openStepCases = stepCases.filter((caseRecord) => caseRecord.status !== "closed");
     const waitingCount = openStepCases.filter((caseRecord) => caseRecord.status === "waiting").length;
@@ -5547,14 +5560,19 @@ function renderCaseFlowBoard(openCases) {
           <small>${stepCases.length === openStepCases.length ? "öppna" : `${stepCases.length} totalt`}</small>
         </span>
         <span class="case-flow-meter" aria-hidden="true"><span style="width: ${share}%"></span></span>
-        <span class="case-flow-signals">${signals.length ? signals.map((signal) => `<span>${escapeHtml(signal)}</span>`).join("") : "<span>Inga stopp</span>"}</span>
+        <span class="case-flow-footer">
+          <span class="case-flow-signals">${signals.length ? signals.map((signal) => `<span>${escapeHtml(signal)}</span>`).join("") : "<span>Inga stopp</span>"}</span>
+          <span class="case-flow-direction" data-case-flow-direction="${nextType ? "next" : "end"}" title="${escapeHtml(nextType ? `Leder vidare till ${nextType.name}` : "Ingen nästa ärendetyp")}">
+            <span aria-hidden="true">${nextType ? "&rarr;" : "&#9745;"}</span>
+            <span class="visually-hidden">${escapeHtml(nextType ? `Leder vidare till ${nextType.name}` : "Ingen nästa ärendetyp")}</span>
+          </span>
+        </span>
       </a>
     `;
   };
   const renderTrack = (items) => items.map((item, index) => `
     ${item.relationship ? `<div class="case-flow-connector">
       <span>${escapeHtml(relationshipKindLabel(item.relationship.kind))}</span>
-      <i aria-hidden="true">&rarr;</i>
       <small>${escapeHtml(item.relationship.label)}</small>
     </div>` : ""}
     ${renderNode(item.caseTypeId, index + 1)}

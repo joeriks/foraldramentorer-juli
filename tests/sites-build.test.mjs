@@ -126,6 +126,9 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.doesNotMatch(scriptText, /CASE_FLOW_STEPS/);
   assert.match(scriptText, /function caseTypeRelationshipGroups/);
   assert.match(scriptText, /function renderCaseFlowBoard/);
+  assert.match(scriptText, /data-case-flow-direction/);
+  assert.match(scriptText, /Leder vidare till/);
+  assert.match(scriptText, /Ingen nästa ärendetyp/);
   assert.match(scriptText, /function renderSupportCaseChoices/);
   assert.match(scriptText, /function renderMatchingCaseChoices/);
   assert.match(scriptText, /function renderCertificationCaseChoices/);
@@ -140,6 +143,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /Behovsanalys som leder vidare/);
   assert.match(scriptText, /Handlingsstyrd uppföljning av mentoruppdrag/);
   assert.match(scriptText, /Ett nästa steg i ersättningshanteringen/);
+  assert.match(scriptText, /Tydligare riktning i ärendeflöden/);
   assert.match(scriptText, /data-case-flow-type/);
   assert.match(scriptText, /status=open/);
   assert.match(scriptText, /caseRecord\.status !== "closed"/);

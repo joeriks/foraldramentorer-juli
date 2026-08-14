@@ -1032,11 +1032,10 @@ body {
 
 .case-flow-connector {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  align-content: center;
   align-self: center;
-  align-items: center;
   flex: .75 0 9rem;
-  gap: .15rem var(--app-space-2);
+  gap: .25rem;
   min-width: 9rem;
   color: var(--app-text-muted);
 }
@@ -1047,18 +1046,7 @@ body {
   text-transform: uppercase;
 }
 
-.case-flow-connector i {
-  height: 1px;
-  overflow: visible;
-  background: #8ca0ad;
-  color: #607988;
-  font-style: normal;
-  line-height: 0;
-  text-align: right;
-}
-
 .case-flow-connector small {
-  grid-column: 1 / -1;
   font-size: .75rem;
   line-height: 1.35;
 }
@@ -1121,7 +1109,6 @@ body {
 }
 
 .case-flow-signals {
-  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   gap: .35rem;
@@ -1132,6 +1119,32 @@ body {
   border: 1px solid var(--app-border);
   border-radius: 999px;
   background: var(--app-surface-muted);
+}
+
+.case-flow-footer {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--app-space-2);
+  min-width: 0;
+}
+
+.case-flow-direction {
+  display: inline-grid;
+  flex: 0 0 2rem;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--app-primary);
+  font-family: Arial, sans-serif;
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.case-flow-direction[data-case-flow-direction="end"] {
+  color: #3f7150;
+  font-size: 1.3rem;
 }
 
 .presentation-step-list {
@@ -3738,11 +3751,6 @@ body {
     width: 100%;
     min-width: 0;
     padding: var(--app-space-1) 0;
-  }
-
-  .case-flow-connector i {
-    transform: rotate(90deg);
-    transform-origin: right center;
   }
 
   .case-summary-item,
