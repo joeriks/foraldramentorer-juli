@@ -2556,6 +2556,36 @@ body {
   margin-bottom: var(--app-space-2);
 }
 
+.matching-mentor-criteria-filters {
+  margin: 0 0 var(--app-space-2);
+  padding: .65rem .75rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--bs-border-radius);
+  background: #fff;
+}
+
+.matching-mentor-criteria-filters legend {
+  float: none;
+  width: auto;
+  margin: 0 0 .15rem;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.matching-mentor-criteria-filters > p {
+  margin-bottom: .5rem;
+}
+
+.matching-mentor-criteria-filters > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem 1rem;
+}
+
+.matching-mentor-criteria-filters .form-check {
+  margin: 0;
+}
+
 .matching-mentor-results {
   overflow: hidden;
   border: 1px solid var(--app-border);

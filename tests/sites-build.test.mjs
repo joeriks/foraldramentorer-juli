@@ -46,6 +46,7 @@ test("serves the application shell", async () => {
   assert.match(html, /id="matchingMentorPicker"/);
   assert.match(html, /id="matchingMentorSearchInput"/);
   assert.match(html, /id="matchingMentorAreaFilter"/);
+  assert.match(html, /id="matchingMentorCriteriaFilters"/);
   assert.match(html, /id="matchingMentorResults"/);
   assert.match(html, /id="assignmentNextStepPanel"/);
   assert.match(html, /id="assignmentFollowupDetails"/);
@@ -138,6 +139,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /function matchingCaseTitle/);
   assert.match(scriptText, /function renderMatchingMentorPicker/);
   assert.match(scriptText, /function matchingMentorAssessment/);
+  assert.match(scriptText, /function activeMatchingMentorCriteria/);
   assert.match(scriptText, /data-select-matching-mentor/);
   assert.match(scriptText, /Saknas eller behöver kontrolleras/);
   assert.match(scriptText, /function renderCertificationCaseChoices/);
@@ -155,6 +157,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /Tydligare riktning i ärendeflöden/);
   assert.match(scriptText, /Matchning börjar med rätt mentorurval/);
   assert.match(scriptText, /Öppen bedömning av varje mentorförslag/);
+  assert.match(scriptText, /Justerbara matchningspunkter/);
   assert.match(scriptText, /data-case-flow-type/);
   assert.match(scriptText, /status=open/);
   assert.match(scriptText, /caseRecord\.status !== "closed"/);

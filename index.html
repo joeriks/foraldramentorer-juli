@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260814-flow-v78">
+    <link rel="stylesheet" href="styles.css?v=20260814-flow-v79">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -542,6 +542,17 @@
                               <select id="matchingMentorAreaFilter" class="form-select form-select-sm"><option value="">Alla stödområden</option></select>
                             </div>
                           </div>
+                          <fieldset id="matchingMentorCriteriaFilters" class="matching-mentor-criteria-filters">
+                            <legend>Aktiva matchningspunkter</legend>
+                            <p class="small text-secondary">Avmarkera en punkt för att bredda urvalet. Punkter utan underlag i stödärendet är avstängda.</p>
+                            <div>
+                              <label class="form-check"><input class="form-check-input" type="checkbox" value="support_area" checked><span class="form-check-label">Stödområde</span></label>
+                              <label class="form-check"><input class="form-check-input" type="checkbox" value="language" checked><span class="form-check-label">Språk</span></label>
+                              <label class="form-check"><input class="form-check-input" type="checkbox" value="area" checked><span class="form-check-label">Geografiskt område</span></label>
+                              <label class="form-check"><input class="form-check-input" type="checkbox" value="availability" checked><span class="form-check-label">Tillgänglighet</span></label>
+                              <label class="form-check"><input class="form-check-input" type="checkbox" value="capacity" checked><span class="form-check-label">Ledig uppdragskapacitet</span></label>
+                            </div>
+                          </fieldset>
                           <p id="matchingMentorPickerSummary" class="small text-secondary mb-2" role="status"></p>
                           <div id="matchingMentorResults" class="matching-mentor-results"></div>
                         </section>
@@ -2092,6 +2103,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260814-flow-v78"></script>
+    <script type="module" src="app.js?v=20260814-flow-v79"></script>
   </body>
 </html>

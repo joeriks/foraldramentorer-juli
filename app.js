@@ -119,6 +119,18 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "79",
+    date: "2026-08-14",
+    title: "Justerbara matchningspunkter",
+    flow: "Matchning → bredda eller begränsa mentorurvalet",
+    simplified: "Handläggaren kan avmarkera matchningspunkter som inte ska begränsa den aktuella sökningen och ser direkt hur mentorurvalet förändras.",
+    retained: "Godkännande och aktiv status är fortsatt grundkrav. De avmarkerade uppgifterna finns kvar i varje mentors bedömningslista och behöver fortfarande vägas in manuellt.",
+    changes: [
+      "Stödområde, språk, geografiskt område, tillgänglighet och uppdragskapacitet kan aktiveras eller avaktiveras var för sig.",
+      "Punkter utan underlag i stödärendet stängs av automatiskt i stället för att dölja alla mentorer."
+    ]
+  },
+  {
     version: "78",
     date: "2026-08-14",
     title: "Öppen bedömning av varje mentorförslag",
@@ -1067,6 +1079,7 @@ const els = {
   matchingMentorPicker: document.querySelector("#matchingMentorPicker"),
   matchingMentorSearchInput: document.querySelector("#matchingMentorSearchInput"),
   matchingMentorAreaFilter: document.querySelector("#matchingMentorAreaFilter"),
+  matchingMentorCriteriaFilters: document.querySelector("#matchingMentorCriteriaFilters"),
   matchingMentorPickerSummary: document.querySelector("#matchingMentorPickerSummary"),
   matchingMentorResults: document.querySelector("#matchingMentorResults"),
   matchingMentorClearButton: document.querySelector("#matchingMentorClearButton"),
@@ -6977,6 +6990,7 @@ function populateCaseForm(mentorId = "", caseRecord = null, parentId = "", suppo
   els.caseMentorSuggestions.innerHTML = "";
   els.matchingMentorSearchInput.value = "";
   els.matchingMentorAreaFilter.dataset.supportCaseId = "";
+  els.matchingMentorCriteriaFilters.dataset.supportCaseId = "";
   const selectedParent = parents.find((parent) => parent.id === (parentId || caseRecord?.parentId));
   els.caseParentInput.value = selectedParent?.name || "";
   els.caseParentIdInput.value = selectedParent?.id || "";
@@ -10672,47 +10686,99 @@ function matchingMentorAssessment(candidate, supportCase, overlap = null) {
   const matches = [];
   const missing = [];
 
-  if (overlapAreas.length) matches.push(`Stödområden: ${overlapAreas.map((area) => area.title).join(", ")}`);
-  if (missingAreaIds.length) missing.push(`Stödområden: ${supportAreaLabels(missingAreaIds).join(", ")}`);
-  if (!supportAreaIds.length) missing.push("Stödområden saknas i stödärendet");
+  if (overlapAreas.length) matches.push({ key: "support_area", text: `Stödområden: ${overlapAreas.map((area) => area.title).join(", ")}` });
+  if (missingAreaIds.length) missing.push({ key: "support_area", text: `Stödområden: ${supportAreaLabels(missingAreaIds).join(", ")}` });
+  if (!supportAreaIds.length) missing.push({ key: "support_area", text: "Stödområden saknas i stödärendet" });
 
-  if (sharedLanguages.length) matches.push(`Språk: ${sharedLanguages.join(", ")}`);
-  else if (supportLanguages.length) missing.push(`Språk: ${supportLanguages.join(", ")}`);
-  else missing.push("Språkbehov saknas i stödärendet");
+  if (sharedLanguages.length) matches.push({ key: "language", text: `Språk: ${sharedLanguages.join(", ")}` });
+  else if (supportLanguages.length) missing.push({ key: "language", text: `Språk: ${supportLanguages.join(", ")}` });
+  else missing.push({ key: "language", text: "Språkbehov saknas i stödärendet" });
 
-  if (supportArea && candidate.area && matchingTextOverlaps(supportArea, candidate.area)) matches.push(`Geografiskt område: ${candidate.area}`);
-  else if (!supportArea) missing.push("Geografiskt område saknas i stödärendet");
-  else if (!candidate.area) missing.push("Mentorns geografiska område saknas");
-  else missing.push(`Geografiskt område behöver kontrolleras: behov ${supportArea} · mentor ${candidate.area}`);
+  const areaMatches = Boolean(supportArea && candidate.area && matchingTextOverlaps(supportArea, candidate.area));
+  if (areaMatches) matches.push({ key: "area", text: `Geografiskt område: ${candidate.area}` });
+  else if (!supportArea) missing.push({ key: "area", text: "Geografiskt område saknas i stödärendet" });
+  else if (!candidate.area) missing.push({ key: "area", text: "Mentorns geografiska område saknas" });
+  else missing.push({ key: "area", text: `Geografiskt område behöver kontrolleras: behov ${supportArea} · mentor ${candidate.area}` });
 
-  if (supportAvailability && candidate.availability && matchingTextOverlaps(supportAvailability, candidate.availability)) matches.push(`Tillgänglighet: ${candidate.availability}`);
-  else if (!supportAvailability) missing.push("Önskad tillgänglighet saknas i stödärendet");
-  else if (!candidate.availability) missing.push("Mentorns tillgänglighet saknas");
-  else missing.push(`Tillgänglighet behöver kontrolleras: behov ${supportAvailability} · mentor ${candidate.availability}`);
+  const availabilityMatches = Boolean(supportAvailability && candidate.availability && matchingTextOverlaps(supportAvailability, candidate.availability));
+  if (availabilityMatches) matches.push({ key: "availability", text: `Tillgänglighet: ${candidate.availability}` });
+  else if (!supportAvailability) missing.push({ key: "availability", text: "Önskad tillgänglighet saknas i stödärendet" });
+  else if (!candidate.availability) missing.push({ key: "availability", text: "Mentorns tillgänglighet saknas" });
+  else missing.push({ key: "availability", text: `Tillgänglighet behöver kontrolleras: behov ${supportAvailability} · mentor ${candidate.availability}` });
 
   const capacity = candidate.availableAssignmentCapacity;
-  if (Number(capacity) > 0) matches.push(`Uppdragskapacitet: ${capacity} ${Number(capacity) === 1 ? "plats" : "platser"}`);
-  else if (Number(capacity) === 0 && capacity !== null && capacity !== "") missing.push("Ingen registrerad uppdragskapacitet");
-  else missing.push("Uppdragskapacitet behöver kontrolleras");
+  const capacityMatches = Number(capacity) > 0;
+  if (capacityMatches) matches.push({ key: "capacity", text: `Uppdragskapacitet: ${capacity} ${Number(capacity) === 1 ? "plats" : "platser"}` });
+  else if (Number(capacity) === 0 && capacity !== null && capacity !== "") missing.push({ key: "capacity", text: "Ingen registrerad uppdragskapacitet" });
+  else missing.push({ key: "capacity", text: "Uppdragskapacitet behöver kontrolleras" });
 
-  return { matches, missing };
+  return {
+    matches,
+    missing,
+    criteria: {
+      support_area: supportAreaIds.length > 0 && overlapAreas.length > 0,
+      language: supportLanguages.length > 0 && sharedLanguages.length > 0,
+      area: areaMatches,
+      availability: availabilityMatches,
+      capacity: capacityMatches
+    }
+  };
 }
 
-function matchingMentorRows(supportCase, searchTerm = "", supportAreaId = "") {
+function matchingMentorCriterionAvailability(supportCase) {
+  const supportProfile = supportMatchingProfile(supportCase?.id);
+  const parent = caseParent(supportCase);
+  const languageRows = supportProfile
+    ? supportMatchingLanguages.filter((entry) => entry.profileId === supportProfile.id)
+    : [];
+  const languages = languageRows.length
+    ? languageRows
+    : normalizeLanguageEntries(supportCase?.details?.languages || parent?.languages);
+  return {
+    support_area: supportAreaIdsForCase(supportCase).length > 0,
+    language: languages.length > 0,
+    area: Boolean(supportProfile?.area || supportCase?.details?.area || parent?.area),
+    availability: Boolean(supportProfile?.availability || supportCase?.details?.availability || parent?.availability),
+    capacity: true
+  };
+}
+
+function activeMatchingMentorCriteria() {
+  return new Set([...els.matchingMentorCriteriaFilters.querySelectorAll('input[type="checkbox"]:checked:not(:disabled)')].map((input) => input.value));
+}
+
+function renderMatchingMentorCriterionFilters(supportCase) {
+  const availability = matchingMentorCriterionAvailability(supportCase);
+  const supportCaseId = supportCase?.id || "";
+  const changedCase = els.matchingMentorCriteriaFilters.dataset.supportCaseId !== supportCaseId;
+  for (const input of els.matchingMentorCriteriaFilters.querySelectorAll('input[type="checkbox"]')) {
+    input.disabled = !availability[input.value];
+    if (changedCase) input.checked = Boolean(availability[input.value]);
+    if (input.disabled) input.checked = false;
+  }
+  els.matchingMentorCriteriaFilters.dataset.supportCaseId = supportCaseId;
+}
+
+function matchingMentorRows(supportCase, searchTerm = "", supportAreaId = "", activeCriteria = new Set()) {
   const supportAreaIds = supportAreaIdsForCase(supportCase);
   const normalizedSearch = searchTerm.trim().toLocaleLowerCase("sv-SE");
   return candidates
     .filter((candidate) => candidate.status === "Godkänd" && candidate.active !== false)
-    .map((candidate) => ({ candidate, overlap: supportAreaOverlap(supportAreaIds, candidate.supportAreas) }))
+    .map((candidate) => {
+      const overlap = supportAreaOverlap(supportAreaIds, candidate.supportAreas);
+      return { candidate, overlap, assessment: matchingMentorAssessment(candidate, supportCase, overlap) };
+    })
     .filter(({ candidate, overlap }) => !normalizedSearch || matchingMentorSearchText(candidate).includes(normalizedSearch))
     .filter(({ overlap }) => !supportAreaId || overlap.some((area) => area.id === supportAreaId))
-    .sort((a, b) => b.overlap.length - a.overlap.length || a.candidate.name.localeCompare(b.candidate.name, "sv"));
+    .filter(({ assessment }) => [...activeCriteria].every((criterion) => assessment.criteria[criterion]))
+    .sort((a, b) => b.assessment.matches.length - a.assessment.matches.length || b.overlap.length - a.overlap.length || a.candidate.name.localeCompare(b.candidate.name, "sv"));
 }
 
 function renderMatchingMentorPicker() {
   if (!els.matchingMentorPicker || els.matchingMentorPicker.hidden) return;
   const supportCase = cases.find((item) => item.id === els.caseSupportCaseInput.value && item.caseTypeId === "parent-support");
   const supportAreaIds = supportAreaIdsForCase(supportCase);
+  renderMatchingMentorCriterionFilters(supportCase);
   if (els.matchingMentorAreaFilter.dataset.supportCaseId !== (supportCase?.id || "")) {
     els.matchingMentorAreaFilter.innerHTML = '<option value="">Alla stödområden</option>';
     for (const areaId of supportAreaIds) {
@@ -10723,21 +10789,21 @@ function renderMatchingMentorPicker() {
     }
     els.matchingMentorAreaFilter.dataset.supportCaseId = supportCase?.id || "";
   }
-  const rows = matchingMentorRows(supportCase, els.matchingMentorSearchInput.value, els.matchingMentorAreaFilter.value);
+  const rowsWithoutCriteria = matchingMentorRows(supportCase, els.matchingMentorSearchInput.value, els.matchingMentorAreaFilter.value);
+  const activeCriteria = activeMatchingMentorCriteria();
+  const rows = rowsWithoutCriteria.filter(({ assessment }) => [...activeCriteria].every((criterion) => assessment.criteria[criterion]));
   const selectedMentorId = els.caseMentorIdInput.value;
   const selectedMentor = candidates.find((candidate) => candidate.id === selectedMentorId);
   els.matchingMentorClearButton.hidden = !selectedMentor;
-  els.matchingMentorPickerSummary.textContent = selectedMentor
-    ? `Vald mentor: ${selectedMentor.name}. Visar ${rows.length} mentorer i urvalet.`
-    : `Visar ${rows.length} godkända, aktiva mentorer${supportAreaIds.length ? ", sorterade efter matchande stödområden" : ""}.`;
-  els.matchingMentorResults.innerHTML = rows.length ? rows.map(({ candidate, overlap }) => {
+  const selectedIsVisible = !selectedMentor || rows.some(({ candidate }) => candidate.id === selectedMentor.id);
+  els.matchingMentorPickerSummary.textContent = `${selectedMentor ? `Vald mentor: ${selectedMentor.name}. ` : ""}Visar ${rows.length} av ${rowsWithoutCriteria.length} mentorer med ${activeCriteria.size} aktiva matchningspunkter.${selectedIsVisible ? "" : " Vald mentor ligger utanför det aktuella urvalet."}`;
+  els.matchingMentorResults.innerHTML = rows.length ? rows.map(({ candidate, assessment }) => {
     const selected = candidate.id === selectedMentorId;
-    const assessment = matchingMentorAssessment(candidate, supportCase, overlap);
     return `<div class="matching-mentor-result${selected ? " is-selected" : ""}">
       <div><strong>${escapeHtml(candidate.name)}</strong><small>${escapeHtml([candidate.area, candidate.languages].filter(Boolean).join(" · ") || "Område och språk ej angivet")}</small></div>
       <div class="matching-mentor-assessment">
-        <div class="matching-mentor-criteria is-match"><span class="matching-mentor-criteria-title">Matchar</span><ul>${assessment.matches.length ? assessment.matches.map((item) => `<li><span aria-hidden="true">✓</span>${escapeHtml(item)}</li>`).join("") : "<li><span aria-hidden=\"true\">–</span>Inga bekräftade träffar</li>"}</ul></div>
-        <div class="matching-mentor-criteria is-missing"><span class="matching-mentor-criteria-title">Saknas eller behöver kontrolleras</span><ul>${assessment.missing.length ? assessment.missing.map((item) => `<li><span aria-hidden="true">!</span>${escapeHtml(item)}</li>`).join("") : "<li><span aria-hidden=\"true\">✓</span>Inga saknade uppgifter</li>"}</ul></div>
+        <div class="matching-mentor-criteria is-match"><span class="matching-mentor-criteria-title">Matchar</span><ul>${assessment.matches.length ? assessment.matches.map((item) => `<li><span aria-hidden="true">✓</span>${escapeHtml(item.text)}</li>`).join("") : "<li><span aria-hidden=\"true\">–</span>Inga bekräftade träffar</li>"}</ul></div>
+        <div class="matching-mentor-criteria is-missing"><span class="matching-mentor-criteria-title">Saknas eller behöver kontrolleras</span><ul>${assessment.missing.length ? assessment.missing.map((item) => `<li><span aria-hidden="true">!</span>${escapeHtml(item.text)}</li>`).join("") : "<li><span aria-hidden=\"true\">✓</span>Inga saknade uppgifter</li>"}</ul></div>
       </div>
       <button type="button" class="btn ${selected ? "btn-primary" : "btn-outline-primary"} btn-sm" data-select-matching-mentor="${escapeHtml(candidate.id)}" aria-pressed="${selected}">${selected ? "Vald" : "Välj"}</button>
     </div>`;
@@ -10802,6 +10868,7 @@ els.caseMentorSuggestions.addEventListener("click", (event) => {
 
 els.matchingMentorSearchInput.addEventListener("input", renderMatchingMentorPicker);
 els.matchingMentorAreaFilter.addEventListener("change", renderMatchingMentorPicker);
+els.matchingMentorCriteriaFilters.addEventListener("change", renderMatchingMentorPicker);
 els.matchingMentorResults.addEventListener("click", (event) => {
   const button = event.target.closest("[data-select-matching-mentor]");
   if (!button) return;
