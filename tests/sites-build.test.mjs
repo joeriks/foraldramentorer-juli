@@ -108,15 +108,13 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /renderRoutineFlowDiagrams/);
   assert.match(scriptText, /routineProcessLink/);
   assert.match(scriptText, /else if \(\["completed", "not_applicable"\]\.includes\(nextStatus\)\) selectedCaseActivityId = nextActivity\?\.id \|\| null;/);
-  assert.match(scriptText, /data-quick-finish-activity/);
-  assert.match(scriptText, /registerQuickActivityResult/);
+  assert.doesNotMatch(scriptText, /data-quick-finish-activity/);
+  assert.doesNotMatch(scriptText, /registerQuickActivityResult/);
   assert.match(scriptText, /publicSupportAreaChoices/);
   assert.match(scriptText, /quickCompletionResultCodes/);
   assert.match(scriptText, /function renderActivityTypeConfiguration/);
   assert.match(scriptText, /function renderCaseTypeActivitiesFact/);
-  assert.match(scriptText, /alternativeLabel: "Komplettera uppgifter"/);
-  assert.match(scriptText, /title: "Avsluta aktiviteten\?"/);
-  assert.match(scriptText, /resultOptions,/);
+  assert.match(scriptText, /incompleteWorkInput/);
   assert.doesNotMatch(scriptText, /resultValue:/);
   assert.match(scriptText, /if \(resolveConfirmation\("confirm"\)\) confirmActionModal\.hide\(\)/);
   assert.match(scriptText, /function renderCaseClosureSummary/);

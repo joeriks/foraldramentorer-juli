@@ -119,6 +119,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "85",
+    date: "2026-08-15",
+    title: "En renare aktivitetslista",
+    flow: "Ärende → aktivitetslista → aktivitet",
+    simplified: "Aktivitetslistan visar nu bara ordning, namn, status, resultat och uppgifter som kräver åtgärd. Snabbavslutning, instruktioner, anteckningar och revisionsuppgifter har tagits bort från listan.",
+    retained: "Aktivitetens fullständiga instruktion, registrering, anteckningar, ansvarig, datum, handlingar, resultat och historik finns kvar när aktiviteten öppnas.",
+    changes: [
+      "Aktiviteter avslutas endast inne i aktiviteten, där resultat och eventuell anteckning hanteras tillsammans.",
+      "Avslutade aktiviteter visar sitt resultat på en enda kompakt rad.",
+      "Kopplad registrering visas i listan endast när den behöver kompletteras."
+    ]
+  },
+  {
     version: "84",
     date: "2026-08-15",
     title: "Aktiviteterna direkt i ärendets arbetsvy",
@@ -6343,11 +6356,6 @@ function activityResultOptions(activity) {
   return ACTIVITY_RESULT_OPTIONS[activity?.templateId] || ACTIVITY_RESULT_OPTIONS.default;
 }
 
-function quickActivityResultOptions(activity) {
-  const allowedCodes = new Set(activityTemplateById(activity?.templateId)?.quickCompletionResultCodes || []);
-  return activityResultOptions(activity).filter(([resultCode]) => allowedCodes.has(resultCode));
-}
-
 const WORK_INPUT_STATE_LABELS = {
   not_started: "Inte påbörjad",
   in_progress: "Påbörjad",
@@ -7633,7 +7641,7 @@ function renderCaseActivities(caseRecord, activities) {
 
   if (!visibleActivities.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="6" class="activity-empty">${activities.length ? "Inga aktiviteter matchar filtret." : "Inga aktiviteter har registrerats."}</td>`;
+    row.innerHTML = `<td colspan="5" class="activity-empty">${activities.length ? "Inga aktiviteter matchar filtret." : "Inga aktiviteter har registrerats."}</td>`;
     els.caseActivityTableBody.append(row);
   }
 
@@ -7652,23 +7660,8 @@ function renderCaseActivities(caseRecord, activities) {
     const documents = activityDocuments(activity.id);
     const workInput = activityWorkInputSummary(activity, caseRecord);
     const handler = effectiveActivityHandler(activity, caseRecord);
-    const ownerSource = handler
-      ? activityOwnerOverrideId(activity, caseRecord) ? "Särskilt tilldelad" : "Ärendeansvarig"
-      : "";
     const result = activity.status === "completed" ? activityResultLabel(activity) : "";
-    const instruction = activityTemplateDefinitionById(activity.templateId)?.workInstruction || "";
-    const note = latestActivityNote(activity.id);
-    const completionMeta = activity.status === "completed" && activity.completedAt
-      ? `Avslutad ${formatDateTime(activity.completedAt)} av ${handlerNameById(activity.completedBy)}`
-      : "";
-    const quickResults = !["completed", "not_applicable"].includes(activity.status)
-      && !["paused", "closed"].includes(caseRecord.status)
-      && (!workInput?.required || workInput.state === "complete")
-      ? quickActivityResultOptions(activity)
-      : [];
-    const quickFinishButton = quickResults.length
-      ? `<button type="button" class="btn btn-outline-primary btn-sm activity-quick-finish-button" data-quick-finish-activity="${escapeHtml(activity.id)}">Avsluta</button>`
-      : "";
+    const incompleteWorkInput = workInput?.required && workInput.state !== "complete" ? workInput : null;
     const stepNumber = Number.isFinite(activity.sortOrder) ? activity.sortOrder + 1 : activities.indexOf(activity) + 1;
     const row = document.createElement("tr");
     if (activityHasBlockingResult(activity)) row.classList.add("activity-row-attention");
@@ -7678,20 +7671,15 @@ function renderCaseActivities(caseRecord, activities) {
           <span class="activity-step" aria-hidden="true">${stepNumber}</span>
           <div>
             <button type="button" class="activity-title-button" data-open-activity="${escapeHtml(activity.id)}">${escapeHtml(activity.title)}</button>
-            ${instruction ? `<small class="activity-instruction-preview"><strong>Gör så här:</strong> ${escapeHtml(instruction)}</small>` : ""}
-            ${workInput ? `<small class="activity-linked-input"><strong>Kopplad registrering:</strong> <a href="${escapeHtml(workInput.href || "#")}">${escapeHtml(workInput.label)}</a> <span class="badge ${escapeHtml(workInput.stateClass)}">${escapeHtml(workInput.stateLabel)}</span>${workInput.updatedAt ? `<span>Senast ändrad ${escapeHtml(formatDateTime(workInput.updatedAt))}</span>` : ""}</small>` : ""}
-            ${result ? `<small class="activity-result-summary"><strong>Registrerat utfall:</strong> ${escapeHtml(result)}</small>` : ""}
-            ${note ? `<small class="activity-note-summary"><strong>Tjänsteanteckning:</strong> ${escapeHtml(note)}</small>` : ""}
-            ${completionMeta ? `<small class="activity-completion-meta">${escapeHtml(completionMeta)}</small>` : ""}
-            ${quickFinishButton ? `<div class="activity-mobile-result mt-2">${quickFinishButton}</div>` : ""}
+            ${result ? `<small class="activity-result-summary">${escapeHtml(result)}</small>` : ""}
+            ${incompleteWorkInput ? `<small class="activity-linked-input"><span>Komplettera:</span> <a href="${escapeHtml(incompleteWorkInput.href || "#")}">${escapeHtml(incompleteWorkInput.label)}</a> <span class="badge ${escapeHtml(incompleteWorkInput.stateClass)}">${escapeHtml(incompleteWorkInput.stateLabel)}</span></small>` : ""}
           </div>
         </div>
       </td>
       <td><span class="badge activity-status-badge ${activityStatusClass(activity)}">${escapeHtml(activityWorkStateLabel(activity))}</span></td>
-      <td><span class="activity-owner-name">${escapeHtml(handler?.name || "Ej tilldelad")}</span>${ownerSource ? `<small>${ownerSource}</small>` : ""}</td>
+      <td><span class="activity-owner-name">${escapeHtml(handler?.name || "Ej tilldelad")}</span></td>
       <td class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityDueLabel(activity))}</td>
       <td>${documents.length ? `${documents.length} st` : '<span class="text-secondary">0</span>'}</td>
-      <td class="text-end"><div class="activity-row-actions">${quickFinishButton ? `<div class="activity-desktop-result">${quickFinishButton}</div>` : ""}<button type="button" class="btn btn-outline-primary btn-sm activity-open-button" data-open-activity="${escapeHtml(activity.id)}">Öppna</button></div></td>
     `;
     els.caseActivityTableBody.append(row);
   }
@@ -11754,20 +11742,6 @@ for (const button of els.activityFilterButtons) {
 }
 
 els.caseActivityTableBody.addEventListener("click", (event) => {
-  const quickFinishButton = event.target.closest("[data-quick-finish-activity]");
-  if (quickFinishButton) {
-    const activityId = quickFinishButton.dataset.quickFinishActivity;
-    for (const matchingButton of els.caseActivityTableBody.querySelectorAll(`[data-quick-finish-activity="${CSS.escape(activityId)}"]`)) matchingButton.disabled = true;
-    registerQuickActivityResult(activityId)
-      .catch((error) => {
-        console.error("Kunde inte avsluta aktiviteten", error);
-        showFeedback(error.message || "Aktiviteten kunde inte avslutas.");
-      })
-      .finally(() => {
-        for (const matchingButton of els.caseActivityTableBody.querySelectorAll(`[data-quick-finish-activity="${CSS.escape(activityId)}"]`)) matchingButton.disabled = false;
-      });
-    return;
-  }
   const openButton = event.target.closest("[data-open-activity]");
   if (openButton) openCaseActivity(openButton.dataset.openActivity);
 });
@@ -11986,81 +11960,6 @@ function openCaseActivity(activityId) {
   }
   bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
   renderCaseDetail();
-}
-
-function openCaseActivityWithResult(activityId, resultCode) {
-  const activity = caseActivities.find((item) => item.id === activityId);
-  if (!activity) return;
-  openCaseActivity(activityId);
-  els.activityDetailStatusInput.value = "completed";
-  els.activityDetailResultInput.value = resultCode;
-  for (const input of els.activityDetailResultOptions.querySelectorAll('input[type="radio"]')) input.checked = input.value === resultCode;
-  renderActivityStateControls(activity);
-  updateActivityValidationState();
-  updateActivityDetailDirtyState();
-  requestAnimationFrame(() => {
-    const classification = resultClassification(activity.templateId, resultCode);
-    (classification === "deviation" ? els.activityDetailNoteInput : els.activityDetailSaveButton).focus();
-  });
-}
-
-async function registerQuickActivityResult(activityId) {
-  const activity = caseActivities.find((item) => item.id === activityId);
-  const caseRecord = cases.find((item) => item.id === activity?.caseId);
-  const resultOptions = activity ? quickActivityResultOptions(activity) : [];
-  if (!activity || !caseRecord || !resultOptions.length) throw new Error("Aktiviteten kan inte snabbavslutas.");
-  const workInput = activityWorkInputSummary(activity, caseRecord);
-  if (workInput?.required && workInput.state !== "complete") {
-    openCaseActivity(activity.id);
-    showFeedback(`Komplettera ${workInput.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas.`);
-    return;
-  }
-  const confirmation = await confirmAction({
-    eyebrow: "Snabbregistrering",
-    title: "Avsluta aktiviteten?",
-    body: "Välj resultat innan aktiviteten avslutas. Resultatet, registrerande användare och tidpunkt sparas i ärendets logg. Välj Komplettera uppgifter om du behöver registrera mer information eller koppla ett underlag.",
-    subjectLabel: "Aktivitet",
-    subjectValue: activity.title,
-    confirmLabel: "Avsluta aktivitet",
-    alternativeLabel: "Komplettera uppgifter",
-    resultOptions,
-    summaryItems: [
-      { label: "Ärende", value: `${caseRecord.number} · ${caseRecord.title}` },
-      { label: "Status", value: "Aktiviteten avslutas och loggas" },
-      { label: "Underlag", value: workInput ? `${workInput.label}: ${workInput.stateLabel}` : "Ingen kopplad registrering krävs" }
-    ]
-  });
-  const resultCode = confirmation.resultCode;
-  if (confirmation.action === "alternative") {
-    if (resultCode) openCaseActivityWithResult(activity.id, resultCode);
-    else openCaseActivity(activity.id);
-    if (confirmation.note) els.activityDetailNoteInput.value = confirmation.note;
-    updateActivityDetailDirtyState();
-    return;
-  }
-  if (!confirmation.confirmed) return;
-
-  const validResult = resultOptions.some(([value]) => value === resultCode);
-  if (!validResult) throw new Error("Välj ett giltigt resultat.");
-
-  const candidateSynced = await syncCandidateFromActivity(activity, "completed", confirmation.note, new Date().toISOString(), resultCode);
-  if (!candidateSynced) {
-    openCaseActivityWithResult(activity.id, resultCode);
-    return;
-  }
-  await saveActivityCommand({
-    activity,
-    caseRecord,
-    nextStatus: "completed",
-    nextResult: resultCode,
-    nextHandlerId: activity.handlerIdOverride || "",
-    nextDueDate: activity.dueDate || "",
-    nextWaitingForParty: null,
-    note: confirmation.note
-  });
-  markSaved();
-  showFeedback(`Aktiviteten har avslutats med resultatet ${activityResultOptions(activity).find(([value]) => value === resultCode)?.[1] || resultCode}.`);
-  await refresh();
 }
 
 function openCaseMeetings(caseId) {

@@ -50,3 +50,13 @@ test("shows activities in the first case work tab", () => {
   assert.match(app, /els\.caseActivitiesPane\.hidden = false/);
   assert.doesNotMatch(app, /\["open_activities", "Visa alla kontroller"/);
 });
+
+test("keeps the activity list compact and finishes activities in their detail view", () => {
+  assert.doesNotMatch(app, /data-quick-finish-activity/);
+  assert.doesNotMatch(app, /registerQuickActivityResult/);
+  assert.doesNotMatch(app, /<strong>Gör så här:<\/strong>/);
+  assert.doesNotMatch(app, /<strong>Registrerat utfall:<\/strong>/);
+  assert.doesNotMatch(app, /activity-completion-meta/);
+  assert.match(app, /const incompleteWorkInput = workInput\?\.required && workInput\.state !== "complete"/);
+  assert.match(app, /class="activity-result-summary">\$\{escapeHtml\(result\)\}/);
+});

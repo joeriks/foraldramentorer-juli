@@ -2752,7 +2752,7 @@ body {
 }
 
 .activity-table {
-  min-width: 980px;
+  min-width: 760px;
 }
 
 .activity-table th:first-child,
@@ -2798,14 +2798,6 @@ body {
   line-height: 1.35;
 }
 
-.activity-instruction-preview {
-  display: -webkit-box !important;
-  overflow: hidden;
-  color: #52616d;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
 .activity-linked-input {
   display: flex !important;
   flex-wrap: wrap;
@@ -2820,18 +2812,6 @@ body {
 
 .activity-result-summary {
   color: var(--app-text) !important;
-}
-
-.activity-note-summary {
-  display: -webkit-box !important;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.activity-completion-meta {
-  color: var(--bs-secondary-color);
-  font-size: 0.75rem;
 }
 
 .activity-step {
@@ -2856,18 +2836,6 @@ body {
 .activity-owner-name {
   display: block;
   font-weight: 600;
-}
-
-.activity-open-button {
-  min-width: 4.5rem;
-}
-
-.activity-row-actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: var(--app-space-2);
-  white-space: nowrap;
 }
 
 .case-closure-summary {
@@ -2953,10 +2921,6 @@ body {
   display: flex;
   flex: 0 0 auto;
   gap: var(--app-space-2);
-}
-
-.activity-mobile-result {
-  display: none;
 }
 
 .activity-empty {
@@ -4144,10 +4108,6 @@ body {
   .activity-table th:nth-child(n + 3),
   .activity-table td:nth-child(n + 3) {
     display: none;
-  }
-
-  .activity-mobile-result {
-    display: block;
   }
 
   .activity-status-badge {
