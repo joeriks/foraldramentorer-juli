@@ -119,6 +119,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "83",
+    date: "2026-08-15",
+    title: "Tydligt avslut och nästa aktivitet",
+    flow: "Aktivitet → resultat → eventuell anteckning → nästa aktivitet",
+    simplified: "Resultat, tjänsteanteckning och avslutningsknapp ligger nu tillsammans som aktivitetens normala arbetsflöde. Efter ett normalt resultat öppnas nästa aktivitet automatiskt.",
+    retained: "Ansvarig, förfallodatum, vänteläge, Ej aktuell och andra undantag finns kvar under Planering och undantag. Avvikande resultat stannar kvar för ställningstagande.",
+    changes: [
+      "Avslutningsknappen visas direkt efter resultat och tjänsteanteckning.",
+      "Knapptexten berättar om nästa aktivitet öppnas eller om handläggaren återgår till ärendet.",
+      "Planeringsuppgifter och ovanliga aktivitetslägen har samlats i en utfällbar del."
+    ]
+  },
+  {
     version: "82",
     date: "2026-08-15",
     title: "Realistisk prototypdata med full historik",
@@ -1295,6 +1308,7 @@ const els = {
   activityWorkInputMeta: document.querySelector("#activityWorkInputMeta"),
   activityWorkInputLink: document.querySelector("#activityWorkInputLink"),
   activityDetailForm: document.querySelector("#activityDetailForm"),
+  activityPlanningDetails: document.querySelector("#activityPlanningDetails"),
   activityDetailStatusInput: document.querySelector("#activityDetailStatusInput"),
   activityDetailResultFieldset: document.querySelector("#activityDetailResultFieldset"),
   activityDetailResultInput: document.querySelector("#activityDetailResultInput"),
@@ -7710,6 +7724,9 @@ function renderActivityDetail(caseRecord) {
   els.activityDetailWaitingForInput.disabled = locked || activity.status !== "waiting";
   els.activityDetailNoteInput.disabled = locked;
   els.reopenActivityButton.hidden = !locked;
+  els.activityPlanningDetails.open = activity.status === "waiting"
+    || Boolean(activity.handlerIdOverride)
+    || Boolean(activity.dueDate);
   const deviation = activityDeviations.find((item) => item.activityId === activity.id && item.status === "open" && !item.activeDecisionId);
   els.activityDeviationPanel.hidden = !deviation;
   els.activityDeviationPanel.dataset.deviationId = deviation?.id || "";
@@ -7777,12 +7794,37 @@ function activityDetailHasChanges() {
     && JSON.stringify(activityDetailFormSnapshot()) !== JSON.stringify(activityDetailBaseline);
 }
 
+function nextOpenActivity(activity) {
+  if (!activity) return null;
+  const openActivities = activitiesForCase(activity.caseId)
+    .filter((item) => item.id !== activity.id && !["completed", "not_applicable"].includes(item.status))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  return openActivities.find((item) => item.sortOrder > activity.sortOrder) || openActivities[0] || null;
+}
+
 function updateActivityDetailDirtyState() {
   const dirty = activityDetailHasChanges();
   const nextStatus = els.activityDetailStatusInput.value;
-  els.activityDetailSaveButton.disabled = !dirty;
-  els.activityDetailSaveButton.textContent = nextStatus === "completed"
-    ? "Avsluta aktivitet"
+  const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
+  const caseRecord = cases.find((item) => item.id === activity?.caseId);
+  const nextActivity = nextOpenActivity(activity);
+  const classification = activity && nextStatus === "completed"
+    ? resultClassification(activity.templateId, els.activityDetailResultInput.value)
+    : null;
+  const requiresNote = nextStatus === "not_applicable" || classification === "deviation";
+  const workInput = activity && caseRecord ? activityWorkInputSummary(activity, caseRecord) : null;
+  const blocker = requiresNote && !els.activityDetailNoteInput.value.trim()
+    ? "Skriv en tjänsteanteckning för att registrera resultatet"
+    : nextStatus === "waiting" && !els.activityDetailWaitingForInput.value
+      ? "Ange vem eller vad aktiviteten väntar på"
+      : nextStatus === "completed" && workInput?.required && workInput.state !== "complete"
+        ? `Komplettera ${workInput.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas`
+        : "";
+  els.activityDetailSaveButton.disabled = !dirty || Boolean(blocker);
+  els.activityDetailSaveButton.textContent = nextStatus === "completed" && classification === "deviation"
+    ? "Registrera resultat"
+    : nextStatus === "completed"
+      ? nextActivity ? "Avsluta och gå vidare" : "Avsluta och återgå till ärendet"
     : nextStatus === "waiting"
       ? "Sätt i vänteläge"
       : nextStatus === "not_applicable"
@@ -7790,7 +7832,15 @@ function updateActivityDetailDirtyState() {
         : nextStatus === "in_progress" && activityDetailBaseline?.status !== "in_progress"
           ? activityDetailBaseline?.status === "waiting" ? "Fortsätt aktivitet" : "Markera som pågående"
           : "Spara ändringar";
-  els.activityDetailSaveState.textContent = dirty ? "Osparade ändringar" : "Inga osparade ändringar";
+  if (!dirty) {
+    els.activityDetailSaveButton.textContent = ["completed", "not_applicable"].includes(activity?.status)
+      ? "Aktiviteten är avslutad"
+      : "Välj resultat ovan";
+  }
+  els.activityDetailSaveState.textContent = blocker
+    || (dirty && nextStatus === "completed"
+      ? nextActivity ? `Resultatet är inte sparat. Nästa aktivitet: ${nextActivity.title}` : "Resultatet är inte sparat"
+      : dirty ? "Osparade ändringar" : ["completed", "not_applicable"].includes(activity?.status) ? "Aktiviteten är avslutad" : "Välj resultat när arbetet är klart");
   els.activityDetailSaveState.classList.toggle("activity-save-pending", dirty);
   els.backToActivitiesButton.textContent = dirty ? "Avbryt och gå tillbaka" : "Tillbaka till aktiviteterna";
 }
@@ -7841,7 +7891,9 @@ function renderActivityStateControls(activity) {
   els.activityResultHelp.textContent = activity.templateId === "registryChecked"
     ? "Välj särskilt ställningstagande om kontrollen behöver bedömas vidare. Dokumentera inte registerutdragets innehåll."
     : status === "completed"
-      ? "Det valda resultatet avslutar aktiviteten när du sparar."
+      ? resultClassification(activity.templateId, els.activityDetailResultInput.value) === "deviation"
+        ? "Komplettera med en tjänsteanteckning. När resultatet registreras öppnas ställningstagandet."
+        : "Komplettera vid behov med en tjänsteanteckning och avsluta aktiviteten nedan."
       : "Välj resultat när arbetet är klart. Aktiviteten avslutas automatiskt.";
 }
 
@@ -7854,6 +7906,7 @@ function setActivityDraftStatus(status) {
     for (const input of els.activityDetailResultOptions.querySelectorAll('input[type="radio"]')) input.checked = false;
   }
   if (status !== "waiting") els.activityDetailWaitingForInput.value = "";
+  els.activityPlanningDetails.open = true;
   renderActivityStateControls(activity);
   updateActivityValidationState();
   updateActivityDetailDirtyState();
@@ -11786,6 +11839,9 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   const nextWaitingForParty = nextStatus === "waiting" ? els.activityDetailWaitingForInput.value : null;
   const nextNote = els.activityDetailNoteInput.value.trim();
   const closesCase = activitySaveRequiresConfirmation(activity, nextStatus, nextResult);
+  const nextActivity = nextOpenActivity(activity);
+  const hasDeviatingResult = nextStatus === "completed"
+    && resultClassification(activity.templateId, nextResult) === "deviation";
   updateActivityValidationState();
   if (!els.activityDetailForm.reportValidity()) return;
 
@@ -11803,10 +11859,16 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   const candidateSynced = await syncCandidateFromActivity(activity, nextStatus, nextNote, new Date().toISOString(), nextResult);
   if (!candidateSynced) return;
   await saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nextHandlerId, nextDueDate, nextWaitingForParty, note: nextNote });
-  if (["completed", "not_applicable"].includes(nextStatus)) selectedCaseActivityId = null;
+  if (closesCase) selectedCaseActivityId = null;
+  else if (hasDeviatingResult) selectedCaseActivityId = activity.id;
+  else if (["completed", "not_applicable"].includes(nextStatus)) selectedCaseActivityId = nextActivity?.id || null;
   markSaved();
   showFeedback(nextStatus === "completed"
-    ? "Aktiviteten har avslutats."
+    ? hasDeviatingResult
+      ? "Resultatet har registrerats. Ta nu ställning till avvikelsen."
+      : nextActivity && !closesCase
+        ? "Aktiviteten har avslutats. Nästa aktivitet har öppnats."
+        : "Aktiviteten har avslutats."
     : nextStatus === "waiting"
       ? "Aktiviteten har satts i vänteläge."
       : nextStatus === "not_applicable"
@@ -11815,6 +11877,10 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   await refresh();
   if (closesCase) {
     requestAnimationFrame(() => els.activityCaseClosedNotice.scrollIntoView({ behavior: "smooth", block: "start" }));
+  } else if (hasDeviatingResult) {
+    requestAnimationFrame(() => els.activityDeviationPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
+  } else if (selectedCaseActivityId) {
+    requestAnimationFrame(() => els.activityDetailPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 });
 

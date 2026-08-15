@@ -780,60 +780,63 @@
                         <a id="activityWorkInputLink" class="btn btn-outline-primary btn-sm" href="#"></a>
                       </section>
                       <form id="activityDetailForm" class="activity-record-body">
-                        <div class="row g-3">
+                        <div class="activity-completion-flow">
                           <input id="activityDetailStatusInput" type="hidden" value="not_started">
-                          <div class="col-12">
-                            <fieldset id="activityDetailResultFieldset" class="activity-result-action">
-                              <legend>Avsluta med resultat</legend>
-                              <input id="activityDetailResultInput" type="hidden" value="">
-                              <div id="activityDetailResultOptions" class="activity-result-options"></div>
-                              <button id="activityClearResultButton" type="button" class="btn btn-link btn-sm px-0" hidden>Avmarkera resultat</button>
-                              <div id="activityResultHelp" class="form-text"></div>
-                            </fieldset>
-                          </div>
-                          <div id="activityOpenStateActions" class="col-12 activity-state-actions">
-                            <span class="small text-secondary">Behöver aktiviteten fortsätta senare?</span>
-                            <div class="activity-state-action-buttons">
-                              <button id="activitySetWaitingButton" type="button" class="btn btn-outline-primary btn-sm">Sätt i vänteläge</button>
-                              <div class="dropdown">
-                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Fler åtgärder</button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                  <li><button id="activitySetInProgressButton" type="button" class="dropdown-item">Markera som pågående</button></li>
-                                  <li><button id="activitySetNotApplicableButton" type="button" class="dropdown-item">Markera som ej aktuell</button></li>
-                                </ul>
-                              </div>
-                            </div>
-                          </div>
-                          <div class="col-md-6">
-                            <label class="form-label" for="activityDetailOwnerInput">Ansvarig</label>
-                            <select id="activityDetailOwnerInput" class="form-select form-select-sm"></select>
-                            <div class="form-text">Ärver normalt ärendets ansvariga handläggare.</div>
-                          </div>
-                          <div class="col-md-6">
-                            <label class="form-label" for="activityDetailDueDateInput">Förfallodatum <span class="text-secondary fw-normal">(valfritt)</span></label>
-                            <input id="activityDetailDueDateInput" class="form-control form-control-sm" type="date">
-                          </div>
-                          <div id="activityWaitingForRow" class="col-md-6" hidden>
-                            <label class="form-label" for="activityDetailWaitingForInput">Väntar på</label>
-                            <select id="activityDetailWaitingForInput" class="form-select form-select-sm">
-                              <option value="">Välj vem eller vad som inväntas</option>
-                              <option value="mentor">Mentorn</option>
-                              <option value="handler">Handläggaren</option>
-                              <option value="external">Extern part</option>
-                            </select>
-                          </div>
-                          <div class="col-12">
+                          <fieldset id="activityDetailResultFieldset" class="activity-result-action">
+                            <legend>Avsluta med resultat</legend>
+                            <input id="activityDetailResultInput" type="hidden" value="">
+                            <div id="activityDetailResultOptions" class="activity-result-options"></div>
+                            <button id="activityClearResultButton" type="button" class="btn btn-link btn-sm px-0" hidden>Avmarkera resultat</button>
+                            <div id="activityResultHelp" class="form-text"></div>
+                          </fieldset>
+                          <div class="activity-note-field">
                             <label class="form-label" for="activityDetailNoteInput">Tjänsteanteckning <span id="activityDetailNoteRequirement" class="text-secondary fw-normal" hidden>(krävs för detta resultat)</span></label>
                             <textarea id="activityDetailNoteInput" class="form-control form-control-sm" rows="3" placeholder="Kort notering om genomförande, vänteläge eller avvikelse."></textarea>
                           </div>
-                        </div>
-                        <div class="activity-save-bar mt-3">
-                          <span id="activityDetailSaveState" class="small text-secondary">Inga osparade ändringar</span>
-                          <div class="d-flex gap-2">
-                            <button id="reopenActivityButton" type="button" class="btn btn-outline-primary btn-sm" hidden>Återöppna aktivitet</button>
-                            <button id="activityDetailSaveButton" type="submit" class="btn btn-primary btn-sm" disabled>Spara ändringar</button>
+                          <div class="activity-save-bar">
+                            <span id="activityDetailSaveState" class="small text-secondary">Välj resultat när arbetet är klart</span>
+                            <div class="d-flex gap-2">
+                              <button id="reopenActivityButton" type="button" class="btn btn-outline-primary btn-sm" hidden>Återöppna aktivitet</button>
+                              <button id="activityDetailSaveButton" type="submit" class="btn btn-primary btn-sm" disabled>Välj resultat ovan</button>
+                            </div>
                           </div>
                         </div>
+                        <details id="activityPlanningDetails" class="activity-planning-details mt-3">
+                          <summary>Planering och undantag</summary>
+                          <div class="activity-planning-body row g-3">
+                            <div id="activityOpenStateActions" class="col-12 activity-state-actions">
+                              <span class="small text-secondary">Behöver aktiviteten fortsätta senare?</span>
+                              <div class="activity-state-action-buttons">
+                                <button id="activitySetWaitingButton" type="button" class="btn btn-outline-primary btn-sm">Sätt i vänteläge</button>
+                                <div class="dropdown">
+                                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Fler åtgärder</button>
+                                  <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><button id="activitySetInProgressButton" type="button" class="dropdown-item">Markera som pågående</button></li>
+                                    <li><button id="activitySetNotApplicableButton" type="button" class="dropdown-item">Markera som ej aktuell</button></li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="col-md-6">
+                              <label class="form-label" for="activityDetailOwnerInput">Ansvarig</label>
+                              <select id="activityDetailOwnerInput" class="form-select form-select-sm"></select>
+                              <div class="form-text">Ärver normalt ärendets ansvariga handläggare.</div>
+                            </div>
+                            <div class="col-md-6">
+                              <label class="form-label" for="activityDetailDueDateInput">Förfallodatum <span class="text-secondary fw-normal">(valfritt)</span></label>
+                              <input id="activityDetailDueDateInput" class="form-control form-control-sm" type="date">
+                            </div>
+                            <div id="activityWaitingForRow" class="col-md-6" hidden>
+                              <label class="form-label" for="activityDetailWaitingForInput">Väntar på</label>
+                              <select id="activityDetailWaitingForInput" class="form-select form-select-sm">
+                                <option value="">Välj vem eller vad som inväntas</option>
+                                <option value="mentor">Mentorn</option>
+                                <option value="handler">Handläggaren</option>
+                                <option value="external">Extern part</option>
+                              </select>
+                            </div>
+                          </div>
+                        </details>
                       </form>
                       <section id="activityDeviationPanel" class="activity-deviation-panel border-top" hidden>
                         <h4 class="h6">Ställningstagande krävs</h4>

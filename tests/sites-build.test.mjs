@@ -107,7 +107,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /function activityTemplateAdminRoute/);
   assert.match(scriptText, /renderRoutineFlowDiagrams/);
   assert.match(scriptText, /routineProcessLink/);
-  assert.match(scriptText, /if \(\["completed", "not_applicable"\]\.includes\(nextStatus\)\) selectedCaseActivityId = null;/);
+  assert.match(scriptText, /else if \(\["completed", "not_applicable"\]\.includes\(nextStatus\)\) selectedCaseActivityId = nextActivity\?\.id \|\| null;/);
   assert.match(scriptText, /data-quick-finish-activity/);
   assert.match(scriptText, /registerQuickActivityResult/);
   assert.match(scriptText, /publicSupportAreaChoices/);
