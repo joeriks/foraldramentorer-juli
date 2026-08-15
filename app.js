@@ -119,6 +119,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "82",
+    date: "2026-08-15",
+    title: "Realistisk prototypdata med full historik",
+    flow: "Inkommande kontakt → stödärende → matchning → mentoruppdrag samt mentorgodkännande",
+    simplified: "Prototypen visar nu sammanhängande exempel med trovärdiga datum, ansvariga och nästa steg i stället för att alla poster ser ut att ha skapats samtidigt.",
+    retained: "Samma ärendetyper, aktiviteter, resultat, avvikelser och beslutsregler används. Ändringen gäller endast exempeldata och dess revisionshistorik.",
+    changes: [
+      "Varje ärendekedja har fått en kronologisk logg från registrering och tilldelning till aktuellt läge.",
+      "Aktiviteter, tjänsteanteckningar, möten, mentorrapporter, föräldraavstämningar och ersättningsperioder har egna realistiska tidpunkter.",
+      "Exempeldata omfattar inkommande kontakter samt både öppna och hanterade avvikelser."
+    ]
+  },
+  {
     version: "81",
     date: "2026-08-15",
     title: "Alla aktivitetsresultat syns direkt",
@@ -2496,34 +2509,58 @@ function exampleTemplates(count) {
   });
 }
 
-const EXAMPLE_DATA_VERSION = 5;
+const EXAMPLE_DATA_VERSION = 6;
+
+function exampleTime(base, hours) {
+  return new Date(new Date(base).getTime() + (hours * 60 * 60 * 1000)).toISOString();
+}
 
 function buildExampleDataset(count) {
   const now = new Date().toISOString();
   return exampleTemplates(count).map((candidate, index) => {
     const id = crypto.randomUUID();
-    const identityVerified = Boolean(candidate.checks?.identityVerified);
-    const assignedHandler = count === 1 || index % 2 === 1
-      ? seedHandlers.find((handler) => handler.name === candidate.coordinator) || null
-      : null;
+    const checks = { ...candidate.checks, inviteInterview: Boolean(candidate.interviewDate) };
+    const identityVerified = Boolean(checks.identityVerified);
+    const leaveUnassigned = count > 1 && candidate.status === "Anmäld" && index % 2 === 1;
+    const assignedHandler = leaveUnassigned
+      ? null
+      : seedHandlers.find((handler) => handler.name === candidate.coordinator) || null;
     const coordinator = assignedHandler?.name || "";
-    const checkMeta = buildCheckMeta(candidate.checks, {
-      checkedAt: now,
-      checkedBy: coordinator || "System",
-      note: "Kontrollen är registrerad som sammanhängande prototypdata."
-    });
+    const createdAt = exampleTime(now, -(24 * (95 - (index % 55))));
+    const assignedAt = exampleTime(createdAt, 20);
+    let completedCheckIndex = 0;
+    const checkMeta = Object.fromEntries(CHECKS.map(([key, label]) => {
+      if (!checks[key]) return [key, { checkedAt: "", checkedBy: "", note: "" }];
+      const checkedAt = key === "interviewDone" && candidate.interviewDate
+        ? new Date(candidate.interviewDate).toISOString()
+        : exampleTime(assignedAt, 18 + (completedCheckIndex++ * 32));
+      return [key, {
+        checkedAt,
+        checkedBy: coordinator || "System",
+        note: `${label} har kontrollerats och dokumenterats i prototypärendet.`
+      }];
+    }));
+    const completedChecks = CHECKS
+      .filter(([key]) => checks[key])
+      .map(([key, label]) => ({
+        at: checkMeta[key].checkedAt,
+        text: `${label} registrerades som klar`,
+        actor: checkMeta[key].checkedBy
+      }));
+    const latestCheckAt = completedChecks.map((entry) => entry.at).sort().at(-1) || assignedAt;
+    const updatedAt = candidate.status === "Godkänd" ? exampleTime(latestCheckAt, 18) : latestCheckAt;
     return {
       ...candidate,
       tenantId: DEFAULT_TENANT_ID,
-      checks: { ...candidate.checks },
+      checks,
       checkMeta,
       id,
       coordinatorId: assignedHandler?.id || "",
       coordinator,
       personalNumber: makeExamplePersonalNumber(index),
       identityMethod: identityVerified ? (index % 2 === 0 ? "bankid" : "physical_id") : "",
-      identityVerifiedAt: identityVerified ? now : "",
-      identityVerifiedBy: identityVerified ? "Sara Lind" : "",
+      identityVerifiedAt: identityVerified ? checkMeta.identityVerified.checkedAt : "",
+      identityVerifiedBy: identityVerified ? checkMeta.identityVerified.checkedBy : "",
       supportAreas: [
         { areaId: SUPPORT_AREAS[index % SUPPORT_AREAS.length].id, confidenceLevel: "very_good", experienceLevels: index % 3 === 0 ? ["trained", "practical"] : ["practical"], verified: index % 4 === 0 },
         { areaId: SUPPORT_AREAS[(index + 3) % SUPPORT_AREAS.length].id, confidenceLevel: "good", experienceLevels: ["lived"], verified: false },
@@ -2536,13 +2573,242 @@ function buildExampleDataset(count) {
       exampleDatasetSize: count,
       caseNumber: formatSequentialCaseNumber(index + 1),
       history: [
-        { at: now, text: "Ärende skapat som exempeldata", actor: "System" },
-        { at: now, text: `Status satt till ${candidate.status}`, actor: "System" }
+        { at: createdAt, text: "Intresseanmälan registrerades", actor: "System" },
+        ...(assignedHandler ? [{ at: assignedAt, text: `${coordinator} blev ansvarig handläggare`, actor: "System" }] : []),
+        ...completedChecks,
+        { at: updatedAt, text: `Aktuellt läge sattes till ${candidate.status}`, actor: coordinator || "System" }
       ],
-      createdAt: now,
-      updatedAt: now
+      createdAt,
+      updatedAt
     };
   });
+}
+
+function completeExampleHistory(records, exampleCandidates, now) {
+  const caseRecords = records[CASES_STORE];
+  const assignments = records[CASE_ASSIGNMENTS_STORE];
+  const activities = records[CASE_ACTIVITIES_STORE];
+  const documents = records[CASE_DOCUMENTS_STORE];
+  const events = [];
+  const activitiesByCase = (caseId) => activities
+    .filter((activity) => activity.caseId === caseId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const ownerForCase = (caseId) => assignments.find((assignment) => assignment.caseId === caseId && !assignment.endedAt)?.handlerId || "system";
+  const actorLabel = (actorId) => seedHandlers.find((handler) => handler.id === actorId)?.name || (actorId === "system" ? "System" : "Handläggaren");
+  const addHistoryEvent = (caseId, eventType, message, occurredAt, actorId, entityType = "case", entityId = caseId) => {
+    const eventRecord = caseEventRecord({
+      caseId, eventType, entityType, entityId, message,
+      idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now: occurredAt
+    });
+    eventRecord.actorId = actorId || "system";
+    events.push(eventRecord);
+    return eventRecord;
+  };
+  const resultLabel = (activity) => activityTemplateById(activity.templateId)?.results
+    ?.find(([code]) => code === activity.resultCode)?.[1] || activity.resultCode || "klart";
+  const timeAssignment = (caseId, actorId, assignedAt) => {
+    const assignment = assignments.find((item) => item.caseId === caseId && !item.endedAt);
+    if (!assignment) return;
+    Object.assign(assignment, { assignedAt, assignedBy: actorId });
+    addHistoryEvent(caseId, "assignment_changed", `${actorLabel(actorId)} blev ansvarig handläggare`, assignedAt, actorId, "assignment", assignment.id);
+  };
+  const timeActivities = (caseRecord, startedAt, actorId, intervalHours = 12) => {
+    let latestAt = startedAt;
+    for (const [index, activity] of activitiesByCase(caseRecord.id).entries()) {
+      const changedAt = exampleTime(startedAt, 8 + (index * intervalHours));
+      activity.createdAt = startedAt;
+      activity.createdBy = actorId;
+      if (activity.status === "not_started") {
+        activity.updatedAt = startedAt;
+        activity.updatedBy = actorId;
+        continue;
+      }
+      activity.updatedAt = changedAt;
+      activity.updatedBy = actorId;
+      if (activity.status === "completed") {
+        activity.completedAt = changedAt;
+        activity.completedBy = actorId;
+      } else {
+        activity.completedAt = null;
+        activity.completedBy = null;
+      }
+      if (activity.status === "waiting") activity.dueDate = exampleTime(changedAt, 72).slice(0, 10);
+      const message = activity.status === "completed"
+        ? `${activity.title} avslutades med resultatet ${resultLabel(activity)}`
+        : activity.status === "not_applicable"
+          ? `${activity.title} markerades som ej aktuell`
+          : activity.status === "waiting"
+            ? `${activity.title} sattes i vänteläge`
+            : `${activity.title} påbörjades`;
+      addHistoryEvent(caseRecord.id, "activity_updated", message, changedAt, actorId, "activity", activity.id);
+      for (const document of documents.filter((item) => item.activityId === activity.id)) {
+        document.createdAt = exampleTime(changedAt, 0.1);
+        document.createdBy = actorId;
+        document.documentDate = changedAt.slice(0, 10);
+        addHistoryEvent(caseRecord.id, "document_registered", `${document.title} registrerades`, document.createdAt, actorId, "document", document.id);
+      }
+      latestAt = changedAt > latestAt ? changedAt : latestAt;
+    }
+    return latestAt;
+  };
+
+  let handledDeviationCount = 0;
+  const supportCases = caseRecords.filter((item) => item.caseTypeId === "parent-support");
+  for (const [index, supportCase] of supportCases.entries()) {
+    const matchingCase = caseRecords.find((item) => item.caseTypeId === "matching" && item.supportCaseId === supportCase.id);
+    const assignmentCase = matchingCase
+      ? caseRecords.find((item) => item.caseTypeId === "mentor-assignment" && item.sourceMatchingCaseId === matchingCase.id)
+      : null;
+    const daysAgo = assignmentCase ? 55 + (index % 18) : matchingCase ? 16 + (index % 8) : supportCase.status === "closed" ? 9 + (index % 5) : 3 + (index % 3);
+    const supportStartedAt = exampleTime(now, -(daysAgo * 24));
+    const ownerId = ownerForCase(supportCase.id);
+    const parent = records[PARENTS_STORE].find((item) => item.id === supportCase.parentId);
+    if (parent && (!parent.createdAt || parent.createdAt > exampleTime(supportStartedAt, -12))) {
+      parent.createdAt = exampleTime(supportStartedAt, -12);
+      parent.updatedAt = supportStartedAt;
+      parent.createdBy = ownerId;
+      parent.updatedBy = ownerId;
+    }
+
+    const contact = records[INCOMING_CONTACTS_STORE].find((item) => item.id === supportCase.details?.intakeContactId);
+    if (contact) {
+      const intakeCase = caseRecords.find((item) => item.id === contact.intakeCaseId);
+      const contactAt = exampleTime(supportStartedAt, -9);
+      const intakeClosedAt = exampleTime(supportStartedAt, -0.1);
+      Object.assign(contact, { occurredAt: contactAt, createdAt: contactAt, updatedAt: intakeClosedAt });
+      if (intakeCase) {
+        Object.assign(intakeCase, {
+          createdAt: contactAt, createdBy: ownerId, updatedAt: intakeClosedAt, updatedBy: ownerId,
+          closedAt: intakeClosedAt, closedBy: ownerId
+        });
+        addHistoryEvent(intakeCase.id, "case_created", `Inkommande kontakt registrerades via ${contact.channel === "email" ? "e-post" : "telefon"}`, contactAt, ownerId);
+        timeAssignment(intakeCase.id, ownerId, exampleTime(contactAt, 0.2));
+        timeActivities(intakeCase, exampleTime(contactAt, 0.3), ownerId, 1);
+        addHistoryEvent(intakeCase.id, "successor_case_created", `Stödärende ${supportCase.number} skapades från kontakten`, exampleTime(intakeClosedAt, -0.1), ownerId, "case", supportCase.id);
+        addHistoryEvent(intakeCase.id, "case_closed", `Mottagningsärendet avslutades när stödärende ${supportCase.number} skapades`, intakeClosedAt, ownerId);
+      }
+    }
+
+    Object.assign(supportCase, { createdAt: supportStartedAt, createdBy: ownerId });
+    addHistoryEvent(supportCase.id, "case_created", contact ? "Stödärende skapades från en registrerad kontakt" : `Stödärendet ${supportCase.number} registrerades`, supportStartedAt, ownerId);
+    timeAssignment(supportCase.id, ownerId, exampleTime(supportStartedAt, 1));
+    const supportLatestAt = timeActivities(supportCase, exampleTime(supportStartedAt, 2), ownerId, 14);
+    const supportUpdatedAt = supportCase.status === "closed" ? exampleTime(supportLatestAt, 2) : supportLatestAt;
+    Object.assign(supportCase, {
+      updatedAt: supportUpdatedAt, updatedBy: ownerId,
+      closedAt: supportCase.status === "closed" ? supportUpdatedAt : null,
+      closedBy: supportCase.status === "closed" ? ownerId : null
+    });
+    if (supportCase.status === "closed") addHistoryEvent(supportCase.id, "case_closed", "Stödbehov och matchningskriterier är bekräftade", supportUpdatedAt, ownerId);
+    if (!matchingCase) continue;
+
+    const matchingStartedAt = exampleTime(supportUpdatedAt, 20);
+    const matchingOwnerId = ownerForCase(matchingCase.id);
+    Object.assign(matchingCase, { createdAt: matchingStartedAt, createdBy: matchingOwnerId });
+    addHistoryEvent(supportCase.id, "successor_case_created", `Matchning ${matchingCase.number} skapades från stödärendet`, matchingStartedAt, matchingOwnerId, "case", matchingCase.id);
+    addHistoryEvent(matchingCase.id, "case_created", `Matchningen ${matchingCase.number} skapades från ${supportCase.number}`, matchingStartedAt, matchingOwnerId);
+    timeAssignment(matchingCase.id, matchingOwnerId, exampleTime(matchingStartedAt, 1));
+    const matchingLatestAt = timeActivities(matchingCase, exampleTime(matchingStartedAt, 2), matchingOwnerId, 10);
+    const matchingMeeting = records[CASE_MEETINGS_STORE].find((item) => item.caseId === matchingCase.id);
+    if (matchingMeeting) {
+      const meetingAt = exampleTime(matchingLatestAt, 0.5);
+      Object.assign(matchingMeeting, { occurredAt: meetingAt, createdAt: meetingAt, updatedAt: meetingAt, createdBy: matchingOwnerId, updatedBy: matchingOwnerId });
+      addHistoryEvent(matchingCase.id, "meeting_registered", "Första mötet bokades och dokumenterades", meetingAt, matchingOwnerId, "meeting", matchingMeeting.id);
+    }
+    const responsesAt = exampleTime(matchingLatestAt, 1);
+    addHistoryEvent(matchingCase.id, "matching_responses_recorded", matchingCase.details.matchingOutcome === "pending" ? "Förälderns svar registrerades, mentorns svar inväntas" : "Båda parternas svar registrerades", responsesAt, matchingOwnerId);
+    const matchingUpdatedAt = matchingCase.status === "closed" ? exampleTime(responsesAt, 1) : responsesAt;
+    Object.assign(matchingCase, {
+      updatedAt: matchingUpdatedAt, updatedBy: matchingOwnerId,
+      closedAt: matchingCase.status === "closed" ? matchingUpdatedAt : null,
+      closedBy: matchingCase.status === "closed" ? matchingOwnerId : null
+    });
+    if (matchingCase.status === "closed") {
+      addHistoryEvent(matchingCase.id, "case_closed", matchingCase.details.matchingOutcome === "accepted" ? "Matchningen accepterades av båda parter" : "Matchningen avslutades efter att förslaget avböjdes", matchingUpdatedAt, matchingOwnerId);
+    }
+    if (!assignmentCase) continue;
+
+    const assignmentStartedAt = exampleTime(matchingUpdatedAt, 20);
+    const assignmentOwnerId = ownerForCase(assignmentCase.id);
+    Object.assign(assignmentCase, { createdAt: assignmentStartedAt, createdBy: assignmentOwnerId });
+    addHistoryEvent(matchingCase.id, "successor_case_created", `Mentoruppdrag ${assignmentCase.number} skapades från matchningen`, assignmentStartedAt, assignmentOwnerId, "case", assignmentCase.id);
+    addHistoryEvent(assignmentCase.id, "assignment_created_from_matching", `Uppdraget ${assignmentCase.number} skapades från ${matchingCase.number}`, assignmentStartedAt, assignmentOwnerId);
+    timeAssignment(assignmentCase.id, assignmentOwnerId, exampleTime(assignmentStartedAt, 1));
+    const planAt = exampleTime(assignmentStartedAt, 3);
+    assignmentCase.details.assignmentPlan.updatedAt = planAt;
+    assignmentCase.details.assignmentPlan.updatedBy = assignmentOwnerId;
+    assignmentCase.details.assignmentPlan.startDate = exampleTime(assignmentStartedAt, 24).slice(0, 10);
+    assignmentCase.details.assignmentPlan.firstFollowUpDate = exampleTime(assignmentStartedAt, 24 * 14).slice(0, 10);
+    addHistoryEvent(assignmentCase.id, "assignment_plan_updated", "Uppdragsplan och första uppföljning registrerades", planAt, assignmentOwnerId);
+    let assignmentLatestAt = timeActivities(assignmentCase, exampleTime(assignmentStartedAt, 4), assignmentOwnerId, 24 * 7);
+
+    for (const report of records[MENTOR_REPORTS_STORE].filter((item) => item.caseId === assignmentCase.id)) {
+      const reportAt = exampleTime(assignmentStartedAt, 24 * 10);
+      Object.assign(report, { occurredOn: reportAt.slice(0, 10), createdAt: reportAt, createdBy: assignmentOwnerId });
+      addHistoryEvent(assignmentCase.id, "mentor_report_registered", "Mentorns kontakt- och tidsrapport registrerades", reportAt, assignmentOwnerId, "mentor_report", report.id);
+      assignmentLatestAt = reportAt > assignmentLatestAt ? reportAt : assignmentLatestAt;
+    }
+    for (const checkIn of records[PARENT_CHECK_INS_STORE].filter((item) => item.caseId === assignmentCase.id)) {
+      const checkInAt = exampleTime(assignmentStartedAt, 24 * 14);
+      Object.assign(checkIn, { occurredOn: checkInAt.slice(0, 10), createdAt: checkInAt, createdBy: assignmentOwnerId });
+      addHistoryEvent(assignmentCase.id, "parent_checkin_registered", "Förälderns avstämning registrerades", checkInAt, assignmentOwnerId, "parent_check_in", checkIn.id);
+      assignmentLatestAt = checkInAt > assignmentLatestAt ? checkInAt : assignmentLatestAt;
+    }
+    for (const period of records[COMPENSATION_PERIODS_STORE].filter((item) => item.caseId === assignmentCase.id)) {
+      const periodAt = exampleTime(assignmentStartedAt, (24 * (period.status === "needs_completion" ? 15 : 22)) + 2);
+      const periodDate = new Date(periodAt);
+      period.periodFrom = new Date(Date.UTC(periodDate.getUTCFullYear(), periodDate.getUTCMonth(), 1)).toISOString().slice(0, 10);
+      period.periodTo = new Date(Date.UTC(periodDate.getUTCFullYear(), periodDate.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+      Object.assign(period, { createdAt: periodAt, updatedAt: periodAt, createdBy: assignmentOwnerId, updatedBy: assignmentOwnerId });
+      addHistoryEvent(assignmentCase.id, "compensation_period_created", "Ersättningsperiod skapades från registrerade underlag", periodAt, assignmentOwnerId, "compensation_period", period.id);
+      assignmentLatestAt = periodAt > assignmentLatestAt ? periodAt : assignmentLatestAt;
+    }
+
+    for (const deviation of records[ACTIVITY_DEVIATIONS_STORE].filter((item) => item.caseId === assignmentCase.id)) {
+      const activity = activities.find((item) => item.id === deviation.activityId);
+      const openedAt = exampleTime(activity?.completedAt || assignmentStartedAt, 0.2);
+      Object.assign(deviation, { openedAt, openedBy: assignmentOwnerId });
+      const openedEvent = addHistoryEvent(assignmentCase.id, "deviation_opened", `Avvikelse registrerades för ${activity?.title || "aktiviteten"}`, openedAt, assignmentOwnerId, "deviation", deviation.id);
+      deviation.activityCompletionEventId = events.findLast((item) => item.entityId === deviation.activityId && item.eventType === "activity_updated")?.id || openedEvent.id;
+      if (handledDeviationCount % 2 === 1) {
+        const decisionAt = exampleTime(openedAt, 40);
+        const decision = {
+          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, deviationId: deviation.id,
+          outcome: "continue", reasonCode: "risk_assessed", note: "Samordnaren har följt upp med båda parter. Uppdraget fortsätter med tätare avstämning.",
+          resumeAt: null, supersedesDecisionId: null, decidedAt: decisionAt, decidedBy: assignmentOwnerId
+        };
+        records[DEVIATION_DECISIONS_STORE].push(decision);
+        Object.assign(deviation, { status: "resolved", version: 2, resolvedAt: decisionAt, resolvedBy: assignmentOwnerId, activeDecisionId: decision.id });
+        assignmentCase.status = "in_progress";
+        assignmentCase.priority = "normal";
+        addHistoryEvent(assignmentCase.id, "deviation_decided", "Ställningstagande registrerades: fortsätt handläggningen", decisionAt, assignmentOwnerId, "decision", decision.id);
+        assignmentLatestAt = decisionAt > assignmentLatestAt ? decisionAt : assignmentLatestAt;
+      } else {
+        assignmentLatestAt = openedAt > assignmentLatestAt ? openedAt : assignmentLatestAt;
+      }
+      handledDeviationCount += 1;
+    }
+    Object.assign(assignmentCase, { updatedAt: assignmentLatestAt, updatedBy: assignmentOwnerId });
+  }
+
+  for (const mentor of exampleCandidates) {
+    const caseId = `cert-${mentor.id}`;
+    const actor = mentor.coordinatorId || "system";
+    if (mentor.coordinatorId) addHistoryEvent(caseId, "assignment_changed", `${mentor.coordinator} blev ansvarig handläggare`, exampleTime(mentor.createdAt, 20), "system", "assignment", `${caseId}-${mentor.coordinatorId}`);
+    for (const [key, title] of CERTIFICATION_ACTIVITIES) {
+      if (certificationActivityState(mentor, key) !== "completed") continue;
+      const meta = certificationActivityMeta(mentor, key);
+      const completedAt = meta.completedAt || mentor.updatedAt;
+      addHistoryEvent(caseId, "activity_updated", `${title} avslutades`, completedAt, actor, "activity", `${caseId}-${key}`);
+      const document = documents.find((item) => item.activityId === `${caseId}-${key}`);
+      if (document) addHistoryEvent(caseId, "document_registered", `${document.title} registrerades`, document.createdAt, actor, "document", document.id);
+    }
+    const interview = records[CASE_MEETINGS_STORE].find((item) => item.caseId === caseId);
+    if (interview) addHistoryEvent(caseId, "meeting_registered", "Intervjun dokumenterades i ärendet", interview.occurredAt, actor, "meeting", interview.id);
+    if (mentor.status === "Godkänd") addHistoryEvent(caseId, "case_closed", "Ärendet avslutades: mentorn godkänd", mentor.updatedAt, actor);
+  }
+
+  records[CASE_EVENTS_STORE] = events.sort((a, b) => new Date(a.occurredAt) - new Date(b.occurredAt));
 }
 
 function buildExampleParentWorkflows(exampleCandidates, count) {
@@ -2551,6 +2817,7 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
   const monthStart = `${today.slice(0, 7)}-01`;
   const monthEnd = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0)).toISOString().slice(0, 10);
   const ownerIds = seedHandlers.map((handler) => handler.id);
+  const incomingType = caseTypeById("incoming-contact");
   const supportType = caseTypeById("parent-support");
   const matchingType = caseTypeById("matching");
   const assignmentType = caseTypeById("mentor-assignment");
@@ -2567,7 +2834,7 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
   const records = {
     [PARENTS_STORE]: [], [INCOMING_CONTACTS_STORE]: [], [CASES_STORE]: [], [CASE_ASSIGNMENTS_STORE]: [], [CASE_ACTIVITIES_STORE]: [],
     [CASE_DOCUMENTS_STORE]: [], [CASE_EVENTS_STORE]: [], [ACTIVITY_DEVIATIONS_STORE]: [], [CASE_MEETINGS_STORE]: [],
-    [MENTOR_REPORTS_STORE]: [], [PARENT_CHECK_INS_STORE]: [], [COMPENSATION_PERIODS_STORE]: []
+    [DEVIATION_DECISIONS_STORE]: [], [MENTOR_REPORTS_STORE]: [], [PARENT_CHECK_INS_STORE]: [], [COMPENSATION_PERIODS_STORE]: []
   };
   let nextExampleSequence = count + 1;
   const nextExampleCaseNumber = () => formatSequentialCaseNumber(nextExampleSequence++);
@@ -2667,7 +2934,42 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       const phase = count === 1 ? 0 : workflowIndex % 5;
       const supportProfileComplete = phase !== 2;
       const supportCaseId = crypto.randomUUID();
+      const seedIncomingContact = needIndex === 0 && workflowIndex % 3 === 0;
+      const incomingContactId = seedIncomingContact ? crypto.randomUUID() : null;
+      const intakeCaseId = seedIncomingContact ? crypto.randomUUID() : null;
+      const intakeNumber = seedIncomingContact ? nextExampleCaseNumber() : null;
       const supportNumber = nextExampleCaseNumber();
+      if (seedIncomingContact) {
+        const channel = workflowIndex % 2 ? "email" : "phone";
+        const nextStep = `Kontakta ${parentName} och komplettera underlaget för ${supportPurpose.toLowerCase()}.`;
+        records[INCOMING_CONTACTS_STORE].push({
+          id: incomingContactId, tenantId: DEFAULT_TENANT_ID, occurredAt: now, channel,
+          contactDetails: channel === "email" ? `${parentName.toLowerCase().replaceAll(" ", ".")}@example.se` : parent.contactDetails,
+          parentName, callerType: workflowIndex % 4 === 0 ? "professional" : "self",
+          summary: `Kontakt om ${supportPurpose.toLowerCase()}. ${parentName} önskar information om vilket stöd som kan erbjudas.`,
+          nextStep, parentId, caseId: supportCaseId, status: "linked", receivedBy: ownerId, registeredBy: ownerId,
+          supportAreaIds: [...supportAreaIds], availability: parent.availability, intakeCaseId,
+          createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId,
+          exampleData: true, exampleDataVersion: EXAMPLE_DATA_VERSION
+        });
+        records[CASES_STORE].push({
+          id: intakeCaseId, tenantId: DEFAULT_TENANT_ID, number: intakeNumber,
+          caseTypeId: incomingType.id, caseTypeVersion: incomingType.version,
+          organizationUnitId: DEFAULT_ORGANIZATION_UNIT_ID, type: incomingType.name,
+          title: `${channel === "email" ? "E-post" : "Telefon"}: ${parentName}`,
+          description: `Kontakt om ${supportPurpose.toLowerCase()}.\n\nNästa steg: ${nextStep}`,
+          details: { contactChannel: channel, contactDetails: parent.contactDetails, callerType: workflowIndex % 4 === 0 ? "professional" : "self", affectedPerson: parentName, nextStep },
+          mentorId: null, parentId, supportCaseId: null, sourceMatchingCaseId: null,
+          status: "closed", priority: "normal", dueDate: null, version: 2,
+          createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId,
+          closedAt: now, closedBy: ownerId, exampleData: true, exampleDataVersion: EXAMPLE_DATA_VERSION
+        });
+        addAssignment(intakeCaseId, ownerId);
+        addActivities(intakeCaseId, incomingType, {
+          notApplicable: incomingType.suggestedActivities,
+          completedBy: ownerId
+        });
+      }
       const supportCase = {
         id: supportCaseId, tenantId: DEFAULT_TENANT_ID, number: supportNumber,
         caseTypeId: supportType.id, caseTypeVersion: supportType.version,
@@ -2685,7 +2987,8 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
           sharedExperiencePreference: parentIndex % 3 === 0 ? "important" : "helpful",
           complementarySupport: parentIndex % 4 === 0
             ? { active: true, area: "Skola eller vård", note: "Mentorn ska vara ett kompletterande vardagsstöd, inte ersätta professionella insatser." }
-            : { active: false, area: "", note: "" }
+            : { active: false, area: "", note: "" },
+          intakeContactId: incomingContactId
         },
         mentorId: null, parentId, supportCaseId: null, sourceMatchingCaseId: null,
         status: supportProfileComplete ? "closed" : "in_progress", priority: "normal", dueDate: null, version: 1,
@@ -2791,8 +3094,8 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       const assignmentActivities = addActivities(assignmentCaseId, assignmentType, {
         completed: concern
           ? assignmentType.suggestedActivities.slice(0, 3)
-          : assignmentType.suggestedActivities.slice(0, 2),
-        inProgress: concern ? [] : [assignmentType.suggestedActivities[2]],
+          : assignmentType.suggestedActivities.slice(0, 4),
+        inProgress: concern ? [] : [assignmentType.suggestedActivities[4]],
         resultCodes: concern ? { [assignmentType.suggestedActivities[2]]: "not_completed" } : {},
         notes: concern ? {
           [assignmentType.suggestedActivities[2]]: "Föräldern beskriver oro kring kontakten. Uppdraget pausas i väntan på samordnarens bedömning."
@@ -2866,6 +3169,7 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       });
     }
   }
+  completeExampleHistory(records, exampleCandidates, now);
   return records;
 }
 
@@ -3420,11 +3724,14 @@ function projectMentorWorkflow(candidate) {
     checkMeta,
     interviewDate: interviewMeeting?.occurredAt || "",
     interviewMode: interviewMeeting?.mode || "",
-    history: caseEvents.filter((event) => event.caseId === caseRecord.id).map((event) => ({
-      at: event.occurredAt || event.createdAt,
-      text: event.payload?.message || event.text || event.eventType,
-      actor: handlerNameById(event.actorId) || event.actor
-    }))
+    history: caseEvents
+      .filter((event) => event.caseId === caseRecord.id)
+      .sort((a, b) => new Date(a.occurredAt || a.createdAt) - new Date(b.occurredAt || b.createdAt))
+      .map((event) => ({
+        at: event.occurredAt || event.createdAt,
+        text: event.payload?.message || event.text || event.eventType,
+        actor: handlerNameById(event.actorId) || event.actor
+      }))
   };
 }
 
@@ -3445,7 +3752,8 @@ function certificationActivityState(candidate, key) {
 
 function certificationActivityMeta(candidate, key) {
   if (key === "inviteInterview" && candidate.interviewDate) {
-    return { completedAt: candidate.updatedAt, completedBy: candidate.coordinator || "System", note: `Intervju bokad ${formatDateTime(candidate.interviewDate)}` };
+    const meta = candidate.checkMeta?.inviteInterview || {};
+    return { completedAt: meta.checkedAt || candidate.updatedAt, completedBy: meta.checkedBy || candidate.coordinator || "System", note: meta.note || `Intervju bokad ${formatDateTime(candidate.interviewDate)}` };
   }
   if (key === "decision" && candidate.status === "Godkänd") {
     return { completedAt: candidate.updatedAt, completedBy: candidate.coordinator || "System", note: "Mentorn godkänd" };
