@@ -3744,6 +3744,14 @@ body {
   opacity: .78;
 }
 
+.activity-result-action-blocked .activity-result-option {
+  background: var(--app-surface-muted);
+}
+
+.activity-result-action-blocked + .activity-note-field {
+  margin-top: var(--app-space-1);
+}
+
 .activity-completion-flow {
   display: grid;
   gap: var(--app-space-3);

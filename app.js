@@ -119,6 +119,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "86",
+    date: "2026-08-15",
+    title: "Resultat låses tills registreringen är klar",
+    flow: "Aktivitet → obligatorisk registrering → resultat",
+    simplified: "Avslutande resultat kan inte längre väljas innan aktivitetens obligatoriska registrering är fullständig. Aktiviteten visar vad som måste slutföras och länkar direkt till registreringen.",
+    retained: "Vänteläge, planering och andra icke-avslutande åtgärder är fortsatt tillgängliga medan registreringen pågår.",
+    changes: [
+      "Resultatvalen inaktiveras när ett obligatoriskt underlag är ofullständigt.",
+      "Förklaringen under resultatvalen anger vilken registrering som måste slutföras.",
+      "Samma regel kontrolleras även vid validering och sparande."
+    ]
+  },
+  {
     version: "85",
     date: "2026-08-15",
     title: "En renare aktivitetslista",
@@ -6489,6 +6502,11 @@ function activityWorkInputSummary(activity, caseRecord) {
   };
 }
 
+function incompleteRequiredActivityWorkInput(activity, caseRecord) {
+  const workInput = activityWorkInputSummary(activity, caseRecord);
+  return workInput?.required && workInput.state !== "complete" ? workInput : null;
+}
+
 function defaultCompletedResult(activity) {
   return activityResultOptions(activity)[0]?.[0] || "";
 }
@@ -7728,7 +7746,6 @@ function renderActivityDetail(caseRecord) {
   renderActivityResultInput(activity);
   const locked = ["completed", "not_applicable"].includes(activity.status);
   els.activityDetailStatusInput.disabled = locked;
-  els.activityDetailResultFieldset.disabled = locked;
   els.activityDetailOwnerInput.disabled = locked;
   els.activityDetailDueDateInput.disabled = locked;
   els.activityDetailWaitingForInput.disabled = locked || activity.status !== "waiting";
@@ -7822,13 +7839,13 @@ function updateActivityDetailDirtyState() {
     ? resultClassification(activity.templateId, els.activityDetailResultInput.value)
     : null;
   const requiresNote = nextStatus === "not_applicable" || classification === "deviation";
-  const workInput = activity && caseRecord ? activityWorkInputSummary(activity, caseRecord) : null;
+  const workInputBlocker = activity && caseRecord ? incompleteRequiredActivityWorkInput(activity, caseRecord) : null;
   const blocker = requiresNote && !els.activityDetailNoteInput.value.trim()
     ? "Skriv en tjänsteanteckning för att registrera resultatet"
     : nextStatus === "waiting" && !els.activityDetailWaitingForInput.value
       ? "Ange vem eller vad aktiviteten väntar på"
-      : nextStatus === "completed" && workInput?.required && workInput.state !== "complete"
-        ? `Komplettera ${workInput.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas`
+      : nextStatus === "completed" && workInputBlocker
+        ? `Komplettera ${workInputBlocker.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas`
         : "";
   els.activityDetailSaveButton.disabled = !dirty || Boolean(blocker);
   els.activityDetailSaveButton.textContent = nextStatus === "completed" && classification === "deviation"
@@ -7864,7 +7881,6 @@ function renderActivityResultInput(activity) {
       <input id="activity-result-option-${index}" class="form-check-input" type="radio" name="activityResultOption" value="${escapeHtml(value)}"${value === els.activityDetailResultInput.value ? " checked" : ""}>
       <span>${escapeHtml(label)}</span>
     </label>`).join("");
-  els.activityDetailResultFieldset.disabled = ["completed", "not_applicable"].includes(activity.status);
   renderActivityStateControls(activity);
   updateActivityValidationState();
 }
@@ -7872,6 +7888,8 @@ function renderActivityResultInput(activity) {
 function setActivityResultSelection(resultCode) {
   const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
   if (!activity) return;
+  const caseRecord = cases.find((item) => item.id === activity.caseId);
+  if (resultCode && incompleteRequiredActivityWorkInput(activity, caseRecord)) return;
   els.activityDetailResultInput.value = resultCode;
   for (const input of els.activityDetailResultOptions.querySelectorAll('input[type="radio"]')) {
     input.checked = input.value === resultCode;
@@ -7887,6 +7905,10 @@ function setActivityResultSelection(resultCode) {
 function renderActivityStateControls(activity) {
   const status = els.activityDetailStatusInput.value;
   const locked = ["completed", "not_applicable"].includes(activity.status);
+  const caseRecord = cases.find((item) => item.id === activity.caseId);
+  const workInputBlocker = !locked ? incompleteRequiredActivityWorkInput(activity, caseRecord) : null;
+  els.activityDetailResultFieldset.disabled = locked || Boolean(workInputBlocker);
+  els.activityDetailResultFieldset.classList.toggle("activity-result-action-blocked", Boolean(workInputBlocker));
   els.activityOpenStateActions.hidden = locked;
   els.activitySetWaitingButton.hidden = status === "waiting";
   els.activitySetInProgressButton.hidden = status === "in_progress";
@@ -7898,7 +7920,9 @@ function renderActivityStateControls(activity) {
   const resultInputs = [...els.activityDetailResultOptions.querySelectorAll('input[type="radio"]')];
   for (const input of resultInputs) input.required = status === "completed";
   els.activityClearResultButton.hidden = locked || !els.activityDetailResultInput.value;
-  els.activityResultHelp.textContent = activity.templateId === "registryChecked"
+  els.activityResultHelp.textContent = workInputBlocker
+    ? `Slutför ${workInputBlocker.label.toLocaleLowerCase("sv-SE")} ovan innan du kan välja ett avslutande resultat.`
+    : activity.templateId === "registryChecked"
     ? "Välj särskilt ställningstagande om kontrollen behöver bedömas vidare. Dokumentera inte registerutdragets innehåll."
     : status === "completed"
       ? resultClassification(activity.templateId, els.activityDetailResultInput.value) === "deviation"
@@ -7944,9 +7968,9 @@ function updateActivityValidationState() {
       ? "Ange en kort motivering till varför aktiviteten inte är aktuell."
       : "Ange en kort notering när resultatet kräver ställningstagande."
     : "");
-  const workInput = activity && caseRecord ? activityWorkInputSummary(activity, caseRecord) : null;
-  if (completed && workInput?.required && workInput.state !== "complete") {
-    resultValidationMessage = `Komplettera ${workInput.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas.`;
+  const workInputBlocker = activity && caseRecord ? incompleteRequiredActivityWorkInput(activity, caseRecord) : null;
+  if (completed && workInputBlocker) {
+    resultValidationMessage = `Komplettera ${workInputBlocker.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas.`;
   }
   const resultInputs = [...els.activityDetailResultOptions.querySelectorAll('input[type="radio"]')];
   for (const input of resultInputs) input.setCustomValidity("");

@@ -60,3 +60,12 @@ test("keeps the activity list compact and finishes activities in their detail vi
   assert.match(app, /const incompleteWorkInput = workInput\?\.required && workInput\.state !== "complete"/);
   assert.match(app, /class="activity-result-summary">\$\{escapeHtml\(result\)\}/);
 });
+
+test("blocks completion results until required registration is complete", () => {
+  assert.match(app, /function incompleteRequiredActivityWorkInput\(activity, caseRecord\)/);
+  assert.match(app, /workInput\?\.required && workInput\.state !== "complete"/);
+  assert.match(app, /activityDetailResultFieldset\.disabled = locked \|\| Boolean\(workInputBlocker\)/);
+  assert.doesNotMatch(app, /activityDetailResultFieldset\.disabled = locked;/);
+  assert.match(app, /if \(resultCode && incompleteRequiredActivityWorkInput\(activity, caseRecord\)\) return/);
+  assert.match(app, /Slutför \$\{workInputBlocker\.label\.toLocaleLowerCase\("sv-SE"\)\} ovan innan du kan välja ett avslutande resultat/);
+});
