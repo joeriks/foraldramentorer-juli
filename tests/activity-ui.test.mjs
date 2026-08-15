@@ -40,3 +40,13 @@ test("mobile completion action remains visible without covering support", () => 
   assert.match(styles, /\.activity-save-bar \{\s*position: sticky;/);
   assert.match(styles, /padding: var\(--app-space-3\) 4\.5rem/);
 });
+
+test("shows activities in the first case work tab", () => {
+  assert.match(html, /id="case-overview-tab"[^>]*>Arbete <span id="caseActivityCount"/);
+  assert.doesNotMatch(html, /id="case-activities-tab"/);
+  assert.match(html, /id="case-activities-pane" hidden/);
+  assert.match(app, /function prepareCaseWorkView\(\)/);
+  assert.match(app, /els\.caseSecondaryDetails\.before\(els\.caseActivitiesPane\)/);
+  assert.match(app, /els\.caseActivitiesPane\.hidden = false/);
+  assert.doesNotMatch(app, /\["open_activities", "Visa alla kontroller"/);
+});

@@ -656,8 +656,7 @@
                   </dl>
                 </section>
                 <ul class="detail-tabs nav nav-tabs" role="tablist" aria-label="Ärendekort">
-                  <li class="nav-item"><button class="nav-link active" id="case-overview-tab" data-bs-toggle="tab" data-bs-target="#case-overview-pane" type="button">Översikt</button></li>
-                  <li class="nav-item"><button class="nav-link" id="case-activities-tab" data-bs-toggle="tab" data-bs-target="#case-activities-pane" type="button">Aktiviteter <span id="caseActivityCount" class="tab-count">0</span></button></li>
+                  <li class="nav-item"><button class="nav-link active" id="case-overview-tab" data-bs-toggle="tab" data-bs-target="#case-overview-pane" type="button">Arbete <span id="caseActivityCount" class="tab-count">0</span></button></li>
                   <li id="assignmentFollowupTabItem" class="nav-item" hidden><button class="nav-link" id="assignment-followup-tab" data-bs-toggle="tab" data-bs-target="#assignment-followup-pane" type="button">Uppföljning <span id="assignmentFollowupCount" class="tab-count">0</span></button></li>
                   <li class="nav-item"><button class="nav-link" id="case-documents-tab" data-bs-toggle="tab" data-bs-target="#case-documents-pane" type="button">Handlingar <span id="caseDocumentCount" class="tab-count">0</span></button></li>
                   <li class="nav-item"><button class="nav-link" id="case-meetings-tab" data-bs-toggle="tab" data-bs-target="#case-meetings-pane" type="button">Möten <span id="caseMeetingCount" class="tab-count">0</span></button></li>
@@ -719,7 +718,7 @@
                     <section class="case-actions-panel" aria-labelledby="caseActionsTitle">
                       <div class="case-actions-heading">
                         <h3 id="caseActionsTitle" class="record-section-title mb-1">Ärendeåtgärder</h3>
-                        <p class="small text-secondary mb-0">Välj vad som ska hända med själva ärendet. Aktiviteter, handlingar och möten hanteras i respektive flik.</p>
+                        <p class="small text-secondary mb-0">Välj vad som ska hända med själva ärendet. Aktiviteterna visas ovan, medan handlingar och möten finns i egna flikar.</p>
                       </div>
                       <div class="case-actions-list">
                         <div id="editCaseAction" class="case-action-row">
@@ -747,7 +746,7 @@
                       </div>
                     </details>
                   </section>
-                  <section class="tab-pane fade card-body" id="case-activities-pane">
+                  <section class="case-work-activities mb-4" id="case-activities-pane" hidden>
                     <section id="activityDetailPanel" class="activity-record" hidden>
                       <div class="activity-record-header">
                         <button id="backToActivitiesButton" type="button" class="btn btn-link btn-sm px-0">Tillbaka till aktiviteterna</button>

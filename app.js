@@ -119,6 +119,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "84",
+    date: "2026-08-15",
+    title: "Aktiviteterna direkt i ärendets arbetsvy",
+    flow: "Ärende → nästa steg → aktivitetslista → aktivitet",
+    simplified: "Första fliken heter nu Arbete och visar både nästa steg och hela aktivitetslistan. Den separata aktivitetsfliken och knappen Visa alla kontroller har tagits bort.",
+    retained: "Aktivitetsfilter, status, resultat, ansvarig, förfallodatum, underlag och full aktivitetsredigering finns kvar. Handlingar, möten och logg behåller egna flikar.",
+    changes: [
+      "Samtliga aktiviteter visas direkt under ärendets nästa steg.",
+      "Klick på en aktivitet öppnar den i samma arbetsvy.",
+      "Ärendeuppgifter och ovanliga ärendeåtgärder ligger fortsatt hopfällda efter aktiviteterna."
+    ]
+  },
+  {
     version: "83",
     date: "2026-08-15",
     title: "Tydligt avslut och nästa aktivitet",
@@ -1173,6 +1186,8 @@ const els = {
   reopenCaseButton: document.querySelector("#reopenCaseButton"),
   reopenCaseAction: document.querySelector("#reopenCaseAction"),
   caseActivityCount: document.querySelector("#caseActivityCount"),
+  caseOverviewPane: document.querySelector("#case-overview-pane"),
+  caseActivitiesPane: document.querySelector("#case-activities-pane"),
   caseDocumentCount: document.querySelector("#caseDocumentCount"),
   caseMeetingCount: document.querySelector("#caseMeetingCount"),
   caseEventCount: document.querySelector("#caseEventCount"),
@@ -1533,6 +1548,14 @@ const els = {
   confirmActionResultInput: document.querySelector("#confirmActionResultInput"),
   confirmActionButton: document.querySelector("#confirmActionButton")
 };
+
+function prepareCaseWorkView() {
+  if (!els.caseOverviewPane || !els.caseActivitiesPane || !els.caseSecondaryDetails) return;
+  els.caseSecondaryDetails.before(els.caseActivitiesPane);
+  els.caseActivitiesPane.hidden = false;
+}
+
+prepareCaseWorkView();
 
 function markSaved() {
   const time = new Intl.DateTimeFormat("sv-SE", {
@@ -4637,8 +4660,8 @@ function applyCurrentRouteIntent() {
   if (currentView !== "case" || !caseRouteIntent) return;
   requestAnimationFrame(() => {
     if (caseRouteIntent === "activities") {
-      bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-activities-tab")).show();
-      els.activityDetailPanel?.scrollIntoView({ block: "start" });
+      bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
+      (selectedCaseActivityId ? els.activityDetailPanel : els.activityListPanel)?.scrollIntoView({ block: "start" });
       return;
     }
     if (caseRouteIntent === "matching") {
@@ -6953,7 +6976,6 @@ function renderCertificationCaseChoices(caseRecord) {
       : ["open_mentor_next", "Granska prövningen", "btn-primary", candidate?.id];
   const actions = [
     primary,
-    ["open_activities", "Visa alla kontroller", "btn-outline-primary"],
     ...(caseRecord.status === "closed" ? [] : [["close_case", "Avsluta utan godkännande", "btn-outline-secondary"]])
   ];
   els.caseTransitionChoices.hidden = false;
@@ -7056,7 +7078,7 @@ function renderCaseTransitionPanel(caseRecord) {
   if (isSupport) {
     els.caseWorkGuidance.hidden = true;
     els.caseTransitionTitle.textContent = "Vad ska hända med stödärendet?";
-    els.caseTransitionHelp.textContent = "Välj nästa steg. Uppgifter, aktiviteter och historik finns kvar under Ärendeuppgifter och fler åtgärder.";
+    els.caseTransitionHelp.textContent = "Välj nästa steg. Ärendets aktiviteter visas direkt nedan och övriga uppgifter finns under Ärendeuppgifter och fler åtgärder.";
     renderSupportCaseChoices(caseRecord);
   }
   if (isMatching) {
@@ -7077,7 +7099,7 @@ function renderCaseTransitionPanel(caseRecord) {
   if (isCertification) {
     els.caseWorkGuidance.hidden = true;
     els.caseTransitionTitle.textContent = "Vad är nästa steg i mentorprövningen?";
-    els.caseTransitionHelp.textContent = "Arbeta med nästa kontroll eller avvikelse. Hela kontrollkedjan, underlaget och loggen finns kvar i sina flikar.";
+    els.caseTransitionHelp.textContent = "Arbeta med nästa kontroll eller avvikelse. Hela kontrollkedjan visas direkt nedan; handlingar, möten och logg finns i egna flikar.";
     renderCertificationCaseChoices(caseRecord);
   }
   if (isNeedsAnalysis) {
@@ -7484,7 +7506,7 @@ function renderCaseDetail() {
   renderCaseEvents(events);
   renderActivityDetail(caseRecord);
   if (selectedCaseActivityId) {
-    requestAnimationFrame(() => bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-activities-tab")).show());
+    requestAnimationFrame(() => bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show());
   }
   if (pendingCaseMeetingsId === caseRecord.id) {
     pendingCaseMeetingsId = null;
@@ -10523,7 +10545,10 @@ els.caseTransitionChoices.addEventListener("click", (event) => {
   if (action === "open_activities") {
     const firstOpenActivity = activitiesForCase(caseRecord.id).find((activity) => !["completed", "not_applicable"].includes(activity.status));
     if (firstOpenActivity) openCaseActivity(firstOpenActivity.id);
-    else bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-activities-tab")).show();
+    else {
+      bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
+      requestAnimationFrame(() => els.activityListPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
     return;
   }
   if (action === "open_activity" && button.dataset.targetId) {
@@ -11663,7 +11688,11 @@ els.caseCreateForm.addEventListener("change", clearCaseFormError);
 
 els.newCaseActivityButton.addEventListener("click", () => {
   els.caseActivityForm.hidden = false;
-  els.activityTitleInput.focus();
+  bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
+  requestAnimationFrame(() => {
+    els.caseActivityForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    els.activityTitleInput.focus({ preventScroll: true });
+  });
 });
 
 els.cancelCaseActivityButton.addEventListener("click", () => {
@@ -11955,7 +11984,7 @@ function openCaseActivity(activityId) {
     navigateToCase(activity.caseId);
     return;
   }
-  bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-activities-tab")).show();
+  bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
   renderCaseDetail();
 }
 
