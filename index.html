@@ -1030,7 +1030,7 @@
                   <section class="tab-pane fade card-body" id="case-meetings-pane">
                     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
                       <div><h3 class="h6 mb-1">Möten i ärendet</h3><p class="small text-secondary mb-0">Möten registreras och rättas i det ärende där de hör hemma.</p></div>
-                      <button id="newCaseMeetingButton" type="button" class="btn btn-primary btn-sm">Registrera möte</button>
+                      <button id="newCaseMeetingButton" type="button" class="btn btn-primary btn-sm">Boka eller registrera möte</button>
                     </div>
                     <form id="caseMeetingForm" class="inline-editor border rounded mb-3" hidden>
                       <div class="d-flex justify-content-between align-items-center mb-3"><h4 id="caseMeetingFormTitle" class="h6 mb-0">Nytt möte</h4><button id="cancelCaseMeetingButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button></div>
@@ -1039,10 +1039,11 @@
                         <div class="col-md-3"><label class="form-label" for="caseMeetingDateInput">Tidpunkt</label><input id="caseMeetingDateInput" class="form-control form-control-sm" type="datetime-local" required></div>
                         <div class="col-md-3"><label class="form-label" for="caseMeetingModeInput">Mötesform</label><select id="caseMeetingModeInput" class="form-select form-select-sm"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option></select></div>
                         <div class="col-md-3"><label class="form-label" for="caseMeetingActivityInput">Kopplad aktivitet</label><select id="caseMeetingActivityInput" class="form-select form-select-sm"><option value="">Ingen</option></select></div>
-                        <div class="col-12"><label class="form-label" for="caseMeetingSummaryInput">Sammanfattning</label><textarea id="caseMeetingSummaryInput" class="form-control form-control-sm" rows="3" required></textarea></div>
+                        <div class="col-12"><div class="form-check border rounded p-3 ps-5"><input id="caseMeetingCompletedInput" class="form-check-input" type="checkbox"><label id="caseMeetingCompletedLabel" class="form-check-label fw-semibold" for="caseMeetingCompletedInput">Mötet är genomfört</label><div id="caseMeetingCompletedHelp" class="form-text mt-1">Markera först efter mötet. En sammanfattning krävs då.</div></div></div>
+                        <div class="col-12"><label class="form-label" for="caseMeetingSummaryInput">Sammanfattning <span id="caseMeetingSummaryRequirement" class="text-secondary fw-normal">(valfritt för bokat möte)</span></label><textarea id="caseMeetingSummaryInput" class="form-control form-control-sm" rows="3"></textarea></div>
                         <div class="col-12"><label class="form-label" for="caseMeetingNextStepInput">Nästa steg <span class="text-secondary fw-normal">(valfritt)</span></label><input id="caseMeetingNextStepInput" class="form-control form-control-sm" autocomplete="off"></div>
                       </div>
-                      <div class="d-flex justify-content-end mt-3"><button type="submit" class="btn btn-primary btn-sm">Registrera möte</button></div>
+                      <div class="d-flex justify-content-end mt-3"><button id="caseMeetingSubmitButton" type="submit" class="btn btn-primary btn-sm">Spara bokning</button></div>
                     </form>
                     <div id="caseMeetingsEmpty" class="empty-list border rounded text-secondary">Inga möten har registrerats.</div>
                     <div id="caseMeetingsList" class="document-list"></div>

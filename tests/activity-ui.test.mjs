@@ -69,3 +69,12 @@ test("blocks completion results until required registration is complete", () => 
   assert.match(app, /if \(resultCode && incompleteRequiredActivityWorkInput\(activity, caseRecord\)\) return/);
   assert.match(app, /Slutför \$\{workInputBlocker\.label\.toLocaleLowerCase\("sv-SE"\)\} ovan innan du kan välja ett avslutande resultat/);
 });
+
+test("distinguishes a booked interview from a completed interview", () => {
+  assert.match(html, /id="caseMeetingCompletedInput"/);
+  assert.match(app, /function caseMeetingStatus\(meeting\)/);
+  assert.match(app, /\{ not_started: "Inte bokad", in_progress: "Bokad", complete: "Genomförd" \}/);
+  assert.match(app, /caseMeetingStatus\(meeting\) === "completed" && meeting\.occurredAt && meeting\.summary\?\.trim\(\)/);
+  assert.match(app, /activity\.status === "not_started" && workInputState && workInputState !== "not_started"\) return "Pågår"/);
+  assert.match(app, /Ett genomfört möte kan inte ha en tidpunkt i framtiden/);
+});

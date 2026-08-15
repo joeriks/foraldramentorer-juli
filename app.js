@@ -119,6 +119,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "87",
+    date: "2026-08-15",
+    title: "Tydligt om intervjun är bokad eller genomförd",
+    flow: "Aktivitet → intervju → resultat",
+    simplified: "Intervjuunderlaget använder nu lägena Inte bokad, Bokad och Genomförd i stället för den tekniska etiketten Fullständig.",
+    retained: "Tidpunkt, mötesform, kopplad aktivitet, sammanfattning, nästa steg och rättelsehistorik finns kvar i mötesregistreringen.",
+    changes: [
+      "En intervju måste uttryckligen markeras som genomförd.",
+      "Genomförd intervju kräver passerad tidpunkt och en saklig sammanfattning.",
+      "Aktiviteten visas som Pågår när intervjun har bokats och resultat kan väljas först när intervjun är genomförd."
+    ]
+  },
+  {
     version: "86",
     date: "2026-08-15",
     title: "Resultat låses tills registreringen är klar",
@@ -1398,8 +1411,13 @@ const els = {
   caseMeetingDateInput: document.querySelector("#caseMeetingDateInput"),
   caseMeetingModeInput: document.querySelector("#caseMeetingModeInput"),
   caseMeetingActivityInput: document.querySelector("#caseMeetingActivityInput"),
+  caseMeetingCompletedInput: document.querySelector("#caseMeetingCompletedInput"),
+  caseMeetingCompletedLabel: document.querySelector("#caseMeetingCompletedLabel"),
+  caseMeetingCompletedHelp: document.querySelector("#caseMeetingCompletedHelp"),
   caseMeetingSummaryInput: document.querySelector("#caseMeetingSummaryInput"),
+  caseMeetingSummaryRequirement: document.querySelector("#caseMeetingSummaryRequirement"),
   caseMeetingNextStepInput: document.querySelector("#caseMeetingNextStepInput"),
+  caseMeetingSubmitButton: document.querySelector("#caseMeetingSubmitButton"),
   caseMeetingsEmpty: document.querySelector("#caseMeetingsEmpty"),
   caseMeetingsList: document.querySelector("#caseMeetingsList"),
   caseEventTableBody: document.querySelector("#caseEventTableBody"),
@@ -6375,6 +6393,16 @@ const WORK_INPUT_STATE_LABELS = {
   complete: "Fullständig"
 };
 
+function caseMeetingStatus(meeting) {
+  if (["scheduled", "completed"].includes(meeting?.meetingStatus)) return meeting.meetingStatus;
+  const occurredAt = new Date(meeting?.occurredAt || 0);
+  return meeting?.occurredAt && occurredAt.getTime() <= Date.now() && meeting?.summary?.trim() ? "completed" : "scheduled";
+}
+
+function caseMeetingStatusLabel(meeting) {
+  return caseMeetingStatus(meeting) === "completed" ? "Genomfört" : "Bokat";
+}
+
 function workInputStateClass(state) {
   return state === "complete"
     ? "text-bg-success"
@@ -6412,7 +6440,9 @@ function activityWorkInputSummary(activity, caseRecord) {
       && (meeting.activityId === activity.id || activity.templateId === "interviewDone" && meeting.meetingType === "certification_interview"));
     const latest = latestRecord(records);
     started = records.length > 0;
-    complete = records.some((meeting) => Boolean(meeting.occurredAt && meeting.summary?.trim()));
+    complete = activity.templateId === "interviewDone"
+      ? records.some((meeting) => caseMeetingStatus(meeting) === "completed" && meeting.occurredAt && meeting.summary?.trim())
+      : records.some((meeting) => Boolean(meeting.occurredAt && meeting.summary?.trim()));
     updatedAt = latest?.updatedAt || latest?.createdAt;
     updatedBy = latest?.updatedBy || latest?.createdBy;
     help = activity.templateId === "matchingFirstMeeting"
@@ -6489,16 +6519,21 @@ function activityWorkInputSummary(activity, caseRecord) {
 
   const state = deriveWorkInputState({ started, complete });
   const href = resolveFeatureRoute(definition.featureKey, routeParameters);
+  const interviewRegistration = definition.kind === "case_meeting" && activity.templateId === "interviewDone";
   return {
     ...definition,
     state,
-    stateLabel: WORK_INPUT_STATE_LABELS[state],
+    stateLabel: interviewRegistration
+      ? ({ not_started: "Inte bokad", in_progress: "Bokad", complete: "Genomförd" })[state]
+      : WORK_INPUT_STATE_LABELS[state],
     stateClass: workInputStateClass(state),
     updatedAt,
     updatedBy,
     help,
     href,
-    actionLabel: state === "not_started" ? "Påbörja registrering" : state === "in_progress" ? "Fortsätt registrering" : "Öppna registrering"
+    actionLabel: interviewRegistration
+      ? state === "not_started" ? "Boka intervju" : state === "in_progress" ? "Öppna bokning" : "Öppna intervju"
+      : state === "not_started" ? "Påbörja registrering" : state === "in_progress" ? "Fortsätt registrering" : "Öppna registrering"
   };
 }
 
@@ -6563,16 +6598,19 @@ function waitingForPartyLabel(value) {
   return ({ mentor: "mentorn", handler: "handläggaren", external: "extern part" })[value] || "";
 }
 
-function activityWorkStateLabel(activity) {
+function activityWorkStateLabel(activity, caseRecord = selectedCaseRecord()) {
   if (activityHasBlockingResult(activity)) return "Ställningstagande krävs";
   if (activity.status === "waiting" && activity.waitingForParty) return `Väntar på ${waitingForPartyLabel(activity.waitingForParty)}`;
+  const workInputState = activityWorkInputSummary(activity, caseRecord)?.state;
+  if (activity.status === "not_started" && workInputState && workInputState !== "not_started") return "Pågår";
   return activityStatusLabel(activity.status);
 }
 
-function activityStatusClass(activity) {
+function activityStatusClass(activity, caseRecord = selectedCaseRecord()) {
   if (activityHasBlockingResult(activity)) return "text-bg-danger";
   if (activity.status === "completed") return "text-bg-success";
-  if (activity.status === "in_progress") return "text-bg-primary";
+  const workInputState = activityWorkInputSummary(activity, caseRecord)?.state;
+  if (activity.status === "in_progress" || activity.status === "not_started" && workInputState && workInputState !== "not_started") return "text-bg-primary";
   if (activity.status === "waiting") return "text-bg-warning";
   if (activity.status === "not_applicable") return "text-bg-light border text-secondary";
   return "text-bg-secondary";
@@ -6995,10 +7033,11 @@ function renderCertificationCaseChoices(caseRecord) {
       : approval.allowed
         ? "Alla krav är klara. Handläggaren kan fatta beslut om godkännande."
         : `${completed.length} av ${applicable.length} kontroller är klara. Nästa steg: ${nextAction?.label || nextActivity?.title || "granska prövningen"}.`;
+  const nextWorkInput = nextActivity ? activityWorkInputSummary(nextActivity, caseRecord) : null;
   const primary = caseRecord.status === "closed"
     ? ["view_mentor", "Öppna mentorposten", "btn-primary", candidate?.id]
     : nextActivity
-      ? ["open_activity", attentionActivity ? "Hantera avvikelsen" : approval.allowed ? "Fatta beslut" : `Fortsätt: ${nextActivity.title}`, "btn-primary", nextActivity.id]
+      ? ["open_activity", attentionActivity ? "Hantera avvikelsen" : approval.allowed ? "Fatta beslut" : nextWorkInput?.state === "complete" ? "Registrera resultat" : `Fortsätt: ${nextActivity.title}`, "btn-primary", nextActivity.id]
       : ["open_mentor_next", "Granska prövningen", "btn-primary", candidate?.id];
   const actions = [
     primary,
@@ -7694,7 +7733,7 @@ function renderCaseActivities(caseRecord, activities) {
           </div>
         </div>
       </td>
-      <td><span class="badge activity-status-badge ${activityStatusClass(activity)}">${escapeHtml(activityWorkStateLabel(activity))}</span></td>
+      <td><span class="badge activity-status-badge ${activityStatusClass(activity, caseRecord)}">${escapeHtml(activityWorkStateLabel(activity, caseRecord))}</span></td>
       <td><span class="activity-owner-name">${escapeHtml(handler?.name || "Ej tilldelad")}</span></td>
       <td class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityDueLabel(activity))}</td>
       <td>${documents.length ? `${documents.length} st` : '<span class="text-secondary">0</span>'}</td>
@@ -7722,14 +7761,14 @@ function renderActivityDetail(caseRecord) {
   els.activityDetailAudit.textContent = auditParts.join(" · ");
   renderActivityGuidance(activity, caseRecord);
   renderActivityWorkInput(activity, caseRecord);
-  els.activityDetailStatus.textContent = activityWorkStateLabel(activity);
+  els.activityDetailStatus.textContent = activityWorkStateLabel(activity, caseRecord);
   els.activityDetailStatus.className = activityHasBlockingResult(activity)
     ? "badge text-bg-danger"
     : activity.status === "completed"
       ? "badge text-bg-success"
     : activity.status === "waiting"
       ? "badge text-bg-warning"
-      : "badge text-bg-secondary";
+      : `badge ${activityStatusClass(activity, caseRecord)}`;
   els.activityDetailStatusInput.value = activity.status;
   els.activityDetailOwnerInput.innerHTML = `<option value="">${owner ? `Ärendeansvarig: ${escapeHtml(owner.name)}` : "Ej tilldelad"}</option>`;
   for (const handler of availableHandlers) {
@@ -8046,8 +8085,8 @@ function renderCaseMeetings(caseRecord, meetingRows) {
     const article = document.createElement("article");
     article.className = "document-row border rounded";
     article.innerHTML = `
-      <div><strong>${escapeHtml(({ certification_interview: "Intervju inför godkännande", follow_up: "Uppföljning", other: "Annat möte" })[meeting.meetingType])}</strong><small>${escapeHtml(formatDateTime(meeting.occurredAt))} · ${escapeHtml(({ physical: "Fysiskt", digital: "Digitalt", phone: "Telefon" })[meeting.mode] || "Ej angivet")}</small>${activity ? `<button type="button" class="document-activity-link" data-open-activity="${escapeHtml(activity.id)}">Kopplad till: ${escapeHtml(activity.title)}</button>` : ""}</div>
-      <div class="text-secondary small">${escapeHtml(meeting.summary)}${meeting.nextStep ? `<span class="d-block mt-1">Nästa steg: ${escapeHtml(meeting.nextStep)}</span>` : ""}</div>
+      <div><div class="d-flex flex-wrap align-items-center gap-2"><strong>${escapeHtml(({ certification_interview: "Intervju inför godkännande", follow_up: "Uppföljning", other: "Annat möte" })[meeting.meetingType])}</strong><span class="badge ${caseMeetingStatus(meeting) === "completed" ? "text-bg-success" : "text-bg-warning"}">${escapeHtml(caseMeetingStatusLabel(meeting))}</span></div><small>${escapeHtml(formatDateTime(meeting.occurredAt))} · ${escapeHtml(({ physical: "Fysiskt", digital: "Digitalt", phone: "Telefon" })[meeting.mode] || "Ej angivet")}</small>${activity ? `<button type="button" class="document-activity-link" data-open-activity="${escapeHtml(activity.id)}">Kopplad till: ${escapeHtml(activity.title)}</button>` : ""}</div>
+      <div class="text-secondary small">${escapeHtml(meeting.summary || (caseMeetingStatus(meeting) === "scheduled" ? "Ingen sammanfattning ännu." : "Ingen sammanfattning registrerad."))}${meeting.nextStep ? `<span class="d-block mt-1">Nästa steg: ${escapeHtml(meeting.nextStep)}</span>` : ""}</div>
       <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center"><span class="text-secondary small">Registrerat av ${escapeHtml(handlerNameById(meeting.createdBy))}${meeting.supersedesMeetingId ? " · Rättad version" : ""}</span><button type="button" class="btn btn-outline-secondary btn-sm" data-edit-case-meeting="${escapeHtml(meeting.id)}">Öppna</button></div>
     `;
     els.caseMeetingsList.append(article);
@@ -8070,14 +8109,29 @@ function openCaseMeetingForm(meeting = null) {
     els.caseMeetingDateInput.value = localDateTimeValue(meeting.occurredAt);
     els.caseMeetingModeInput.value = meeting.mode;
     els.caseMeetingActivityInput.value = meeting.activityId || "";
-    els.caseMeetingSummaryInput.value = meeting.summary;
+    els.caseMeetingCompletedInput.checked = caseMeetingStatus(meeting) === "completed";
+    els.caseMeetingSummaryInput.value = meeting.summary || "";
     els.caseMeetingNextStepInput.value = meeting.nextStep || "";
   } else {
     els.caseMeetingDateInput.value = localDateTimeValue();
   }
+  updateCaseMeetingFormState();
   els.caseMeetingForm.hidden = false;
   els.newCaseMeetingButton.hidden = true;
-  els.caseMeetingSummaryInput.focus({ preventScroll: true });
+  (meeting ? els.caseMeetingSummaryInput : els.caseMeetingDateInput).focus({ preventScroll: true });
+}
+
+function updateCaseMeetingFormState() {
+  const completed = els.caseMeetingCompletedInput.checked;
+  const interview = els.caseMeetingTypeInput.value === "certification_interview";
+  els.caseMeetingCompletedLabel.textContent = interview ? "Intervjun är genomförd" : "Mötet är genomfört";
+  els.caseMeetingCompletedHelp.textContent = completed
+    ? "Tidpunkten måste ha passerat och en saklig sammanfattning krävs."
+    : interview ? "Lämna omarkerad när intervjun endast är bokad." : "Lämna omarkerad när mötet endast är bokat.";
+  els.caseMeetingSummaryInput.required = completed;
+  if (!completed) els.caseMeetingDateInput.setCustomValidity("");
+  els.caseMeetingSummaryRequirement.textContent = completed ? "(krävs)" : "(valfritt för bokat möte)";
+  els.caseMeetingSubmitButton.textContent = completed ? "Registrera genomfört möte" : "Spara bokning";
 }
 
 function renderCaseEvents(events) {
@@ -9168,6 +9222,12 @@ function saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nex
   if (classification === "deviation" && !note.trim()) {
     return Promise.reject(Object.assign(new Error("En kort tjänsteanteckning krävs för ett avvikande resultat."), { code: "NOTE_REQUIRED" }));
   }
+  if (meeting?.meetingStatus === "completed" && new Date(meeting.occurredAt).getTime() > Date.now()) {
+    return Promise.reject(Object.assign(new Error("Ett genomfört möte kan inte ha en tidpunkt i framtiden."), { code: "MEETING_DATE_IN_FUTURE" }));
+  }
+  if (meeting?.meetingStatus === "completed" && !meeting.summary?.trim()) {
+    return Promise.reject(Object.assign(new Error("En sammanfattning krävs för ett genomfört möte."), { code: "MEETING_SUMMARY_REQUIRED" }));
+  }
 
   return executeCaseCommand({
     commandType: reopen ? "reopen_activity" : "update_activity",
@@ -9206,7 +9266,7 @@ function saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nex
         const meetingId = crypto.randomUUID();
         put(CASE_MEETINGS_STORE, {
           id: meetingId, tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id, activityId: activity.id,
-          meetingType: meeting.meetingType, occurredAt: meeting.occurredAt, mode: meeting.mode,
+          meetingType: meeting.meetingType, meetingStatus: meeting.meetingStatus || "completed", occurredAt: meeting.occurredAt, mode: meeting.mode,
           summary: meeting.summary, nextStep: meeting.nextStep || "", participantHandlerIds: [CURRENT_USER_ID],
           externalParticipantNames: [],
           supersedesMeetingId: null, supersededByMeetingId: null, version: 1,
@@ -9534,14 +9594,20 @@ async function registerDocumentCommand({ caseRecord, activityId, type, title, do
   });
 }
 
-function registerCaseMeetingCommand({ caseRecord, existing = null, meetingType, occurredAt, mode, activityId, summary, nextStep = "" }) {
+function registerCaseMeetingCommand({ caseRecord, existing = null, meetingType, meetingStatus = "scheduled", occurredAt, mode, activityId, summary, nextStep = "" }) {
+  if (meetingStatus === "completed" && new Date(occurredAt).getTime() > Date.now()) {
+    return Promise.reject(Object.assign(new Error("Ett genomfört möte kan inte ha en tidpunkt i framtiden."), { code: "MEETING_DATE_IN_FUTURE" }));
+  }
+  if (meetingStatus === "completed" && !summary.trim()) {
+    return Promise.reject(Object.assign(new Error("En sammanfattning krävs för ett genomfört möte."), { code: "MEETING_SUMMARY_REQUIRED" }));
+  }
   const now = new Date().toISOString();
   const meetingId = crypto.randomUUID();
   return executeCaseCommand({
     commandType: existing ? "revise_meeting" : "register_meeting",
     caseId: caseRecord.id,
     expectedVersion: caseRecord.version,
-    payload: { existingId: existing?.id || null, meetingType, occurredAt, mode, activityId, summary, nextStep },
+    payload: { existingId: existing?.id || null, meetingType, meetingStatus, occurredAt, mode, activityId, summary, nextStep },
     additionalStores: [CASE_MEETINGS_STORE],
     mutate: ({ currentCase, put, event }) => {
       if (existing) put(CASE_MEETINGS_STORE, { ...existing, supersededByMeetingId: meetingId, updatedAt: now, updatedBy: CURRENT_USER_ID });
@@ -9551,6 +9617,7 @@ function registerCaseMeetingCommand({ caseRecord, existing = null, meetingType, 
         caseId: currentCase.id,
         activityId: activityId || null,
         meetingType,
+        meetingStatus,
         occurredAt,
         mode,
         summary,
@@ -9568,7 +9635,7 @@ function registerCaseMeetingCommand({ caseRecord, existing = null, meetingType, 
       const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
       put(CASES_STORE, updatedCase);
       event(existing ? "meeting_revised" : "meeting_registered", "meeting", meetingId,
-        `${existing ? "Mötesanteckningen rättades" : "Mötet registrerades"}: ${summary}`);
+        `${existing ? "Mötesregistreringen rättades" : meetingStatus === "completed" ? "Mötet registrerades som genomfört" : "Mötet bokades"}${summary ? `: ${summary}` : ""}`);
       return { caseId: currentCase.id, meetingId, version: updatedCase.version };
     }
   });
@@ -12069,6 +12136,9 @@ els.caseMeetingsList.addEventListener("click", (event) => {
 
 els.newCaseMeetingButton.addEventListener("click", () => openCaseMeetingForm());
 els.cancelCaseMeetingButton.addEventListener("click", closeCaseMeetingForm);
+els.caseMeetingCompletedInput.addEventListener("change", updateCaseMeetingFormState);
+els.caseMeetingTypeInput.addEventListener("change", updateCaseMeetingFormState);
+els.caseMeetingDateInput.addEventListener("input", () => els.caseMeetingDateInput.setCustomValidity(""));
 
 els.caseMeetingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -12076,10 +12146,16 @@ els.caseMeetingForm.addEventListener("submit", async (event) => {
   if (!caseRecord) return;
   const returnActivityId = caseRouteIntent === "meetings" ? caseRouteTargetId : "";
   const existing = caseMeetings.find((item) => item.id === els.caseMeetingForm.dataset.meetingId);
+  const meetingStatus = els.caseMeetingCompletedInput.checked ? "completed" : "scheduled";
+  els.caseMeetingDateInput.setCustomValidity(meetingStatus === "completed" && new Date(els.caseMeetingDateInput.value).getTime() > Date.now()
+    ? "Ett genomfört möte kan inte ha en tidpunkt i framtiden."
+    : "");
+  if (!els.caseMeetingForm.reportValidity()) return;
   await registerCaseMeetingCommand({
     caseRecord,
     existing,
     meetingType: els.caseMeetingTypeInput.value,
+    meetingStatus,
     occurredAt: els.caseMeetingDateInput.value,
     mode: els.caseMeetingModeInput.value,
     activityId: els.caseMeetingActivityInput.value || null,
@@ -12552,6 +12628,7 @@ els.newMeetingButton.addEventListener("click", () => {
   else showFeedback("Skapa ett ärende för mentorn innan ett möte registreras.");
 });
 els.cancelMeetingButton.addEventListener("click", closeMeetingForm);
+els.meetingDateInput.addEventListener("input", () => els.meetingDateInput.setCustomValidity(""));
 els.meetingsTableBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-edit-meeting]");
   if (!button) return;
@@ -12569,10 +12646,17 @@ els.meetingForm.addEventListener("submit", async (event) => {
   if (!caseRecord) throw new Error("Skapa ett ärende för mentorn innan mötet registreras.");
   const meetingType = ({ "Intervju inför godkännande": "certification_interview", "Uppföljning": "follow_up" })[els.meetingTypeInput.value] || "other";
   const mode = ({ "Fysiskt möte": "physical", "Digitalt möte": "digital", "Telefon": "phone" })[els.meetingModeInput.value];
+  if (new Date(els.meetingDateInput.value).getTime() > Date.now()) {
+    els.meetingDateInput.setCustomValidity("Ett genomfört möte kan inte ha en tidpunkt i framtiden.");
+    els.meetingDateInput.reportValidity();
+    return;
+  }
+  els.meetingDateInput.setCustomValidity("");
   await registerCaseMeetingCommand({
     caseRecord,
     existing,
     meetingType,
+    meetingStatus: "completed",
     occurredAt: els.meetingDateInput.value,
     mode,
     activityId: meetingType === "certification_interview"
@@ -12684,10 +12768,17 @@ els.interviewDoneInput.addEventListener("change", async () => {
     missingField.focus();
     return;
   }
+  if (els.interviewDoneInput.checked && new Date(els.interviewDateInput.value).getTime() > Date.now()) {
+    els.interviewDoneInput.checked = false;
+    showFeedback("En intervju kan markeras som genomförd först efter den angivna tidpunkten.");
+    els.interviewDateInput.focus();
+    return;
+  }
   const mode = ({ "Fysiskt möte": "physical", "Digitalt möte": "digital", "Telefon": "phone" })[els.interviewModeInput.value];
   const context = els.interviewDoneInput.checked ? {
     meeting: {
       meetingType: "certification_interview",
+      meetingStatus: "completed",
       occurredAt: els.interviewDateInput.value,
       mode,
       summary: "Intervju inför godkännande genomförd"
