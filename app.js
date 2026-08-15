@@ -119,6 +119,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "80",
+    date: "2026-08-15",
+    title: "Resultatet styr aktivitetens status",
+    flow: "Aktivitet → registrera resultat eller välj undantag",
+    simplified: "Det manuella statusfältet har tagits bort. När handläggaren väljer ett resultat avslutas aktiviteten automatiskt, medan vänteläge och ovanliga lägen hanteras som separata åtgärder.",
+    retained: "Aktivitetsstatus, tillåtna övergångar, avvikelsehantering, obligatoriska underlag, återöppning och full historik finns kvar i den underliggande modellen.",
+    changes: [
+      "Resultat är nu den primära vägen för att avsluta alla aktivitetstyper.",
+      "Väntar, Pågår och Ej aktuell har flyttats till tydliga undantagsåtgärder.",
+      "Avvikande resultat kräver fortsatt en tjänsteanteckning, och Ej aktuell kräver nu en kort motivering."
+    ]
+  },
+  {
     version: "79",
     date: "2026-08-14",
     title: "Justerbara matchningspunkter",
@@ -1260,6 +1273,10 @@ const els = {
   activityDetailStatusInput: document.querySelector("#activityDetailStatusInput"),
   activityDetailResultInput: document.querySelector("#activityDetailResultInput"),
   activityResultHelp: document.querySelector("#activityResultHelp"),
+  activityOpenStateActions: document.querySelector("#activityOpenStateActions"),
+  activitySetWaitingButton: document.querySelector("#activitySetWaitingButton"),
+  activitySetInProgressButton: document.querySelector("#activitySetInProgressButton"),
+  activitySetNotApplicableButton: document.querySelector("#activitySetNotApplicableButton"),
   activityDetailOwnerInput: document.querySelector("#activityDetailOwnerInput"),
   activityDetailDueDateInput: document.querySelector("#activityDetailDueDateInput"),
   activityWaitingForRow: document.querySelector("#activityWaitingForRow"),
@@ -7364,7 +7381,7 @@ function renderActivityDetail(caseRecord) {
   renderActivityResultInput(activity);
   const locked = ["completed", "not_applicable"].includes(activity.status);
   els.activityDetailStatusInput.disabled = locked;
-  els.activityDetailResultInput.disabled = locked || activity.status !== "completed";
+  els.activityDetailResultInput.disabled = locked;
   els.activityDetailOwnerInput.disabled = locked;
   els.activityDetailDueDateInput.disabled = locked;
   els.activityDetailWaitingForInput.disabled = locked || activity.status !== "waiting";
@@ -7439,11 +7456,17 @@ function activityDetailHasChanges() {
 
 function updateActivityDetailDirtyState() {
   const dirty = activityDetailHasChanges();
-  const completingActivity = dirty
-    && activityDetailBaseline?.status !== "completed"
-    && els.activityDetailStatusInput.value === "completed";
+  const nextStatus = els.activityDetailStatusInput.value;
   els.activityDetailSaveButton.disabled = !dirty;
-  els.activityDetailSaveButton.textContent = completingActivity ? "Avsluta aktivitet" : "Spara ändringar";
+  els.activityDetailSaveButton.textContent = nextStatus === "completed"
+    ? "Avsluta aktivitet"
+    : nextStatus === "waiting"
+      ? "Sätt i vänteläge"
+      : nextStatus === "not_applicable"
+        ? "Markera som ej aktuell"
+        : nextStatus === "in_progress" && activityDetailBaseline?.status !== "in_progress"
+          ? activityDetailBaseline?.status === "waiting" ? "Fortsätt aktivitet" : "Markera som pågående"
+          : "Spara ändringar";
   els.activityDetailSaveState.textContent = dirty ? "Osparade ändringar" : "Inga osparade ändringar";
   els.activityDetailSaveState.classList.toggle("activity-save-pending", dirty);
   els.backToActivitiesButton.textContent = dirty ? "Avbryt och gå tillbaka" : "Tillbaka till aktiviteterna";
@@ -7460,14 +7483,39 @@ function renderActivityResultInput(activity) {
     els.activityDetailResultInput.append(option);
   }
   els.activityDetailResultInput.value = completed ? selectedResult : "";
-  els.activityDetailResultInput.disabled = !completed;
-  els.activityDetailResultInput.required = completed;
+  els.activityDetailResultInput.disabled = ["completed", "not_applicable"].includes(activity.status);
+  renderActivityStateControls(activity);
+  updateActivityValidationState();
+}
+
+function renderActivityStateControls(activity) {
+  const status = els.activityDetailStatusInput.value;
+  const locked = ["completed", "not_applicable"].includes(activity.status);
+  els.activityOpenStateActions.hidden = locked;
+  els.activitySetWaitingButton.hidden = status === "waiting";
+  els.activitySetInProgressButton.hidden = status === "in_progress";
+  els.activitySetInProgressButton.textContent = status === "waiting" ? "Fortsätt aktivitet" : "Markera som pågående";
+  els.activitySetNotApplicableButton.hidden = status === "not_applicable";
+  els.activityWaitingForRow.hidden = status !== "waiting";
+  els.activityDetailWaitingForInput.disabled = locked || status !== "waiting";
+  els.activityDetailWaitingForInput.required = status === "waiting";
+  els.activityDetailResultInput.required = status === "completed";
   els.activityResultHelp.textContent = activity.templateId === "registryChecked"
     ? "Välj särskilt ställningstagande om kontrollen behöver bedömas vidare. Dokumentera inte registerutdragets innehåll."
-    : completed
-      ? "Resultat krävs när aktiviteten avslutas."
-      : "Resultat anges när status sätts till Avslutad.";
+    : status === "completed"
+      ? "Det valda resultatet avslutar aktiviteten när du sparar."
+      : "Välj resultat när arbetet är klart. Aktiviteten avslutas automatiskt.";
+}
+
+function setActivityDraftStatus(status) {
+  const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
+  if (!activity) return;
+  els.activityDetailStatusInput.value = status;
+  if (status !== "completed") els.activityDetailResultInput.value = "";
+  if (status !== "waiting") els.activityDetailWaitingForInput.value = "";
+  renderActivityStateControls(activity);
   updateActivityValidationState();
+  updateActivityDetailDirtyState();
 }
 
 function updateActivityValidationState() {
@@ -7475,24 +7523,28 @@ function updateActivityValidationState() {
   const caseRecord = cases.find((item) => item.id === activity?.caseId);
   const completed = els.activityDetailStatusInput.value === "completed";
   const waiting = els.activityDetailStatusInput.value === "waiting";
+  const notApplicable = els.activityDetailStatusInput.value === "not_applicable";
   const requiresNote = Boolean(activity
-    && completed
-    && resultClassification(activity.templateId, els.activityDetailResultInput.value) === "deviation");
+    && (notApplicable || completed && resultClassification(activity.templateId, els.activityDetailResultInput.value) === "deviation"));
 
   els.activityDetailNoteRequirement.hidden = !requiresNote;
+  els.activityDetailNoteRequirement.textContent = notApplicable ? "(krävs när aktiviteten inte är aktuell)" : "(krävs för detta resultat)";
   els.activityDetailWaitingForInput.setCustomValidity(waiting && !els.activityDetailWaitingForInput.value
     ? "Ange vem eller vad aktiviteten väntar på."
     : "");
-  els.activityDetailResultInput.setCustomValidity(completed && !els.activityDetailResultInput.value
+  let resultValidationMessage = completed && !els.activityDetailResultInput.value
     ? "Välj resultat innan aktiviteten avslutas."
-    : "");
+    : "";
   els.activityDetailNoteInput.setCustomValidity(requiresNote && !els.activityDetailNoteInput.value.trim()
-    ? "Ange en kort notering när resultatet kräver ställningstagande."
+    ? notApplicable
+      ? "Ange en kort motivering till varför aktiviteten inte är aktuell."
+      : "Ange en kort notering när resultatet kräver ställningstagande."
     : "");
   const workInput = activity && caseRecord ? activityWorkInputSummary(activity, caseRecord) : null;
-  els.activityDetailStatusInput.setCustomValidity(completed && workInput?.required && workInput.state !== "complete"
-    ? `Komplettera ${workInput.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas.`
-    : "");
+  if (completed && workInput?.required && workInput.state !== "complete") {
+    resultValidationMessage = `Komplettera ${workInput.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas.`;
+  }
+  els.activityDetailResultInput.setCustomValidity(resultValidationMessage);
 }
 
 function renderActivityDocuments(activity) {
@@ -11332,18 +11384,31 @@ els.activityCaseReadyPrimaryButton.addEventListener("click", () => {
 
 els.activityCaseReadyCloseButton.addEventListener("click", () => openCaseLifecycle("close"));
 
-els.activityDetailStatusInput.addEventListener("change", () => {
+els.activityDetailResultInput.addEventListener("change", () => {
   const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
   if (activity) {
-    renderActivityResultInput(activity);
-    const waiting = els.activityDetailStatusInput.value === "waiting";
-    els.activityWaitingForRow.hidden = !waiting;
-    els.activityDetailWaitingForInput.disabled = !waiting;
-    els.activityDetailWaitingForInput.required = waiting;
-    if (!waiting) els.activityDetailWaitingForInput.value = "";
+    const fallbackStatus = activityDetailBaseline?.status || activity.status || "not_started";
+    els.activityDetailStatusInput.value = els.activityDetailResultInput.value ? "completed" : fallbackStatus;
+    if (els.activityDetailStatusInput.value !== "waiting") els.activityDetailWaitingForInput.value = "";
+    renderActivityStateControls(activity);
     updateActivityValidationState();
     updateActivityDetailDirtyState();
   }
+});
+
+els.activitySetWaitingButton.addEventListener("click", () => {
+  setActivityDraftStatus("waiting");
+  requestAnimationFrame(() => els.activityDetailWaitingForInput.focus());
+});
+
+els.activitySetInProgressButton.addEventListener("click", () => {
+  setActivityDraftStatus("in_progress");
+  requestAnimationFrame(() => els.activityDetailNoteInput.focus());
+});
+
+els.activitySetNotApplicableButton.addEventListener("click", () => {
+  setActivityDraftStatus("not_applicable");
+  requestAnimationFrame(() => els.activityDetailNoteInput.focus());
 });
 
 els.activityDetailForm.addEventListener("input", () => {
@@ -11369,10 +11434,10 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   if (!activity || !caseRecord) return;
   if (!activityDetailHasChanges()) return;
 
-  const nextStatus = els.activityDetailStatusInput.value;
+  let nextStatus = els.activityDetailStatusInput.value;
+  if (nextStatus === "not_started") nextStatus = "in_progress";
   const nextResult = nextStatus === "completed" ? els.activityDetailResultInput.value : "";
   const nextHandlerId = els.activityDetailOwnerInput.value;
-  const currentHandlerOverrideId = activityOwnerOverrideId(activity, caseRecord);
   const nextDueDate = els.activityDetailDueDateInput.value;
   const nextWaitingForParty = nextStatus === "waiting" ? els.activityDetailWaitingForInput.value : null;
   const nextNote = els.activityDetailNoteInput.value.trim();
@@ -11394,9 +11459,15 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   const candidateSynced = await syncCandidateFromActivity(activity, nextStatus, nextNote, new Date().toISOString(), nextResult);
   if (!candidateSynced) return;
   await saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nextHandlerId, nextDueDate, nextWaitingForParty, note: nextNote });
-  if (nextStatus === "completed") selectedCaseActivityId = null;
+  if (["completed", "not_applicable"].includes(nextStatus)) selectedCaseActivityId = null;
   markSaved();
-  showFeedback(nextStatus === "completed" ? "Aktiviteten har avslutats." : "Aktiviteten har sparats.");
+  showFeedback(nextStatus === "completed"
+    ? "Aktiviteten har avslutats."
+    : nextStatus === "waiting"
+      ? "Aktiviteten har satts i vänteläge."
+      : nextStatus === "not_applicable"
+        ? "Aktiviteten har markerats som ej aktuell."
+        : "Aktiviteten pågår och har sparats.");
   await refresh();
   if (closesCase) {
     requestAnimationFrame(() => els.activityCaseClosedNotice.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -11483,8 +11554,8 @@ function openCaseActivityWithResult(activityId, resultCode) {
   if (!activity) return;
   openCaseActivity(activityId);
   els.activityDetailStatusInput.value = "completed";
-  renderActivityResultInput(activity);
   els.activityDetailResultInput.value = resultCode;
+  renderActivityStateControls(activity);
   updateActivityValidationState();
   updateActivityDetailDirtyState();
   requestAnimationFrame(() => {

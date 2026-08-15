@@ -48,6 +48,10 @@ test("serves the application shell", async () => {
   assert.match(html, /id="matchingMentorAreaFilter"/);
   assert.match(html, /id="matchingMentorCriteriaFilters"/);
   assert.match(html, /id="matchingMentorResults"/);
+  assert.match(html, /id="activityDetailStatusInput" type="hidden"/);
+  assert.match(html, /id="activitySetWaitingButton"/);
+  assert.match(html, /id="activitySetInProgressButton"/);
+  assert.match(html, /id="activitySetNotApplicableButton"/);
   assert.match(html, /id="assignmentNextStepPanel"/);
   assert.match(html, /id="assignmentFollowupDetails"/);
   assert.match(html, /id="compensationNextStepPanel"/);
@@ -101,7 +105,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /function activityTemplateAdminRoute/);
   assert.match(scriptText, /renderRoutineFlowDiagrams/);
   assert.match(scriptText, /routineProcessLink/);
-  assert.match(scriptText, /if \(nextStatus === "completed"\) selectedCaseActivityId = null;/);
+  assert.match(scriptText, /if \(\["completed", "not_applicable"\]\.includes\(nextStatus\)\) selectedCaseActivityId = null;/);
   assert.match(scriptText, /data-quick-finish-activity/);
   assert.match(scriptText, /registerQuickActivityResult/);
   assert.match(scriptText, /publicSupportAreaChoices/);
@@ -158,6 +162,9 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /Matchning börjar med rätt mentorurval/);
   assert.match(scriptText, /Öppen bedömning av varje mentorförslag/);
   assert.match(scriptText, /Justerbara matchningspunkter/);
+  assert.match(scriptText, /Resultatet styr aktivitetens status/);
+  assert.match(scriptText, /function setActivityDraftStatus/);
+  assert.match(scriptText, /if \(nextStatus === "not_started"\) nextStatus = "in_progress";/);
   assert.match(scriptText, /data-case-flow-type/);
   assert.match(scriptText, /status=open/);
   assert.match(scriptText, /caseRecord\.status !== "closed"/);

@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260814-flow-v79">
+    <link rel="stylesheet" href="styles.css?v=20260815-flow-v80">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -781,20 +781,24 @@
                       </section>
                       <form id="activityDetailForm" class="activity-record-body">
                         <div class="row g-3">
-                          <div class="col-md-6">
-                            <label class="form-label" for="activityDetailStatusInput">Status</label>
-                            <select id="activityDetailStatusInput" class="form-select form-select-sm">
-                              <option value="not_started">Ej påbörjad</option>
-                              <option value="in_progress">Pågår</option>
-                              <option value="waiting">Väntar</option>
-                              <option value="completed">Avslutad</option>
-                              <option value="not_applicable">Ej aktuell</option>
-                            </select>
-                          </div>
-                          <div class="col-md-6">
-                            <label class="form-label" for="activityDetailResultInput">Resultat</label>
+                          <input id="activityDetailStatusInput" type="hidden" value="not_started">
+                          <div class="col-12 activity-result-action">
+                            <label class="form-label" for="activityDetailResultInput">Avsluta med resultat</label>
                             <select id="activityDetailResultInput" class="form-select form-select-sm"></select>
                             <div id="activityResultHelp" class="form-text"></div>
+                          </div>
+                          <div id="activityOpenStateActions" class="col-12 activity-state-actions">
+                            <span class="small text-secondary">Behöver aktiviteten fortsätta senare?</span>
+                            <div class="activity-state-action-buttons">
+                              <button id="activitySetWaitingButton" type="button" class="btn btn-outline-primary btn-sm">Sätt i vänteläge</button>
+                              <div class="dropdown">
+                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Fler åtgärder</button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                  <li><button id="activitySetInProgressButton" type="button" class="dropdown-item">Markera som pågående</button></li>
+                                  <li><button id="activitySetNotApplicableButton" type="button" class="dropdown-item">Markera som ej aktuell</button></li>
+                                </ul>
+                              </div>
+                            </div>
                           </div>
                           <div class="col-md-6">
                             <label class="form-label" for="activityDetailOwnerInput">Ansvarig</label>
@@ -2103,6 +2107,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260814-flow-v79"></script>
+    <script type="module" src="app.js?v=20260815-flow-v80"></script>
   </body>
 </html>

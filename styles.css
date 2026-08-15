@@ -3722,6 +3722,29 @@ body {
   flex: 0 0 auto;
 }
 
+.activity-result-action {
+  max-width: 46rem;
+}
+
+.activity-state-actions,
+.activity-state-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-2);
+  align-items: center;
+}
+
+.activity-state-actions {
+  justify-content: space-between;
+  padding-top: var(--app-space-1);
+  padding-bottom: var(--app-space-2);
+  border-bottom: 1px solid var(--app-border-soft);
+}
+
+.activity-state-actions[hidden] {
+  display: none;
+}
+
 .activity-save-bar {
   display: flex;
   flex-wrap: wrap;
@@ -3963,6 +3986,14 @@ body {
   }
 
   .activity-work-input .btn {
+    width: 100%;
+  }
+
+  .activity-state-actions,
+  .activity-state-action-buttons,
+  .activity-state-action-buttons > .btn,
+  .activity-state-action-buttons > .dropdown,
+  .activity-state-action-buttons > .dropdown > .btn {
     width: 100%;
   }
 
