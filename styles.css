@@ -3724,6 +3724,60 @@ body {
 
 .activity-result-action {
   max-width: 46rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.activity-result-action legend {
+  float: none;
+  width: auto;
+  margin-bottom: var(--app-space-2);
+  font-size: 1rem;
+}
+
+.activity-result-options {
+  display: grid;
+  gap: var(--app-space-2);
+}
+
+.activity-result-option {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: var(--app-space-2);
+  align-items: start;
+  min-height: 2.75rem;
+  margin: 0;
+  padding: .7rem .75rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: #fff;
+  cursor: pointer;
+}
+
+.activity-result-option:has(input:checked) {
+  border-color: var(--app-primary);
+  background: #f3f8fa;
+  box-shadow: 0 0 0 1px var(--app-primary);
+}
+
+.activity-result-option:has(input:focus-visible) {
+  outline: 2px solid var(--app-primary);
+  outline-offset: 2px;
+}
+
+.activity-result-option input {
+  margin-top: .15rem;
+}
+
+.activity-result-option span {
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.activity-result-action:disabled .activity-result-option {
+  cursor: default;
+  opacity: .78;
 }
 
 .activity-state-actions,

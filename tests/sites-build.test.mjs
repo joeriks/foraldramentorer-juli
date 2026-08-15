@@ -49,6 +49,8 @@ test("serves the application shell", async () => {
   assert.match(html, /id="matchingMentorCriteriaFilters"/);
   assert.match(html, /id="matchingMentorResults"/);
   assert.match(html, /id="activityDetailStatusInput" type="hidden"/);
+  assert.match(html, /id="activityDetailResultOptions"/);
+  assert.match(html, /id="activityClearResultButton"/);
   assert.match(html, /id="activitySetWaitingButton"/);
   assert.match(html, /id="activitySetInProgressButton"/);
   assert.match(html, /id="activitySetNotApplicableButton"/);
@@ -163,6 +165,8 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /Öppen bedömning av varje mentorförslag/);
   assert.match(scriptText, /Justerbara matchningspunkter/);
   assert.match(scriptText, /Resultatet styr aktivitetens status/);
+  assert.match(scriptText, /Alla aktivitetsresultat syns direkt/);
+  assert.match(scriptText, /function setActivityResultSelection/);
   assert.match(scriptText, /function setActivityDraftStatus/);
   assert.match(scriptText, /if \(nextStatus === "not_started"\) nextStatus = "in_progress";/);
   assert.match(scriptText, /data-case-flow-type/);

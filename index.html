@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260815-flow-v80">
+    <link rel="stylesheet" href="styles.css?v=20260815-flow-v81">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -782,10 +782,14 @@
                       <form id="activityDetailForm" class="activity-record-body">
                         <div class="row g-3">
                           <input id="activityDetailStatusInput" type="hidden" value="not_started">
-                          <div class="col-12 activity-result-action">
-                            <label class="form-label" for="activityDetailResultInput">Avsluta med resultat</label>
-                            <select id="activityDetailResultInput" class="form-select form-select-sm"></select>
-                            <div id="activityResultHelp" class="form-text"></div>
+                          <div class="col-12">
+                            <fieldset id="activityDetailResultFieldset" class="activity-result-action">
+                              <legend>Avsluta med resultat</legend>
+                              <input id="activityDetailResultInput" type="hidden" value="">
+                              <div id="activityDetailResultOptions" class="activity-result-options"></div>
+                              <button id="activityClearResultButton" type="button" class="btn btn-link btn-sm px-0" hidden>Avmarkera resultat</button>
+                              <div id="activityResultHelp" class="form-text"></div>
+                            </fieldset>
                           </div>
                           <div id="activityOpenStateActions" class="col-12 activity-state-actions">
                             <span class="small text-secondary">Behöver aktiviteten fortsätta senare?</span>
@@ -2107,6 +2111,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260815-flow-v80"></script>
+    <script type="module" src="app.js?v=20260815-flow-v81"></script>
   </body>
 </html>

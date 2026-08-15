@@ -119,6 +119,18 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "81",
+    date: "2026-08-15",
+    title: "Alla aktivitetsresultat syns direkt",
+    flow: "Aktivitet → jämför, välj eller avmarkera resultat",
+    simplified: "Resultatmenyn har ersatts av en synlig lista med radioknappar. Handläggaren kan jämföra alternativen utan att öppna en meny och kan avmarkera ett oavsiktligt val.",
+    retained: "Resultatet sparas först när aktiviteten avslutas. Avvikande resultat, obligatoriska underlag, bekräftelser och aktivitetslogg fungerar som tidigare.",
+    changes: [
+      "Alla resultat visas samtidigt i en mobilanpassad lista.",
+      "Ett valt resultat kan avmarkeras genom ett nytt tryck eller med knappen Avmarkera resultat."
+    ]
+  },
+  {
     version: "80",
     date: "2026-08-15",
     title: "Resultatet styr aktivitetens status",
@@ -1271,7 +1283,10 @@ const els = {
   activityWorkInputLink: document.querySelector("#activityWorkInputLink"),
   activityDetailForm: document.querySelector("#activityDetailForm"),
   activityDetailStatusInput: document.querySelector("#activityDetailStatusInput"),
+  activityDetailResultFieldset: document.querySelector("#activityDetailResultFieldset"),
   activityDetailResultInput: document.querySelector("#activityDetailResultInput"),
+  activityDetailResultOptions: document.querySelector("#activityDetailResultOptions"),
+  activityClearResultButton: document.querySelector("#activityClearResultButton"),
   activityResultHelp: document.querySelector("#activityResultHelp"),
   activityOpenStateActions: document.querySelector("#activityOpenStateActions"),
   activitySetWaitingButton: document.querySelector("#activitySetWaitingButton"),
@@ -7381,7 +7396,7 @@ function renderActivityDetail(caseRecord) {
   renderActivityResultInput(activity);
   const locked = ["completed", "not_applicable"].includes(activity.status);
   els.activityDetailStatusInput.disabled = locked;
-  els.activityDetailResultInput.disabled = locked;
+  els.activityDetailResultFieldset.disabled = locked;
   els.activityDetailOwnerInput.disabled = locked;
   els.activityDetailDueDateInput.disabled = locked;
   els.activityDetailWaitingForInput.disabled = locked || activity.status !== "waiting";
@@ -7475,17 +7490,30 @@ function updateActivityDetailDirtyState() {
 function renderActivityResultInput(activity) {
   const completed = els.activityDetailStatusInput.value === "completed";
   const selectedResult = activityResultValue(activity);
-  els.activityDetailResultInput.innerHTML = '<option value="">Välj resultat</option>';
-  for (const [value, label] of activityResultOptions(activity)) {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = label;
-    els.activityDetailResultInput.append(option);
-  }
   els.activityDetailResultInput.value = completed ? selectedResult : "";
-  els.activityDetailResultInput.disabled = ["completed", "not_applicable"].includes(activity.status);
+  els.activityDetailResultOptions.innerHTML = activityResultOptions(activity).map(([value, label], index) => `
+    <label class="activity-result-option" for="activity-result-option-${index}">
+      <input id="activity-result-option-${index}" class="form-check-input" type="radio" name="activityResultOption" value="${escapeHtml(value)}"${value === els.activityDetailResultInput.value ? " checked" : ""}>
+      <span>${escapeHtml(label)}</span>
+    </label>`).join("");
+  els.activityDetailResultFieldset.disabled = ["completed", "not_applicable"].includes(activity.status);
   renderActivityStateControls(activity);
   updateActivityValidationState();
+}
+
+function setActivityResultSelection(resultCode) {
+  const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
+  if (!activity) return;
+  els.activityDetailResultInput.value = resultCode;
+  for (const input of els.activityDetailResultOptions.querySelectorAll('input[type="radio"]')) {
+    input.checked = input.value === resultCode;
+  }
+  const fallbackStatus = activityDetailBaseline?.status || activity.status || "not_started";
+  els.activityDetailStatusInput.value = resultCode ? "completed" : fallbackStatus;
+  if (els.activityDetailStatusInput.value !== "waiting") els.activityDetailWaitingForInput.value = "";
+  renderActivityStateControls(activity);
+  updateActivityValidationState();
+  updateActivityDetailDirtyState();
 }
 
 function renderActivityStateControls(activity) {
@@ -7499,7 +7527,9 @@ function renderActivityStateControls(activity) {
   els.activityWaitingForRow.hidden = status !== "waiting";
   els.activityDetailWaitingForInput.disabled = locked || status !== "waiting";
   els.activityDetailWaitingForInput.required = status === "waiting";
-  els.activityDetailResultInput.required = status === "completed";
+  const resultInputs = [...els.activityDetailResultOptions.querySelectorAll('input[type="radio"]')];
+  for (const input of resultInputs) input.required = status === "completed";
+  els.activityClearResultButton.hidden = locked || !els.activityDetailResultInput.value;
   els.activityResultHelp.textContent = activity.templateId === "registryChecked"
     ? "Välj särskilt ställningstagande om kontrollen behöver bedömas vidare. Dokumentera inte registerutdragets innehåll."
     : status === "completed"
@@ -7511,7 +7541,10 @@ function setActivityDraftStatus(status) {
   const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
   if (!activity) return;
   els.activityDetailStatusInput.value = status;
-  if (status !== "completed") els.activityDetailResultInput.value = "";
+  if (status !== "completed") {
+    els.activityDetailResultInput.value = "";
+    for (const input of els.activityDetailResultOptions.querySelectorAll('input[type="radio"]')) input.checked = false;
+  }
   if (status !== "waiting") els.activityDetailWaitingForInput.value = "";
   renderActivityStateControls(activity);
   updateActivityValidationState();
@@ -7544,7 +7577,9 @@ function updateActivityValidationState() {
   if (completed && workInput?.required && workInput.state !== "complete") {
     resultValidationMessage = `Komplettera ${workInput.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas.`;
   }
-  els.activityDetailResultInput.setCustomValidity(resultValidationMessage);
+  const resultInputs = [...els.activityDetailResultOptions.querySelectorAll('input[type="radio"]')];
+  for (const input of resultInputs) input.setCustomValidity("");
+  resultInputs[0]?.setCustomValidity(resultValidationMessage);
 }
 
 function renderActivityDocuments(activity) {
@@ -11384,17 +11419,18 @@ els.activityCaseReadyPrimaryButton.addEventListener("click", () => {
 
 els.activityCaseReadyCloseButton.addEventListener("click", () => openCaseLifecycle("close"));
 
-els.activityDetailResultInput.addEventListener("change", () => {
-  const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
-  if (activity) {
-    const fallbackStatus = activityDetailBaseline?.status || activity.status || "not_started";
-    els.activityDetailStatusInput.value = els.activityDetailResultInput.value ? "completed" : fallbackStatus;
-    if (els.activityDetailStatusInput.value !== "waiting") els.activityDetailWaitingForInput.value = "";
-    renderActivityStateControls(activity);
-    updateActivityValidationState();
-    updateActivityDetailDirtyState();
+els.activityDetailResultOptions.addEventListener("click", (event) => {
+  const input = event.target.closest('input[type="radio"]');
+  if (!input) return;
+  if (els.activityDetailResultInput.value === input.value) {
+    event.preventDefault();
+    requestAnimationFrame(() => setActivityResultSelection(""));
+    return;
   }
+  setActivityResultSelection(input.value);
 });
+
+els.activityClearResultButton.addEventListener("click", () => setActivityResultSelection(""));
 
 els.activitySetWaitingButton.addEventListener("click", () => {
   setActivityDraftStatus("waiting");
@@ -11555,6 +11591,7 @@ function openCaseActivityWithResult(activityId, resultCode) {
   openCaseActivity(activityId);
   els.activityDetailStatusInput.value = "completed";
   els.activityDetailResultInput.value = resultCode;
+  for (const input of els.activityDetailResultOptions.querySelectorAll('input[type="radio"]')) input.checked = input.value === resultCode;
   renderActivityStateControls(activity);
   updateActivityValidationState();
   updateActivityDetailDirtyState();
