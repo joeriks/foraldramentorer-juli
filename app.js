@@ -119,6 +119,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "89",
+    date: "2026-08-16",
+    title: "Kompaktare ärendeflöden och tydlig kontaktväg",
+    flow: "Översikt → ärendeflöde och kontaktmottagning",
+    simplified: "Ärendeflöden använder två kolumner vid mellanbredder i stället för en lång enkelkolumn, och kontaktregistreringen ligger som en diskret underåtgärd till Kontaktmottagning.",
+    retained: "Flödesordning, sambandstexter, öppna ärenden, slutmarkeringar och kontaktformuläret fungerar som tidigare.",
+    changes: [
+      "Tvåkolumnsläge används när flödets behållare är mellan 640 och 1200 pixlar bred.",
+      "Fyrastegsflödet Stöd till förälder ryms utan intern sidledsskroll vid 1440 pixlars viewport.",
+      "Registrera kontakt är åter synlig direkt under Kontaktmottagning utan gul framhävning."
+    ]
+  },
+  {
     version: "88",
     date: "2026-08-16",
     title: "Översikt med lugnare och responsiv layout",
@@ -946,6 +959,7 @@ const els = {
   currentUserRole: document.querySelector("#currentUserRole"),
   testUserTypeSelect: document.querySelector("#testUserTypeSelect"),
   navDashboard: document.querySelector("#navDashboard"),
+  navIncomingContact: document.querySelector("#navIncomingContact"),
   navPresentation: document.querySelector("#navPresentation"),
   navIntake: document.querySelector("#navIntake"),
   navCases: document.querySelector("#navCases"),
@@ -6064,13 +6078,16 @@ function renderCaseFlowBoard(openCases) {
       </a>
     `;
   };
-  const renderTrack = (items) => items.map((item, index) => `
-    ${item.relationship ? `<div class="case-flow-connector">
-      <span>${escapeHtml(relationshipKindLabel(item.relationship.kind))}</span>
-      <small>${escapeHtml(item.relationship.label)}</small>
-    </div>` : ""}
-    ${renderNode(item.caseTypeId, index + 1)}
-  `).join("");
+  const renderTrack = (items) => items.map((item, index) => {
+    const nextRelationship = items[index + 1]?.relationship;
+    return `<div class="case-flow-segment">
+      ${renderNode(item.caseTypeId, index + 1)}
+      ${nextRelationship ? `<div class="case-flow-connector">
+        <span>${escapeHtml(relationshipKindLabel(nextRelationship.kind))}</span>
+        <small>${escapeHtml(nextRelationship.label)}</small>
+      </div>` : ""}
+    </div>`;
+  }).join("");
   els.caseFlowBoard.innerHTML = groups.map(({ title, items }) => `
     <section class="case-flow-group" aria-label="${escapeHtml(title)}">
       <h3>${escapeHtml(title)}</h3>
@@ -10411,6 +10428,7 @@ els.dashboardMentorRegisterLink.addEventListener("click", (event) => {
   navigateTo("#/mentors");
 });
 
+els.navIncomingContact.addEventListener("click", () => openIncomingContact());
 els.mobileIncomingContact.addEventListener("click", () => openIncomingContact());
 els.dashboardIncomingContactButton.addEventListener("click", () => openIncomingContact());
 els.newIncomingContactButton.addEventListener("click", () => openIncomingContact());

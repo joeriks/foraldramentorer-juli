@@ -18,7 +18,7 @@ test("serves the application shell", async () => {
   assert.match(html, /FöräldraMentorer/);
   assert.match(html, /id="dashboardView"/);
   assert.match(html, /id="caseFlowBoard"/);
-  assert.doesNotMatch(html, /id="navIncomingContact"/);
+  assert.match(html, /id="navIncomingContact"[^>]*sidebar-subaction-link/);
   assert.match(html, /id="navIntake"/);
   assert.match(html, /id="navVersions"/);
   assert.match(html, /id="mobileIncomingContact"/);
