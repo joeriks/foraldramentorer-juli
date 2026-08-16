@@ -119,6 +119,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "88",
+    date: "2026-08-16",
+    title: "Översikt med lugnare huvudnavigation",
+    flow: "Översikt → kontaktmottagning",
+    simplified: "Dashboard heter nu Översikt och den gula genvägen Registrera kontakt har tagits bort ur huvudnavigeringen.",
+    retained: "Inkommande kontakter kan fortfarande registreras direkt från Översikt och från Kontaktmottagning.",
+    changes: [
+      "Dashboard har bytt synligt namn till Översikt i navigation, sidrubrik och brödsmulor.",
+      "Den dubblerade gula kontaktknappen har tagits bort från sidomenyn.",
+      "Kontaktregistreringen finns kvar där den hör ihop med det aktuella arbetsflödet."
+    ]
+  },
+  {
     version: "87",
     date: "2026-08-15",
     title: "Tydligt om intervjun är bokad eller genomförd",
@@ -261,7 +274,7 @@ const APP_VERSION_HISTORY = [
     version: "76",
     date: "2026-08-14",
     title: "Tydligare riktning i ärendeflöden",
-    flow: "Dashboardens ärendeflöden",
+    flow: "Översiktens ärendeflöden",
     simplified: "Varje ärendetypsruta visar nu själv om flödet fortsätter eller slutar, i stället för att förlita sig på en separat roterad pil mellan rutorna.",
     retained: "Sambandstexterna, ordningen, ärendeantalet och länkarna till öppna ärenden finns kvar.",
     changes: [
@@ -407,7 +420,7 @@ const APP_VERSION_HISTORY = [
     version: "64",
     date: "2026-08-10",
     title: "Tydligare ny-knapp i ärenderegistret",
-    flow: "Dashboard → vald ärendetyp → ny registrering",
+    flow: "Översikt → vald ärendetyp → ny registrering",
     simplified: "Den generella knappen Ny registrering ersattes av en knapp som direkt säger vilken typ av ärende som skapas.",
     retained: "Samma registreringsfunktion och vald filtrering används fortfarande.",
     changes: [
@@ -738,7 +751,7 @@ const seedHandlers = [
 const PRESENTATION_STEPS = [
   {
     id: "overview",
-    title: "Dashboard och arbetskö",
+    title: "Översikt och arbetskö",
     featureId: "dashboard.work-queue",
     summary: "Börja i handläggarens dagliga vy med ärendeläge, arbetskö och tydliga avvikelser.",
     points: ["Ärendestatus visar kommunens samlade handläggningsläge", "Arbetskön skiljer på egna, otilldelade och försenade aktiviteter", "Mentorflödet är en sekundär registeröversikt"]
@@ -1012,7 +1025,6 @@ const els = {
   parentSupportCaseTableBody: document.querySelector("#parentSupportCaseTableBody"),
   parentMatchingCaseTableBody: document.querySelector("#parentMatchingCaseTableBody"),
   parentAssignmentCaseTableBody: document.querySelector("#parentAssignmentCaseTableBody"),
-  navIncomingContact: document.querySelector("#navIncomingContact"),
   mobileIncomingContact: document.querySelector("#mobileIncomingContact"),
   dashboardIncomingContactButton: document.querySelector("#dashboardIncomingContactButton"),
   newIncomingContactButton: document.querySelector("#newIncomingContactButton"),
@@ -5501,8 +5513,8 @@ function applyRoute() {
   els.navPublicLearning.classList.toggle("active", currentView === "public-learning");
 
   if (currentView === "dashboard") {
-    els.pageTitle.textContent = "Dashboard";
-    els.breadcrumb.textContent = "Start / Dashboard";
+    els.pageTitle.textContent = "Översikt";
+    els.breadcrumb.textContent = "Start / Översikt";
   } else if (currentView === "versions") {
     els.pageTitle.textContent = "Versioner";
     els.breadcrumb.textContent = "Start / Systemadministration / Versioner";
@@ -6679,6 +6691,7 @@ function caseListRoute(typeFilter = caseTypeFilter, statusFilter = caseStatusFil
 
 function newCaseButtonLabel(caseTypeId) {
   if (!caseTypeId) return "Ny registrering";
+  if (caseTypeId === "incoming-contact") return "Registrera kontakt";
   const name = caseTypeRelationshipName(caseTypeId);
   const article = ["mentor-assignment", "parent-support", "mentor-certification", "other"].includes(caseTypeId) ? "Nytt" : "Ny";
   return `${article} ${name.charAt(0).toLowerCase()}${name.slice(1)}`;
@@ -10395,7 +10408,6 @@ els.dashboardMentorRegisterLink.addEventListener("click", (event) => {
   navigateTo("#/mentors");
 });
 
-els.navIncomingContact.addEventListener("click", () => openIncomingContact());
 els.mobileIncomingContact.addEventListener("click", () => openIncomingContact());
 els.dashboardIncomingContactButton.addEventListener("click", () => openIncomingContact());
 els.newIncomingContactButton.addEventListener("click", () => openIncomingContact());
@@ -11460,6 +11472,10 @@ els.nextCasePageButton.addEventListener("click", () => {
 });
 
 els.newGeneralCaseButton.addEventListener("click", () => {
+  if (caseTypeFilter === "incoming-contact") {
+    openIncomingContact();
+    return;
+  }
   newCaseTypePreset = caseTypeFilter;
   els.caseCreateForm.dataset.route = "";
   navigateToNewCase();

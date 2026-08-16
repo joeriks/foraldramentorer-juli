@@ -18,11 +18,12 @@ test("serves the application shell", async () => {
   assert.match(html, /FöräldraMentorer/);
   assert.match(html, /id="dashboardView"/);
   assert.match(html, /id="caseFlowBoard"/);
-  assert.match(html, /id="navIncomingContact"/);
+  assert.doesNotMatch(html, /id="navIncomingContact"/);
   assert.match(html, /id="navIntake"/);
   assert.match(html, /id="navVersions"/);
   assert.match(html, /id="mobileIncomingContact"/);
   assert.match(html, /Kontaktmottagning/);
+  assert.match(html, />Översikt<\/a>/);
   assert.match(html, /id="versionsView"/);
   assert.match(html, /id="versionHistoryList"/);
   assert.match(html, /Berörd person/);

@@ -330,28 +330,10 @@ body {
   padding: var(--app-space-2) var(--app-space-3);
 }
 
-.sidebar .sidebar-action-link {
-  width: 100%;
-  margin-bottom: var(--app-space-1);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: #f5c85a;
-  color: #1d2730;
-  font-weight: 700;
-  text-align: left;
-}
-
 .sidebar .nav-link:hover,
 .sidebar .nav-link.active {
   color: #fff;
   background: var(--app-primary);
-}
-
-.sidebar .sidebar-action-link:hover,
-.sidebar .sidebar-action-link:focus-visible {
-  color: #111820;
-  background: #ffd978;
-  outline: 2px solid #fff;
-  outline-offset: 2px;
 }
 
 .sidebar .nav-link.disabled {
