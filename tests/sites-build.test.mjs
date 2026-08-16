@@ -137,6 +137,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /function caseTypeRelationshipGroups/);
   assert.match(scriptText, /function renderCaseFlowBoard/);
   assert.match(scriptText, /data-case-flow-direction/);
+  assert.doesNotMatch(scriptText, /case-flow-connector/);
   assert.match(scriptText, /Leder vidare till/);
   assert.match(scriptText, /Ingen nästa ärendetyp/);
   assert.match(scriptText, /function renderSupportCaseChoices/);

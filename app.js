@@ -119,6 +119,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "90",
+    date: "2026-08-16",
+    title: "Renare visuell presentation av ärendeflöden",
+    flow: "Översikt → ärendeflöden",
+    simplified: "Hjälptexterna mellan ärendetyperna har tagits bort. Flödet visas i stället med jämna stegkort, tydlig numrering och visuella samband.",
+    retained: "Ärendetypernas ordning, öppna antal, avvikelser, länkar samt pil eller slutmarkering i varje kort finns kvar.",
+    changes: [
+      "Mellanliggande rubriker och förklarande sambandstexter visas inte längre på Översikt.",
+      "Tre- och fyrastegsflöden fördelas jämnt över en rad när utrymmet räcker.",
+      "Stegkorten har fått tydligare hierarki, jämn höjd och en diskret sammanbindande linje i bred layout."
+    ]
+  },
+  {
     version: "89",
     date: "2026-08-16",
     title: "Kompaktare ärendeflöden och tydlig kontaktväg",
@@ -6078,20 +6091,15 @@ function renderCaseFlowBoard(openCases) {
       </a>
     `;
   };
-  const renderTrack = (items) => items.map((item, index) => {
-    const nextRelationship = items[index + 1]?.relationship;
-    return `<div class="case-flow-segment">
+  const renderTrack = (items) => items.map((item, index) => `
+    <div class="case-flow-segment">
       ${renderNode(item.caseTypeId, index + 1)}
-      ${nextRelationship ? `<div class="case-flow-connector">
-        <span>${escapeHtml(relationshipKindLabel(nextRelationship.kind))}</span>
-        <small>${escapeHtml(nextRelationship.label)}</small>
-      </div>` : ""}
-    </div>`;
-  }).join("");
+    </div>
+  `).join("");
   els.caseFlowBoard.innerHTML = groups.map(({ title, items }) => `
     <section class="case-flow-group" aria-label="${escapeHtml(title)}">
       <h3>${escapeHtml(title)}</h3>
-      <div class="case-flow-track">
+      <div class="case-flow-track" data-flow-count="${items.length}">
         ${renderTrack(items)}
       </div>
     </section>
