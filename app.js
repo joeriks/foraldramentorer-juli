@@ -121,14 +121,17 @@ const APP_VERSION_HISTORY = [
   {
     version: "88",
     date: "2026-08-16",
-    title: "Översikt med lugnare huvudnavigation",
+    title: "Översikt med lugnare och responsiv layout",
     flow: "Översikt → kontaktmottagning",
-    simplified: "Dashboard heter nu Översikt och den gula genvägen Registrera kontakt har tagits bort ur huvudnavigeringen.",
-    retained: "Inkommande kontakter kan fortfarande registreras direkt från Översikt och från Kontaktmottagning.",
+    simplified: "Dashboard heter nu Översikt, den gula genvägen Registrera kontakt har tagits bort ur huvudnavigeringen och innehållet håller sig inom sidans bredd på både desktop och mobil.",
+    retained: "Inkommande kontakter kan fortfarande registreras direkt från Översikt och Kontaktmottagning. Breda tabeller behåller egen horisontell skroll.",
     changes: [
       "Dashboard har bytt synligt namn till Översikt i navigation, sidrubrik och brödsmulor.",
       "Den dubblerade gula kontaktknappen har tagits bort från sidomenyn.",
-      "Kontaktregistreringen finns kvar där den hör ihop med det aktuella arbetsflödet."
+      "Kontaktregistreringen finns kvar där den hör ihop med det aktuella arbetsflödet.",
+      "Ärendeflöden blir vertikala när deras behållare är smalare än cirka 1000 pixlar.",
+      "Arbetsköfilter radbryts på mobil och mobilmenyn skrollar inom en begränsad höjd.",
+      "Tabellskroll och horisontella ärendeflöden kapslas så att hela dokumentet inte blir bredare."
     ]
   },
   {
