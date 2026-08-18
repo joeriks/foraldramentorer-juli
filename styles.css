@@ -2260,6 +2260,84 @@ body {
   padding-top: 1rem;
 }
 
+.completion-required-mark {
+  color: #9e352f;
+  font-weight: 700;
+}
+
+.support-profile-completeness {
+  padding: 0.75rem 1rem;
+  border-left: 3px solid #55758c;
+  background: #f2f6f8;
+}
+
+.support-profile-completeness.is-complete {
+  border-left-color: #368357;
+  background: #eff7f1;
+}
+
+.support-profile-completeness-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+}
+
+.support-profile-completeness-heading span {
+  color: #52636e;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.support-profile-completeness.is-complete .support-profile-completeness-heading span {
+  color: #286b46;
+}
+
+.support-profile-completeness ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.support-profile-completeness li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.45rem;
+  min-width: 0;
+  color: #52636e;
+  font-size: 0.875rem;
+}
+
+.support-profile-completeness li::before {
+  grid-row: 1 / span 2;
+  content: "\25CB";
+  color: #6b7a84;
+  font-weight: 700;
+}
+
+.support-profile-completeness li.is-complete {
+  color: #286b46;
+}
+
+.support-profile-completeness li.is-complete::before {
+  content: "\2713";
+  color: #368357;
+}
+
+.support-profile-completeness li small {
+  color: inherit;
+}
+
+@media (max-width: 560px) {
+  .support-profile-completeness ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .case-type-field-choices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

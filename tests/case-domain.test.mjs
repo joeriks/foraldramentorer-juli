@@ -25,7 +25,8 @@ import {
   matchingOutcome,
   compensationReadiness,
   resultClassification,
-  stableHash
+  stableHash,
+  supportProfileRequirements
 } from "../case-domain.js";
 
 test("groups a parent's linked cases by workflow stage", () => {
@@ -40,6 +41,25 @@ test("groups a parent's linked cases by workflow stage", () => {
   assert.deepEqual(grouped.supportCases.map((item) => item.id), ["support-1"]);
   assert.deepEqual(grouped.matchingCases.map((item) => item.id), ["matching-1"]);
   assert.deepEqual(grouped.assignmentCases.map((item) => item.id), ["assignment-1"]);
+});
+
+test("lists the exact requirements for a complete support profile", () => {
+  const incomplete = supportProfileRequirements({
+    supportPurpose: "Stöd i skolkontakter",
+    desiredOutcome: "",
+    supportAreaIds: []
+  });
+  assert.deepEqual(incomplete.map(({ id, complete }) => [id, complete]), [
+    ["supportPurpose", true],
+    ["desiredOutcome", false],
+    ["supportAreaIds", false]
+  ]);
+
+  assert.equal(supportProfileRequirements({
+    supportPurpose: "Stöd i skolkontakter",
+    desiredOutcome: "Fungerande samverkan",
+    supportAreaIds: ["school-absence"]
+  }).every((requirement) => requirement.complete), true);
 });
 
 function completedActivity(templateId) {

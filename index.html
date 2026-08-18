@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260816-flow-v90">
+    <link rel="stylesheet" href="styles.css?v=20260818-completeness-v91">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -574,15 +574,19 @@
                       <div id="needsAnalysisFields" class="col-12" hidden>
                         <div class="needs-analysis-fields">
                           <h4 class="h6 mb-1">Behovets omfattning</h4>
-                          <p class="small text-secondary mb-3">Fyll i det som är känt nu. Uppgifterna kan kompletteras när analysen fortsätter.</p>
-                          <div id="caseSupportAreaField" class="mb-3"><label class="form-label mb-1">Stödområden</label><p class="form-text mt-0">Välj det som har bekräftats med föräldern. Lämna tomt om området behöver kompletteras innan matchning. Uppgiften används som beslutsunderlag, inte för automatisk matchning.</p><div id="caseSupportAreaChoices" class="support-area-choices"></div></div>
+                          <p class="small text-secondary mb-3">Fyll i det som är känt nu. Fält markerade med <span class="completion-required-mark" aria-hidden="true">*</span> krävs för att underlaget ska betraktas som fullständigt.</p>
+                          <div id="supportProfileCompleteness" class="support-profile-completeness mb-3" role="status" aria-live="polite" hidden>
+                            <div class="support-profile-completeness-heading"><strong>Fullständigt underlag</strong><span id="supportProfileCompletenessSummary"></span></div>
+                            <ul id="supportProfileCompletenessList"></ul>
+                          </div>
+                          <div id="caseSupportAreaField" class="mb-3"><label class="form-label mb-1">Stödområden <span class="completion-required-mark" aria-hidden="true">*</span><span class="visually-hidden"> krävs för fullständigt underlag</span></label><p class="form-text mt-0">Välj minst ett område som har bekräftats med föräldern. Uppgiften används som beslutsunderlag, inte för automatisk matchning.</p><div id="caseSupportAreaChoices" class="support-area-choices"></div></div>
                           <div class="row g-3">
                             <div class="col-md-6">
-                              <label class="form-label" for="supportPurposeInput">Stödets syfte</label>
+                              <label class="form-label" for="supportPurposeInput">Stödets syfte <span class="completion-required-mark" aria-hidden="true">*</span><span class="visually-hidden"> krävs för fullständigt underlag</span></label>
                               <input id="supportPurposeInput" class="form-control form-control-sm" placeholder="Exempel: stöd kring skolfrånvaro">
                             </div>
                             <div class="col-md-6">
-                              <label class="form-label" for="desiredOutcomeInput">Önskat resultat</label>
+                              <label class="form-label" for="desiredOutcomeInput">Önskat resultat <span class="completion-required-mark" aria-hidden="true">*</span><span class="visually-hidden"> krävs för fullständigt underlag</span></label>
                               <input id="desiredOutcomeInput" class="form-control form-control-sm" placeholder="Vad ska stödet bidra till?">
                             </div>
                             <div class="col-md-6">

@@ -33,8 +33,9 @@ import {
   normalizeMentorStatus,
   resultClassification,
   resultOptions,
-  stableHash
-} from "./case-domain.js?v=20260809-activity-work-input-v28";
+  stableHash,
+  supportProfileRequirements
+} from "./case-domain.js?v=20260818-completeness-v29";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260809-activity-work-input-v2";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
@@ -118,6 +119,19 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "91",
+    date: "2026-08-18",
+    title: "Tydliga krav för fullständigt stöd- och matchningsunderlag",
+    flow: "Stödärende → underlag → fullständigt",
+    simplified: "Formuläret visar nu direkt vilka tre uppgifter som krävs och hur många som är klara, i stället för att fullständighet först framgår efteråt.",
+    retained: "Stödärendet kan fortfarande sparas och kompletteras stegvis. Språk, geografiskt område och övriga matchningsuppgifter är fortsatt frivilliga.",
+    changes: [
+      "Stödets syfte, önskat resultat och minst ett bekräftat stödområde markeras som krav för fullständigt underlag.",
+      "En levande checklista visar klara och återstående krav medan formuläret fylls i.",
+      "Samma fullständighetsregel används i formuläret, aktiviteten och kontrollen inför matchning."
+    ]
+  },
   {
     version: "90",
     date: "2026-08-16",
@@ -1240,6 +1254,9 @@ const els = {
   needsTargetGroupInput: document.querySelector("#needsTargetGroupInput"),
   supportPurposeInput: document.querySelector("#supportPurposeInput"),
   caseSupportAreaChoices: document.querySelector("#caseSupportAreaChoices"),
+  supportProfileCompleteness: document.querySelector("#supportProfileCompleteness"),
+  supportProfileCompletenessSummary: document.querySelector("#supportProfileCompletenessSummary"),
+  supportProfileCompletenessList: document.querySelector("#supportProfileCompletenessList"),
   desiredOutcomeInput: document.querySelector("#desiredOutcomeInput"),
   needsAreaInput: document.querySelector("#needsAreaInput"),
   needsLanguagesInput: document.querySelector("#needsLanguagesInput"),
@@ -6520,10 +6537,14 @@ function activityWorkInputSummary(activity, caseRecord) {
     help = "Kontrollera underlaget och registrera det samlade utfallet. Ett uppdrag skapas inte utan båda parters godkännande.";
   } else if (definition.kind === "support_profile") {
     const profile = supportMatchingProfile(caseRecord.id);
-    const areaCount = profile ? supportMatchingAreas.filter((entry) => entry.profileId === profile.id).length : 0;
     const details = caseRecord.details || {};
-    started = Boolean(details.supportPurpose?.trim() || details.desiredOutcome?.trim() || areaCount);
-    complete = Boolean(details.supportPurpose?.trim() && details.desiredOutcome?.trim() && areaCount);
+    const requirements = supportProfileRequirements({
+      supportPurpose: details.supportPurpose,
+      desiredOutcome: details.desiredOutcome,
+      supportAreaIds: supportAreaIdsForCase(caseRecord)
+    });
+    started = requirements.some((requirement) => requirement.complete);
+    complete = requirements.every((requirement) => requirement.complete);
     updatedAt = started ? profile?.updatedAt || caseRecord.updatedAt : null;
     updatedBy = started ? profile?.updatedBy || caseRecord.updatedBy : null;
     help = "Komplettera stödets syfte, önskat resultat och minst ett bekräftat stödområde.";
@@ -6808,6 +6829,32 @@ function configuredDetailFields(caseType) {
   return CASE_DETAIL_FIELD_DEFINITIONS.filter((field) => enabled.has(field.id));
 }
 
+function currentSupportProfileFormRequirements() {
+  return supportProfileRequirements({
+    supportPurpose: els.supportPurposeInput.value,
+    desiredOutcome: els.desiredOutcomeInput.value,
+    supportAreaIds: selectedSupportAreaIdsFrom(els.caseSupportAreaChoices, "caseSupportArea")
+  });
+}
+
+function renderSupportProfileCompleteness() {
+  const visible = els.caseTypeInput.value === "parent-support" && !els.needsAnalysisFields.hidden;
+  els.supportProfileCompleteness.hidden = !visible;
+  if (!visible) return;
+
+  const requirements = currentSupportProfileFormRequirements();
+  const completeCount = requirements.filter((requirement) => requirement.complete).length;
+  const complete = completeCount === requirements.length;
+  els.supportProfileCompleteness.classList.toggle("is-complete", complete);
+  els.supportProfileCompletenessSummary.textContent = complete ? "Fullständigt" : `${completeCount} av ${requirements.length} klara`;
+  els.supportProfileCompletenessList.innerHTML = requirements.map((requirement) => `
+    <li class="${requirement.complete ? "is-complete" : ""}">
+      <span>${escapeHtml(requirement.label)}</span>
+      <small>${requirement.complete ? "Klart" : "Återstår"}</small>
+    </li>
+  `).join("");
+}
+
 function renderCaseTypeGuidance(caseRecord = null) {
   const caseType = caseTypeById(els.caseTypeInput.value, caseRecord?.caseTypeVersion);
   els.caseTypeGuidance.hidden = !caseType;
@@ -6877,7 +6924,7 @@ function renderCaseTypeGuidance(caseRecord = null) {
   };
   els.caseTitleInput.placeholder = caseType ? titlePlaceholders[caseType.id] : "Välj ärendetyp först";
   els.caseDescriptionInput.placeholder = caseType ? descriptionPlaceholders[caseType.id] : "";
-
+  renderSupportProfileCompleteness();
 }
 
 function renderCaseTypeDetails(caseRecord) {
@@ -6980,10 +7027,17 @@ function renderMatchingDecisionSummary(caseRecord) {
 
 function supportCaseReadiness(caseRecord) {
   const details = caseRecord.details || {};
-  const missing = [];
-  if (!details.supportPurpose?.trim()) missing.push("stödets syfte");
-  if (!details.desiredOutcome?.trim()) missing.push("önskat resultat");
-  if (!supportAreaIdsForCase(caseRecord).length) missing.push("stödområde");
+  const missingLabels = {
+    supportPurpose: "stödets syfte",
+    desiredOutcome: "önskat resultat",
+    supportAreaIds: "stödområde"
+  };
+  const missing = supportProfileRequirements({
+    supportPurpose: details.supportPurpose,
+    desiredOutcome: details.desiredOutcome,
+    supportAreaIds: supportAreaIdsForCase(caseRecord)
+  }).filter((requirement) => !requirement.complete)
+    .map((requirement) => missingLabels[requirement.id]);
   return { ready: missing.length === 0, missing };
 }
 
@@ -11807,8 +11861,13 @@ els.caseCreateForm.addEventListener("invalid", (event) => {
   showCaseFormError(`${label || "Ett obligatoriskt fält"} måste fyllas i innan ärendet kan sparas.`, field);
 }, true);
 
-els.caseCreateForm.addEventListener("input", clearCaseFormError);
-els.caseCreateForm.addEventListener("change", clearCaseFormError);
+function handleCaseFormProgress() {
+  clearCaseFormError();
+  renderSupportProfileCompleteness();
+}
+
+els.caseCreateForm.addEventListener("input", handleCaseFormProgress);
+els.caseCreateForm.addEventListener("change", handleCaseFormProgress);
 
 els.newCaseActivityButton.addEventListener("click", () => {
   els.caseActivityForm.hidden = false;

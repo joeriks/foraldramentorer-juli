@@ -49,6 +49,8 @@ test("serves the application shell", async () => {
   assert.match(html, /id="matchingMentorAreaFilter"/);
   assert.match(html, /id="matchingMentorCriteriaFilters"/);
   assert.match(html, /id="matchingMentorResults"/);
+  assert.match(html, /id="supportProfileCompleteness"/);
+  assert.match(html, /krävs för fullständigt underlag/);
   assert.match(html, /id="activityDetailStatusInput" type="hidden"/);
   assert.match(html, /id="activityDetailResultOptions"/);
   assert.match(html, /id="activityClearResultButton"/);
@@ -99,6 +101,7 @@ test("serves the application shell", async () => {
 
 test("serves application assets and returns 404 for unknown files", async () => {
   const script = await worker.fetch(new Request("https://example.test/app.js"), {}, context);
+  assert.match(await script.clone().text(), /function renderSupportProfileCompleteness/);
   assert.equal(script.status, 200);
   assert.match(script.headers.get("content-type"), /^text\/javascript/);
   assert.equal(script.headers.get("cache-control"), "no-cache");

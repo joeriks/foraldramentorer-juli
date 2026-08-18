@@ -230,6 +230,14 @@ export const CASE_DETAIL_FIELD_DEFINITIONS = [
   { id: "desiredDate", label: "Behovet ska vara mött senast", inputType: "date" }
 ];
 
+export function supportProfileRequirements({ supportPurpose = "", desiredOutcome = "", supportAreaIds = [] } = {}) {
+  return [
+    { id: "supportPurpose", label: "Stödets syfte", complete: Boolean(String(supportPurpose).trim()) },
+    { id: "desiredOutcome", label: "Önskat resultat", complete: Boolean(String(desiredOutcome).trim()) },
+    { id: "supportAreaIds", label: "Minst ett bekräftat stödområde", complete: Array.isArray(supportAreaIds) && supportAreaIds.length > 0 }
+  ];
+}
+
 export const CASE_TYPE_DEFINITIONS = [
   {
     id: "incoming-contact",
