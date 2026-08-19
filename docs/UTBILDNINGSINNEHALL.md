@@ -1,10 +1,16 @@
 # Tekniskt format för utbildningsinnehåll
 
+Status: Implementerat prototypformat och målbild för produktion
+
+Senast uppdaterad: 2026-08-19
+
 ## Princip
 
 Utbildningsinnehåll lagras som versionshanterade innehållspaket. Ett paket kan vara `material`, `course` eller `test` och har ett stabilt tekniskt ID samt ett versionsnummer.
 
 Kommunens urval lagras separat som referenser till innehållspaket. Gemensamt material kopieras därför inte när en kommun väljer att använda det. En kurs tar automatiskt med de material och test som kursen refererar till.
+
+I den aktuella prototypen kan användaren filtrera utbildningsbiblioteket på kurser, referensmaterial och kunskapstest. Administratören kan välja kommunens innehåll, se versionsläge och styra publik exponering för referensmaterial. Mentorportalen visar den valda utbildningen, sparar progress och låter mentorn genomföra test. Den publika vyn visar endast referensmaterial som kommunen uttryckligen har valt och publicerat.
 
 Urvalet har två skilda dimensioner:
 

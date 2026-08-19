@@ -1,5 +1,9 @@
 # FöräldraMentorer - koncept och systemskiss
 
+Status: Aktuell konceptbeskrivning för prototypen
+
+Senast uppdaterad: 2026-08-19
+
 Teknisk fördjupning: [Progressiv ärendehantering](teknisk-specifikation-progressiv-arendehantering.md)
 
 Verksamhetsflöden: [Verksamhetsflöden och handläggningsrutiner](verksamhetsfloden-och-handlaggningsrutiner.md)
@@ -120,27 +124,22 @@ Utbildningen föreslås bestå av fyra block:
 
 Pedagogiken bör bygga på case och dilemman snarare än långa regeltexter. Kunskapsavstämningen ska lära ut genom återkoppling och låta mentorn försöka igen direkt vid fel svar. Kritiska frågor om sekretess och orosanmälan måste däremot vara korrekt förstådda innan godkännande.
 
-## Första prototyp: Kommunens kontrollpanel
+## Aktuell prototyp: kommunportalen
 
-Den första prototypen ska visa administratörens vy för introduktion och godkännande.
+Den aktuella prototypen omfattar ett sammanhängande kommunalt arbetsflöde från behovsanalys och rekrytering till godkännande av mentor, stödärende, matchning, mentoruppdrag och uppföljning. Den innehåller också kontaktmottagning, personregister, utbildningsinnehåll, administration, support och versionshistorik.
 
-Prioriterade funktioner:
+Prototypens viktigaste funktioner är:
 
-- Enkel pipeline över mentorer i processen för godkännande.
-- Status för varje steg i prövningen för godkännande.
-- Mentordetaljer.
-- Centralt ärenderegister.
-- Personanknutna och generella ärenden.
-- En ansvarig handläggare och flera medhandläggare per ärende.
-- Aktiviteter som handläggarens huvudsakliga arbetsyta.
-- Handlingar och underlag kopplade till ärendet och vid behov till en aktivitet.
-- Automatisk händelselogg när aktiviteter eller handlingar ändras.
-- Intervjuanteckningar.
-- Manuell statusändring.
-- Knapp för godkännande när alla krav är uppfyllda.
-- Lokal datalagring i IndexedDB under prototypfasen.
+- **Översikt** med arbetskö, genvägar för att skapa nytt och en visuell bild av hur ärendetyperna hänger ihop.
+- Centralt ärenderegister med sökning samt filtrering på ärendetyp och status.
+- Personanknutna och generella ärenden med ansvarig handläggare, aktiviteter, handlingar, möten och fullständig logg.
+- Aktiviteter som handläggarens huvudsakliga arbetsyta, med strukturerade resultat och tydligt nästa steg.
+- Godkännandeflöde för mentor med kontroller, utbildning, intervju och beslut.
+- Stöd- och matchningsflöde med sökbar mentorlista och synliga matchande respektive saknade kriterier.
+- Kontaktmottagning för inkommande samtal och e-post utan krav på personkoppling.
+- Lokal datalagring i IndexedDB med realistiska exempelärenden och bevarad historik.
 
-Denna prototyp är avsiktligt enkel. Målet är att tidigt kunna känna på arbetsflödet, inte att låsa slutlig informationsarkitektur eller visuell identitet.
+Vyerna använder progressiv visning. Det som behövs för nästa normala arbetsmoment visas först. Sällan använda uppgifter, planering och undantag finns kvar men tar inte plats förrän användaren behöver dem. Prototypen är avsedd för verksamhetsprövning och är inte en produktionslösning för autentisering, central lagring eller kommunal arkivering.
 
 ### Ärendemodell
 
@@ -156,16 +155,28 @@ Minnesregel:
 
 När en ny mentor registreras är `Skapa ärende om godkännande` förvalt, men användaren kan välja bort det. Godkännandeärendet använder aktiviteter för identitet, belastningsregister, referenser, utbildning, kunskapsavstämning, kallelse, intervju och beslut. Handläggaren kan även lägga till fria uppföljningsaktiviteter, exempelvis att kontakta mentorn när en referens inte går att nå.
 
+### Översikt, register och ärendekort
+
+Översiktens arbetskö är den primära ingången till det dagliga arbetet. Den kan filtreras på `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden`. Varje rad visar ärendet och dess nästa aktivitet. Processöversikten visar antal öppna ärenden per ärendetyp och leder till ett register som redan är filtrerat på den valda typen.
+
+Ärenderegistret samlar rubrik, typ och registreringsdatum i kolumnen `Ärende`, personkopplingen i `Person`, status och nästa aktivitet i `Läge` samt handläggare i `Ansvarig`. Tabeller får skrolla inom sin egen yta på små skärmar men ska aldrig göra hela sidan bredare.
+
+På ärendekortet är fliken `Arbete` den första arbetsytan och innehåller både nästa rekommenderade steg och hela aktivitetslistan. Handlingar, möten och logg finns i egna flikar. Sekundära ärendeuppgifter visas endast när de har ett relevant värde eller när användaren öppnar den utfällbara delen för fler åtgärder.
+
 ### Aktiviteter och kommunal handläggningsrutin
 
 Ärendet har en ansvarig handläggare. Aktiviteter ärver normalt denna ansvariga, men kan uttryckligen tilldelas en annan handläggare. Ett byte av ärendeansvarig påverkar endast aktiviteter som använder det ärvda ansvaret.
 
-Aktivitetens status och resultat är två skilda uppgifter:
+Aktivitetens arbetsläge och resultat är två skilda uppgifter:
 
 - Status beskriver arbetet: Ej påbörjad, Pågår, Väntar, Avslutad eller Ej aktuell.
 - Resultat beskriver utfallet och anpassas efter aktivitetstypen.
 
-När en aktivitet avslutas måste handläggaren välja resultat. Ett avvikande resultat markerar ärendet som `Ställningstagande krävs` och ligger kvar i arbetskön tills avvikelsen har hanterats. En kort tjänsteanteckning krävs för resultat som behöver följas upp.
+I den normala vyn väljer handläggaren ett resultat i en alltid synlig lista. Valet kan avmarkeras om det gjordes av misstag. Resultat, valfri eller obligatorisk tjänsteanteckning och avslutningsknapp ligger tillsammans. När aktiviteten avslutas öppnar systemet nästa aktivitet eller återgår till ärendet. Vänteläge, särskild planering och `Ej aktuell` finns under `Planering och undantag`.
+
+Om aktiviteten kräver en strukturerad registrering är avslutande resultat spärrade tills underlaget är klart. Gränssnittet visar vilka uppgifter som saknas och länkar direkt till registreringen. Intervjuer använder verksamhetsnära lägen som `Inte bokad`, `Bokad` och `Genomförd` i stället för det generella ordet `Fullständig`; en genomförd intervju kräver passerad mötestid och en saklig sammanfattning.
+
+Ett avvikande resultat markerar ärendet som `Ställningstagande krävs` och ligger kvar i arbetskön tills avvikelsen har hanterats. En kort tjänsteanteckning krävs för resultat som behöver följas upp.
 
 Att den sista aktiviteten avslutas stänger inte ett vanligt ärende och skapar inte automatiskt ett nytt ärende. Systemet visar vad som har sparats och låter handläggaren uttryckligen välja nästa verksamhetssteg. Sammansatta beslut, exempelvis att godkänna en mentor, ska visa och logga samtliga effekter innan de genomförs.
 
@@ -175,11 +186,22 @@ Förfallodatum används när det finns en beslutad tidsfrist, bokad tid eller ö
 
 Handlingar kan gälla hela ärendet eller kopplas till en viss aktivitet. Kopplingen ska visas både på aktivitetskortet och i ärendets handlingslista.
 
-Dashboardens arbetsköer utgår från den inloggade användaren:
+### Kontaktmottagning
 
-- Mina aktiviteter.
-- Otilldelade aktiviteter.
-- Försenade aktiviteter.
-- Ställningstaganden.
+`Registrera kontakt` är en tydlig underåtgärd i navigationen och finns även på Översikt och i vyn `Kontaktmottagning`. En inkommande kontakt registreras som ett mottagningsärende med kontaktväg, kontaktuppgift, kort saklig anteckning och en fri beskrivning av nästa steg. Den som kontaktar kommunen behöver inte vara en förälder och någon personpost behöver inte skapas under samtalet. Ett stödärende eller annan fortsatt handläggning kan kopplas senare när behovet är tydligt.
 
-Varje ärende bidrar normalt med nästa relevanta aktivitet. En avslutad aktivitet med ett resultat som kräver uppföljning prioriteras framför senare aktiviteter.
+### Stödärende och matchning
+
+Ett stöd- och matchningsunderlag räknas som fullständigt först när följande finns:
+
+1. Stödets syfte.
+2. Önskat resultat.
+3. Minst ett bekräftat stödområde.
+
+Obligatoriska fält markeras med asterisk och en dynamisk checklista visar vad som återstår. Ett ofullständigt utkast kan sparas, men en aktivitet som kräver fullständigt underlag kan inte avslutas.
+
+När handläggaren väljer `Starta matchning` hämtas det nya ärendets namn från stödärendet. Matchningsärendet innehåller en sök- och filtrerbar lista över godkända, tillgängliga mentorer. Varje förslag visar vilka kriterier som matchar och vilka som saknas eller behöver kontrolleras. Handläggaren kan tillfälligt avaktivera enskilda kriterier för att bredda urvalet; systemet visar beslutsunderlag men väljer aldrig mentor automatiskt.
+
+### Prototypens gräns
+
+Kommunportalen använder realistiskt prototypdata med sammanhängande ärenden, aktiviteter och logghistorik. Data lagras lokalt i webbläsarens IndexedDB. Testrollerna simulerar behörighetsstyrda vyer men ersätter inte autentisering, tenantavgränsning eller serverbaserad behörighetskontroll. Produktionsinförande kräver därför central databas, säker filhantering, fastställda rättsliga rutiner och integrationer för exempelvis identitet, notifiering och arkivering.

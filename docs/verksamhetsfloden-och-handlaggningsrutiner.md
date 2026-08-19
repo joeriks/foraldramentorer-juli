@@ -1,8 +1,8 @@
 # Verksamhetsflöden och handläggningsrutiner
 
-Status: Verksamhetsförslag 1.9
+Status: Verksamhetsförslag 2.0
 Produkt: FöräldraMentorer - Kommunportal  
-Senast uppdaterad: 2026-08-08
+Senast uppdaterad: 2026-08-19
 
 Relaterade dokument:
 
@@ -211,22 +211,19 @@ flowchart LR
 
 ### 5.1 Börja arbetsdagen
 
-Handläggaren öppnar dashboarden. Den har två nivåer som bygger på samma ärende- och aktivitetsdata:
+Handläggaren öppnar `Översikt`. Arbetskön ligger först och bygger på samma ärende- och aktivitetsdata som register och ärendekort. Köerna är `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden`. Varje rad visar ärendet och nästa aktivitet och leder direkt till rätt arbetsyta.
 
-1. **Ärendeläge** visar antal nya, pågående, väntande och pausade ärenden samt ärenden där ett ställningstagande krävs. Ett val öppnar motsvarande urval i ärenderegistret.
-2. **Arbetskö** visar aktiviteter som kan handläggas direkt. Köerna är `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden`.
+Rekommenderad arbetsordning är att först bedöma ställningstaganden och försenade aktiviteter och därefter fortsätta med egna aktiviteter. Samordnaren kontrollerar dessutom kön `Otilldelade` och fördelar arbetet. Om ett bevakningsdatum passeras visas aktiviteten som försenad.
 
-Rekommenderad arbetsordning är att först bedöma ställningstaganden och försenade aktiviteter och därefter fortsätta med egna aktiviteter. Samordnaren kontrollerar dessutom kön `Otilldelade` och fördelar arbetet. Ett väntande ärende visas i ärendeläget; om bevakningsdatumet passeras visas dess aktivitet även som försenad.
+Varje köpost ska visa ärende, relevant personkoppling, nästa aktivitet och varför posten visas i kön. Förfallodatum visas när det finns. Formuleringen `Kräver åtgärd` ska undvikas. Systemet ska i stället ange exempelvis `Ställningstagande krävs av handläggare`, `Förfallodatum passerat` eller `Inväntar komplettering från mentor`.
 
-Varje köpost ska visa ärende, mentor eller annan koppling, nästa aktivitet, förfallodatum och varför posten visas i kön. Formuleringen `Kräver åtgärd` ska undvikas. Systemet ska i stället ange exempelvis `Ställningstagande krävs av handläggare`, `Förfallodatum passerat` eller `Inväntar komplettering från mentor`.
+Ärendeflödena längre ned på Översikt visar antal öppna ärenden per ärendetyp och hur typerna hänger ihop. De centrala flödena visas först. Sekundära samband och mentorflödet kan fällas ut och får inte användas som ersättning för arbetskö eller beslutspunkt.
 
-Mentorflödet längre ned på dashboarden är en sekundär registeröversikt. Det får inte användas som ersättning för ärendestatus, aktivitetskö eller beslutspunkt.
-
-**I systemet:** [Öppna dashboard och arbetskö](feature:dashboard.work-queue)
+**I systemet:** [Öppna Översikt och arbetskö](feature:dashboard.work-queue)
 
 ### 5.2 Öppna och bedöma ett ärende
 
-När handläggaren öppnar ett ärende ska översikten direkt besvara:
+När handläggaren öppnar ett ärende ska fliken `Arbete` direkt besvara:
 
 - Vad gäller ärendet?
 - Vem är ansvarig?
@@ -237,32 +234,33 @@ När handläggaren öppnar ett ärende ska översikten direkt besvara:
 
 Handläggaren går därefter till den aktuella aktiviteten, utför arbetet, registrerar relevant resultat och kompletterar med underlag endast när det behövs.
 
+Aktivitetslistan ligger i samma första flik. Den är medvetet kompakt och visar aktivitetens namn, aktuellt läge, registrerat resultat och den kopplade registrering som fortfarande måste färdigställas. Ansvarsundantag, förfallodatum och handlingar visas bara när de är relevanta.
+
 Om aktiviteten hör ihop med en strukturerad registrering visar aktivitetslistan och aktivitetskortet samma block med:
 
 - registreringens namn,
-- status `Inte påbörjad`, `Påbörjad` eller `Fullständig`,
+- ett härlett, verksamhetsnära läge, exempelvis `Inte påbörjad`, `Påbörjad` och `Fullständig` eller för intervju `Inte bokad`, `Bokad` och `Genomförd`,
 - tidpunkt och användare för senaste ändring,
 - ett direkt kommando som öppnar rätt flik och rätt inmatning.
 
-Statusen räknas från den faktiska registreringen och anges inte separat på aktiviteten. Exempelvis hämtas identitetsstatus från mentorkortets identitetsuppgifter, intervjuunderlag från det kopplade mötet och matchningsstatus från matchningsärendets strukturerade underlag. När obligatorisk registrering inte är fullständig kan aktiviteten inte avslutas. Handläggaren ska inte behöva söka efter rätt formulär i ett annat register.
+Läget räknas från den faktiska registreringen och anges inte separat på aktiviteten. Exempelvis hämtas identitetsstatus från mentorkortets identitetsuppgifter, intervjuunderlag från det kopplade mötet och matchningsstatus från matchningsärendets strukturerade underlag. När obligatorisk registrering inte är klar är avslutande resultat spärrade. Vyn förklarar vad som saknas och ger ett direkt kommando till rätt formulär.
 
 **I systemet:** [Öppna ärenderegistret](feature:cases.list)
 
 ### 5.3 Avsluta arbetsmomentet
 
-När en aktivitet avslutas i den fullständiga aktivitetsvyn ska användaren:
+När en aktivitet avslutas i aktivitetsvyn ska användaren:
 
 1. välja ett strukturerat resultat,
 2. ange notering om resultattypen kräver det,
-3. registrera eller länka relevant handling,
-4. spara avslutningen,
-5. återgå till ärendets aktivitetslista och se nästa föreslagna steg.
+3. registrera eller länka relevant handling när det behövs,
+4. använda den tydliga avslutningsknappen, som anger om nästa aktivitet öppnas eller om användaren återgår till ärendet.
 
-Systemet registrerar automatiskt vem som gjorde ändringen och när den gjordes. Resultat får inte vara förvalt.
+Systemet registrerar automatiskt vem som gjorde ändringen och när den gjordes. Resultat får inte vara förvalt och ett valt resultat ska kunna avmarkeras. Resultaten visas som en lista med alternativ så att möjliga utfall är synliga utan att en meny behöver öppnas.
 
-För vanliga, väldefinierade utfall kan aktivitetslistan visa kommandot `Avsluta`. Det öppnar en kompakt dialog med aktivitetens handledande text, valbara resultat och en förklaring av vad som sparas. Dialogen ska även erbjuda `Komplettera uppgifter`, som öppnar den fullständiga aktivitetsvyn. Snabbavslut får bara användas för resultat som aktivitetsmallen uttryckligen tillåter och ska inte visas när utfallet kräver tjänsteanteckning, möte, handling eller andra kompletterande uppgifter.
+Om en obligatorisk kopplad registrering inte är klar är resultatvalen inaktiverade. Kommandot `Påbörja registrering` eller `Fortsätt registrering` leder direkt till rätt arbetsyta. Efter att uppgifterna sparats återgår handläggaren till aktiviteten och kan registrera dess verksamhetsresultat.
 
-Om en obligatorisk kopplad registrering är `Inte påbörjad` eller `Påbörjad` visas inte snabbavslut. I den fullständiga aktivitetsvyn leder kommandot `Påbörja registrering` eller `Fortsätt registrering` direkt till rätt arbetsyta. Efter att uppgifterna sparats återgår handläggaren till aktiviteten och kan registrera dess verksamhetsresultat.
+Vänteläge, `Pågår`, `Ej aktuell` och andra undantag ligger under `Planering och undantag`. De ska inte konkurrera med det normala flödet resultat, eventuell anteckning och avslut.
 
 När alla tillämpliga aktiviteter är avslutade och inga ställningstaganden återstår ska aktivitetsvyn visa:
 
@@ -274,13 +272,13 @@ När alla tillämpliga aktiviteter är avslutade och inga ställningstaganden å
 
 ### 5.4 Välj rätt vy
 
-- **Dashboard:** prioriterar dagens arbete och visar sammanräknat ärendeläge. Här ska användaren inte registrera fristående verksamhetsuppgifter.
+- **Översikt:** prioriterar dagens arbete, ger genvägar för att skapa nytt och visar antal öppna ärenden i verksamhetsflödena.
 - **Ärenderegister:** visar den fullständiga, sökbara listan över ärenden. Här väljer användaren vilket ärende som ska öppnas.
 - **Ärendekort:** är den primära arbetsytan för översikt, aktiviteter, handlingar, logg och beslut i ett ärende.
 - **Mentorregister och mentorkort:** visar person- och registeruppgifter samt länkar till personens ärenden. Kontroller, möten och beslut ska registreras i rätt ärende och bara sammanfattas på mentorkortet.
 - **Demoläge:** finns under Systemadministration och demonstrerar aktuella funktioner i en förberedd ordning. Återkoppling från ett demosteg registreras som ett utvecklingsförslag i supportkön och får inte blandas med verksamhetsärenden, tjänsteanteckningar eller logghändelser.
 
-Samma status ska aldrig registreras separat i flera vyer. Dashboard, listor och mentorkort ska härleda sina sammanfattningar från ärenden och aktiviteter.
+Samma status ska aldrig registreras separat i flera vyer. Översikt, listor och mentorkort ska härleda sina sammanfattningar från ärenden och aktiviteter.
 
 ## 6. Flöde A: behovsanalys och rekrytering
 
@@ -537,13 +535,14 @@ Innan en mentor föreslås ska handläggaren avgöra om registreringen är ett n
 
 Det valda stödärendet ska därefter innehålla tillräckliga och aktuella uppgifter för urvalet:
 
-- ett eller flera bekräftade stödområden ur kommunens katalog, eller en tydlig markering att området ännu behöver bekräftas,
-- fastställda grundkriterier, exempelvis språk, område och praktisk tillgänglighet,
-- stödets avgränsade syfte och vad föräldern vill ha stöd med på en nivå som är nödvändig för matchningen,
+- stödets avgränsade syfte,
+- önskat resultat,
+- minst ett bekräftat stödområde ur kommunens katalog,
+- kända grundkriterier, exempelvis språk, område och praktisk tillgänglighet,
 - kontaktstatus och om föräldern vill medverka i matchningen,
 - ansvarig handläggare och nästa planerade kontakt.
 
-Om underlaget inte räcker skapas en aktivitet för komplettering. Matchningsärendet ska inte startas med påhittade standardvärden. Om föräldern redan har ett aktivt stödärende eller uppdrag ska systemet visa detta som en upplysning, inte blockera en ny registrering. Handläggaren bedömer och dokumenterar eventuell samordning.
+De tre första punkterna är prototypens krav för `Fullständigt underlag`. De markeras som obligatoriska i formuläret och en checklista visar vilka som återstår. Ett ofullständigt utkast får sparas, men en aktivitet som kräver underlaget kan inte avslutas förrän kraven är uppfyllda. Matchningsärendet ska inte startas med påhittade standardvärden. Om föräldern redan har ett aktivt stödärende eller uppdrag ska systemet visa detta som en upplysning, inte blockera en ny registrering. Handläggaren bedömer och dokumenterar eventuell samordning.
 
 ### 10.3 Matcha stödärende med mentor
 
@@ -551,13 +550,15 @@ Matchning är ett eget ärende som alltid tillhör ett bestämt stödärende. De
 
 När matchningen startas fryser systemet en ögonblicksbild av stödärendets och mentorns aktiva matchningsprofiler. Ändringar som görs senare ska användas i nya matchningar men får inte ändra vad den tidigare matchningen grundades på.
 
-1. Handläggaren startar matchningsärendet från det stödärende som ska få en mentorinsats.
-2. Systemet visar endast mentorer som är godkända och tillgängliga. Registrerad överlappning mellan stödärendets stödområden och mentorns erfarenhetsområden visas och kan användas för sortering.
-3. Handläggaren bedömer språk, geografi, tillgänglighet, erfarenhetsnivå, parternas önskemål och andra relevanta kriterier samt dokumenterar kort varför en match föreslås. Avsaknad av registrerad överlappning är en upplysning, inte ett automatiskt avslag.
-4. Föräldern och mentorn kontaktas var för sig enligt kommunens rutin.
-5. Första mötet bokas och registreras.
-6. Båda parters återkoppling dokumenteras utan onödiga samtalsdetaljer.
-7. Matchningen accepteras eller avslutas utan match. Stödärendet ligger kvar och kan få ett nytt matchningsförsök.
+1. Handläggaren startar matchningsärendet från det stödärende som ska få en mentorinsats. Ärendets namn fylls automatiskt från stödärendet.
+2. Systemet visar en sök- och filtrerbar lista över godkända och tillgängliga mentorer.
+3. På varje mentor visas vilka aktiva kriterier som matchar och vilka uppgifter som saknas eller behöver kontrolleras.
+4. Handläggaren kan tillfälligt avaktivera enskilda kriterier för att bredda urvalet. Avaktiveringen ändrar inte det sparade stödunderlaget och ska vara synlig i bedömningen.
+5. Handläggaren bedömer språk, geografi, tillgänglighet, erfarenhetsnivå, parternas önskemål och andra relevanta kriterier samt dokumenterar kort varför en match föreslås. Avsaknad av registrerad överlappning är en upplysning, inte ett automatiskt avslag.
+6. Föräldern och mentorn kontaktas var för sig enligt kommunens rutin.
+7. Första mötet bokas och registreras.
+8. Båda parters återkoppling dokumenteras utan onödiga samtalsdetaljer.
+9. Matchningen accepteras eller avslutas utan match. Stödärendet ligger kvar och kan få ett nytt matchningsförsök.
 
 Matchningsärendets aktiviteter har var sin avgränsade uppgift och egna resultat. `Genomförd` ska inte användas som ett generellt matchningsutfall.
 
@@ -675,21 +676,23 @@ Akuta skydds- eller orosfrågor ska följa kommunens särskilda rutin och får i
 
 **I systemet:** [Öppna uppdragsärenden](feature:assignment.list)
 
-## 12. Flöde G: enkel registrering som kan växa
+## 12. Flöde G: kontaktmottagning och enkel registrering
 
-En handläggare ska kunna registrera en kontakt eller observation med högst fyra manuella uppgifter:
+`Registrera kontakt` finns som en tydlig underåtgärd till `Kontaktmottagning` i navigationen och kan även nås från Översikt. Den används för inkommande telefonsamtal och e-post och förutsätter inte att den som kontaktar kommunen är en förälder.
 
-1. typ av registrering,
-2. mentor om registreringen gäller en person,
-3. rubrik,
-4. kort beskrivning.
+Under kontakten registrerar handläggaren endast det som behövs för att arbetet ska kunna fortsätta:
 
-Systemet söker efter kompatibla öppna ärenden och visar alternativen innan något sparas.
+1. kontaktväg och kontaktuppgift,
+2. vem som kontaktar kommunen, om det är relevant,
+3. en kort saklig anteckning,
+4. vad nästa steg ska vara, beskrivet med egna ord.
 
-- Om registreringen hör till ett öppet ärende läggs den till där som tjänsteanteckning eller möte.
-- Om den kräver egen handläggning skapas ett nytt fullvärdigt ärende.
-- Om fortsatt arbete behövs lägger användaren till aktivitet, ansvarig eller förfallodatum.
-- Om inget mer behövs kan ärendet avslutas direkt med orsak.
+Registreringen skapar ett mottagningsärende. Personkoppling är inte obligatorisk och en förälder- eller mentorpost ska inte skapas bara för att ett samtal tas emot. I vyn `Kontaktmottagning` finns tidigare mottagningsärenden med anteckningar och historik.
+
+- Om kontakten hör till ett öppet ärende kan mottagningsärendet länkas dit senare.
+- Om fortsatt stöd blir aktuellt skapas eller länkas ett stödärende när behov och person är tillräckligt kända.
+- Om fortsatt arbete behövs används den angivna nästa-steg-texten som grund för aktivitet, ansvar och eventuell tidsfrist.
+- Om inget mer behövs avslutas mottagningsärendet med orsak.
 
 Det finns inget separat avancerat ärende. Samma ärende kompletteras stegvis och behåller alltid ID, nummer och historik.
 
@@ -783,7 +786,7 @@ Systemet bör automatiskt:
 - markera återstående aktiviteter som ej aktuella när ett ärende avslutas,
 - logga ansvar, status, resultat, beslut och handlingar,
 - visa ett uttryckligt beslutsläge när alla tillämpliga aktiviteter är klara,
-- beräkna dashboardens antal och arbetsköer från samma ärenden och aktiviteter som visas i register och kort.
+- beräkna Översiktens antal och arbetsköer från samma ärenden och aktiviteter som visas i register och kort.
 
 Systemet bör inte automatiskt:
 
@@ -801,11 +804,11 @@ Systemet bör inte automatiskt:
 - avsluta ett ärende enbart på grund av ett avvikande aktivitetsresultat,
 - återöppna eller radera avslutade ärenden,
 - lagra kopior av identitetshandlingar eller registerutdrag utan fastställd rutin,
-- skapa en separat statusuppsättning för dashboard, mentorflöde eller presentation.
+- skapa en separat statusuppsättning för Översikt, mentorflöde eller presentation.
 
 ### 16.1 Administration av ärende- och aktivitetsmallar
 
-Administratören ska kunna se hur ärendetyper och aktivitetsmallar styr handläggningen. För en ärendetyp visas hjälptext, registreringsanvisning, skapandeväg, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallarna öppnas och administreras från aktivitetsflödet på respektive ärendetyp. En mall är fortfarande ett gemensamt versionshanterat objekt och kan återanvändas av flera ärendetyper. Processkartan skiljer mellan manuellt skapbara ärenden och ärenden som måste startas från en mentorpost, ett stödärende eller en accepterad matchning. För en aktivitetsmall visas handläggningsanvisning, tillåtna statuslägen, avslutsregel, snabbavslut, kopplad strukturerad registrering, resultatval och vilka ärendetyper som använder mallen.
+Administratören ska kunna se hur ärendetyper och aktivitetsmallar styr handläggningen. För en ärendetyp visas hjälptext, registreringsanvisning, skapandeväg, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallarna öppnas och administreras från aktivitetsflödet på respektive ärendetyp. En mall är fortfarande ett gemensamt versionshanterat objekt och kan återanvändas av flera ärendetyper. Processkartan skiljer mellan manuellt skapbara ärenden och ärenden som måste startas från en mentorpost, ett stödärende eller en accepterad matchning. För en aktivitetsmall visas handläggningsanvisning, tillåtna statuslägen, avslutsregel, kopplad strukturerad registrering, resultatval och vilka ärendetyper som använder mallen.
 
 Kommunen får ändra handledande texter och valbara verksamhetsinställningar. Tekniska ID:n, skapandevägar, grundläggande statusregler och lagringsnycklar är systemstyrda. En sparad ändring skapar en ny mallversion för nya ärenden; pågående och avslutade ärenden behåller den version som användes när de skapades.
 
@@ -852,9 +855,9 @@ Aktiviteten avslutas med avvikande resultat och notering. Systemet visar `Ställ
 
 Behörig beslutsfattare öppnar ställningstagandet, väljer att avsluta, anger orsak och motivering och bekräftar. Ärendet avslutas och återstående aktiviteter blir ej aktuella. Beslut, aktör och tidpunkt visas i loggen.
 
-### Scenario 5: enkel kontakt blir ett ärende
+### Scenario 5: inkommande kontakt får ett tydligt nästa steg
 
-En handläggare väljer `Ny registrering` och registrerar ett telefonsamtal. Systemet visar ett kompatibelt öppet uppföljningsärende. Handläggaren kopplar anteckningen dit och lägger till en aktivitet med förfallodatum när fortsatt arbete behövs. Ingen dubblett skapas.
+En handläggare väljer `Registrera kontakt` och registrerar ett telefonsamtal utan att skapa en personpost. Handläggaren skriver med egna ord vad nästa steg ska vara. Kontakten visas därefter i `Kontaktmottagning` som ett mottagningsärende med full historik och kan senare länkas till eller leda till ett stödärende.
 
 ### Scenario 6: byte av handläggare
 
@@ -866,7 +869,7 @@ Två intervjuer inför godkännande registreras som separata möten med var sin 
 
 ### Scenario 8: 250 mentorer
 
-Handläggaren växlar mellan `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden` på dashboarden. Väntande ärenden väljs via ärendeläget och öppnas i ärenderegistret. Listor är paginerade, sökbara och sorterade utan att varje ärende behöver öppnas. Antal, status, nästa aktivitet och ansvarig ska vara konsekventa på dashboard, i ärenderegistret och på ärendekortet. Mentorflödet kontrolleras separat som en sekundär registeröversikt.
+Handläggaren växlar mellan `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden` på Översikt. Listor är paginerade, sökbara och sorterade utan att varje ärende behöver öppnas. Antal, status, nästa aktivitet och ansvarig ska vara konsekventa på Översikt, i ärenderegistret och på ärendekortet. Mentorflödet kontrolleras separat som en sekundär registeröversikt.
 
 ### Scenario 9: förälder registreras och matchas
 
@@ -888,9 +891,9 @@ Föräldern har två tydligt avgränsade stödärenden där olika kompetens och 
 
 Handläggaren avslutar aktiviteten `Bekräfta att föräldern vill gå vidare`. Systemet sparar resultat, registrerande användare och tidpunkt i ärendet och loggen. Stödärendet ligger kvar som öppet och visar att inget matchningsärende eller registerkort har ändrats automatiskt. Handläggaren väljer därefter `Starta matchning`, `Avsluta ärendet` eller kompletterar handläggningen. Om en matchning redan finns visas en länk till den i stället för att en dubblett föreslås.
 
-### Scenario 14: snabbavslut kräver mer information
+### Scenario 14: avslut kräver mer information
 
-Handläggaren väljer `Avsluta` för en aktivitet. Resultatlistan saknar förvalt värde. Om ett valt resultat kräver notering eller annat underlag hänvisar dialogen till den fullständiga aktivitetsvyn och sparar inget. För ett tillåtet enkelt resultat visar dialogen vad som registreras och avslutar aktiviteten med ett uttryckligt kommando.
+Handläggaren öppnar en aktivitet och ser alla möjliga resultat som en lista utan förvalt värde. Om den kopplade registreringen inte är klar är de avslutande resultaten spärrade och vyn visar vad som saknas. När underlaget är klart kan handläggaren välja resultat, komplettera med anteckning och använda knappen som tydligt anger om nästa aktivitet öppnas eller om användaren återgår till ärendet.
 
 ## 18A. Utbildningsmaterial och rollstyrda ingångar
 

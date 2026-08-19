@@ -1,5 +1,9 @@
 # AI-support
 
+Status: Implementerad i prototypen
+
+Senast uppdaterad: 2026-08-19
+
 ## Syfte
 
 AI-supporten hjälper samordnare, handläggare, mentorer och besökande föräldrar att:
@@ -32,6 +36,8 @@ Lägg in följande hemlighet i Sites-miljön:
 - `OPENAI_SUPPORT_MODEL` - valfri modellinställning. Standard är `gpt-5.6-terra`.
 
 Supportpanelen ligger kvar öppen under navigering och återställs efter en omladdning i samma webbläsarflik. Den stängs uttryckligen med stängningsknappen eller Escape.
+
+Panelen öppnas med hjälpknappen som ligger fast i gränssnittets nedre högra hörn. Den kan användas från alla kommunportalens vyer. Aktuell roll och vy används för att prioritera relevant lokalt stöd, men registrerade verksamhetsärenden eller personposter skickas inte med i frågan.
 
 Publicera sedan om sajten. Endpointen `POST /api/support` svarar med `503 AI_NOT_CONFIGURED` när nyckeln saknas; klienten växlar då automatiskt till lokalt stöd.
 

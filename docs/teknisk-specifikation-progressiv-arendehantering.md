@@ -1,15 +1,18 @@
 # Teknisk specifikation: progressiv ärendehantering
 
-Status: Utkast 1.1  
+Status: Utkast 1.2
 Produkt: FöräldraMentorer – Kommunportal  
 Målmiljö: Webbaserad SaaS  
 Prototyplagring: IndexedDB
+Senast uppdaterad: 2026-08-19
 
 Verksamhetsmässig tillämpning: [Verksamhetsflöden och handläggningsrutiner](verksamhetsfloden-och-handlaggningsrutiner.md)
 
 ## 1. Syfte
 
 Systemet ska göra det möjligt att registrera ett ärende med mycket få uppgifter och därefter komplettera samma ärende med aktiviteter, handlingar, ansvar, tidsfrister, avvikelser och beslut.
+
+Specifikationen beskriver både den implementerade IndexedDB-prototypen och målarkitekturen för SaaS. Avsnitt om server-API, tenantisolering och produktionslagring är målbild; avsnittet om användargränssnitt beskriver aktuell prototypfunktion om inget annat anges.
 
 Den enkla vägen är standard. Den utökade strukturen visas eller efterfrågas först när användaren behöver den eller när en verksamhetsregel kräver den.
 
@@ -384,7 +387,7 @@ type WorkInputState = "not_started" | "in_progress" | "complete";
 
 `WorkInputState` lagras inte på aktiviteten. Den härleds från den kanoniska verksamhetsposten, exempelvis identitetsuppgifterna på mentorn, matchningsunderlaget, mötet eller uppdragsuppföljningen. Läsmodellen ska även lämna `updatedAt` och `updatedBy` från samma post. Därmed kan aktivitetslista, aktivitetskort och målvy visa samma status utan parallella statusfält.
 
-Om `required` är sant får aktiviteten inte avslutas förrän läsmodellen ger `complete`. Snabbavslut ska då döljas och den fullständiga aktivitetsvyn ska förklara vilken registrering som saknas samt ge en direktlänk dit. Ett avvikande verksamhetsresultat och ett ofullständigt registreringsunderlag är olika tillstånd och får inte blandas ihop.
+Om `required` är sant får aktiviteten inte avslutas förrän läsmodellen ger `complete`. Avslutande resultat ska då vara inaktiverade och aktivitetsvyn ska förklara vilken registrering som saknas samt ge en direktlänk dit. Ett avvikande verksamhetsresultat och ett ofullständigt registreringsunderlag är olika tillstånd och får inte blandas ihop.
 
 `resultClassification` är en snapshot av den versionsstyrda resultatdefinitionen. Systemet ska inte räkna om historiska aktivitetsresultat mot en senare mallversion. Kombinationen `tenantId`, definitions-ID och version identifierar alltid exakt en definition. Högst en version per definitions-ID får vara `published` samtidigt.
 
@@ -392,7 +395,7 @@ Om `required` är sant får aktiviteten inte avslutas förrän läsmodellen ger 
 
 Aktivitetens effektiva ansvariga är `handlerIdOverride` när det är satt, annars ärendets aktiva ansvariga assignment. Om båda saknas visas `Ej tilldelad`. Ett byte av ärendets ansvariga slår därför igenom på alla aktiviteter som inte är särskilt tilldelade, utan att aktivitetsraderna behöver skrivas om.
 
-`quickCompletionResultCodes` är en uttrycklig tillåtelselista. Ett resultat får bara snabbregistreras när det finns i listan, eventuell kopplad registrering är fullständig och resultatet inte kräver tjänsteanteckning, möte, handling eller andra strukturerade uppgifter. Resultatfältet får aldrig förväljas. Om kompletterande information krävs ska klienten öppna den fullständiga aktivitetsvyn utan att skriva data.
+`quickCompletionResultCodes` finns kvar i mallmodellen för bakåtkompatibilitet och administration, men den aktuella klienten avslutar inte aktiviteter direkt från listan. Alla resultat väljs i aktivitetsvyn, där resultat, eventuell anteckning och avslutningskommando visas tillsammans. Resultatfältet får aldrig förväljas och ett valt resultat ska kunna avmarkeras innan aktiviteten avslutas.
 
 När alla tillämpliga aktiviteter är `completed` eller `not_applicable`, inga öppna avvikelser finns och ärendet inte är avslutat eller pausat, är ärendet redo för ett uttryckligt nästa beslut. Detta är en härledd läsmodell och inte en ny lagrad ärendestatus.
 
@@ -660,7 +663,6 @@ Validering ska ske när informationen behövs, inte vid första registreringen.
 | Tilldela aktivitet | Giltig handläggare |
 | Ange förfallodatum | Giltigt datum |
 | Avsluta aktivitet | Uttryckligen vald resultatkod; notering, möte eller handling när resultatdefinitionen kräver det |
-| Snabbavsluta aktivitet | Resultatkod i mallens `quickCompletionResultCodes`; inga ytterligare uppgifter får krävas |
 | Registrera avvikelse | Notering |
 | Begära komplettering | Ansvarig och beskrivning av nästa steg |
 | Pausa ärende | Orsak, beslutsfattare och valfritt bevakningsdatum |
@@ -745,23 +747,22 @@ Känsligt innehåll ur belastningsregistret ska inte registreras i resultat elle
 
 ### 10.1 Standardvy
 
-Första vyn för en registrering ska vara ett kort formulär. Efter sparandet visas:
+Första vyn för en registrering ska vara ett kort formulär. Efter sparandet visas ett fokuserat ärendekort med:
 
 - Ärendenummer och rubrik.
 - Status.
-- Mentor och ansvarig, om de finns.
+- Relevanta personkopplingar och ansvarig, om de finns.
 - Senaste registrering.
 - Ett primärt rekommenderat nästa steg.
-- Kommandot `Redigera ärendeuppgifter`.
+- Aktivitetslistan i den första fliken `Arbete`.
 
-Tomma sektioner för aktiviteter, handlingar och medhandläggare ska inte dominera standardvyn.
+Tomma eller irrelevanta faktarader ska inte visas. Normalt prioriterade uppgifter ska vara synliga; sällan använda ärendeuppgifter och åtgärder samlas i en utfällbar sektion.
 
 ### 10.2 Utökad ärendevy
 
-När användaren kompletterar ärendet används befintlig uppdelning:
+När användaren kompletterar ärendet används följande uppdelning:
 
-- Översikt.
-- Aktiviteter.
+- Arbete, med nästa steg och samtliga aktiviteter.
 - Handlingar.
 - Möten.
 - Logg.
@@ -787,7 +788,15 @@ Exempel:
 
 Förslag ska kunna avböjas när ingen verksamhetsregel kräver uppgiften.
 
-### 10.5 Slutläge för aktivitetsflödet
+### 10.5 Aktivitetsvy
+
+Aktivitetsvyn ska utgå från det normala flödet `resultat → eventuell anteckning → avslut`. Tillåtna resultat visas som en lista med radioknappar och inget resultat är förvalt. Ett valt resultat kan avmarkeras innan sparande.
+
+Om aktiviteten har ett obligatoriskt `ActivityWorkInputDefinition` och dess härledda läge inte är `complete` ska avslutande resultat vara inaktiverade. Vyn visar kraven för fullständighet och ett direkt kommando till den kopplade registreringen. Domänspecifika lägen får ersätta det generella ordet `Fullständig`; intervju visas exempelvis som `Inte bokad`, `Bokad` eller `Genomförd`, där genomförd kräver passerad mötestid och sammanfattning.
+
+Avslutningsknappen placeras i direkt anslutning till resultatet och anger nästa navigeringsmål, exempelvis nästa aktivitet eller återgång till ärendet. Ansvar, förfallodatum, vänteläge, `Pågår`, `Ej aktuell` och andra undantag finns under `Planering och undantag`.
+
+### 10.6 Slutläge för aktivitetsflödet
 
 När alla tillämpliga aktiviteter är klara och inga öppna avvikelser finns ska aktivitetsvyn visa en särskild beslutsyta. Den ska ange:
 
@@ -799,9 +808,25 @@ När alla tillämpliga aktiviteter är klara och inga öppna avvikelser finns sk
 
 Förslaget beräknas från länkat följdärende, ärendetyp och `nextCaseTypeId` i den ordningen. En befintlig efterföljare ska alltid öppnas i stället för att en dubblett skapas.
 
-### 10.6 Administration av definitioner
+### 10.7 Översikt, register och responsivitet
 
-Ärendetypsvyn ska visa och versionshantera hjälptext, registreringsanvisning, handläggningsanvisning, mentorkoppling, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallsvyn ska visa handläggningsanvisning, statusregler, avslutsregel, snabbresultat, resultatdefinitioner och användande ärendetyper.
+`Översikt` ska visa arbetskön före processöversikten. Arbetskön har filtren `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden` och visar kolumnerna `Ärende` och `Nästa aktivitet`. Processöversikten visar antal öppna ärenden per ärendetyp. Centrala flöden visas direkt och sekundära samband kan fällas ut.
+
+Ärenderegistret ska kunna sökas och filtreras på ärendetyp och status. Kolumnerna är `Ärende`, `Person`, `Läge` och `Ansvarig`; flera närliggande uppgifter får kombineras i samma cell för att begränsa bredden.
+
+Grid- och flexbarn ska kunna krympa med `min-width: 0`. Ärendeflödet ska använda två kolumner vid mellanbredder och vertikal layout på mobil. Korttitlar får inte delas mitt i ord. Filter ska radbrytas på mobil. Breda tabeller får ha horisontell skroll inom `.table-responsive`, men `documentElement.scrollWidth` får inte överstiga `clientWidth` vid 1280 × 720 eller 390 × 844.
+
+### 10.8 Kontaktmottagning och matchning
+
+`Registrera kontakt` ska vara direkt nåbar som underåtgärd till `Kontaktmottagning`, från Översikt och i mottagningsvyn. Registreringen får inte kräva personkoppling. Den ska lagra kontaktväg, kontaktuppgift, saklig anteckning och fri nästa-steg-text i ett mottagningsärende.
+
+Stöd- och matchningsunderlaget är `complete` först när stödets syfte, önskat resultat och minst ett bekräftat stödområde finns. Formuläret ska markera obligatoriska fält och visa en dynamisk checklista utan att hindra sparande av utkast.
+
+Ett matchningsärende startas från stödärendet och får ett förifyllt namn. Mentorurvalet ska kunna sökas och filtreras. För varje mentor visas matchande och saknade kriterier. Användaren kan tillfälligt avaktivera kriterier för ett bredare urval utan att skriva om stödärendets sparade profil.
+
+### 10.9 Administration av definitioner
+
+Ärendetypsvyn ska visa och versionshantera hjälptext, registreringsanvisning, handläggningsanvisning, mentorkoppling, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallsvyn ska visa handläggningsanvisning, statusregler, avslutsregel, resultatdefinitioner, eventuell äldre konfiguration för listavslut och användande ärendetyper.
 
 Stödområdesvyn ska visa den centrala katalogen grupperad efter kategori samt två lokala val per område: `Används av kommunen` och `Visas publikt`. Tekniskt ID, kategori och central betydelse är skrivskyddade. Om ett område inaktiveras ska gränssnittet förklara att historiska registreringar bevaras. Kommunen ska inte behöva administrera egna fält, regler eller matchningsalgoritmer för varje område.
 
@@ -936,7 +961,7 @@ Personnummer, registeruppgifter och andra skyddsvärda uppgifter ska ha fältspe
 
 ## 14. Läsmodeller och arbetsköer
 
-Dashboard och register ska byggas från samma ärendedata genom tenantavgränsade läsmodeller.
+Översikt och register ska byggas från samma ärendedata genom tenantavgränsade läsmodeller.
 
 Exempel:
 
@@ -995,7 +1020,9 @@ interface CaseRepository {
 ### Avslutade aktiviteter och nästa steg
 
 - Resultatfältet är tomt tills användaren väljer ett resultat.
-- Snabbavslut visas endast för resultat som aktivitetsmallen uttryckligen tillåter och som inte kräver kompletterande uppgifter.
+- Resultatalternativen visas i aktivitetsvyn, saknar förvalt värde och kan avmarkeras före avslut.
+- Om en obligatorisk kopplad registrering inte är klar är avslutande resultat inaktiverade och kraven visas för användaren.
+- Efter avslut öppnas nästa aktivitet eller ärendet enligt den text som visades på avslutningsknappen.
 - När alla aktiviteter är klara ligger ärendet kvar som öppet tills ett separat kommando avslutar eller för processen vidare.
 - Beslutsytan visar vad som sparades och att inget följdärende eller registerkort ändrades automatiskt.
 - Ett befintligt länkat följdärende öppnas i stället för att en dubblett föreslås.
