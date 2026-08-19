@@ -77,7 +77,8 @@ test("serves the application shell", async () => {
   assert.match(html, /id="activityTypesAdministrationView"/);
   assert.match(html, /form="activityTypeAdminForm"/);
   assert.match(html, /id="activityTypeResultsFact"/);
-  assert.match(html, /id="activityTypeQuickFact"/);
+  assert.doesNotMatch(html, /id="activityTypeQuickFact"/);
+  assert.doesNotMatch(html, />Snabbavslut</);
   assert.match(html, /id="supportLauncher"/);
   assert.match(html, /id="supportOffcanvas"/);
   assert.match(html, /data-bs-backdrop="false"/);
@@ -115,9 +116,11 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.doesNotMatch(scriptText, /data-quick-finish-activity/);
   assert.doesNotMatch(scriptText, /registerQuickActivityResult/);
   assert.match(scriptText, /publicSupportAreaChoices/);
-  assert.match(scriptText, /quickCompletionResultCodes/);
+  assert.doesNotMatch(scriptText, /quickCompletionResultCodes/);
   assert.match(scriptText, /function renderActivityTypeConfiguration/);
   assert.match(scriptText, /function renderCaseTypeActivitiesFact/);
+  assert.doesNotMatch(scriptText, /Ärendestatus visar kommunens samlade handläggningsläge/);
+  assert.match(scriptText, /title: "Kontaktmottagning"/);
   assert.match(scriptText, /incompleteWorkInput/);
   assert.doesNotMatch(scriptText, /resultValue:/);
   assert.match(scriptText, /if \(resolveConfirmation\("confirm"\)\) confirmActionModal\.hide\(\)/);
@@ -127,6 +130,8 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /function completeIncomingContactWithCase/);
   assert.match(scriptText, /function prefillCaseFromIncomingContact/);
   assert.match(scriptText, /APP_VERSION_HISTORY/);
+  assert.match(scriptText, /version: "93"/);
+  assert.match(scriptText, /Informationsmaterial som följer de aktuella arbetsflödena/);
   assert.match(scriptText, /function renderVersions/);
   assert.match(scriptText, /Tre tydliga vägar efter inkommande kontakt/);
   assert.match(scriptText, /Förenklingar dokumenteras per flöde/);

@@ -23,6 +23,11 @@ test("returns relevant system routes", () => {
   assert.match(createMentor.answer, /Registrera mentor/);
   const [match] = findSupportKnowledge("Hur avslutar jag en aktivitet?", { route: "#/case/1" });
   assert.equal(match.href, "#/cases");
+  assert.match(match.answer, /första fliken Arbete/);
+  assert.doesNotMatch(match.answer, /snabbavslut/i);
+  const [incomingContact] = findSupportKnowledge("Hur registrerar jag ett inkommande telefonsamtal?", { route: "#/dashboard" });
+  assert.equal(incomingContact.href, "#/intake");
+  assert.match(incomingContact.answer, /Personkoppling behövs inte/);
   const response = localSupportResponse("Hur matchar jag en förälder med mentor?");
   assert.equal(response.needsHuman, false);
   assert.ok(response.sources.some((source) => source.href === "#/cases/matching"));

@@ -37,7 +37,7 @@ import {
   supportProfileRequirements
 } from "./case-domain.js?v=20260818-completeness-v29";
 import { marked } from "./vendor/marked/marked.esm.js";
-import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260809-activity-work-input-v2";
+import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260819-information-v3";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
 import {
   DEFAULT_TENANT_LEARNING_SELECTION,
@@ -54,7 +54,7 @@ import {
   findSupportKnowledge,
   localSupportResponse,
   supportCategoryLabel
-} from "./support-domain.js?v=20260809-demo-v1";
+} from "./support-domain.js?v=20260819-information-v2";
 import {
   MENTOR_EXPERIENCE_LEVELS,
   SUPPORT_AREA_CATEGORIES,
@@ -119,6 +119,20 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "93",
+    date: "2026-08-19",
+    title: "Informationsmaterial som följer de aktuella arbetsflödena",
+    flow: "Demoläge → AI-support → systemadministration",
+    simplified: "Demoläget och supporten beskriver nu samma fokuserade arbetssätt som de aktuella vyerna. Äldre vägledning om Ärendeläge och snabbavslut från aktivitetslistan har tagits bort.",
+    retained: "Demosteg, funktionslänkar, lokal support, aktivitetsmallarnas resultatregler och full versionshistorik finns kvar.",
+    changes: [
+      "Demoläget har fått aktuella beskrivningar av Översikt, ärendearbete, stödprofil och matchning.",
+      "Kontaktmottagning har lagts till som ett eget demosteg.",
+      "AI-supporten vägleder till resultat, anteckning och avslut inne i aktiviteten.",
+      "Den äldre snabbavslutsinställningen har dolts i aktivitetsadministrationen."
+    ]
+  },
   {
     version: "92",
     date: "2026-08-19",
@@ -810,22 +824,29 @@ const PRESENTATION_STEPS = [
     id: "overview",
     title: "Översikt och arbetskö",
     featureId: "dashboard.work-queue",
-    summary: "Börja i handläggarens dagliga vy med ärendeläge, arbetskö och tydliga avvikelser.",
-    points: ["Ärendestatus visar kommunens samlade handläggningsläge", "Arbetskön skiljer på egna, otilldelade och försenade aktiviteter", "Mentorflödet är en sekundär registeröversikt"]
+    summary: "Börja i handläggarens dagliga vy med arbetskön först och en visuell överblick över öppna ärendeflöden.",
+    points: ["Arbetskön skiljer på egna, otilldelade, försenade aktiviteter och ställningstaganden", "Varje rad visar ärendet och dess nästa aktivitet", "Ärendeflödena visar antal öppna ärenden per typ och leder till rätt filtrerat register"]
+  },
+  {
+    id: "incoming-contact",
+    title: "Kontaktmottagning",
+    featureId: "intake.list",
+    summary: "Visa hur ett inkommande samtal, mejl eller besök tas emot utan att en personpost måste skapas under kontakten.",
+    points: ["Kontaktväg, kontaktuppgift och en kort saklig anteckning registreras", "Nästa steg skrivs med egna ord", "Mottagningsärendet kan följas upp, kopplas vidare eller avslutas senare"]
   },
   {
     id: "cases",
     title: "Ärenderegister",
     featureId: "cases.list",
     summary: "Visa att all strukturerad handläggning utgår från ärenden, oavsett om de gäller en mentor eller ett generellt behov.",
-    points: ["Sök och filtrera på status", "Se ansvarig, kopplad mentor och nästa aktivitet", "Öppna både ärenden om godkännande och generella ärenden"]
+    points: ["Sök och filtrera på ärendetyp och status", "Se ärende, relevant person, läge och ansvarig i fyra kolumner", "Öppna registret redan filtrerat från ett ärendeflöde på Översikt"]
   },
   {
     id: "case-work",
     title: "Ärendekort och aktiviteter",
     featureId: "cases.list",
-    summary: "Följ ett ärende från nästa åtgärd till aktivitet, underlag, ställningstagande och avslut.",
-    points: ["Ärendet samlar ansvar, tidsfrister och historik", "Aktiviteter kan tilldelas och kompletteras med underlag", "Avvikande resultat kan pausa eller avsluta ärendet"]
+    summary: "Följ ett ärende från nästa rekommenderade steg genom aktivitet, resultat och fortsatt handläggning.",
+    points: ["Första fliken Arbete visar både nästa steg och hela aktivitetslistan", "Resultat, eventuell anteckning och avslutningsknapp ligger tillsammans i aktiviteten", "Obligatoriska registreringar visar vad som saknas och spärrar avslutande resultat tills underlaget är klart"]
   },
   {
     id: "new-mentor",
@@ -839,14 +860,14 @@ const PRESENTATION_STEPS = [
     title: "Förälder och stödärende",
     featureId: "parent.list",
     summary: "Visa hur en förälder registreras en gång medan varje avgränsat stödbehov får ett eget ärende.",
-    points: ["Föräldrakortet innehåller stabila person- och kontaktuppgifter", "Stödområden, syfte och önskat resultat hör till stödärendet", "Kommunens publika urval hjälper föräldern att beskriva behovet utan krav på diagnos"]
+    points: ["Föräldrakortet innehåller stabila person- och kontaktuppgifter", "Stödets syfte, önskat resultat och minst ett bekräftat stödområde krävs för fullständigt underlag", "En levande checklista visar vad som är klart och vad som återstår"]
   },
   {
     id: "matching",
     title: "Matchning",
     featureId: "matching.list",
     summary: "Visa den spårbara kedjan från ett bestämt stödärende till ett matchningsförsök.",
-    points: ["Varje matchning gäller ett stödärende och en mentor", "Överlappande stödområden visas som beslutsunderlag, aldrig som automatiskt beslut", "Båda parternas svar registreras innan ett uppdrag kan skapas"]
+    points: ["Det nya ärendets namn fylls från stödärendet", "Mentorlistan kan sökas och filtreras och visar vad som matchar eller saknas", "Kriterier kan avaktiveras för ett bredare urval, men handläggaren fattar alltid beslutet"]
   },
   {
     id: "assignment",
@@ -1182,7 +1203,6 @@ const els = {
   activityTypeWorkInstructionFact: document.querySelector("#activityTypeWorkInstructionFact"),
   activityTypeStatusFact: document.querySelector("#activityTypeStatusFact"),
   activityTypeCompletionFact: document.querySelector("#activityTypeCompletionFact"),
-  activityTypeQuickFact: document.querySelector("#activityTypeQuickFact"),
   activityTypeWorkInputFact: document.querySelector("#activityTypeWorkInputFact"),
   activityTypeUsageFact: document.querySelector("#activityTypeUsageFact"),
   activityTypeResultsFact: document.querySelector("#activityTypeResultsFact"),
@@ -8536,12 +8556,11 @@ function renderCaseTypeActivitiesFact(definition) {
         ${templateIds.map((templateId) => {
           const template = activityTemplateDefinitionById(templateId);
           if (!template) return "";
-          const quickCount = template.quickCompletionResultCodes?.length || 0;
           return `<li>
             <span class="case-type-activity-order" aria-hidden="true"></span>
             <div>
               <a href="${activityTemplateAdminRoute(definition.id, template.id)}"><strong>${escapeHtml(template.title)}</strong></a>
-              <small>${template.results?.length || 0} resultatval · ${quickCount ? "snabbavslut tillåtet för normalt utfall" : "öppnas för fullständig registrering"}</small>
+              <small>${template.results?.length || 0} resultatval · öppnas och avslutas i aktiviteten</small>
             </div>
           </li>`;
         }).join("")}
@@ -8571,16 +8590,11 @@ function activityResultClassificationLabel(classification) {
 
 function renderActivityTypeConfiguration(definition) {
   const results = definition.results || [];
-  const quickCodes = new Set(definition.quickCompletionResultCodes || []);
-  const quickResults = results.filter(([code]) => quickCodes.has(code));
   const usage = caseTypesUsingActivityTemplate(definition.id);
   els.activityTypeStatusFact.textContent = Object.values(ACTIVITY_STATUS_LABELS).join(", ");
   els.activityTypeCompletionFact.textContent = definition.id === "decision"
     ? "Resultat krävs. Godkänd avslutar godkännandeärendet; avvikande resultat kräver tjänsteanteckning och ställningstagande."
     : "Resultat krävs när aktiviteten avslutas. Avvikande resultat kräver tjänsteanteckning och ställningstagande.";
-  els.activityTypeQuickFact.textContent = quickResults.length
-    ? `Tillåtet för: ${quickResults.map(([, label]) => label).join(", ")}. Handläggaren bekräftar valet innan det sparas.`
-    : "Inte tillåtet. Aktiviteten måste öppnas för att resultatet ska registreras.";
   els.activityTypeWorkInputFact.textContent = definition.workInput
     ? `${definition.workInput.label} · måste vara fullständig före avslut`
     : "Ingen systemstyrd registrering";
@@ -8592,11 +8606,10 @@ function renderActivityTypeConfiguration(definition) {
   els.activityTypeResultsFact.innerHTML = `
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0">
-        <thead class="table-light"><tr><th>Resultat</th><th>Klassificering</th><th>Snabbavslut</th><th>Teknisk kod</th></tr></thead>
+        <thead class="table-light"><tr><th>Resultat</th><th>Klassificering</th><th>Teknisk kod</th></tr></thead>
         <tbody>${results.map(([code, label, classification]) => `<tr>
           <td><strong>${escapeHtml(label)}</strong></td>
           <td><span class="badge ${classification === "acceptable" ? "text-bg-success" : "text-bg-warning"}">${escapeHtml(activityResultClassificationLabel(classification))}</span></td>
-          <td>${quickCodes.has(code) ? "Ja" : "Nej"}</td>
           <td><code>${escapeHtml(code)}</code></td>
         </tr>`).join("")}</tbody>
       </table>

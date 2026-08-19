@@ -19,8 +19,15 @@ export const SUPPORT_KNOWLEDGE = [
     id: "cases",
     title: "Ärenden och aktiviteter",
     keywords: ["ärende", "aktivitet", "avsluta", "resultat", "förfallodatum", "ansvarig", "handling"],
-    answer: "Öppna Ärenden och välj ärendet. Under Aktiviteter ser du nästa arbetsmoment. Öppna en aktivitet för fullständig registrering eller använd Avsluta när snabbavslut är tillåtet. Ett nytt ärende skapas aldrig dolt; efter sista aktiviteten visas vilket ställningstagande som återstår.",
+    answer: "Öppna Ärenden och välj ärendet. I den första fliken Arbete ser du nästa steg och hela aktivitetslistan. Öppna aktiviteten, färdigställ eventuell obligatorisk registrering och välj sedan resultat. Resultat, anteckning och avslutningsknapp ligger tillsammans, och knapptexten visar om nästa aktivitet öppnas eller om du återgår till ärendet.",
     href: "#/cases"
+  },
+  {
+    id: "incoming-contact",
+    title: "Registrera inkommande kontakt",
+    keywords: ["inkommande kontakt", "kontaktmottagning", "telefonsamtal", "e-post", "nästa steg", "registrera kontakt"],
+    answer: "Välj Registrera kontakt under Kontaktmottagning. Ange kontaktväg, kontaktuppgift, en kort saklig anteckning och skriv med egna ord vad nästa steg ska vara. Personkoppling behövs inte under kontakten; mottagningsärendet kan kopplas till fortsatt handläggning senare.",
+    href: "#/intake"
   },
   {
     id: "register-mentor",
@@ -47,7 +54,7 @@ export const SUPPORT_KNOWLEDGE = [
     id: "matching",
     title: "Matchning",
     keywords: ["matchning", "matcha", "lämplig mentor", "accepterar"],
-    answer: "En matchning ska vara kopplad till ett bestämt stödärende. Systemet visar överlappning mellan stödärendets områden och mentorns erfarenhetsområden, men handläggaren bedömer också tillgänglighet, språk och parternas önskemål. När båda parter accepterar kan matchningen övergå i ett mentoruppdrag.",
+    answer: "Starta matchningen från ett bestämt stödärende. Sök och filtrera mentorlistan och jämför vilka aktiva kriterier som matchar eller saknas för varje mentor. Enskilda kriterier kan avaktiveras tillfälligt för ett bredare urval. Handläggaren gör helhetsbedömningen, och båda parter måste acceptera innan ett mentoruppdrag kan skapas.",
     href: "#/cases/matching"
   },
   {

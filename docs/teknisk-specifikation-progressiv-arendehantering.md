@@ -826,7 +826,7 @@ Ett matchningsärende startas från stödärendet och får ett förifyllt namn. 
 
 ### 10.9 Administration av definitioner
 
-Ärendetypsvyn ska visa och versionshantera hjälptext, registreringsanvisning, handläggningsanvisning, mentorkoppling, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallsvyn ska visa handläggningsanvisning, statusregler, avslutsregel, resultatdefinitioner, eventuell äldre konfiguration för listavslut och användande ärendetyper.
+Ärendetypsvyn ska visa och versionshantera hjälptext, registreringsanvisning, handläggningsanvisning, mentorkoppling, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallsvyn ska visa handläggningsanvisning, statusregler, avslutsregel, resultatdefinitioner och användande ärendetyper. Äldre konfiguration för listavslut bevaras endast för bakåtkompatibilitet och visas inte i den aktuella administrationen.
 
 Stödområdesvyn ska visa den centrala katalogen grupperad efter kategori samt två lokala val per område: `Används av kommunen` och `Visas publikt`. Tekniskt ID, kategori och central betydelse är skrivskyddade. Om ett område inaktiveras ska gränssnittet förklara att historiska registreringar bevaras. Kommunen ska inte behöva administrera egna fält, regler eller matchningsalgoritmer för varje område.
 
