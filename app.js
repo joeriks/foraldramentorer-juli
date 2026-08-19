@@ -120,6 +120,20 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "92",
+    date: "2026-08-19",
+    title: "Fokuserade arbetsvyer med mindre upprepning",
+    flow: "Översikt → register → ärende → aktivitet",
+    simplified: "Vyerna visar nu det som behöver uppmärksamhet först. Upprepade och tomma uppgifter har tagits bort från förstavyerna och relaterad information har samlats på färre rader.",
+    retained: "Alla ärenden, samband, aktiviteter, ansvariga, datum, handlingar och historik finns kvar i sina register, detaljvyer och utfällbara avsnitt.",
+    changes: [
+      "Arbetskön visas före processöversikten och sekundära ärendesamband kan fällas ut vid behov.",
+      "Ärenderegistret samlar rubrik och typ samt status och nästa aktivitet i fyra tydliga kolumner.",
+      "Aktivitetslistan visar två huvudkolumner och lyfter ansvarig, datum eller handlingar endast när uppgiften är relevant.",
+      "Ärendehuvudet och den utfällbara faktadelen döljer kopplingar och normalvärden som inte tillför information."
+    ]
+  },
+  {
     version: "91",
     date: "2026-08-18",
     title: "Tydliga krav för fullständigt stöd- och matchningsunderlag",
@@ -1190,7 +1204,8 @@ const els = {
   unassignedQueueButton: document.querySelector("#unassignedQueueButton"),
   overdueQueueButton: document.querySelector("#overdueQueueButton"),
   decisionQueueButton: document.querySelector("#decisionQueueButton"),
-  dashboardMentorRegisterLink: document.querySelector("#dashboardMentorRegisterLink"),
+  dashboardCaseFlows: document.querySelector("#dashboardCaseFlows"),
+  dashboardPrimaryWork: document.querySelector("#dashboardPrimaryWork"),
   presentationStepList: document.querySelector("#presentationStepList"),
   presentationOpenStepButton: document.querySelector("#presentationOpenStepButton"),
   presentationStepNumber: document.querySelector("#presentationStepNumber"),
@@ -1658,6 +1673,12 @@ function prepareCaseWorkView() {
   els.caseActivitiesPane.hidden = false;
 }
 
+function prepareDashboardView() {
+  if (!els.dashboardCaseFlows || !els.dashboardPrimaryWork) return;
+  els.dashboardCaseFlows.before(els.dashboardPrimaryWork);
+}
+
+prepareDashboardView();
 prepareCaseWorkView();
 
 function markSaved() {
@@ -6113,20 +6134,30 @@ function renderCaseFlowBoard(openCases) {
       ${renderNode(item.caseTypeId, index + 1)}
     </div>
   `).join("");
-  els.caseFlowBoard.innerHTML = groups.map(({ title, items }) => `
+  const renderGroup = ({ title, items }) => `
     <section class="case-flow-group" aria-label="${escapeHtml(title)}">
       <h3>${escapeHtml(title)}</h3>
       <div class="case-flow-track" data-flow-count="${items.length}">
         ${renderTrack(items)}
       </div>
     </section>
-  `).join("") + (standalone.length ? `
+  `;
+  const primaryGroups = groups.filter(({ title }) => ["Tillgång till mentorer", "Stöd till förälder"].includes(title));
+  const secondaryGroups = groups.filter(({ title }) => !["Tillgång till mentorer", "Stöd till förälder"].includes(title));
+  const standaloneMarkup = standalone.length ? `
     <section class="case-flow-group" aria-label="Fristående ärendetyper">
       <h3>Fristående ärendetyper</h3>
       <div class="case-flow-standalone">
         ${standalone.map((definition, index) => renderNode(definition.id, index + 1)).join("")}
       </div>
     </section>
+  ` : "";
+  const secondaryMarkup = secondaryGroups.map(renderGroup).join("") + standaloneMarkup;
+  els.caseFlowBoard.innerHTML = primaryGroups.map(renderGroup).join("") + (secondaryMarkup ? `
+    <details class="case-flow-more">
+      <summary>Fler samband mellan ärendetyper</summary>
+      <div class="case-flow-more-content">${secondaryMarkup}</div>
+    </details>
   ` : "");
 }
 
@@ -6189,7 +6220,7 @@ function renderDashboard() {
 
   if (!rows.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="4" class="text-secondary">Inga aktiviteter kräver åtgärd i den här arbetskön.</td>`;
+    row.innerHTML = `<td colspan="2" class="text-secondary">Inga aktiviteter kräver åtgärd i den här arbetskön.</td>`;
     els.actionTableBody.append(row);
     return;
   }
@@ -6199,10 +6230,8 @@ function renderDashboard() {
     const parent = caseParent(caseRecord);
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td><span class="case-number-text text-nowrap">${escapeHtml(caseRecord.number)}</span></td>
-      <td>${escapeHtml(mentor?.name || parent?.name || caseRecord.title)}<small>${escapeHtml(activityHandlerLabel(activity, caseRecord))}</small></td>
-      <td>${escapeHtml(activity.title)}<small class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityHasBlockingResult(activity) ? "Ställningstagande krävs" : `Förfaller: ${activityDueLabel(activity)}`)}</small></td>
-      <td><button type="button" class="btn btn-outline-primary btn-sm" data-open-activity="${activity.id}">Öppna</button></td>
+      <td class="dashboard-queue-case"><span class="case-number-text">${escapeHtml(caseRecord.number)}</span><strong>${escapeHtml(mentor?.name || parent?.name || caseRecord.title)}</strong><small>${escapeHtml(activityHandlerLabel(activity, caseRecord))}</small></td>
+      <td><div class="dashboard-queue-next"><div><strong>${escapeHtml(activity.title)}</strong><small class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityHasBlockingResult(activity) ? "Ställningstagande krävs" : `Förfaller: ${activityDueLabel(activity)}`)}</small></div><button type="button" class="btn btn-outline-primary btn-sm" data-open-activity="${activity.id}">Öppna</button></div></td>
     `;
     els.actionTableBody.append(row);
   }
@@ -6777,7 +6806,7 @@ function renderCases() {
 
   if (!rows.length) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="7" class="text-secondary">Inga ärenden matchar urvalet.</td>';
+    row.innerHTML = '<td colspan="4" class="text-secondary">Inga ärenden matchar urvalet.</td>';
     els.caseTableBody.append(row);
     return;
   }
@@ -6792,13 +6821,10 @@ function renderCases() {
     row.dataset.caseId = caseRecord.id;
     row.setAttribute("aria-label", `Öppna ärende ${caseRecord.number}: ${caseRecord.title}`);
     row.innerHTML = `
-      <td><span class="case-number-text">${escapeHtml(caseRecord.number)}</span><small>${escapeHtml(formatDate(caseRecord.updatedAt))}</small></td>
-      <td>${escapeHtml(caseRecord.title)}</td>
-      <td>${escapeHtml(caseRecord.type)}</td>
+      <td class="case-register-primary"><span class="case-number-text">${escapeHtml(caseRecord.number)}</span><strong>${escapeHtml(caseRecord.title)}</strong><small>${escapeHtml(caseRecord.type)} · ändrad ${escapeHtml(formatDate(caseRecord.updatedAt))}</small></td>
       <td>${mentor ? escapeHtml(mentor.name) : parent ? escapeHtml(parent.name) : '<span class="text-secondary">Ej personanknutet</span>'}</td>
-      <td><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></td>
+      <td class="case-register-state"><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseStatusLabel(caseRecord.status))}</span><small>${escapeHtml(nextActivity?.title || "Ingen återstående aktivitet")}</small></td>
       <td>${escapeHtml(owner?.name || "Ej tilldelad")}</td>
-      <td>${escapeHtml(nextActivity?.title || "Ingen återstående")}</td>
     `;
     row.addEventListener("click", () => navigateToCase(caseRecord.id));
     row.addEventListener("keydown", (event) => {
@@ -7559,6 +7585,11 @@ function populateCaseForm(mentorId = "", caseRecord = null, parentId = "", suppo
   }
 }
 
+function setRecordFactVisibility(element, visible) {
+  const row = element?.closest("div");
+  if (row) row.hidden = !visible;
+}
+
 function renderCaseDetail() {
   const creating = currentView === "case" && selectedCaseRecordId?.startsWith("new");
   const caseRecord = selectedCaseRecord();
@@ -7588,6 +7619,9 @@ function renderCaseDetail() {
     els.selectedCaseMentor.textContent = mentorId ? candidates.find((candidate) => candidate.id === mentorId)?.name || "Saknas" : "Ej personanknutet";
     els.selectedCaseParent.textContent = supportCase ? caseParent(supportCase)?.name || "Saknas" : parentId ? parents.find((parent) => parent.id === parentId)?.name || "Saknas" : "Ej personanknutet";
     els.selectedCaseSupportCase.textContent = supportCase?.number || "Ej kopplat";
+    setRecordFactVisibility(els.selectedCaseMentor, Boolean(mentorId));
+    setRecordFactVisibility(els.selectedCaseParent, Boolean(parentId || supportCase?.parentId));
+    setRecordFactVisibility(els.selectedCaseSupportCase, Boolean(supportCase));
     els.selectedCaseOwner.textContent = currentUserName();
     els.selectedCaseUpdated.textContent = "Inte sparat";
     if (els.caseCreateForm.dataset.route !== selectedCaseRecordId) {
@@ -7616,6 +7650,7 @@ function renderCaseDetail() {
   const mentor = caseMentor(caseRecord);
   const parent = caseParent(caseRecord);
   const supportCase = caseSupportCase(caseRecord);
+  const linkedSupportCase = caseRecord.caseTypeId === "parent-support" ? null : supportCase;
   const owner = responsibleHandler(caseRecord);
   const caseCoHandlers = coHandlers(caseRecord);
   const activities = activitiesForCase(caseRecord.id);
@@ -7634,7 +7669,10 @@ function renderCaseDetail() {
   els.selectedCaseStatus.className = caseStatusBadge(caseRecord.status);
   els.selectedCaseMentor.innerHTML = mentor ? `<a href="#/mentor/${escapeHtml(mentor.id)}">${escapeHtml(mentor.name)}</a>` : "Ej personanknutet";
   els.selectedCaseParent.innerHTML = parent ? `<a href="#/parent/${escapeHtml(parent.id)}">${escapeHtml(parent.name)}</a>` : "Ej personanknutet";
-  els.selectedCaseSupportCase.innerHTML = supportCase ? `<a href="#/case/${escapeHtml(supportCase.id)}">${escapeHtml(supportCase.number)}</a>` : "Ej kopplat";
+  els.selectedCaseSupportCase.innerHTML = linkedSupportCase ? `<a href="#/case/${escapeHtml(linkedSupportCase.id)}">${escapeHtml(linkedSupportCase.number)}</a>` : "Ej kopplat";
+  setRecordFactVisibility(els.selectedCaseMentor, Boolean(mentor));
+  setRecordFactVisibility(els.selectedCaseParent, Boolean(parent));
+  setRecordFactVisibility(els.selectedCaseSupportCase, Boolean(linkedSupportCase));
   els.selectedCaseOwner.textContent = owner?.name || "Ej tilldelad";
   els.selectedCaseUpdated.textContent = formatDateTime(caseRecord.updatedAt);
   els.caseStatusFact.textContent = caseStatusLabel(caseRecord.status);
@@ -7648,6 +7686,13 @@ function renderCaseDetail() {
   els.caseParentFact.innerHTML = parent ? `<a href="#/parent/${escapeHtml(parent.id)}">${escapeHtml(parent.name)}</a>` : "Ej personanknutet";
   els.caseSupportCaseFact.innerHTML = supportCase ? `<a href="#/case/${escapeHtml(supportCase.id)}">${escapeHtml(supportCase.number)} · ${escapeHtml(supportCase.details?.supportPurpose || supportCase.title)}</a>` : "Ej kopplat";
   els.caseCreatedFact.textContent = `${formatDateTime(caseRecord.createdAt)} av ${handlerNameById(caseRecord.createdBy)}`;
+  setRecordFactVisibility(els.casePriorityFact, caseRecord.priority && caseRecord.priority !== "normal");
+  setRecordFactVisibility(els.caseDueDateFact, Boolean(caseRecord.dueDate));
+  setRecordFactVisibility(els.caseDescriptionFact, Boolean(caseRecord.description?.trim()));
+  setRecordFactVisibility(els.caseCoHandlersFact, caseCoHandlers.length > 0);
+  setRecordFactVisibility(els.caseMentorFact, Boolean(mentor));
+  setRecordFactVisibility(els.caseParentFact, Boolean(parent));
+  setRecordFactVisibility(els.caseSupportCaseFact, Boolean(linkedSupportCase));
   renderCaseClosureSummary(caseRecord);
   const caseGuidance = caseTypeById(caseRecord.caseTypeId)?.workInstruction?.trim() || "";
   els.caseWorkGuidance.hidden = !caseGuidance;
@@ -7793,7 +7838,7 @@ function renderCaseActivities(caseRecord, activities) {
 
   if (!visibleActivities.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="5" class="activity-empty">${activities.length ? "Inga aktiviteter matchar filtret." : "Inga aktiviteter har registrerats."}</td>`;
+    row.innerHTML = `<td colspan="2" class="activity-empty">${activities.length ? "Inga aktiviteter matchar filtret." : "Inga aktiviteter har registrerats."}</td>`;
     els.caseActivityTableBody.append(row);
   }
 
@@ -7814,6 +7859,11 @@ function renderCaseActivities(caseRecord, activities) {
     const handler = effectiveActivityHandler(activity, caseRecord);
     const result = activity.status === "completed" ? activityResultLabel(activity) : "";
     const incompleteWorkInput = workInput?.required && workInput.state !== "complete" ? workInput : null;
+    const activityMeta = [
+      activity.handlerIdOverride || !handler ? `Ansvarig: ${handler?.name || "Ej tilldelad"}` : "",
+      activity.dueDate ? `Förfallodatum: ${activityDueLabel(activity)}` : "",
+      documents.length ? `${documents.length} ${documents.length === 1 ? "handling" : "handlingar"}` : ""
+    ].filter(Boolean);
     const stepNumber = Number.isFinite(activity.sortOrder) ? activity.sortOrder + 1 : activities.indexOf(activity) + 1;
     const row = document.createElement("tr");
     if (activityHasBlockingResult(activity)) row.classList.add("activity-row-attention");
@@ -7825,13 +7875,11 @@ function renderCaseActivities(caseRecord, activities) {
             <button type="button" class="activity-title-button" data-open-activity="${escapeHtml(activity.id)}">${escapeHtml(activity.title)}</button>
             ${result ? `<small class="activity-result-summary">${escapeHtml(result)}</small>` : ""}
             ${incompleteWorkInput ? `<small class="activity-linked-input"><span>Komplettera:</span> <a href="${escapeHtml(incompleteWorkInput.href || "#")}">${escapeHtml(incompleteWorkInput.label)}</a> <span class="badge ${escapeHtml(incompleteWorkInput.stateClass)}">${escapeHtml(incompleteWorkInput.stateLabel)}</span></small>` : ""}
+            ${activityMeta.length ? `<small class="activity-list-meta">${activityMeta.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</small>` : ""}
           </div>
         </div>
       </td>
       <td><span class="badge activity-status-badge ${activityStatusClass(activity, caseRecord)}">${escapeHtml(activityWorkStateLabel(activity, caseRecord))}</span></td>
-      <td><span class="activity-owner-name">${escapeHtml(handler?.name || "Ej tilldelad")}</span></td>
-      <td class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityDueLabel(activity))}</td>
-      <td>${documents.length ? `${documents.length} st` : '<span class="text-secondary">0</span>'}</td>
     `;
     els.caseActivityTableBody.append(row);
   }
@@ -10482,12 +10530,6 @@ els.clearRoutinesSearchButton.addEventListener("click", () => {
 els.openActionQueueButton.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/cases");
-});
-
-els.dashboardMentorRegisterLink.addEventListener("click", (event) => {
-  event.preventDefault();
-  resetMentorFilters();
-  navigateTo("#/mentors");
 });
 
 els.navIncomingContact.addEventListener("click", () => openIncomingContact());

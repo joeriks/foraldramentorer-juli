@@ -61,6 +61,21 @@ test("keeps the activity list compact and finishes activities in their detail vi
   assert.match(app, /class="activity-result-summary">\$\{escapeHtml\(result\)\}/);
 });
 
+test("keeps overview, registers and case headers focused on actionable information", () => {
+  assert.match(app, /function prepareDashboardView\(\)/);
+  assert.match(app, /dashboardCaseFlows\.before\(els\.dashboardPrimaryWork\)/);
+  assert.match(app, /<details class="case-flow-more">/);
+  assert.match(html, /<th>Ärende<\/th>\s*<th>Nästa aktivitet<\/th>/);
+  assert.match(app, /class="dashboard-queue-next"/);
+  assert.match(html, /<thead class="table-light"><tr><th>Aktivitet<\/th><th>Läge<\/th><\/tr><\/thead>/);
+  assert.doesNotMatch(html, /<th>Aktivitet<\/th><th>Status<\/th><th>Ansvarig<\/th><th>Förfallodatum<\/th><th>Underlag<\/th>/);
+  assert.match(app, /class="activity-list-meta"/);
+  assert.match(app, /class="case-register-primary"/);
+  assert.match(app, /class="case-register-state"/);
+  assert.match(app, /setRecordFactVisibility\(els\.selectedCaseSupportCase, Boolean\(linkedSupportCase\)\)/);
+  assert.match(app, /setRecordFactVisibility\(els\.casePriorityFact, caseRecord\.priority && caseRecord\.priority !== "normal"\)/);
+});
+
 test("blocks completion results until required registration is complete", () => {
   assert.match(app, /function incompleteRequiredActivityWorkInput\(activity, caseRecord\)/);
   assert.match(app, /workInput\?\.required && workInput\.state !== "complete"/);

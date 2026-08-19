@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260818-completeness-v91">
+    <link rel="stylesheet" href="styles.css?v=20260819-focused-views-v92">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -136,7 +136,7 @@
 
         <main class="app-main">
           <section id="dashboardView" class="view-stack">
-            <section class="card" aria-label="Ärendeflöden">
+            <section id="dashboardCaseFlows" class="card" aria-label="Ärendeflöden">
               <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
                 <div>
                   <h2 class="h5 mb-1">Ärendeflöden</h2>
@@ -149,7 +149,7 @@
               </div>
             </section>
 
-            <div class="row g-4">
+            <div id="dashboardPrimaryWork" class="row g-4">
               <section class="col-xl-8">
                 <div class="card h-100">
                   <div class="card-header bg-white d-flex justify-content-between align-items-start gap-2">
@@ -172,9 +172,7 @@
                       <thead class="table-light">
                         <tr>
                           <th>Ärende</th>
-                          <th>Koppling</th>
                           <th>Nästa aktivitet</th>
-                          <th>Åtgärd</th>
                         </tr>
                       </thead>
                       <tbody id="actionTableBody"></tbody>
@@ -186,15 +184,12 @@
               <section class="col-xl-4">
                 <div class="card dashboard-shortcuts-card">
                   <div class="card-header bg-white">
-                    <h2 class="h5 mb-1">Snabbvägar</h2>
-                    <p class="text-secondary mb-0">Vanliga arbetsmoment.</p>
+                    <h2 class="h5 mb-1">Skapa nytt</h2>
                   </div>
                   <div class="card-body d-flex flex-column gap-2">
                     <button id="dashboardIncomingContactButton" type="button" class="btn btn-primary">Registrera kontakt</button>
                     <button id="dashboardNewCaseButton" type="button" class="btn btn-outline-primary">Nytt ärende</button>
                     <button id="dashboardNewMentorButton" type="button" class="btn btn-outline-primary">Registrera mentor</button>
-                    <a class="btn btn-outline-secondary" href="#/cases">Öppna ärenderegistret</a>
-                    <a id="dashboardMentorRegisterLink" class="btn btn-outline-secondary" href="#/mentors">Öppna mentorregistret</a>
                   </div>
                 </div>
               </section>
@@ -208,8 +203,8 @@
               <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Tid</th><th>Kontaktväg</th><th>Kontakt</th><th>Koppling</th><th>Läge</th><th></th></tr></thead><tbody id="incomingContactTableBody"></tbody></table></div>
             </section>
 
-            <section class="card">
-              <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
+            <details id="dashboardMentorSection" class="card dashboard-secondary-section">
+              <summary class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-start">
                 <div>
                   <h2 class="h5 mb-1">Mentorflöde</h2>
                   <p class="text-secondary mb-0">Registeröversikt över mentorernas läge i introduktionen.</p>
@@ -217,7 +212,7 @@
                 <div class="text-secondary small">
                   Totalt <strong id="totalCount">0</strong> personer
                 </div>
-              </div>
+              </summary>
               <div id="pipelineBoard" class="card-body">
                 <div class="pipeline-grid">
                   <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Anmäld"><div class="pipeline-name fw-semibold">Anmäld</div><div class="pipeline-count"><strong data-pipeline-count="Anmäld">0</strong><span>personer</span></div><div class="pipeline-description">Ny intresseanmälan</div><div class="pipeline-action">Visa mentorer</div></button>
@@ -227,7 +222,7 @@
                   <button type="button" class="pipeline-step btn btn-light border text-start" data-pipeline-status="Godkänd"><div class="pipeline-name fw-semibold">Godkänd</div><div class="pipeline-count"><strong data-pipeline-count="Godkänd">0</strong><span>personer</span></div><div class="pipeline-description">Tillgänglig för matchning</div><div class="pipeline-action">Visa mentorer</div></button>
                 </div>
               </div>
-            </section>
+            </details>
           </section>
 
           <section id="versionsView" class="view-stack" hidden>
@@ -335,12 +330,9 @@
                   <thead class="table-light">
                     <tr>
                       <th>Ärende</th>
-                      <th>Rubrik</th>
-                      <th>Typ</th>
                       <th>Person</th>
-                      <th>Status</th>
+                      <th>Läge</th>
                       <th>Ansvarig</th>
-                      <th>Nästa aktivitet</th>
                     </tr>
                   </thead>
                   <tbody id="caseTableBody"></tbody>
@@ -923,7 +915,7 @@
                       </form>
                       <div class="table-responsive border rounded activity-table-wrap">
                         <table class="table table-sm align-middle mb-0 activity-table">
-                          <thead class="table-light"><tr><th>Aktivitet</th><th>Status</th><th>Ansvarig</th><th>Förfallodatum</th><th>Underlag</th></tr></thead>
+                          <thead class="table-light"><tr><th>Aktivitet</th><th>Läge</th></tr></thead>
                           <tbody id="caseActivityTableBody"></tbody>
                         </table>
                       </div>
@@ -2118,6 +2110,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260815-flow-v81"></script>
+    <script type="module" src="app.js?v=20260819-focused-views-v92"></script>
   </body>
 </html>
