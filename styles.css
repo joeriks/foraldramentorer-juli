@@ -2824,6 +2824,24 @@ body {
   background: #f5f7f8;
 }
 
+.case-type-field-choices > * {
+  min-width: 0;
+}
+
+.case-type-template-order {
+  flex: 0 0 5rem;
+  width: 5rem;
+}
+
+.case-type-template-row .form-check-label {
+  min-width: 10rem;
+}
+
+.case-type-template-version {
+  flex: 0 1 10rem;
+  width: auto;
+}
+
 .case-type-relationship-section {
   padding: var(--app-space-3);
   background: #fbfcfc;
@@ -2960,6 +2978,14 @@ body {
 @media (max-width: 575.98px) {
   .case-type-field-choices {
     grid-template-columns: 1fr;
+  }
+
+  .case-type-template-row .form-check-label {
+    min-width: calc(100% - 2.5rem);
+  }
+
+  .case-type-template-version {
+    flex: 1 1 10rem;
   }
 
   .case-type-relationship-header {

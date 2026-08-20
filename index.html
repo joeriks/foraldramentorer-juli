@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260820-case-audit-v96">
+    <link rel="stylesheet" href="styles.css?v=20260820-definition-admin-v97">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -1247,13 +1247,17 @@
 
           <section id="caseTypesAdministrationView" hidden>
             <div id="caseTypeListPanel" class="card" aria-label="Administration av ärendetyper">
-              <div class="card-header bg-white">
-                <h2 class="h5 mb-1">Ärendetyper</h2>
-                <p class="text-secondary mb-0">Styr hjälptexter, mentorkoppling och vilka kompletterande fält som visas i ärendevyn.</p>
+              <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div><h2 class="h5 mb-1">Ärendetyper</h2>
+                <p class="text-secondary mb-0">Skapa egna typer och styr deras vägledning, uppgifter och aktivitetsflöden.</p></div>
+                <div class="d-flex flex-wrap gap-2">
+                  <a class="btn btn-outline-primary btn-sm" href="#/activity-types">Aktivitetsmallar</a>
+                  <a id="newCaseTypeButton" class="btn btn-primary btn-sm" href="#/case-types/new">Ny ärendetyp</a>
+                </div>
               </div>
               <div class="card-body border-bottom">
                 <div class="alert alert-light border mb-0" role="note">
-                  Ärendetypens namn och tekniska ID är fasta. Fält väljs ur en gemensam katalog så att registrering och rapportering förblir enhetlig.
+                  Egna ärendetyper kan skapas, versionshanteras och inaktiveras. Inbyggda kärntyper behåller namn, skapandeväg och aktivitetsstruktur eftersom särskilda verksamhetsregler är kopplade till dem. Publicering påverkar bara nya ärenden.
                 </div>
               </div>
               <section class="case-type-relationship-section border-bottom" aria-labelledby="caseTypeRelationshipHeading">
@@ -1295,15 +1299,16 @@
                   </div>
                   <div class="record-edit-slot">
                     <button id="editCaseTypeButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
+                    <button id="deactivateCaseTypeButton" type="button" class="btn btn-outline-danger btn-sm" hidden>Inaktivera</button>
                     <div id="caseTypeEditActions" class="d-flex gap-2" hidden>
-                      <button type="submit" form="caseTypeAdminForm" class="btn btn-primary btn-sm">Spara ändringar</button>
+                      <button id="saveCaseTypeButton" type="submit" form="caseTypeAdminForm" class="btn btn-primary btn-sm">Spara ändringar</button>
                       <button id="cancelCaseTypeEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
                     </div>
                   </div>
                 </div>
                 <dl class="record-meta mb-0 mt-3">
                   <div><dt>Version</dt><dd id="caseTypeVersionMeta"></dd></div>
-                  <div><dt>Status</dt><dd>Publicerad</dd></div>
+                  <div><dt>Status</dt><dd id="caseTypeStatusMeta">Publicerad</dd></div>
                   <div><dt>Senast ändrad</dt><dd id="caseTypeUpdatedMeta"></dd></div>
                 </dl>
               </div>
@@ -1333,12 +1338,21 @@
                     <h3 class="record-section-title">Samband med andra ärendetyper</h3>
                     <div id="caseTypeRelationshipsFact" class="case-type-detail-relations"></div>
                   </section>
+                  <section class="record-section">
+                    <h3 class="record-section-title">Påverkan och historik</h3>
+                    <div id="caseTypeImpactFact"></div>
+                  </section>
                 </div>
 
                 <form id="caseTypeAdminForm" class="record-grid" hidden>
                   <input id="caseTypeAdminIdInput" type="hidden">
                   <section class="record-section">
                     <h3 class="record-section-title">Användning</h3>
+                    <div id="caseTypeAdminNameField" class="mb-3" hidden>
+                      <label class="form-label" for="caseTypeAdminNameInput">Namn</label>
+                      <input id="caseTypeAdminNameInput" class="form-control" maxlength="80" required>
+                      <div class="form-text">Namnet kan ändras för egna ärendetyper. Det tekniska ID:t ligger kvar.</div>
+                    </div>
                     <div class="mb-3">
                       <label class="form-label" for="caseTypeAdminHelpInput">Hjälptext</label>
                       <textarea id="caseTypeAdminHelpInput" class="form-control" rows="3" required></textarea>
@@ -1373,6 +1387,11 @@
                     <div id="caseTypeAdminFieldChoices" class="case-type-field-choices"></div>
                     <div class="form-text mt-2">Avmarkerade fält döljs, men redan sparade uppgifter raderas inte.</div>
                   </fieldset>
+                  <fieldset id="caseTypeAdminActivitySection" class="record-section" hidden>
+                    <legend class="record-section-title">Aktivitetsflöde</legend>
+                    <div id="caseTypeAdminActivityChoices" class="case-type-field-choices"></div>
+                    <div class="form-text mt-2">Valda mallar skapas i angiven ordning i nya ärenden. Befintliga ärenden påverkas inte.</div>
+                  </fieldset>
                 </form>
               </div>
             </div>
@@ -1380,12 +1399,13 @@
 
           <section id="activityTypesAdministrationView" hidden>
             <div id="activityTypeListPanel" class="card" aria-label="Administration av aktivitetsmallar">
-              <div class="card-header bg-white">
-                <h2 class="h5 mb-1">Aktivitetsmallar</h2>
-                <p class="text-secondary mb-0">Visar aktiviteternas handledning, resultatregler och användning i ärendeflöden.</p>
+              <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div><h2 class="h5 mb-1">Aktivitetsmallar</h2>
+                <p class="text-secondary mb-0">Skapa egna mallar och se deras instruktioner, resultatregler och användning i ärendeflöden.</p></div>
+                <div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-primary btn-sm" href="#/case-types">Ärendetyper</a><a id="newActivityTypeButton" class="btn btn-primary btn-sm" href="#/activity-types/new">Ny aktivitetsmall</a></div>
               </div>
               <div class="card-body border-bottom">
-                <div class="alert alert-light border mb-0" role="note">Aktivitetens namn, tekniska ID, statusregler och resultatval är systemstyrda. Handläggningsanvisningen kan ändras av kommunen.</div>
+                <div class="alert alert-light border mb-0" role="note">Egna aktivitetsmallar kan skapas, versionshanteras och inaktiveras. Inbyggda mallars namn, statusregler, registreringskrav och resultatval är skyddade. Publicering påverkar bara nya aktiviteter.</div>
               </div>
               <div class="table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0">
@@ -1401,13 +1421,14 @@
                   <div><div class="record-type">Aktivitetsmall</div><p id="activityTypeAdminTechnicalId" class="record-id mb-1"></p><h2 id="activityTypeAdminTitle" class="h5 mb-0"></h2></div>
                   <div class="record-edit-slot">
                     <button id="editActivityTypeButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
+                    <button id="deactivateActivityTypeButton" type="button" class="btn btn-outline-danger btn-sm" hidden>Inaktivera</button>
                     <div id="activityTypeEditActions" class="d-flex gap-2" hidden>
-                      <button type="submit" form="activityTypeAdminForm" class="btn btn-primary btn-sm">Spara ändringar</button>
+                      <button id="saveActivityTypeButton" type="submit" form="activityTypeAdminForm" class="btn btn-primary btn-sm">Spara ändringar</button>
                       <button id="cancelActivityTypeEditButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
                     </div>
                   </div>
                 </div>
-                <dl class="record-meta mb-0 mt-3"><div><dt>Version</dt><dd id="activityTypeVersionMeta"></dd></div><div><dt>Status</dt><dd>Publicerad</dd></div><div><dt>Senast ändrad</dt><dd id="activityTypeUpdatedMeta"></dd></div></dl>
+                <dl class="record-meta mb-0 mt-3"><div><dt>Version</dt><dd id="activityTypeVersionMeta"></dd></div><div><dt>Status</dt><dd id="activityTypeStatusMeta">Publicerad</dd></div><div><dt>Senast ändrad</dt><dd id="activityTypeUpdatedMeta"></dd></div></dl>
               </div>
               <div class="card-body">
                 <div id="activityTypeReadView" class="record-grid">
@@ -1428,11 +1449,13 @@
                     <h3 class="record-section-title">Tillåtna resultat</h3>
                     <div id="activityTypeResultsFact" class="activity-type-results"></div>
                   </section>
+                  <section class="record-section"><h3 class="record-section-title">Påverkan och historik</h3><div id="activityTypeImpactFact"></div></section>
                 </div>
                 <form id="activityTypeAdminForm" hidden>
                   <input id="activityTypeAdminIdInput" type="hidden">
                   <section class="record-section">
                     <h3 class="record-section-title">Handläggarstöd</h3>
+                    <div id="activityTypeAdminTitleField" class="mb-3" hidden><label class="form-label" for="activityTypeAdminTitleInput">Namn</label><input id="activityTypeAdminTitleInput" class="form-control" maxlength="80" required><div class="form-text">Namnet kan ändras för egna aktivitetsmallar. Det tekniska ID:t ligger kvar.</div></div>
                     <label class="form-label" for="activityTypeAdminWorkInstructionInput">Handläggningsanvisning</label>
                     <textarea id="activityTypeAdminWorkInstructionInput" class="form-control" rows="5" required></textarea>
                     <div class="form-text">Visas när handläggaren öppnar en aktivitet som bygger på mallen.</div>
@@ -2154,6 +2177,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260820-case-audit-v96"></script>
+    <script type="module" src="app.js?v=20260820-definition-admin-v97"></script>
   </body>
 </html>

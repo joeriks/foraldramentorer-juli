@@ -206,6 +206,14 @@ Obligatoriska fält markeras med asterisk och en dynamisk checklista visar vad s
 
 När handläggaren väljer `Starta matchning` hämtas det nya ärendets namn från stödärendet. Matchningsärendet innehåller en sök- och filtrerbar lista över godkända, tillgängliga mentorer. Varje förslag visar vilka kriterier som matchar och vilka som saknas eller behöver kontrolleras. Handläggaren kan tillfälligt avaktivera enskilda kriterier för att bredda urvalet; systemet visar beslutsunderlag men väljer aldrig mentor automatiskt.
 
+### Administration av flöden
+
+Samordnaren kan skapa egna manuella ärendetyper och generella aktivitetsmallar. En egen ärendetyp kan få vägledning, kompletterande fält, mentorkoppling, ett ordnat aktivitetsflöde och en föreslagen nästa ärendetyp. Ett följdärende skapas aldrig automatiskt, och cirkulära samband tillåts inte.
+
+Ändringar publiceras som nya versioner. Nya ärenden använder den senaste publicerade ärendetypversionen, och nya aktiviteter använder de mallversioner som uttryckligen valts i den versionens flöde. Befintliga poster fortsätter använda exakt den version de skapades med. Inaktivering tar bort definitionen från nya val men bevarar ärenden, aktiviteter, loggar och revisionshistorik. Innan en definition ändras eller inaktiveras visar systemet hur många poster och aktiva flöden som berörs.
+
+De inbyggda kärnflödena har särskilda verksamhetsregler. Därför är deras tekniska struktur skyddad; endast handledande texter och uttryckligen valbara verksamhetsinställningar kan versionshanteras. Egna definitioner kan administreras inom den generella modellen.
+
 ### Prototypens gräns
 
 Kommunportalen använder realistiskt prototypdata med sammanhängande ärenden, aktiviteter och logghistorik. Data lagras lokalt i webbläsarens IndexedDB. Testrollerna simulerar behörighetsstyrda vyer men ersätter inte autentisering, tenantavgränsning eller serverbaserad behörighetskontroll. Produktionsinförande kräver därför central databas, säker filhantering, fastställda rättsliga rutiner och integrationer för exempelvis identitet, notifiering och arkivering.

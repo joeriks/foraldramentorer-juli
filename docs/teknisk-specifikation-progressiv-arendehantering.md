@@ -4,7 +4,7 @@ Status: Utkast 1.2
 Produkt: FöräldraMentorer – Kommunportal  
 Målmiljö: Webbaserad SaaS  
 Prototyplagring: IndexedDB
-Senast uppdaterad: 2026-08-19
+Senast uppdaterad: 2026-08-20
 
 Verksamhetsmässig tillämpning: [Verksamhetsflöden och handläggningsrutiner](verksamhetsfloden-och-handlaggningsrutiner.md)
 
@@ -830,11 +830,17 @@ Ett matchningsärende startas från stödärendet och får ett förifyllt namn. 
 
 ### 10.9 Administration av definitioner
 
-Ärendetypsvyn ska visa och versionshantera hjälptext, registreringsanvisning, handläggningsanvisning, mentorkoppling, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallsvyn ska visa handläggningsanvisning, statusregler, avslutsregel, resultatdefinitioner och användande ärendetyper. Äldre konfiguration för listavslut bevaras endast för bakåtkompatibilitet och visas inte i den aktuella administrationen.
+Ärendetypsvyn ska visa och versionshantera hjälptext, registreringsanvisning, handläggningsanvisning, mentorkoppling, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Samordnaren kan skapa egna manuella ärendetyper, ordna deras aktivitetsmallar och inaktivera dem. Aktivitetsmallsvyn ska visa handläggningsanvisning, statusregler, avslutsregel, resultatdefinitioner och användande ärendetyper. Där kan samordnaren skapa egna generella aktivitetsmallar och inaktivera mallar som inte längre används av ett aktivt flöde. Äldre konfiguration för listavslut bevaras endast för bakåtkompatibilitet och visas inte i den aktuella administrationen.
+
+Publicering är versionsstyrd, inte en ändring på plats. Ett nytt ärende sparar `caseTypeId` och exakt `caseTypeVersion`. Varje aktivitet sparar `templateId` och exakt `templateVersion`. När en aktivitetsmall får en ny version ska samordnaren uttryckligen välja den i ärendetypens aktivitetsflöde och publicera en ny ärendetypversion; befintliga referenser uppgraderas inte automatiskt. Pågående och avslutade poster fortsätter läsa namn, vägledning, fält, resultat och nästa ärendetyp från sin sparade version. Ingen automatisk migrering sker.
+
+Inaktivering motsvarar säker borttagning: den publicerade versionen pensioneras och försvinner från nya val, men historiska poster och revisionsdata raderas inte. En ärendetyp får inte inaktiveras om en aktiv ärendetyp leder till den. En aktivitetsmall får inte inaktiveras om en aktiv ärendetyp använder den. Cirkulära följdflöden ska blockeras före publicering. Administrationsvyn ska före åtgärden visa antal öppna och avslutade poster samt aktiva beroenden.
+
+De inbyggda kärntypernas namn, skapandeväg, föräldrakoppling och aktivitetsstruktur är strukturellt skyddade eftersom särskilda domänkommandon och valideringar är knutna till deras stabila ID:n. På motsvarande sätt är inbyggda aktivitetsmallars namn, resultatkoder och registreringskrav skyddade. Handledande texter och uttryckligen valbara verksamhetsfält får versionshanteras utan att kärnreglerna ändras. Egna typer och mallar kan administreras inom den generella modellen.
 
 Stödområdesvyn ska visa den centrala katalogen grupperad efter kategori samt två lokala val per område: `Används av kommunen` och `Visas publikt`. Tekniskt ID, kategori och central betydelse är skrivskyddade. Om ett område inaktiveras ska gränssnittet förklara att historiska registreringar bevaras. Kommunen ska inte behöva administrera egna fält, regler eller matchningsalgoritmer för varje område.
 
-Kommunen får redigera de fält som uttryckligen är verksamhetskonfiguration. Tekniskt ID, lagringsnycklar och systemstyrda relationer är skrivskyddade. Varje sparad ändring skapar en ny publicerad version och pensionerar den föregående; historiska ärenden behåller sina versionsreferenser.
+Kommunen får redigera de fält som uttryckligen är verksamhetskonfiguration. Tekniskt ID, lagringsnycklar och systemstyrda relationer är skrivskyddade. Varje sparad ändring skapar en ny publicerad version och pensionerar den föregående; historiska ärenden och aktiviteter behåller sina versionsreferenser.
 
 ## 11. API och transaktioner i SaaS-versionen
 

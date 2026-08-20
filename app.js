@@ -113,6 +113,8 @@ const SUPPORT_MATCHING_PROFILES_STORE = "supportMatchingProfiles";
 const SUPPORT_MATCHING_AREAS_STORE = "supportMatchingSupportAreas";
 const SUPPORT_MATCHING_LANGUAGES_STORE = "supportMatchingLanguages";
 const MATCHING_SNAPSHOTS_STORE = "matchingSnapshots";
+const SYSTEM_CASE_TYPE_IDS = new Set(CASE_TYPE_DEFINITIONS.map((definition) => definition.id));
+const SYSTEM_ACTIVITY_TEMPLATE_IDS = new Set(ACTIVITY_TEMPLATES.map((definition) => definition.id));
 const SUPPORT_PANEL_SESSION_KEY = "foraldramentorer.supportPanelOpen";
 const LEARNING_SELECTION_INITIALIZED_ID = "__selection_initialized__";
 let CURRENT_USER_ID = "handler-sara";
@@ -120,6 +122,22 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "97",
+    date: "2026-08-20",
+    title: "Säker administration av egna ärendeflöden",
+    flow: "Systemadministration -> aktivitetsmall -> ärendetyp -> nytt ärende",
+    simplified: "Samordnaren kan nu skapa, versionshantera och inaktivera egna aktivitetsmallar och ärendetyper från samma administrationsyta. Före publicering visas hur många ärenden, aktiviteter och andra flöden som berörs.",
+    retained: "Inbyggda kärnflödens tekniska regler är fortsatt skyddade. Befintliga ärenden och aktiviteter behåller sin ursprungliga typ- respektive mallversion, och inaktivering raderar ingen historik.",
+    changes: [
+      "Egna aktivitetsmallar kan skapas, få ny handläggningsanvisning i en publicerad version och inaktiveras när inget aktivt flöde använder dem.",
+      "Egna ärendetyper kan skapas med fält, mentorkoppling, ordnat aktivitetsflöde och föreslagen nästa ärendetyp.",
+      "Varje steg i ett eget flöde har ett uttryckligt mallversionsval; en ny mallversion tas inte i bruk automatiskt.",
+      "Cirkulära följdflöden blockeras och en ärendetyp kan inte inaktiveras medan ett aktivt flöde leder till den.",
+      "Nya ärenden låser exakt typversion och varje skapad aktivitet låser exakt mallversion.",
+      "Administrationskommandon och redigeringsknappar är begränsade till rollen Samordnare i prototypen."
+    ]
+  },
   {
     version: "96",
     date: "2026-08-20",
@@ -1217,6 +1235,7 @@ const els = {
   versionHistoryList: document.querySelector("#versionHistoryList"),
   handlerDetailView: document.querySelector("#handlerDetailView"),
   caseTypeAdminTableBody: document.querySelector("#caseTypeAdminTableBody"),
+  newCaseTypeButton: document.querySelector("#newCaseTypeButton"),
   caseTypeRelationshipMap: document.querySelector("#caseTypeRelationshipMap"),
   caseTypeListPanel: document.querySelector("#caseTypeListPanel"),
   caseTypeDetailPanel: document.querySelector("#caseTypeDetailPanel"),
@@ -1224,6 +1243,7 @@ const els = {
   caseTypeAdminTitle: document.querySelector("#caseTypeAdminTitle"),
   caseTypeAdminTechnicalId: document.querySelector("#caseTypeAdminTechnicalId"),
   caseTypeVersionMeta: document.querySelector("#caseTypeVersionMeta"),
+  caseTypeStatusMeta: document.querySelector("#caseTypeStatusMeta"),
   caseTypeUpdatedMeta: document.querySelector("#caseTypeUpdatedMeta"),
   caseTypeReadView: document.querySelector("#caseTypeReadView"),
   caseTypeHelpFact: document.querySelector("#caseTypeHelpFact"),
@@ -1235,17 +1255,25 @@ const els = {
   caseTypeActivitiesFact: document.querySelector("#caseTypeActivitiesFact"),
   caseTypeFieldsFact: document.querySelector("#caseTypeFieldsFact"),
   caseTypeRelationshipsFact: document.querySelector("#caseTypeRelationshipsFact"),
+  caseTypeImpactFact: document.querySelector("#caseTypeImpactFact"),
   editCaseTypeButton: document.querySelector("#editCaseTypeButton"),
+  deactivateCaseTypeButton: document.querySelector("#deactivateCaseTypeButton"),
+  saveCaseTypeButton: document.querySelector("#saveCaseTypeButton"),
   caseTypeEditActions: document.querySelector("#caseTypeEditActions"),
   cancelCaseTypeEditButton: document.querySelector("#cancelCaseTypeEditButton"),
   caseTypeAdminIdInput: document.querySelector("#caseTypeAdminIdInput"),
+  caseTypeAdminNameField: document.querySelector("#caseTypeAdminNameField"),
+  caseTypeAdminNameInput: document.querySelector("#caseTypeAdminNameInput"),
   caseTypeAdminHelpInput: document.querySelector("#caseTypeAdminHelpInput"),
   caseTypeAdminHintInput: document.querySelector("#caseTypeAdminHintInput"),
   caseTypeAdminWorkInstructionInput: document.querySelector("#caseTypeAdminWorkInstructionInput"),
   caseTypeAdminMentorModeInput: document.querySelector("#caseTypeAdminMentorModeInput"),
   caseTypeAdminNextTypeInput: document.querySelector("#caseTypeAdminNextTypeInput"),
   caseTypeAdminFieldChoices: document.querySelector("#caseTypeAdminFieldChoices"),
+  caseTypeAdminActivitySection: document.querySelector("#caseTypeAdminActivitySection"),
+  caseTypeAdminActivityChoices: document.querySelector("#caseTypeAdminActivityChoices"),
   activityTypeAdminTableBody: document.querySelector("#activityTypeAdminTableBody"),
+  newActivityTypeButton: document.querySelector("#newActivityTypeButton"),
   activityTypeBackLink: document.querySelector("#activityTypeBackLink"),
   activityTypeListPanel: document.querySelector("#activityTypeListPanel"),
   activityTypeDetailPanel: document.querySelector("#activityTypeDetailPanel"),
@@ -1253,6 +1281,7 @@ const els = {
   activityTypeAdminTitle: document.querySelector("#activityTypeAdminTitle"),
   activityTypeAdminTechnicalId: document.querySelector("#activityTypeAdminTechnicalId"),
   activityTypeVersionMeta: document.querySelector("#activityTypeVersionMeta"),
+  activityTypeStatusMeta: document.querySelector("#activityTypeStatusMeta"),
   activityTypeUpdatedMeta: document.querySelector("#activityTypeUpdatedMeta"),
   activityTypeReadView: document.querySelector("#activityTypeReadView"),
   activityTypeWorkInstructionFact: document.querySelector("#activityTypeWorkInstructionFact"),
@@ -1261,10 +1290,15 @@ const els = {
   activityTypeWorkInputFact: document.querySelector("#activityTypeWorkInputFact"),
   activityTypeUsageFact: document.querySelector("#activityTypeUsageFact"),
   activityTypeResultsFact: document.querySelector("#activityTypeResultsFact"),
+  activityTypeImpactFact: document.querySelector("#activityTypeImpactFact"),
   editActivityTypeButton: document.querySelector("#editActivityTypeButton"),
+  deactivateActivityTypeButton: document.querySelector("#deactivateActivityTypeButton"),
+  saveActivityTypeButton: document.querySelector("#saveActivityTypeButton"),
   activityTypeEditActions: document.querySelector("#activityTypeEditActions"),
   cancelActivityTypeEditButton: document.querySelector("#cancelActivityTypeEditButton"),
   activityTypeAdminIdInput: document.querySelector("#activityTypeAdminIdInput"),
+  activityTypeAdminTitleField: document.querySelector("#activityTypeAdminTitleField"),
+  activityTypeAdminTitleInput: document.querySelector("#activityTypeAdminTitleInput"),
   activityTypeAdminWorkInstructionInput: document.querySelector("#activityTypeAdminWorkInstructionInput"),
   handlerDetailEmpty: document.querySelector("#handlerDetailEmpty"),
   handlerDetail: document.querySelector("#handlerDetail"),
@@ -2413,27 +2447,44 @@ async function loadCaseTypeDefinitions() {
     .sort((a, b) => Number(a.version || 1) - Number(b.version || 1))) {
     storedById.set(definition.id, normalizeCaseTypeTerminology(definition));
   }
-  caseTypeDefinitions = CASE_TYPE_DEFINITIONS.map((fallback) => ({
-    ...fallback,
-    ...(storedById.get(fallback.id) || {}),
-    name: fallback.name,
-    creationMode: fallback.creationMode,
-    ...(["incoming-contact", "parent-support", "matching", "mentor-assignment"].includes(fallback.id) ? {
-      parentMode: fallback.parentMode,
-      helpText: fallback.helpText,
-      registrationHint: fallback.registrationHint,
-      workInstruction: fallback.workInstruction,
-      activityTemplateIds: fallback.activityTemplateIds || [],
-      suggestedActivities: fallback.suggestedActivities || []
-    } : {}),
-    detailFieldIds: storedById.get(fallback.id)?.detailFieldIds || fallback.detailFieldIds || []
-  }));
+  const fallbackById = new Map(CASE_TYPE_DEFINITIONS.map((definition) => [definition.id, definition]));
+  const orderedCaseTypeIds = [
+    ...CASE_TYPE_DEFINITIONS.map((definition) => definition.id),
+    ...[...storedById.keys()].filter((id) => !fallbackById.has(id)).sort((a, b) => a.localeCompare(b, "sv"))
+  ];
+  caseTypeDefinitions = orderedCaseTypeIds.map((id) => storedById.get(id)).filter(Boolean).map((stored) => {
+    const fallback = fallbackById.get(stored.id);
+    return {
+      ...(fallback || {}),
+      ...stored,
+      ...(fallback ? {
+        name: fallback.name,
+        creationMode: fallback.creationMode,
+        parentMode: fallback.parentMode || "none"
+      } : {}),
+      detailFieldIds: stored.detailFieldIds || fallback?.detailFieldIds || [],
+      activityTemplateIds: stored.activityTemplateIds || fallback?.activityTemplateIds || [],
+      suggestedActivities: stored.suggestedActivities || fallback?.suggestedActivities || []
+    };
+  });
 }
 
-function activityTemplateDefinitionById(id) {
-  return activityTemplateDefinitions.find((definition) => definition.id === id)
+function activityTemplateDefinitionById(id, version = null) {
+  return (version ? activityTemplateDefinitionVersions.find((definition) => definition.id === id && Number(definition.version) === Number(version)) : null)
+    || activityTemplateDefinitions.find((definition) => definition.id === id)
     || ACTIVITY_TEMPLATES.find((definition) => definition.id === id)
     || null;
+}
+
+function caseTypeActivityTemplateRefs(caseType) {
+  if (!caseType) return [];
+  const configuredRefs = Array.isArray(caseType.activityTemplateRefs) ? caseType.activityTemplateRefs : [];
+  const refsById = new Map(configuredRefs.map((reference) => [reference.templateId, reference]));
+  return (caseType.activityTemplateIds || configuredRefs.map((reference) => reference.templateId)).map((templateId) => {
+    const configured = refsById.get(templateId);
+    const template = activityTemplateDefinitionById(templateId, configured?.version);
+    return { templateId, version: Number(configured?.version || template?.version || 1) };
+  });
 }
 
 async function loadActivityTemplateDefinitions() {
@@ -2457,12 +2508,19 @@ async function loadActivityTemplateDefinitions() {
     .sort((a, b) => Number(a.version || 1) - Number(b.version || 1))) {
     storedById.set(definition.id, definition);
   }
-  activityTemplateDefinitions = ACTIVITY_TEMPLATES.map((fallback) => ({
-    ...fallback,
-    ...(storedById.get(fallback.id) || {}),
-    title: fallback.title,
-    results: fallback.results
-  }));
+  const fallbackById = new Map(ACTIVITY_TEMPLATES.map((definition) => [definition.id, definition]));
+  const orderedTemplateIds = [
+    ...ACTIVITY_TEMPLATES.map((definition) => definition.id),
+    ...[...storedById.keys()].filter((id) => !fallbackById.has(id)).sort((a, b) => a.localeCompare(b, "sv"))
+  ];
+  activityTemplateDefinitions = orderedTemplateIds.map((id) => storedById.get(id)).filter(Boolean).map((stored) => {
+    const fallback = fallbackById.get(stored.id);
+    return {
+      ...(fallback || {}),
+      ...stored,
+      ...(fallback ? { title: fallback.title, results: fallback.results, workInput: fallback.workInput } : {})
+    };
+  });
 }
 
 async function loadLearningData() {
@@ -3896,7 +3954,7 @@ function caseClosureDetails(caseRecord) {
       : `${mentor.name} visas som Godkänd i mentorregistret och kan väljas i en matchning.`;
   }
   const successors = successorCases(caseRecord);
-  const configuredNextTypeId = caseTypeById(caseRecord.caseTypeId)?.nextCaseTypeId || null;
+  const configuredNextTypeId = caseTypeById(caseRecord.caseTypeId, caseRecord.caseTypeVersion)?.nextCaseTypeId || null;
   let successorHtml = "Inget nytt ärende skapades automatiskt.";
   let successorText = successorHtml;
   if (successors.length) {
@@ -5686,10 +5744,6 @@ function applyRoute() {
     window.history.replaceState(null, "", "#/dashboard");
     route = { view: "dashboard", id: null };
   }
-  if (route.view === "activity-types" && !route.id) {
-    window.history.replaceState(null, "", "#/case-types");
-    route = { view: "case-types", id: null };
-  }
   const nestedActivityRoute = route.view === "case-types" ? route.id?.match(/^([^/]+)\/activities\/([^/]+)$/) : null;
   const nestedCaseRoute = route.view === "case" && route.id && !route.id.startsWith("new")
     ? route.id.match(/^([^/]+)(?:\/([^/]+)(?:\/([^/]+))?)?$/)
@@ -5727,6 +5781,8 @@ function applyRoute() {
   selectedActivityTypeId = nestedActivityRoute?.[2] || (currentView === "activity-types" ? route.id : null);
   if (currentView !== "case-types" || !route.id || nestedActivityRoute) caseTypeEditMode = false;
   if (!selectedActivityTypeId) activityTypeEditMode = false;
+  if (selectedCaseTypeId === "new") caseTypeEditMode = true;
+  if (selectedActivityTypeId === "new") activityTypeEditMode = true;
   workQueueOnly = currentView === "mentors" && route.id === "action";
   caseTypeFilter = currentView === "cases" && caseTypeById(route.id) ? route.id : "";
   if (currentView === "cases" && route.params?.has("status")) {
@@ -6701,7 +6757,10 @@ function activitiesForCase(caseId) {
 }
 
 function activityResultOptions(activity) {
-  return ACTIVITY_RESULT_OPTIONS[activity?.templateId] || ACTIVITY_RESULT_OPTIONS.default;
+  const definition = activityTemplateDefinitionById(activity?.templateId, activity?.templateVersion);
+  return definition?.results?.map(([code, label]) => [code, label])
+    || ACTIVITY_RESULT_OPTIONS[activity?.templateId]
+    || ACTIVITY_RESULT_OPTIONS.default;
 }
 
 const WORK_INPUT_STATE_LABELS = {
@@ -7184,8 +7243,8 @@ function renderCaseTypeGuidance(caseRecord = null) {
     "needs-analysis": "Beskriv vilket behov som har uppmärksammats och vilket underlag bedömningen bygger på.",
     other: "Beskriv frågan och vad som behöver vara gjort för att ärendet ska kunna avslutas."
   };
-  els.caseTitleInput.placeholder = caseType ? titlePlaceholders[caseType.id] : "Välj ärendetyp först";
-  els.caseDescriptionInput.placeholder = caseType ? descriptionPlaceholders[caseType.id] : "";
+  els.caseTitleInput.placeholder = caseType ? titlePlaceholders[caseType.id] || `Exempel: ${caseType.name}` : "Välj ärendetyp först";
+  els.caseDescriptionInput.placeholder = caseType ? descriptionPlaceholders[caseType.id] || "Beskriv frågan och vilket resultat som förväntas." : "";
   renderSupportProfileCompleteness();
 }
 
@@ -7745,7 +7804,12 @@ function renderAssignmentFollowup(caseRecord) {
 }
 
 function availableCaseTypesForForm({ mentorId = "", caseRecord = null, parentId = "", supportCaseId = "" } = {}) {
-  if (caseRecord) return caseTypeDefinitions;
+  if (caseRecord) {
+    const historicalType = caseTypeById(caseRecord.caseTypeId, caseRecord.caseTypeVersion);
+    return historicalType && !caseTypeDefinitions.some((definition) => definition.id === historicalType.id)
+      ? [historicalType, ...caseTypeDefinitions]
+      : caseTypeDefinitions;
+  }
   if (supportCaseId) return caseTypeDefinitions.filter((definition) => definition.creationMode === "support_case");
   if (parentId) return caseTypeDefinitions.filter((definition) => definition.id === "parent-support");
   if (mentorId) {
@@ -7936,7 +8000,7 @@ function renderCaseDetail() {
   setRecordFactVisibility(els.caseParentFact, Boolean(parent));
   setRecordFactVisibility(els.caseSupportCaseFact, Boolean(linkedSupportCase));
   renderCaseClosureSummary(caseRecord);
-  const caseGuidance = caseTypeById(caseRecord.caseTypeId)?.workInstruction?.trim() || "";
+  const caseGuidance = caseTypeById(caseRecord.caseTypeId, caseRecord.caseTypeVersion)?.workInstruction?.trim() || "";
   els.caseWorkGuidance.hidden = !caseGuidance;
   els.caseWorkGuidanceText.textContent = caseGuidance;
   renderCaseTypeDetails(caseRecord);
@@ -8011,7 +8075,7 @@ function activityCompletionDecision(caseRecord) {
       nextText: "Granska rapporter, uppföljning och ersättningsunderlag. Avsluta därefter uppdraget uttryckligen om handläggningen är klar."
     };
   }
-  const nextTypeId = caseTypeById(caseRecord.caseTypeId)?.nextCaseTypeId || "";
+  const nextTypeId = caseTypeById(caseRecord.caseTypeId, caseRecord.caseTypeVersion)?.nextCaseTypeId || "";
   if (nextTypeId) {
     return {
       primaryLabel: `Registrera ${caseTypeRelationshipName(nextTypeId).toLocaleLowerCase("sv-SE")}`,
@@ -8213,7 +8277,7 @@ function renderActivityWorkInput(activity, caseRecord) {
 
 function renderActivityGuidance(activity, caseRecord) {
   const mentor = caseMentor(caseRecord);
-  const templateGuidance = activityTemplateDefinitionById(activity.templateId)?.workInstruction?.trim() || "";
+  const templateGuidance = activityTemplateDefinitionById(activity.templateId, activity.templateVersion)?.workInstruction?.trim() || "";
   const identityDataMissing = activity.templateId === "identityVerified"
     && mentor
     && (!mentor.personalNumber || !mentor.identityMethod);
@@ -8774,19 +8838,19 @@ function activityTemplateAdminRoute(caseTypeId, templateId) {
 }
 
 function renderCaseTypeActivitiesFact(definition) {
-  const templateIds = definition.activityTemplateIds || [];
+  const templateRefs = caseTypeActivityTemplateRefs(definition);
   const suggestions = definition.suggestedActivities || [];
-  if (templateIds.length) {
+  if (templateRefs.length) {
     els.caseTypeActivitiesFact.innerHTML = `
       <ol class="case-type-activity-list">
-        ${templateIds.map((templateId) => {
-          const template = activityTemplateDefinitionById(templateId);
+        ${templateRefs.map((reference) => {
+          const template = activityTemplateDefinitionById(reference.templateId, reference.version);
           if (!template) return "";
           return `<li>
             <span class="case-type-activity-order" aria-hidden="true"></span>
             <div>
               <a href="${activityTemplateAdminRoute(definition.id, template.id)}"><strong>${escapeHtml(template.title)}</strong></a>
-              <small>${template.results?.length || 0} resultatval · öppnas och avslutas i aktiviteten</small>
+              <small>Version ${escapeHtml(reference.version)} · ${template.results?.length || 0} resultatval · öppnas och avslutas i aktiviteten</small>
             </div>
           </li>`;
         }).join("")}
@@ -8842,10 +8906,130 @@ function renderActivityTypeConfiguration(definition) {
     </div>`;
 }
 
+function canAdministerDefinitions() {
+  return currentUser().role === "Samordnare";
+}
+
+function customDefinitionId(prefix) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function newCaseTypeDefinition() {
+  return {
+    id: "",
+    tenantId: DEFAULT_TENANT_ID,
+    version: 1,
+    name: "",
+    status: "published",
+    creationMode: "manual",
+    nextCaseTypeId: null,
+    mentorMode: "none",
+    parentMode: "none",
+    helpText: "",
+    registrationHint: "",
+    workInstruction: "",
+    detailFieldIds: [],
+    defaultPriority: "normal",
+    activityTemplateIds: [],
+    activityTemplateRefs: [],
+    suggestedActivities: []
+  };
+}
+
+function newActivityTypeDefinition() {
+  return {
+    id: "",
+    tenantId: DEFAULT_TENANT_ID,
+    version: 1,
+    title: "",
+    status: "published",
+    workInstruction: "",
+    results: [
+      ["completed", "Genomförd", "acceptable"],
+      ["not_completed", "Kunde inte genomföras", "deviation"],
+      ["not_assessable", "Ej bedömningsbar", "deviation"]
+    ]
+  };
+}
+
+function caseTypeUsageImpact(definition) {
+  const relatedCases = cases.filter((caseRecord) => caseRecord.caseTypeId === definition.id);
+  const inboundTypes = caseTypeDefinitions.filter((item) => item.id !== definition.id && item.nextCaseTypeId === definition.id);
+  return {
+    total: relatedCases.length,
+    open: relatedCases.filter((caseRecord) => caseRecord.status !== "closed").length,
+    closed: relatedCases.filter((caseRecord) => caseRecord.status === "closed").length,
+    inboundTypes
+  };
+}
+
+function activityTypeUsageImpact(definition) {
+  const relatedActivities = caseActivities.filter((activity) => activity.templateId === definition.id);
+  return {
+    total: relatedActivities.length,
+    open: relatedActivities.filter((activity) => !["completed", "not_applicable"].includes(activity.status)).length,
+    caseTypes: caseTypesUsingActivityTemplate(definition.id)
+  };
+}
+
+function renderDefinitionImpact(target, impact, kind) {
+  if (kind === "case-type") {
+    target.innerHTML = `<p class="mb-2"><strong>${impact.total}</strong> ärenden använder typen, varav <strong>${impact.open}</strong> öppna och <strong>${impact.closed}</strong> avslutade.</p><p class="small text-secondary mb-0">${impact.inboundTypes.length ? `Används som nästa steg av: ${escapeHtml(impact.inboundTypes.map((item) => item.name).join(", "))}.` : "Ingen aktiv ärendetyp leder till denna typ."} En ny version påverkar bara nya ärenden. Inaktivering bevarar samtliga historiska poster.</p>`;
+    return;
+  }
+  target.innerHTML = `<p class="mb-2"><strong>${impact.total}</strong> aktiviteter använder mallen, varav <strong>${impact.open}</strong> inte är avslutade.</p><p class="small text-secondary mb-0">${impact.caseTypes.length ? `Används av: ${escapeHtml(impact.caseTypes.map((item) => item.name).join(", "))}.` : "Ingen aktiv ärendetyp skapar mallen automatiskt."} En ny mallversion ändrar inte befintliga aktiviteter.</p>`;
+}
+
+function renderCaseTypeActivityEditor(definition) {
+  const selectedRefs = caseTypeActivityTemplateRefs(definition);
+  const selectedById = new Map(selectedRefs.map((reference, index) => [reference.templateId, { ...reference, index }]));
+  const ordered = [
+    ...selectedRefs.map((reference) => activityTemplateDefinitionById(reference.templateId)).filter(Boolean),
+    ...activityTemplateDefinitions.filter((template) => !selectedById.has(template.id))
+  ];
+  els.caseTypeAdminActivityChoices.innerHTML = ordered.map((template, index) => {
+    const selected = selectedById.get(template.id);
+    const version = Number(selected?.version || template.version || 1);
+    const versions = activityTemplateDefinitionVersions
+      .filter((item) => item.id === template.id)
+      .sort((a, b) => Number(b.version || 1) - Number(a.version || 1));
+    const versionOptions = (versions.length ? versions : [template]).map((item) => {
+      const itemVersion = Number(item.version || 1);
+      const statusLabel = item.status === "published" ? "publicerad" : "tidigare";
+      return `<option value="${itemVersion}" ${itemVersion === version ? "selected" : ""}>Version ${itemVersion} (${statusLabel})</option>`;
+    }).join("");
+    return `<div class="case-type-template-row d-flex flex-wrap align-items-center gap-3 py-2 border-bottom">
+      <input id="case-type-template-${escapeHtml(template.id)}" class="form-check-input mt-0" type="checkbox" data-case-type-template value="${escapeHtml(template.id)}" data-template-version="${version}" ${selected ? "checked" : ""}>
+      <label class="form-check-label flex-grow-1" for="case-type-template-${escapeHtml(template.id)}"><strong>${escapeHtml(template.title)}</strong></label>
+      <select class="form-select form-select-sm case-type-template-version" data-case-type-template-version="${escapeHtml(template.id)}" aria-label="Mallversion för ${escapeHtml(template.title)}" ${selected ? "" : "disabled"}>${versionOptions}</select>
+      <label class="small text-secondary" for="case-type-template-order-${escapeHtml(template.id)}">Ordning</label>
+      <input id="case-type-template-order-${escapeHtml(template.id)}" class="form-control form-control-sm case-type-template-order" type="number" min="1" max="99" value="${selected ? selected.index + 1 : index + 1}" data-case-type-template-order="${escapeHtml(template.id)}" ${selected ? "" : "disabled"}>
+    </div>`;
+  }).join("") || '<p class="text-secondary mb-0">Det finns inga publicerade aktivitetsmallar att välja.</p>';
+}
+
+function caseTypeActivityRefsFromEditor() {
+  return [...els.caseTypeAdminActivityChoices.querySelectorAll("[data-case-type-template]:checked")]
+    .map((input) => ({
+      templateId: input.value,
+      version: Number(els.caseTypeAdminActivityChoices.querySelector(`[data-case-type-template-version="${CSS.escape(input.value)}"]`)?.value || input.dataset.templateVersion || activityTemplateDefinitionById(input.value)?.version || 1),
+      order: Number(els.caseTypeAdminActivityChoices.querySelector(`[data-case-type-template-order="${CSS.escape(input.value)}"]`)?.value || 99)
+    }))
+    .sort((a, b) => a.order - b.order)
+    .map(({ templateId, version }) => ({ templateId, version }));
+}
+
 function renderCaseTypeAdministration() {
-  const selectedDefinition = selectedCaseTypeId ? caseTypeById(selectedCaseTypeId) : null;
+  const creating = selectedCaseTypeId === "new";
+  const selectedDefinition = creating ? newCaseTypeDefinition() : selectedCaseTypeId ? caseTypeById(selectedCaseTypeId) : null;
+  const administrator = canAdministerDefinitions();
+  if (creating && !administrator) {
+    navigateTo("#/case-types");
+    return;
+  }
   els.caseTypeListPanel.hidden = Boolean(selectedCaseTypeId);
   els.caseTypeDetailPanel.hidden = !selectedDefinition;
+  els.newCaseTypeButton.hidden = !administrator;
   renderCaseTypeRelationshipMap();
   els.caseTypeAdminTableBody.innerHTML = "";
   for (const definition of caseTypeDefinitions) {
@@ -8870,12 +9054,14 @@ function renderCaseTypeAdministration() {
     return;
   }
 
+  const customDefinition = creating || !SYSTEM_CASE_TYPE_IDS.has(selectedDefinition.id);
   const fields = configuredDetailFields(selectedDefinition);
   els.caseTypeAdminIdInput.value = selectedDefinition.id;
-  els.caseTypeAdminTitle.textContent = selectedDefinition.name;
-  els.caseTypeAdminTechnicalId.textContent = `Tekniskt ID ${selectedDefinition.id}`;
-  els.caseTypeVersionMeta.textContent = String(selectedDefinition.version || 1);
-  els.caseTypeUpdatedMeta.textContent = selectedDefinition.updatedAt ? formatDateTime(selectedDefinition.updatedAt) : "Grundinställning";
+  els.caseTypeAdminTitle.textContent = creating ? "Ny ärendetyp" : selectedDefinition.name;
+  els.caseTypeAdminTechnicalId.textContent = creating ? "Tekniskt ID skapas vid publicering" : `Tekniskt ID ${selectedDefinition.id}`;
+  els.caseTypeVersionMeta.textContent = creating ? "Ny" : String(selectedDefinition.version || 1);
+  els.caseTypeStatusMeta.textContent = creating ? "Ej sparad" : "Publicerad";
+  els.caseTypeUpdatedMeta.textContent = creating ? "Ej sparad" : selectedDefinition.updatedAt ? formatDateTime(selectedDefinition.updatedAt) : "Grundinställning";
   els.caseTypeHelpFact.textContent = selectedDefinition.helpText || "Ej angivet";
   els.caseTypeHintFact.textContent = selectedDefinition.registrationHint || "Ej angivet";
   els.caseTypeWorkInstructionFact.textContent = selectedDefinition.workInstruction || "Ej angivet";
@@ -8887,8 +9073,12 @@ function renderCaseTypeAdministration() {
     ? `<dl class="record-fields case-type-configured-fields mb-0">${fields.map((field) => `<div><dt>${escapeHtml(field.label)}</dt><dd>${escapeHtml(caseDetailFieldTypeLabel(field.inputType))}</dd></div>`).join("")}</dl>`
     : '<div class="empty-list border rounded text-secondary">Inga kompletterande fält.</div>';
   renderCaseTypeRelationshipsFact(selectedDefinition.id);
+  renderDefinitionImpact(els.caseTypeImpactFact, caseTypeUsageImpact(selectedDefinition), "case-type");
 
   if (caseTypeEditMode) {
+    els.caseTypeAdminNameField.hidden = !customDefinition;
+    els.caseTypeAdminNameInput.disabled = !customDefinition;
+    els.caseTypeAdminNameInput.value = selectedDefinition.name || "";
     els.caseTypeAdminHelpInput.value = selectedDefinition.helpText || "";
     els.caseTypeAdminHintInput.value = selectedDefinition.registrationHint || "";
     els.caseTypeAdminWorkInstructionInput.value = selectedDefinition.workInstruction || "";
@@ -8907,11 +9097,15 @@ function renderCaseTypeAdministration() {
         <label class="form-check-label" for="case-type-field-${escapeHtml(field.id)}">${escapeHtml(field.label)}</label>
       </div>
     `).join("");
+    els.caseTypeAdminActivitySection.hidden = !customDefinition;
+    if (customDefinition) renderCaseTypeActivityEditor(selectedDefinition);
   }
   els.caseTypeReadView.hidden = caseTypeEditMode;
   els.caseTypeAdminForm.hidden = !caseTypeEditMode;
-  els.editCaseTypeButton.hidden = caseTypeEditMode;
-  els.caseTypeEditActions.hidden = !caseTypeEditMode;
+  els.editCaseTypeButton.hidden = caseTypeEditMode || !administrator;
+  els.deactivateCaseTypeButton.hidden = caseTypeEditMode || creating || !customDefinition || !administrator;
+  els.saveCaseTypeButton.textContent = creating ? "Skapa ärendetyp" : "Publicera ny version";
+  els.caseTypeEditActions.hidden = !caseTypeEditMode || !administrator;
 }
 
 function setCaseTypeEditMode(editing) {
@@ -8921,9 +9115,16 @@ function setCaseTypeEditMode(editing) {
 }
 
 function renderActivityTypeAdministration() {
-  const selectedDefinition = selectedActivityTypeId ? activityTemplateDefinitionById(selectedActivityTypeId) : null;
+  const creating = selectedActivityTypeId === "new";
+  const selectedDefinition = creating ? newActivityTypeDefinition() : selectedActivityTypeId ? activityTemplateDefinitionById(selectedActivityTypeId) : null;
+  const administrator = canAdministerDefinitions();
+  if (creating && !administrator) {
+    navigateTo("#/activity-types");
+    return;
+  }
   els.activityTypeListPanel.hidden = Boolean(selectedActivityTypeId);
   els.activityTypeDetailPanel.hidden = !selectedDefinition;
+  els.newActivityTypeButton.hidden = !administrator;
   els.activityTypeAdminTableBody.innerHTML = "";
   for (const definition of activityTemplateDefinitions) {
     const usage = caseTypesUsingActivityTemplate(definition.id);
@@ -8944,21 +9145,31 @@ function renderActivityTypeAdministration() {
     els.activityTypeDetailPanel.innerHTML = '<div class="card-body py-5"><h2 class="h5">Aktivitetsmallen finns inte</h2><a class="btn btn-outline-primary btn-sm" href="#/case-types">Tillbaka till ärendetyper</a></div>';
     return;
   }
+  const customDefinition = creating || !SYSTEM_ACTIVITY_TEMPLATE_IDS.has(selectedDefinition.id);
   els.activityTypeAdminIdInput.value = selectedDefinition.id;
   const parentCaseType = caseTypeById(selectedActivityParentCaseTypeId) || caseTypesUsingActivityTemplate(selectedDefinition.id)[0] || null;
   els.activityTypeBackLink.href = parentCaseType ? `#/case-types/${encodeURIComponent(parentCaseType.id)}` : "#/case-types";
   els.activityTypeBackLink.textContent = parentCaseType ? `Tillbaka till ${parentCaseType.name}` : "Tillbaka till ärendetyper";
-  els.activityTypeAdminTitle.textContent = selectedDefinition.title;
-  els.activityTypeAdminTechnicalId.textContent = `Tekniskt ID ${selectedDefinition.id}`;
-  els.activityTypeVersionMeta.textContent = String(selectedDefinition.version || 1);
-  els.activityTypeUpdatedMeta.textContent = selectedDefinition.updatedAt ? formatDateTime(selectedDefinition.updatedAt) : "Grundinställning";
+  els.activityTypeAdminTitle.textContent = creating ? "Ny aktivitetsmall" : selectedDefinition.title;
+  els.activityTypeAdminTechnicalId.textContent = creating ? "Tekniskt ID skapas vid publicering" : `Tekniskt ID ${selectedDefinition.id}`;
+  els.activityTypeVersionMeta.textContent = creating ? "Ny" : String(selectedDefinition.version || 1);
+  els.activityTypeStatusMeta.textContent = creating ? "Ej sparad" : "Publicerad";
+  els.activityTypeUpdatedMeta.textContent = creating ? "Ej sparad" : selectedDefinition.updatedAt ? formatDateTime(selectedDefinition.updatedAt) : "Grundinställning";
   els.activityTypeWorkInstructionFact.textContent = selectedDefinition.workInstruction || "Ej angivet";
   renderActivityTypeConfiguration(selectedDefinition);
-  if (activityTypeEditMode) els.activityTypeAdminWorkInstructionInput.value = selectedDefinition.workInstruction || "";
+  renderDefinitionImpact(els.activityTypeImpactFact, activityTypeUsageImpact(selectedDefinition), "activity-type");
+  if (activityTypeEditMode) {
+    els.activityTypeAdminTitleField.hidden = !customDefinition;
+    els.activityTypeAdminTitleInput.disabled = !customDefinition;
+    els.activityTypeAdminTitleInput.value = selectedDefinition.title || "";
+    els.activityTypeAdminWorkInstructionInput.value = selectedDefinition.workInstruction || "";
+  }
   els.activityTypeReadView.hidden = activityTypeEditMode;
   els.activityTypeAdminForm.hidden = !activityTypeEditMode;
-  els.editActivityTypeButton.hidden = activityTypeEditMode;
-  els.activityTypeEditActions.hidden = !activityTypeEditMode;
+  els.editActivityTypeButton.hidden = activityTypeEditMode || !administrator;
+  els.deactivateActivityTypeButton.hidden = activityTypeEditMode || creating || !customDefinition || !administrator;
+  els.saveActivityTypeButton.textContent = creating ? "Skapa aktivitetsmall" : "Publicera ny version";
+  els.activityTypeEditActions.hidden = !activityTypeEditMode || !administrator;
 }
 
 function setActivityTypeEditMode(editing) {
@@ -12025,8 +12236,17 @@ async function submitCaseForm(event) {
     if (!confirmation.confirmed) return;
   }
   const selectedActivities = existingCase ? [] : [
-    ...(caseType.activityTemplateIds || []).map((templateId, sortOrder) => ({ templateId, title: activityTemplateById(templateId).title, sortOrder })),
-    ...(caseType.suggestedActivities || []).map((title, index) => ({ templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, title, sortOrder: (caseType.activityTemplateIds || []).length + index }))
+    ...caseTypeActivityTemplateRefs(caseType).map((reference, sortOrder) => ({
+      ...reference,
+      title: activityTemplateDefinitionById(reference.templateId, reference.version)?.title || reference.templateId,
+      sortOrder
+    })),
+    ...(caseType.suggestedActivities || []).map((title, index) => ({
+      templateId: AD_HOC_ACTIVITY_TEMPLATE_ID,
+      version: Number(activityTemplateDefinitionById(AD_HOC_ACTIVITY_TEMPLATE_ID)?.version || 1),
+      title,
+      sortOrder: caseTypeActivityTemplateRefs(caseType).length + index
+    }))
   ];
   const configuredDetails = { ...(existingCase?.details || {}) };
   for (const field of configuredDetailFields(caseType)) {
@@ -12113,7 +12333,7 @@ async function submitCaseForm(event) {
       }
       for (const template of selectedActivities) {
         const activity = {
-          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: id, templateId: template.templateId, templateVersion: 1,
+          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: id, templateId: template.templateId, templateVersion: template.version,
           title: template.title, status: "not_started", resultCode: null, resultClassification: null, handlerIdOverride: null,
           waitingForParty: null, dueDate: null, sortOrder: template.sortOrder, version: 1,
           createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, completedAt: null, completedBy: null
@@ -12701,78 +12921,191 @@ els.statusFilter.addEventListener("change", () => {
 
 els.caseTypeAdminForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const definition = caseTypeById(els.caseTypeAdminIdInput.value);
+  if (!canAdministerDefinitions()) {
+    showFeedback("Endast samordnare kan administrera ärendetyper.");
+    return;
+  }
+  const creating = selectedCaseTypeId === "new";
+  const definition = creating ? newCaseTypeDefinition() : caseTypeById(els.caseTypeAdminIdInput.value);
   if (!definition) return;
+  const customDefinition = creating || !SYSTEM_CASE_TYPE_IDS.has(definition.id);
+  const name = customDefinition ? els.caseTypeAdminNameInput.value.trim() : definition.name;
+  if (!name) {
+    els.caseTypeAdminNameInput.setCustomValidity("Ange ett namn på ärendetypen.");
+    els.caseTypeAdminNameInput.reportValidity();
+    return;
+  }
+  const duplicateName = caseTypeDefinitions.find((item) => item.id !== definition.id && item.name.localeCompare(name, "sv", { sensitivity: "base" }) === 0);
+  if (duplicateName) {
+    els.caseTypeAdminNameInput.setCustomValidity("Det finns redan en ärendetyp med det namnet.");
+    els.caseTypeAdminNameInput.reportValidity();
+    return;
+  }
+  els.caseTypeAdminNameInput.setCustomValidity("");
+  const definitionId = creating ? customDefinitionId("case-type") : definition.id;
   const detailFieldIds = [...els.caseTypeAdminFieldChoices.querySelectorAll("input:checked")]
     .map((input) => input.value);
   const nextCaseTypeId = els.caseTypeAdminNextTypeInput.value || null;
-  if (nextCaseTypeSelectionCreatesCycle(definition.id, nextCaseTypeId)) {
+  if (nextCaseTypeSelectionCreatesCycle(definitionId, nextCaseTypeId)) {
     showFeedback("Valet skulle skapa ett cirkulärt ärendeflöde. Välj en annan ärendetyp eller Ingen.");
     els.caseTypeAdminNextTypeInput.focus();
     return;
   }
   const now = new Date().toISOString();
-  const nextVersion = Math.max(0, ...caseTypeDefinitionVersions
+  const nextVersion = creating ? 1 : Math.max(0, ...caseTypeDefinitionVersions
     .filter((item) => item.id === definition.id)
     .map((item) => Number(item.version || 1))) + 1;
-  await atomicPut({ [CASE_TYPE_DEFINITIONS_STORE]: [{
+  const activityTemplateRefs = customDefinition ? caseTypeActivityRefsFromEditor() : caseTypeActivityTemplateRefs(definition);
+  const nextDefinition = {
     ...definition,
-    status: "retired",
-    updatedAt: now,
-    updatedBy: CURRENT_USER_ID
-  }, {
-    ...definition,
+    id: definitionId,
     tenantId: DEFAULT_TENANT_ID,
     version: nextVersion,
     status: "published",
+    name,
+    creationMode: creating ? "manual" : definition.creationMode,
+    parentMode: creating ? "none" : definition.parentMode,
     helpText: els.caseTypeAdminHelpInput.value.trim(),
     registrationHint: els.caseTypeAdminHintInput.value.trim(),
     workInstruction: els.caseTypeAdminWorkInstructionInput.value.trim(),
     mentorMode: els.caseTypeAdminMentorModeInput.value,
     nextCaseTypeId,
     detailFieldIds,
+    activityTemplateRefs,
+    activityTemplateIds: activityTemplateRefs.map((reference) => reference.templateId),
+    suggestedActivities: customDefinition ? [] : definition.suggestedActivities || [],
     updatedAt: now,
     updatedBy: CURRENT_USER_ID
-  }] });
-  caseTypeEditMode = false;
-  markSaved();
-  showFeedback("Ärendetypen har uppdaterats.");
-  await refresh();
-});
-
-els.editCaseTypeButton.addEventListener("click", () => setCaseTypeEditMode(true));
-els.cancelCaseTypeEditButton.addEventListener("click", () => setCaseTypeEditMode(false));
-
-els.activityTypeAdminForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const definition = activityTemplateDefinitionById(els.activityTypeAdminIdInput.value);
-  if (!definition) return;
-  const now = new Date().toISOString();
-  const nextVersion = Math.max(0, ...activityTemplateDefinitionVersions
-    .filter((item) => item.id === definition.id)
-    .map((item) => Number(item.version || 1))) + 1;
-  await atomicPut({ [ACTIVITY_TEMPLATE_DEFINITIONS_STORE]: [{
+  };
+  const records = creating ? [nextDefinition] : [{
     ...definition,
     status: "retired",
     updatedAt: now,
     updatedBy: CURRENT_USER_ID
-  }, {
+  }, nextDefinition];
+  await atomicPut({ [CASE_TYPE_DEFINITIONS_STORE]: records });
+  caseTypeEditMode = false;
+  markSaved();
+  showFeedback(creating ? "Ärendetypen har skapats." : "En ny version av ärendetypen har publicerats.");
+  await refresh();
+  if (creating) {
+    caseTypeEditMode = false;
+    navigateTo(`#/case-types/${encodeURIComponent(definitionId)}`);
+  }
+});
+
+els.editCaseTypeButton.addEventListener("click", () => setCaseTypeEditMode(true));
+els.cancelCaseTypeEditButton.addEventListener("click", () => selectedCaseTypeId === "new" ? navigateTo("#/case-types") : setCaseTypeEditMode(false));
+els.caseTypeAdminActivityChoices.addEventListener("change", (event) => {
+  const input = event.target.closest("[data-case-type-template]");
+  if (!input) return;
+  const orderInput = els.caseTypeAdminActivityChoices.querySelector(`[data-case-type-template-order="${CSS.escape(input.value)}"]`);
+  const versionInput = els.caseTypeAdminActivityChoices.querySelector(`[data-case-type-template-version="${CSS.escape(input.value)}"]`);
+  if (orderInput) orderInput.disabled = !input.checked;
+  if (versionInput) versionInput.disabled = !input.checked;
+});
+
+els.deactivateCaseTypeButton.addEventListener("click", async () => {
+  const definition = caseTypeById(selectedCaseTypeId);
+  if (!definition || SYSTEM_CASE_TYPE_IDS.has(definition.id) || !canAdministerDefinitions()) return;
+  const impact = caseTypeUsageImpact(definition);
+  if (impact.inboundTypes.length) {
+    showFeedback(`Ärendetypen används som nästa steg av ${impact.inboundTypes.map((item) => item.name).join(", ")}. Ändra dessa flöden först.`);
+    return;
+  }
+  const confirmation = await confirmAction({
+    eyebrow: "Inaktivera ärendetyp",
+    title: `Inaktivera ${definition.name}?`,
+    body: `Typen kan inte längre väljas för nya ärenden. ${impact.open} öppna och ${impact.closed} avslutade ärenden behåller sin version och historik.`,
+    mentorName: definition.name,
+    confirmLabel: "Inaktivera"
+  });
+  if (!confirmation.confirmed) return;
+  const now = new Date().toISOString();
+  await saveCaseTypeDefinition({ ...definition, status: "retired", updatedAt: now, updatedBy: CURRENT_USER_ID });
+  markSaved();
+  await refresh();
+  navigateTo("#/case-types");
+  showFeedback("Ärendetypen har inaktiverats. Historiska ärenden är oförändrade.");
+});
+
+els.activityTypeAdminForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!canAdministerDefinitions()) {
+    showFeedback("Endast samordnare kan administrera aktivitetsmallar.");
+    return;
+  }
+  const creating = selectedActivityTypeId === "new";
+  const definition = creating ? newActivityTypeDefinition() : activityTemplateDefinitionById(els.activityTypeAdminIdInput.value);
+  if (!definition) return;
+  const customDefinition = creating || !SYSTEM_ACTIVITY_TEMPLATE_IDS.has(definition.id);
+  const title = customDefinition ? els.activityTypeAdminTitleInput.value.trim() : definition.title;
+  if (!title) {
+    els.activityTypeAdminTitleInput.setCustomValidity("Ange ett namn på aktivitetsmallen.");
+    els.activityTypeAdminTitleInput.reportValidity();
+    return;
+  }
+  const duplicateTitle = activityTemplateDefinitions.find((item) => item.id !== definition.id && item.title.localeCompare(title, "sv", { sensitivity: "base" }) === 0);
+  if (duplicateTitle) {
+    els.activityTypeAdminTitleInput.setCustomValidity("Det finns redan en aktivitetsmall med det namnet.");
+    els.activityTypeAdminTitleInput.reportValidity();
+    return;
+  }
+  els.activityTypeAdminTitleInput.setCustomValidity("");
+  const definitionId = creating ? customDefinitionId("activity-template") : definition.id;
+  const now = new Date().toISOString();
+  const nextVersion = creating ? 1 : Math.max(0, ...activityTemplateDefinitionVersions
+    .filter((item) => item.id === definition.id)
+    .map((item) => Number(item.version || 1))) + 1;
+  const nextDefinition = {
     ...definition,
+    id: definitionId,
     tenantId: DEFAULT_TENANT_ID,
     version: nextVersion,
     status: "published",
+    title,
     workInstruction: els.activityTypeAdminWorkInstructionInput.value.trim(),
     updatedAt: now,
     updatedBy: CURRENT_USER_ID
-  }] });
+  };
+  const records = creating ? [nextDefinition] : [{ ...definition, status: "retired", updatedAt: now, updatedBy: CURRENT_USER_ID }, nextDefinition];
+  await atomicPut({ [ACTIVITY_TEMPLATE_DEFINITIONS_STORE]: records });
   activityTypeEditMode = false;
   markSaved();
-  showFeedback("Aktivitetsmallen har uppdaterats.");
+  showFeedback(creating ? "Aktivitetsmallen har skapats." : "En ny version av aktivitetsmallen har publicerats.");
   await refresh();
+  if (creating) {
+    activityTypeEditMode = false;
+    navigateTo(`#/activity-types/${encodeURIComponent(definitionId)}`);
+  }
 });
 
 els.editActivityTypeButton.addEventListener("click", () => setActivityTypeEditMode(true));
-els.cancelActivityTypeEditButton.addEventListener("click", () => setActivityTypeEditMode(false));
+els.cancelActivityTypeEditButton.addEventListener("click", () => selectedActivityTypeId === "new" ? navigateTo("#/activity-types") : setActivityTypeEditMode(false));
+
+els.deactivateActivityTypeButton.addEventListener("click", async () => {
+  const definition = activityTemplateDefinitionById(selectedActivityTypeId);
+  if (!definition || SYSTEM_ACTIVITY_TEMPLATE_IDS.has(definition.id) || !canAdministerDefinitions()) return;
+  const impact = activityTypeUsageImpact(definition);
+  if (impact.caseTypes.length) {
+    showFeedback(`Mallen används av ${impact.caseTypes.map((item) => item.name).join(", ")}. Ta bort den från dessa flöden först.`);
+    return;
+  }
+  const confirmation = await confirmAction({
+    eyebrow: "Inaktivera aktivitetsmall",
+    title: `Inaktivera ${definition.title}?`,
+    body: `Mallen kan inte längre läggas till i nya flöden. ${impact.open} öppna och ${impact.total - impact.open} avslutade aktiviteter behåller sin mallversion.`,
+    mentorName: definition.title,
+    confirmLabel: "Inaktivera"
+  });
+  if (!confirmation.confirmed) return;
+  const now = new Date().toISOString();
+  await saveActivityTemplateDefinition({ ...definition, status: "retired", updatedAt: now, updatedBy: CURRENT_USER_ID });
+  markSaved();
+  await refresh();
+  navigateTo("#/activity-types");
+  showFeedback("Aktivitetsmallen har inaktiverats. Historiska aktiviteter är oförändrade.");
+});
 
 els.caseNumberingForm.addEventListener("change", updateCaseNumberingPreview);
 els.nextCaseSequenceInput.addEventListener("input", updateCaseNumberingPreview);
