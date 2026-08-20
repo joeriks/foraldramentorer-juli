@@ -74,6 +74,10 @@ test("keeps overview, registers and case headers focused on actionable informati
   assert.match(app, /class="case-register-state"/);
   assert.match(app, /setRecordFactVisibility\(els\.selectedCaseSupportCase, Boolean\(linkedSupportCase\)\)/);
   assert.match(app, /setRecordFactVisibility\(els\.casePriorityFact, caseRecord\.priority && caseRecord\.priority !== "normal"\)/);
+  assert.match(html, /<details id="caseHeaderDetails" class="case-header-details">\s*<summary>Ärendeinformation<\/summary>/);
+  assert.match(html, /<details id="caseTypeGuidance" class="case-type-guidance" hidden>\s*<summary>Om ärendetypen<\/summary>/);
+  assert.match(app, /els\.caseHeaderDetails\.open = false/);
+  assert.match(app, /els\.caseTypeGuidance\.open = false/);
 });
 
 test("blocks completion results until required registration is complete", () => {

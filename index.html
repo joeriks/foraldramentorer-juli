@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260819-focused-views-v92">
+    <link rel="stylesheet" href="styles.css?v=20260820-collapsed-case-header-v94">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -469,13 +469,16 @@
                     <button id="newCaseActivityButton" type="button" class="btn btn-primary btn-sm">Ny aktivitet</button>
                   </div>
                 </div>
-                <dl class="record-meta mb-0 mt-3">
-                  <div><dt>Förälder</dt><dd id="selectedCaseParent"></dd></div>
-                  <div><dt>Mentor</dt><dd id="selectedCaseMentor"></dd></div>
-                  <div><dt>Stödärende</dt><dd id="selectedCaseSupportCase"></dd></div>
-                  <div><dt>Ansvarig</dt><dd id="selectedCaseOwner"></dd></div>
-                  <div><dt>Senast ändrad</dt><dd id="selectedCaseUpdated"></dd></div>
-                </dl>
+                <details id="caseHeaderDetails" class="case-header-details">
+                  <summary>Ärendeinformation</summary>
+                  <dl class="record-meta mb-0">
+                    <div><dt>Förälder</dt><dd id="selectedCaseParent"></dd></div>
+                    <div><dt>Mentor</dt><dd id="selectedCaseMentor"></dd></div>
+                    <div><dt>Stödärende</dt><dd id="selectedCaseSupportCase"></dd></div>
+                    <div><dt>Ansvarig</dt><dd id="selectedCaseOwner"></dd></div>
+                    <div><dt>Senast ändrad</dt><dd id="selectedCaseUpdated"></dd></div>
+                  </dl>
+                </details>
               </div>
 
               <form id="caseCreateForm" class="card-body" hidden>
@@ -494,11 +497,14 @@
                         <input id="caseTitleInput" class="form-control form-control-sm" required autocomplete="off" placeholder="Välj ärendetyp först">
                       </div>
                       <div class="col-12">
-                        <div id="caseTypeGuidance" class="case-type-guidance" hidden>
-                          <strong id="caseTypeGuidanceTitle"></strong>
-                          <p id="caseTypeGuidanceText" class="mb-1"></p>
-                          <p id="caseTypeRegistrationHint" class="mb-0"></p>
-                        </div>
+                        <details id="caseTypeGuidance" class="case-type-guidance" hidden>
+                          <summary>Om ärendetypen</summary>
+                          <div class="case-type-guidance-content">
+                            <strong id="caseTypeGuidanceTitle"></strong>
+                            <p id="caseTypeGuidanceText" class="mb-1"></p>
+                            <p id="caseTypeRegistrationHint" class="mb-0"></p>
+                          </div>
+                        </details>
                       </div>
                       <div id="caseMentorField" class="col-md-6">
                         <label id="caseMentorLabel" class="form-label" for="caseMentorInput">Mentor <span class="text-secondary fw-normal">(valfritt)</span></label>
@@ -2109,6 +2115,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260819-focused-views-v92"></script>
+    <script type="module" src="app.js?v=20260820-collapsed-case-header-v94"></script>
   </body>
 </html>

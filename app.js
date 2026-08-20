@@ -120,6 +120,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "94",
+    date: "2026-08-20",
+    title: "Lugnare start i ärendet",
+    flow: "Ärende → grunduppgifter eller arbete",
+    simplified: "Ärendets sekundära fakta och den längre förklaringen av ärendetypen är nu stängda från start. Därmed syns formuläret eller det aktuella arbetet tidigare utan att användaren behöver skrolla förbi återkommande information.",
+    retained: "Rubrik, ärendenummer, status, navigering, personkopplingar, ansvar, ändringstid och full vägledning finns kvar. De kompletterande uppgifterna öppnas vid behov.",
+    changes: [
+      "Ärendeinformation i sidhuvudet har samlats i en utfällbar del.",
+      "Hjälptexten om vald ärendetyp kan öppnas separat i formuläret.",
+      "Den utfällbara delens öppna läge bevaras medan användaren arbetar i samma ärende."
+    ]
+  },
+  {
     version: "93",
     date: "2026-08-19",
     title: "Informationsmaterial som följer de aktuella arbetsflödena",
@@ -1252,6 +1265,7 @@ const els = {
   selectedCaseNumber: document.querySelector("#selectedCaseNumber"),
   selectedCaseTitle: document.querySelector("#selectedCaseTitle"),
   selectedCaseStatus: document.querySelector("#selectedCaseStatus"),
+  caseHeaderDetails: document.querySelector("#caseHeaderDetails"),
   selectedCaseMentor: document.querySelector("#selectedCaseMentor"),
   selectedCaseParent: document.querySelector("#selectedCaseParent"),
   selectedCaseSupportCase: document.querySelector("#selectedCaseSupportCase"),
@@ -6903,6 +6917,11 @@ function renderSupportProfileCompleteness() {
 
 function renderCaseTypeGuidance(caseRecord = null) {
   const caseType = caseTypeById(els.caseTypeInput.value, caseRecord?.caseTypeVersion);
+  const guidanceKey = caseType?.id || "";
+  if (els.caseTypeGuidance.dataset.caseTypeId !== guidanceKey) {
+    els.caseTypeGuidance.open = false;
+    els.caseTypeGuidance.dataset.caseTypeId = guidanceKey;
+  }
   els.caseTypeGuidance.hidden = !caseType;
   els.caseTypeGuidanceTitle.textContent = caseType ? `När används ${caseType.name.toLocaleLowerCase("sv-SE")}?` : "";
   els.caseTypeGuidanceText.textContent = caseType?.helpText || "";
@@ -7624,6 +7643,12 @@ function renderCaseDetail() {
   els.editCaseButton.hidden = creating || caseEditMode;
   els.saveCaseButton.textContent = creating ? "Spara registrering" : "Spara ändringar";
   els.caseTypeInput.disabled = !creating;
+
+  const caseHeaderKey = creating ? selectedCaseRecordId : caseRecord.id;
+  if (els.caseHeaderDetails.dataset.caseId !== caseHeaderKey) {
+    els.caseHeaderDetails.open = false;
+    els.caseHeaderDetails.dataset.caseId = caseHeaderKey;
+  }
 
   if (creating) {
     els.assignmentFollowupTabItem.hidden = true;

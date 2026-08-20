@@ -161,7 +161,7 @@ När en ny mentor registreras är `Skapa ärende om godkännande` förvalt, men 
 
 Ärenderegistret samlar rubrik, typ och registreringsdatum i kolumnen `Ärende`, personkopplingen i `Person`, status och nästa aktivitet i `Läge` samt handläggare i `Ansvarig`. Tabeller får skrolla inom sin egen yta på små skärmar men ska aldrig göra hela sidan bredare.
 
-På ärendekortet är fliken `Arbete` den första arbetsytan och innehåller både nästa rekommenderade steg och hela aktivitetslistan. Handlingar, möten och logg finns i egna flikar. Sekundära ärendeuppgifter visas endast när de har ett relevant värde eller när användaren öppnar den utfällbara delen för fler åtgärder.
+På ärendekortet är fliken `Arbete` den första arbetsytan och innehåller både nästa rekommenderade steg och hela aktivitetslistan. Handlingar, möten och logg finns i egna flikar. Rubrik, ärendenummer och status ligger kvar i sidhuvudet, medan personkopplingar, ansvar och ändringstid är stängda från start under `Ärendeinformation`. Även den längre beskrivningen av vald ärendetyp kan öppnas vid behov. Sekundära ärendeuppgifter visas endast när de har ett relevant värde eller när användaren öppnar den utfällbara delen för fler åtgärder.
 
 ### Aktiviteter och kommunal handläggningsrutin
 

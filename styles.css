@@ -1931,6 +1931,27 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.case-header-details {
+  margin-top: var(--app-space-2);
+  border-top: 1px solid var(--app-border);
+}
+
+.case-header-details > summary {
+  padding: var(--app-space-2) 0 0;
+  color: var(--app-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.case-header-details[open] > summary {
+  padding-bottom: var(--app-space-2);
+}
+
+.case-header-details .record-meta {
+  padding-top: var(--app-space-2);
+}
+
 .record-section-title {
   margin: 0 0 var(--app-space-2);
   color: #344553;
@@ -2328,16 +2349,30 @@ body {
 .case-type-guidance {
   border-left: 4px solid #55758c;
   background: #f2f6f8;
-  padding: 0.75rem 1rem;
   color: #263b49;
 }
 
-.case-type-guidance strong {
+.case-type-guidance > summary {
+  padding: 0.75rem 1rem;
+  color: var(--app-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.case-type-guidance[open] > summary {
+  padding-bottom: 0.5rem;
+}
+
+.case-type-guidance-content {
+  padding: 0 1rem 0.75rem;
+}
+
+.case-type-guidance-content strong {
   display: block;
   margin-bottom: 0.25rem;
 }
 
-.case-type-guidance p:last-child {
+.case-type-guidance-content p:last-child {
   color: #52636e;
   font-size: 0.875rem;
 }

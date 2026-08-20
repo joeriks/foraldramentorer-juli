@@ -756,7 +756,7 @@ Första vyn för en registrering ska vara ett kort formulär. Efter sparandet vi
 - Ett primärt rekommenderat nästa steg.
 - Aktivitetslistan i den första fliken `Arbete`.
 
-Tomma eller irrelevanta faktarader ska inte visas. Normalt prioriterade uppgifter ska vara synliga; sällan använda ärendeuppgifter och åtgärder samlas i en utfällbar sektion.
+Tomma eller irrelevanta faktarader ska inte visas. Ärendenummer, rubrik och status ska alltid vara synliga. Personkopplingar, ansvar, ändringstid och längre vägledning om ärendetypen är stängda från start men kan öppnas vid behov. Sällan använda ärendeuppgifter och åtgärder samlas också i en utfällbar sektion.
 
 ### 10.2 Utökad ärendevy
 
