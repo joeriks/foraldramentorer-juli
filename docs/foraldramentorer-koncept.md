@@ -110,7 +110,7 @@ Viktiga UX-principer:
 
 - Stor text.
 - Tydliga knappar.
-- En-klicks-navigation.
+- Ett tydligt nästa steg före stödmaterial och övriga val.
 - Automatisk sparfunktion.
 - Möjlighet till uppläst text.
 - Inget tidsbegränsat prov.
@@ -127,6 +127,8 @@ Pedagogiken bör bygga på case och dilemman snarare än långa regeltexter. Kun
 ## Aktuell prototyp: kommunportalen
 
 Den aktuella prototypen omfattar ett sammanhängande kommunalt arbetsflöde från behovsanalys och rekrytering till godkännande av mentor, stödärende, matchning, mentoruppdrag och uppföljning. Den innehåller också kontaktmottagning, personregister, utbildningsinnehåll, administration, support och versionshistorik.
+
+Utbildningsvyn visar mentorens nästa del först och samlar material och fristående kunskapstest i en sekundär utfällbar del. Systemadministrativa funktioner är märkta med både text och en återhållen grågrön visuell ram, så att användaren tydligt ser när arbetet gäller systemets konfiguration och inte ett vanligt verksamhetsärende.
 
 Prototypens viktigaste funktioner är:
 

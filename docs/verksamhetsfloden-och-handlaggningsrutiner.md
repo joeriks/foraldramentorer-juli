@@ -905,10 +905,10 @@ Handläggaren öppnar en aktivitet och ser alla möjliga resultat som en lista u
 
 ## 18A. Utbildningsmaterial och rollstyrda ingångar
 
-Systemet skiljer mellan referensmaterial, kurser och kunskapstester:
+Systemet skiljer mellan material, utbildningar och kunskapstester:
 
-- **Referensmaterial** är läsbart innehåll som kan visas för mentorer och, om kommunen väljer det, publikt för föräldrar.
-- **Kurs** består av ordnade moduler och kan innehålla enklare interaktiva moment samt länkar till referensmaterial och test.
+- **Material** är läsbart innehåll som kan visas för mentorer och, om kommunen väljer det, publikt för föräldrar.
+- **Utbildning** består av ordnade delar och kan innehålla enklare interaktiva moment samt länkar till material och test.
 - **Kunskapstest** innehåller strukturerade frågor, svarsalternativ, rättning och godkändgräns.
 
 Kommunens administratör väljer vilka publicerade innehållspaket som ingår i kommunens urval. Ett separat val avgör vilka referensmaterial som exponeras publikt. Kurser och kunskapstest är inte publika för oinloggade föräldrar. Om en kurs väljs ska systemet visa och bevara dess beroenden till material och test så att kommunen inte kan publicera en ofullständig kurs av misstag.
@@ -920,6 +920,10 @@ Mentorn använder mentorportalen för att:
 3. fortsätta ett påbörjat genomförande,
 4. genomföra kunskapstest och få resultat,
 5. återrapportera planerade kontakter i ett mentoruppdrag.
+
+Utbildningsvyn visar nästa del och genomförandet först. Hela utbildningar följer därefter, medan fristående material och kunskapstest ligger i en utfällbar stödsektion. Delarna visar `Klar`, `Nästa` eller `Kommande`; ordningen är vägledande och hindrar inte användaren från att öppna en senare del.
+
+Administrera utbildning ligger under den tydligt markerade kontexten **Systemadministration**. Samma textmärkning och visuella ram används för övriga administrativa vyer. Markeringen hjälper användaren att orientera sig men är inte en ersättning för behörighetskontroll.
 
 Genomförande, innehållsversion, testförsök och resultat lagras separat från själva innehållet. Handläggaren ska använda denna registrering som underlag i rätt aktivitet och inte skapa en parallell manuell utbildningsstatus. Ett testresultat fattar inte automatiskt beslut om att godkänna eller underkänna en mentor.
 

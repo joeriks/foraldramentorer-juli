@@ -2,9 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [html, app] = await Promise.all([
+const [html, app, styles] = await Promise.all([
   readFile(new URL("../index.html", import.meta.url), "utf8"),
-  readFile(new URL("../app.js", import.meta.url), "utf8")
+  readFile(new URL("../app.js", import.meta.url), "utf8"),
+  readFile(new URL("../styles.css", import.meta.url), "utf8")
 ]);
 
 test("exposes learning and learning administration routes", () => {
@@ -22,7 +23,35 @@ test("persists municipality selection and learner progress separately", () => {
   assert.match(app, /requiredLearningContentIds/);
   assert.match(app, /queueLearningMutation/);
   assert.match(app, /data-learning-admin-filter/);
-  assert.match(app, /Visa kommunens katalog/);
+  assert.match(app, /Visa utbildningsvyn/);
+});
+
+test("puts the next learning step first without locking later parts", () => {
+  assert.match(app, /function learningCourseState/);
+  assert.match(app, /Nästa steg i utbildningen/);
+  assert.match(app, /Fortsätt.*nextModule\.title/s);
+  assert.match(app, /Material och kunskapstest/);
+  assert.match(app, /completeCount} av \$\{state\.total} delar klara/);
+  assert.match(app, /is-next/);
+  assert.match(app, /is-upcoming/);
+  assert.match(app, /aria-current="step"/);
+  assert.doesNotMatch(app, /is-upcoming[^\n]+disabled/);
+});
+
+test("marks system administration with text and a shared visual context", () => {
+  assert.match(html, /id="administrationContext"[^>]+>.*Systemadministration/);
+  assert.match(html, />Administrera utbildning</);
+  assert.match(app, /SYSTEM_ADMINISTRATION_VIEWS/);
+  assert.match(app, /document\.body\.classList\.toggle\("is-system-administration"/);
+  assert.match(styles, /body\.is-system-administration \.app-header/);
+  assert.match(styles, /body\.is-system-administration \.app-main/);
+  assert.match(styles, /\.administration-context/);
+});
+
+test("stacks the simplified learning flow on small screens", () => {
+  assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.learning-next-step,[\s\S]*\.learning-course-item[\s\S]*grid-template-columns: 1fr/);
+  assert.match(styles, /\.learning-next-step \.btn,[\s\S]*\.learning-course-item \.btn[\s\S]*width: 100%/);
+  assert.match(styles, /\.learning-selection-summary[\s\S]*grid-template-columns: 1fr/);
 });
 
 test("offers a role-switched mentor portal with protected mentor routes", () => {

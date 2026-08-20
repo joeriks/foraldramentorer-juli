@@ -2,7 +2,7 @@
 
 Status: Implementerat prototypformat och målbild för produktion
 
-Senast uppdaterad: 2026-08-19
+Senast uppdaterad: 2026-08-20
 
 ## Princip
 
@@ -10,7 +10,7 @@ Utbildningsinnehåll lagras som versionshanterade innehållspaket. Ett paket kan
 
 Kommunens urval lagras separat som referenser till innehållspaket. Gemensamt material kopieras därför inte när en kommun väljer att använda det. En kurs tar automatiskt med de material och test som kursen refererar till.
 
-I den aktuella prototypen kan användaren filtrera utbildningsbiblioteket på kurser, referensmaterial och kunskapstest. Administratören kan välja kommunens innehåll, se versionsläge och styra publik exponering för referensmaterial. Mentorportalen visar den valda utbildningen, sparar progress och låter mentorn genomföra test. Den publika vyn visar endast referensmaterial som kommunen uttryckligen har valt och publicerat.
+I den aktuella prototypen visar utbildningsvyn först nästa del i mentorens utbildning och därefter hela utbildningar med antal genomförda delar. Fristående material och kunskapstest finns kvar i en utfällbar stödsektion. Delar märks som `Klar`, `Nästa` eller `Kommande`, men presentationen låser inte ordningen tekniskt. Administratören kan välja kommunens innehåll, se versionsläge och styra publik exponering för material. Mentorportalen sparar progress och låter mentorn genomföra test. Den publika vyn visar endast material som kommunen uttryckligen har valt och publicerat.
 
 Urvalet har två skilda dimensioner:
 
@@ -105,6 +105,8 @@ Ett slutfört test eller en kurs uppdaterar utbildningsprogressen men fattar int
 Prototypens val av testanvändartyp simulerar dessa vyer. Det ersätter inte autentisering, tenantavgränsning eller serverbaserad behörighetskontroll.
 
 ## Administrationsflöde
+
+Administrationsvyn heter **Administrera utbildning** och ligger i den visuellt och textmässigt markerade kontexten **Systemadministration**. Den skiljer mellan vad som ingår för mentorer och vilket material som dessutom visas för föräldrar. Den administrativa färgsättningen är ett orienteringsstöd och ersätter inte roll- eller behörighetskontroll.
 
 1. Administratören öppnar det gemensamma och kommunägda biblioteket.
 2. Ett publicerat innehållspaket väljs för aktuell kommun.

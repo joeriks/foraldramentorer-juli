@@ -115,6 +115,7 @@ const SUPPORT_MATCHING_LANGUAGES_STORE = "supportMatchingLanguages";
 const MATCHING_SNAPSHOTS_STORE = "matchingSnapshots";
 const SYSTEM_CASE_TYPE_IDS = new Set(CASE_TYPE_DEFINITIONS.map((definition) => definition.id));
 const SYSTEM_ACTIVITY_TEMPLATE_IDS = new Set(ACTIVITY_TEMPLATES.map((definition) => definition.id));
+const SYSTEM_ADMINISTRATION_VIEWS = new Set(["administration", "handler", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "presentation", "routines", "versions"]);
 const SUPPORT_PANEL_SESSION_KEY = "foraldramentorer.supportPanelOpen";
 const LEARNING_SELECTION_INITIALIZED_ID = "__selection_initialized__";
 let CURRENT_USER_ID = "handler-sara";
@@ -122,6 +123,22 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "98",
+    date: "2026-08-20",
+    title: "Tydligare utbildning och administrativ kontext",
+    flow: "Utbildning -> nästa del / Systemadministration",
+    simplified: "Utbildningen visar nu ett primärt nästa steg, följt av utbildningar i sin helhet. Fristående material och kunskapstest ligger samlade i en utfällbar del. Systemadministrativa vyer har fått en gemensam märkning och en diskret grågrön ram.",
+    retained: "Alla utbildningar, material, test, tidigare genomföranden, testresultat, kommunurval, versionsregler och rollstyrda vyer finns kvar. Kommande utbildningsdelar är synliga och kan fortfarande öppnas; ingen ny låsning har införts.",
+    changes: [
+      "Nästa utbildningsdel och antal klara delar visas först.",
+      "Begreppen har förenklats till utbildning, del, material och kunskapstest.",
+      "Material och fristående kunskapstest har samlats i en utfällbar stödsektion.",
+      "Utbildningsdelar märks som Klar, Nästa eller Kommande utan att arbetsordningen tekniskt låses.",
+      "Administrera utbildning beskriver tydligare vad som ingår för mentorer och vad som visas för föräldrar.",
+      "Alla systemadministrativa sidor visar både textmärkning och en gemensam visuell kontext."
+    ]
+  },
   {
     version: "97",
     date: "2026-08-20",
@@ -1078,6 +1095,7 @@ let activeTestUserType = TEST_USER_TYPES.has(localStorage.getItem(TEST_USER_TYPE
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
   breadcrumb: document.querySelector("#breadcrumb"),
+  administrationContext: document.querySelector("#administrationContext"),
   currentUserInitials: document.querySelector("#currentUserInitials"),
   currentUserLabel: document.querySelector("#currentUserLabel"),
   currentUserName: document.querySelector("#currentUserName"),
@@ -4350,7 +4368,7 @@ async function migrateDefaultHandlerRecords() {
 }
 
 function learningTypeLabel(type) {
-  return { material: "Referensmaterial", course: "Kurs", test: "Kunskapstest", reflection: "Reflektion" }[type] || "Innehåll";
+  return { material: "Material", course: "Utbildning", test: "Kunskapstest", reflection: "Reflektion" }[type] || "Innehåll";
 }
 
 function renderLearningMarkdown(source) {
@@ -4384,40 +4402,82 @@ async function completeLearningModule(courseId, moduleId, extra = {}) {
   await refresh();
 }
 
+function learningCourseState(course) {
+  const progress = learningProgressRecord(selectedLearnerId || "", course.id);
+  const completed = new Set(progress.completedModuleIds || []);
+  return {
+    progress,
+    completed,
+    nextModule: course.modules.find((module) => !completed.has(module.id)) || null,
+    percent: courseProgressPercent(course, progress.completedModuleIds),
+    completeCount: completed.size,
+    total: course.modules.length
+  };
+}
+
 function renderLearningCatalog() {
   if (isMentorSession()) selectedLearnerId = currentUser().mentorId || "";
   const items = selectedLearningContent();
-  const visibleItems = items.filter((item) => learningTypeFilter === "all" || item.type === learningTypeFilter);
+  if (learningTypeFilter === "course") learningTypeFilter = "all";
+  const courses = items.filter((item) => item.type === "course");
+  const courseStates = new Map(courses.map((course) => [course.id, learningCourseState(course)]));
+  const primaryCourse = courses.find((course) => courseStates.get(course.id).percent < 100) || courses[0] || null;
+  const primaryState = primaryCourse ? courseStates.get(primaryCourse.id) : null;
+  const libraryItems = items.filter((item) => item.type !== "course");
+  const visibleLibraryItems = libraryItems.filter((item) => learningTypeFilter === "all" || item.type === learningTypeFilter);
   const learnerOptions = candidates.map((candidate) => `<option value="${escapeHtml(candidate.id)}" ${candidate.id === selectedLearnerId ? "selected" : ""}>${escapeHtml(candidate.name)}</option>`).join("");
   els.learningCatalogPanel.innerHTML = `
     <div class="card-header bg-white d-flex flex-wrap gap-3 justify-content-between align-items-start">
-      <div><h2 class="h5 mb-1">${isMentorSession() ? "Min utbildning" : "Utbildning"}</h2><p class="text-secondary mb-0">${isMentorSession() ? "Kurser, referensmaterial och kunskapstest som kommunen har valt för dig." : "Kommunens valda referensmaterial, kurser och kunskapstest."}</p></div>
+      <div><h2 class="h5 mb-1">${isMentorSession() ? "Min utbildning" : "Mentorutbildning"}</h2><p class="text-secondary mb-0">Fortsätt med nästa del eller se hela utbildningen.</p></div>
       ${isMentorSession() ? `<div class="learning-current-mentor"><span>Genomförande för</span><strong>${escapeHtml(currentUserName())}</strong></div>` : `<div class="learning-learner-select">
-        <label class="form-label" for="learningLearnerSelect">Visa genomförande för mentor</label>
+        <label class="form-label" for="learningLearnerSelect">Mentor</label>
         <select id="learningLearnerSelect" class="form-select form-select-sm" ${candidates.length ? "" : "disabled"}>
           ${candidates.length ? learnerOptions : '<option>Inga mentorer registrerade</option>'}
         </select>
       </div>`}
     </div>
-    <div class="card-body border-bottom d-flex flex-wrap justify-content-between align-items-center gap-3">
-      <div class="btn-group btn-group-sm" role="group" aria-label="Filtrera utbildningsinnehåll">
-        ${[["all", "Allt"], ["course", "Kurser"], ["material", "Referensmaterial"], ["test", "Kunskapstest"]].map(([value, label]) => `<button type="button" class="btn ${learningTypeFilter === value ? "btn-secondary" : "btn-outline-secondary"}" data-learning-filter="${value}">${label}</button>`).join("")}
-      </div>
-      <span class="small text-secondary">${visibleItems.length} innehållspaket</span>
+    <div class="card-body learning-catalog-body">
+      ${primaryCourse ? `<section class="learning-next-step" aria-label="Nästa steg i utbildningen">
+        <div>
+          <div class="record-type">${primaryState.nextModule ? "Nästa steg" : "Utbildningen är klar"}</div>
+          <h3>${escapeHtml(primaryCourse.title)}</h3>
+          <p>${primaryState.nextModule ? `<strong>${escapeHtml(primaryState.nextModule.title)}</strong> · ${learningTypeLabel(primaryState.nextModule.type)}` : "Alla delar är genomförda."}</p>
+          <span>${primaryState.completeCount} av ${primaryState.total} delar klara</span>
+        </div>
+        <a class="btn btn-primary" href="#/learning/${encodeURIComponent(primaryCourse.id)}">${primaryState.nextModule ? `${primaryState.completeCount ? "Fortsätt" : "Starta"}: ${escapeHtml(primaryState.nextModule.title)}` : "Visa genomförd utbildning"}</a>
+      </section>` : '<div class="empty-list text-secondary">Kommunen har ännu inte valt någon utbildning.</div>'}
+      <section class="learning-courses" aria-labelledby="learningCoursesHeading">
+        <div class="learning-section-heading"><div><h3 id="learningCoursesHeading" class="h6 mb-1">Utbildningar</h3><p class="small text-secondary mb-0">Öppna en utbildning för att se alla delar.</p></div><span>${courses.length}</span></div>
+        <div class="learning-course-list">
+          ${courses.map((course) => {
+            const state = courseStates.get(course.id);
+            return `<article class="learning-course-item">
+              <div><span class="record-type">Utbildning · version ${course.version}</span><h4>${escapeHtml(course.title)}</h4><p>${escapeHtml(course.summary)}</p></div>
+              <div class="learning-course-item-progress"><div class="progress" role="progressbar" aria-label="Utbildningsförlopp" aria-valuenow="${state.percent}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${state.percent}%"></div></div><span>${state.completeCount} av ${state.total} delar klara</span></div>
+              <a class="btn btn-outline-primary btn-sm" href="#/learning/${encodeURIComponent(course.id)}">${state.percent > 0 && state.percent < 100 ? "Fortsätt" : "Öppna"}</a>
+            </article>`;
+          }).join("") || '<div class="empty-list text-secondary">Inga utbildningar ingår.</div>'}
+        </div>
+      </section>
+      <details class="learning-library-details">
+        <summary>Material och kunskapstest <span>${libraryItems.length}</span></summary>
+        <div class="learning-library-toolbar">
+          <div class="btn-group btn-group-sm" role="group" aria-label="Filtrera material och kunskapstest">
+            ${[["all", "Alla"], ["material", "Material"], ["test", "Kunskapstest"]].map(([value, label]) => `<button type="button" class="btn ${learningTypeFilter === value ? "btn-secondary" : "btn-outline-secondary"}" data-learning-filter="${value}">${label}</button>`).join("")}
+          </div>
+          <span class="small text-secondary">${visibleLibraryItems.length} delar</span>
+        </div>
+        <div class="learning-catalog-grid">
+          ${visibleLibraryItems.map((item) => `<article class="learning-catalog-item">
+            <div class="d-flex justify-content-between gap-3 align-items-start"><span class="badge text-bg-light border">${learningTypeLabel(item.type)}</span><span class="small text-secondary">v${item.version}</span></div>
+            <h3 class="h6 mt-3 mb-2">${escapeHtml(item.title)}</h3>
+            <p class="text-secondary">${escapeHtml(item.summary)}</p>
+            <a class="btn btn-outline-primary btn-sm" href="#/learning/${encodeURIComponent(item.id)}">${item.type === "test" ? "Gör testet" : "Läs"}</a>
+          </article>`).join("") || '<div class="empty-list text-secondary">Inget innehåll matchar filtret.</div>'}
+        </div>
+      </details>
     </div>
-    <div class="learning-catalog-grid">
-      ${visibleItems.map((item) => {
-        const progress = item.type === "course" && selectedLearnerId ? learningProgressRecord(selectedLearnerId, item.id) : null;
-        const percent = progress ? courseProgressPercent(item, progress.completedModuleIds) : null;
-        return `<article class="learning-catalog-item">
-          <div class="d-flex justify-content-between gap-3 align-items-start"><span class="badge text-bg-light border">${learningTypeLabel(item.type)}</span><span class="small text-secondary">v${item.version}</span></div>
-          <h3 class="h6 mt-3 mb-2">${escapeHtml(item.title)}</h3>
-          <p class="text-secondary">${escapeHtml(item.summary)}</p>
-          ${percent !== null ? `<div class="progress mb-2" role="progressbar" aria-label="Kursförlopp" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${percent}%"></div></div><div class="small text-secondary mb-3">${percent}% genomfört</div>` : ""}
-          <a class="btn btn-outline-primary btn-sm" href="#/learning/${encodeURIComponent(item.id)}">Öppna</a>
-        </article>`;
-      }).join("") || '<div class="empty-list text-secondary">Inget innehåll matchar filtret.</div>'}
-    </div>`;
+    `;
 }
 
 function renderKnowledgeTestForm(test, course = null, module = null) {
@@ -4432,27 +4492,31 @@ function renderKnowledgeTestForm(test, course = null, module = null) {
       ${latestAttempt ? `<div class="learning-answer-feedback ${latestAttempt.answers?.[question.id] === question.correctOptionId ? "is-correct" : "is-incorrect"}"><strong>${latestAttempt.answers?.[question.id] === question.correctOptionId ? "Rätt svar" : "Fel svar"}.</strong> ${escapeHtml(question.explanation)}</div>` : ""}
     </fieldset>`).join("")}
     ${latestAttempt ? `<div class="alert ${latestAttempt.passed ? "alert-success" : "alert-warning"}">Senaste resultat: ${latestAttempt.score}% (${latestAttempt.passed ? "Godkänt" : "Inte godkänt"}).</div>` : ""}
-    <button type="submit" class="btn btn-primary btn-sm" ${selectedLearnerId ? "" : "disabled"}>Rätta testet</button>
+    <button type="submit" class="btn btn-primary btn-sm" ${selectedLearnerId ? "" : "disabled"}>Rätta svaren</button>
   </form>`;
 }
 
 function renderCourseDetail(course) {
-  const progress = selectedLearnerId ? learningProgressRecord(selectedLearnerId, course.id) : learningProgressRecord("", course.id);
-  const completed = new Set(progress.completedModuleIds || []);
-  const percent = courseProgressPercent(course, progress.completedModuleIds);
+  const state = learningCourseState(course);
+  const { progress, completed, nextModule, percent, completeCount, total } = state;
   return `<div class="card-header record-header bg-white">
     <a class="small" href="#/learning">Tillbaka till utbildning</a>
-    <div class="record-type mt-3">Kurs · version ${course.version}</div><h2 class="h5 mb-1">${escapeHtml(course.title)}</h2><p class="text-secondary mb-0">${escapeHtml(course.summary)}</p>
-    <div class="learning-course-progress mt-3"><div class="progress" role="progressbar" aria-label="Kursförlopp" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${percent}%"></div></div><strong>${percent}% genomfört</strong></div>
+    <div class="record-type mt-3">Utbildning · version ${course.version}</div><h2 class="h5 mb-1">${escapeHtml(course.title)}</h2><p class="text-secondary mb-0">${escapeHtml(course.summary)}</p>
+    <div class="learning-course-progress mt-3"><div class="progress" role="progressbar" aria-label="Utbildningsförlopp" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${percent}%"></div></div><strong>${completeCount} av ${total} delar klara</strong></div>
   </div>
   <div class="card-body learning-course-body">
+    <div class="learning-course-next"><span class="record-type">${nextModule ? "Nästa del" : "Utbildningen är klar"}</span><strong>${escapeHtml(nextModule?.title || "Alla delar är genomförda")}</strong></div>
     <div class="learning-markdown mb-4">${renderLearningMarkdown(course.bodyMarkdown)}</div>
     ${course.modules.map((module, index) => {
       const content = module.contentId ? learningContentById(selectedLearningContent(), module.contentId) : null;
       const isComplete = completed.has(module.id);
-      if (module.type === "test" && content) return `<section class="learning-module ${isComplete ? "is-complete" : ""}"><header><span>${index + 1}</span><div><div class="record-type">Kunskapstest</div><h3 class="h6 mb-0">${escapeHtml(module.title)}</h3></div>${isComplete ? '<span class="badge text-bg-success">Klar</span>' : ""}</header>${renderKnowledgeTestForm(content, course, module)}</section>`;
-      if (module.type === "reflection") return `<section class="learning-module ${isComplete ? "is-complete" : ""}"><header><span>${index + 1}</span><div><div class="record-type">Reflektion</div><h3 class="h6 mb-0">${escapeHtml(module.title)}</h3></div>${isComplete ? '<span class="badge text-bg-success">Klar</span>' : ""}</header><form data-learning-reflection="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}"><label class="form-label" for="reflection-${escapeHtml(module.id)}">${escapeHtml(module.prompt)}</label><textarea id="reflection-${escapeHtml(module.id)}" class="form-control" rows="3" required>${escapeHtml(progress.reflections?.[module.id] || "")}</textarea><button type="submit" class="btn btn-primary btn-sm mt-3" ${selectedLearnerId ? "" : "disabled"}>Spara reflektion</button></form></section>`;
-      return `<section class="learning-module ${isComplete ? "is-complete" : ""}"><header><span>${index + 1}</span><div><div class="record-type">Referensmaterial</div><h3 class="h6 mb-0">${escapeHtml(module.title)}</h3></div>${isComplete ? '<span class="badge text-bg-success">Klar</span>' : ""}</header>${content ? `<div class="learning-markdown">${renderLearningMarkdown(content.bodyMarkdown)}</div>` : '<div class="alert alert-warning">Materialet ingår inte i kommunens urval.</div>'}<button type="button" class="btn btn-outline-primary btn-sm mt-3" data-complete-learning-module="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}" ${selectedLearnerId ? "" : "disabled"}>${isComplete ? "Markerad som klar" : "Markera som klar"}</button></section>`;
+      const isNext = module.id === nextModule?.id;
+      const statusClass = isComplete ? "is-complete" : isNext ? "is-next" : "is-upcoming";
+      const statusBadge = isComplete ? '<span class="badge text-bg-success">Klar</span>' : isNext ? '<span class="badge text-bg-primary">Nästa</span>' : '<span class="badge text-bg-light border">Kommande</span>';
+      const sectionStart = `<section class="learning-module ${statusClass}" ${isNext ? 'aria-current="step"' : ""}><header><span>${index + 1}</span><div><div class="record-type">${learningTypeLabel(module.type)}</div><h3 class="h6 mb-0">${escapeHtml(module.title)}</h3></div>${statusBadge}</header>`;
+      if (module.type === "test" && content) return `${sectionStart}${renderKnowledgeTestForm(content, course, module)}</section>`;
+      if (module.type === "reflection") return `${sectionStart}<form data-learning-reflection="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}"><label class="form-label" for="reflection-${escapeHtml(module.id)}">${escapeHtml(module.prompt)}</label><textarea id="reflection-${escapeHtml(module.id)}" class="form-control" rows="3" required>${escapeHtml(progress.reflections?.[module.id] || "")}</textarea><button type="submit" class="btn btn-primary btn-sm mt-3" ${selectedLearnerId ? "" : "disabled"}>Spara reflektion</button></form></section>`;
+      return `${sectionStart}${content ? `<div class="learning-markdown">${renderLearningMarkdown(content.bodyMarkdown)}</div>` : '<div class="alert alert-warning">Materialet ingår inte i kommunens urval.</div>'}<button type="button" class="btn btn-outline-primary btn-sm mt-3" data-complete-learning-module="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}" ${selectedLearnerId ? "" : "disabled"}>${isComplete ? "Delen är klar" : "Markera delen som klar"}</button></section>`;
     }).join("")}
   </div>`;
 }
@@ -4470,7 +4534,7 @@ function renderLearning() {
   }
   if (item.type === "course") els.learningDetailPanel.innerHTML = renderCourseDetail(item);
   else if (item.type === "test") els.learningDetailPanel.innerHTML = `<div class="card-header record-header bg-white"><a class="small" href="#/learning">Tillbaka till utbildning</a><div class="record-type mt-3">Kunskapstest · version ${item.version}</div><h2 class="h5 mb-1">${escapeHtml(item.title)}</h2><p class="text-secondary mb-0">${escapeHtml(item.summary)}</p></div><div class="card-body">${renderKnowledgeTestForm(item)}</div>`;
-  else els.learningDetailPanel.innerHTML = `<div class="card-header record-header bg-white"><a class="small" href="#/learning">Tillbaka till utbildning</a><div class="record-type mt-3">Referensmaterial · version ${item.version}</div><h2 class="h5 mb-1">${escapeHtml(item.title)}</h2><p class="text-secondary mb-0">${escapeHtml(item.summary)}</p></div><article class="card-body learning-markdown learning-material-body">${renderLearningMarkdown(item.bodyMarkdown)}</article>`;
+  else els.learningDetailPanel.innerHTML = `<div class="card-header record-header bg-white"><a class="small" href="#/learning">Tillbaka till utbildning</a><div class="record-type mt-3">Material · version ${item.version}</div><h2 class="h5 mb-1">${escapeHtml(item.title)}</h2><p class="text-secondary mb-0">${escapeHtml(item.summary)}</p></div><article class="card-body learning-markdown learning-material-body">${renderLearningMarkdown(item.bodyMarkdown)}</article>`;
 }
 
 function renderLearningAdministration() {
@@ -4494,43 +4558,43 @@ function renderLearningAdministration() {
     .map((course) => course.title);
   const filters = [
     ["all", "Alla", learningContent.length],
-    ["selected", "Kommunens urval", tenantLearningSelection.length],
-    ["available", "Inte valda", learningContent.length - tenantLearningSelection.length]
+    ["selected", "Ingår", tenantLearningSelection.length],
+    ["available", "Tillgängliga", learningContent.length - tenantLearningSelection.length]
   ];
   els.learningAdminListPanel.innerHTML = `
     <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-start gap-3">
-      <div><div class="record-type">Aktuell kommun</div><h2 class="h5 mb-1">Kommunportalens utbildningsurval</h2><p class="text-secondary mb-0">Välj vilket innehåll som ska visas i kommunens utbildningskatalog.</p></div>
-      <a class="btn btn-outline-primary btn-sm" href="#/learning">Visa kommunens katalog</a>
+      <div><div class="record-type">Systemadministration</div><h2 class="h5 mb-1">Utbildning i kommunen</h2><p class="text-secondary mb-0">Välj vilka utbildningar och material som ingår för mentorer och vad som visas för föräldrar.</p></div>
+      <a class="btn btn-outline-primary btn-sm" href="#/learning">Visa utbildningsvyn</a>
     </div>
     <div class="learning-selection-summary" aria-label="Sammanfattning av kommunens utbildningsurval">
-      <div><strong>${tenantLearningSelection.length}</strong><span>innehållspaket visas</span></div>
-      <div><strong>${explicitCount}</strong><span>direkt valda</span></div>
-      <div><strong>${inheritedCount}</strong><span>ingår via kurs</span></div>
-      <div><strong>${publicCount}</strong><span>publika material</span></div>
+      <div><strong>${tenantLearningSelection.length}</strong><span>delar ingår</span></div>
+      <div><strong>${explicitCount}</strong><span>valda direkt</span></div>
+      <div><strong>${inheritedCount}</strong><span>ingår via utbildning</span></div>
+      <div><strong>${publicCount}</strong><span>material för föräldrar</span></div>
     </div>
     <div class="card-body border-bottom py-3">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div class="btn-group btn-group-sm" role="group" aria-label="Filtrera kommunens utbildningsurval">
           ${filters.map(([value, label, count]) => `<button type="button" class="btn ${learningAdminFilter === value ? "btn-secondary" : "btn-outline-secondary"}" data-learning-admin-filter="${value}" aria-pressed="${learningAdminFilter === value}">${label} <span class="badge text-bg-light ms-1">${count}</span></button>`).join("")}
         </div>
-        <p class="small text-secondary mb-0">Kurser inkluderar automatiskt material och test som kursen behöver.</p>
+        <p class="small text-secondary mb-0">En utbildning inkluderar automatiskt de delar den behöver.</p>
       </div>
     </div>
-    <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Innehåll</th><th>Typ</th><th>Version</th><th>Kommunens urval</th><th>Publikt för föräldrar</th><th class="text-end">Åtgärd</th></tr></thead><tbody>${visibleContent.map((content) => {
+    <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Utbildning eller material</th><th>Typ</th><th>Version</th><th>Ingår för mentorer</th><th>Visas för föräldrar</th><th class="text-end">Åtgärd</th></tr></thead><tbody>${visibleContent.map((content) => {
     const selection = selectionById.get(content.id);
     const parentCourses = selection && !selection.explicit ? requiredByCourses(content.id) : [];
-    const selectionLabel = selection ? selection.explicit ? "Direkt valt" : "Ingår via kurs" : "Inte valt";
+    const selectionLabel = selection ? selection.explicit ? "Vald direkt" : "Ingår via utbildning" : "Ingår inte";
     const canBePublic = Boolean(selection) && content.type === "material";
-    return `<tr><td><strong>${escapeHtml(content.title)}</strong><small class="d-block text-secondary">${escapeHtml(content.summary)}</small></td><td>${learningTypeLabel(content.type)}</td><td>v${content.version}${selection && Number(selection.selectedVersion) < Number(content.version) ? '<small class="d-block text-warning-emphasis">Ny version finns</small>' : ""}</td><td><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" aria-label="Visa ${escapeHtml(content.title)} för aktuell kommun" data-learning-selection="${escapeHtml(content.id)}" ${selection ? "checked" : ""} ${selection && !selection.explicit ? "disabled" : ""}><label class="form-check-label">${selectionLabel}</label>${parentCourses.length ? `<small class="d-block text-secondary">Krävs av: ${escapeHtml(parentCourses.join(", "))}</small>` : ""}</div></td><td><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" aria-label="Exponera ${escapeHtml(content.title)} publikt" data-learning-public="${escapeHtml(content.id)}" ${selection?.public ? "checked" : ""} ${canBePublic ? "" : "disabled"}><label class="form-check-label">${selection?.public ? "Publikt" : "Inte publikt"}</label>${content.type !== "material" ? '<small class="d-block text-secondary">Endast referensmaterial</small>' : !selection ? '<small class="d-block text-secondary">Välj först för kommunen</small>' : ""}</div></td><td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/learning-admin/${encodeURIComponent(content.id)}">Öppna</a></td></tr>`;
+    return `<tr><td><strong>${escapeHtml(content.title)}</strong><small class="d-block text-secondary">${escapeHtml(content.summary)}</small></td><td>${learningTypeLabel(content.type)}</td><td>v${content.version}${selection && Number(selection.selectedVersion) < Number(content.version) ? '<small class="d-block text-warning-emphasis">Ny version finns</small>' : ""}</td><td><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" aria-label="Visa ${escapeHtml(content.title)} för aktuell kommun" data-learning-selection="${escapeHtml(content.id)}" ${selection ? "checked" : ""} ${selection && !selection.explicit ? "disabled" : ""}><label class="form-check-label">${selectionLabel}</label>${parentCourses.length ? `<small class="d-block text-secondary">Ingår i: ${escapeHtml(parentCourses.join(", "))}</small>` : ""}</div></td><td><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" aria-label="Exponera ${escapeHtml(content.title)} publikt" data-learning-public="${escapeHtml(content.id)}" ${selection?.public ? "checked" : ""} ${canBePublic ? "" : "disabled"}><label class="form-check-label">${selection?.public ? "Visas" : "Visas inte"}</label>${content.type !== "material" ? '<small class="d-block text-secondary">Endast material kan visas</small>' : !selection ? '<small class="d-block text-secondary">Låt materialet ingå först</small>' : ""}</div></td><td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/learning-admin/${encodeURIComponent(content.id)}">Öppna</a></td></tr>`;
   }).join("") || '<tr><td colspan="6" class="text-center text-secondary py-4">Inget innehåll matchar filtret.</td></tr>'}</tbody></table></div>`;
   if (!route.id) return;
   if (!item) {
-    els.learningAdminDetailPanel.innerHTML = '<div class="card-body py-5"><h2 class="h5">Innehållspaketet finns inte</h2><a class="btn btn-outline-primary btn-sm" href="#/learning-admin">Tillbaka</a></div>';
+    els.learningAdminDetailPanel.innerHTML = '<div class="card-body py-5"><h2 class="h5">Utbildningsdelen finns inte</h2><a class="btn btn-outline-primary btn-sm" href="#/learning-admin">Tillbaka</a></div>';
     return;
   }
   const selection = selectionById.get(item.id);
-  const structure = item.type === "course" ? `<section class="record-section"><h3 class="record-section-title">Kursmoment</h3><ol class="mb-0">${item.modules.map((module) => `<li>${escapeHtml(module.title)} <span class="text-secondary">(${learningTypeLabel(module.type)})</span></li>`).join("")}</ol></section>` : item.type === "test" ? `<section class="record-section"><h3 class="record-section-title">Testfrågor</h3><ol class="mb-0">${item.questions.map((question) => `<li>${escapeHtml(question.prompt)}</li>`).join("")}</ol></section>` : "";
-  els.learningAdminDetailPanel.innerHTML = `<div class="card-header record-header bg-white"><a class="small" href="#/learning-admin">Tillbaka till utbildningsinnehåll</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">${learningTypeLabel(item.type)}</div><p class="record-id mb-1">Tekniskt ID ${escapeHtml(item.id)}</p><h2 class="h5 mb-0">${escapeHtml(item.title)}</h2></div><div class="d-flex gap-2 align-items-start">${selection && Number(selection.selectedVersion) < Number(item.version) ? `<button type="button" class="btn btn-outline-primary btn-sm" data-use-latest-learning="${escapeHtml(item.id)}">Använd version ${item.version}</button>` : ""}<button type="submit" form="learningAdminForm" class="btn btn-primary btn-sm">Spara ny version</button></div></div><dl class="record-meta mb-0 mt-3"><div><dt>Senaste version</dt><dd>${item.version}</dd></div><div><dt>Kommunens version</dt><dd>${selection ? selection.selectedVersion : "Ingår inte"}</dd></div><div><dt>Omfång</dt><dd>${item.scope === "shared" ? "Gemensamt bibliotek" : "Kommunens eget"}</dd></div></dl></div><form id="learningAdminForm" class="card-body record-grid" data-content-id="${escapeHtml(item.id)}"><section class="record-section"><h3 class="record-section-title">Innehåll</h3><label class="form-label" for="learningAdminTitle">Rubrik</label><input id="learningAdminTitle" class="form-control mb-3" value="${escapeHtml(item.title)}" required><label class="form-label" for="learningAdminSummary">Sammanfattning</label><textarea id="learningAdminSummary" class="form-control mb-3" rows="2" required>${escapeHtml(item.summary)}</textarea><label class="form-label" for="learningAdminMarkdown">Text i Markdown</label><textarea id="learningAdminMarkdown" class="form-control font-monospace" rows="10" required>${escapeHtml(item.bodyMarkdown)}</textarea><div class="form-text">Rubriker, listor, länkar och citat skrivs med vanlig Markdown.</div>${item.type === "test" ? `<label class="form-label mt-3" for="learningAdminPassingScore">Godkändgräns i procent</label><input id="learningAdminPassingScore" class="form-control" type="number" min="1" max="100" value="${Number(item.passingScore)}" required>` : ""}</section>${structure}</form>`;
+  const structure = item.type === "course" ? `<section class="record-section"><h3 class="record-section-title">Delar i utbildningen</h3><ol class="mb-0">${item.modules.map((module) => `<li>${escapeHtml(module.title)} <span class="text-secondary">(${learningTypeLabel(module.type)})</span></li>`).join("")}</ol></section>` : item.type === "test" ? `<section class="record-section"><h3 class="record-section-title">Kunskapsfrågor</h3><ol class="mb-0">${item.questions.map((question) => `<li>${escapeHtml(question.prompt)}</li>`).join("")}</ol></section>` : "";
+  els.learningAdminDetailPanel.innerHTML = `<div class="card-header record-header bg-white"><a class="small" href="#/learning-admin">Tillbaka till administrera utbildning</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">${learningTypeLabel(item.type)}</div><p class="record-id mb-1">Tekniskt ID ${escapeHtml(item.id)}</p><h2 class="h5 mb-0">${escapeHtml(item.title)}</h2></div><div class="d-flex gap-2 align-items-start">${selection && Number(selection.selectedVersion) < Number(item.version) ? `<button type="button" class="btn btn-outline-primary btn-sm" data-use-latest-learning="${escapeHtml(item.id)}">Använd version ${item.version}</button>` : ""}<button type="submit" form="learningAdminForm" class="btn btn-primary btn-sm">Spara ny version</button></div></div><dl class="record-meta mb-0 mt-3"><div><dt>Senaste version</dt><dd>${item.version}</dd></div><div><dt>Kommunens version</dt><dd>${selection ? selection.selectedVersion : "Ingår inte"}</dd></div><div><dt>Omfång</dt><dd>${item.scope === "shared" ? "Gemensamt bibliotek" : "Kommunens eget"}</dd></div></dl></div><form id="learningAdminForm" class="card-body record-grid" data-content-id="${escapeHtml(item.id)}"><section class="record-section"><h3 class="record-section-title">Innehåll</h3><label class="form-label" for="learningAdminTitle">Rubrik</label><input id="learningAdminTitle" class="form-control mb-3" value="${escapeHtml(item.title)}" required><label class="form-label" for="learningAdminSummary">Sammanfattning</label><textarea id="learningAdminSummary" class="form-control mb-3" rows="2" required>${escapeHtml(item.summary)}</textarea><label class="form-label" for="learningAdminMarkdown">Text i Markdown</label><textarea id="learningAdminMarkdown" class="form-control font-monospace" rows="10" required>${escapeHtml(item.bodyMarkdown)}</textarea><div class="form-text">Rubriker, listor, länkar och citat skrivs med vanlig Markdown.</div>${item.type === "test" ? `<label class="form-label mt-3" for="learningAdminPassingScore">Godkändgräns i procent</label><input id="learningAdminPassingScore" class="form-control" type="number" min="1" max="100" value="${Number(item.passingScore)}" required>` : ""}</section>${structure}</form>`;
 }
 
 const assignmentFrequencyLabels = { weekly: "Varje vecka", biweekly: "Varannan vecka", monthly: "Varje månad", as_needed: "Vid behov" };
@@ -5755,6 +5819,9 @@ function applyRoute() {
   const routeMentorId = nestedMentorRoute?.[1] || route.id;
   const previousCaseRecordId = selectedCaseRecordId;
   currentView = ["dashboard", "calendar", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
+  const systemAdministrationView = SYSTEM_ADMINISTRATION_VIEWS.has(currentView);
+  document.body.classList.toggle("is-system-administration", systemAdministrationView);
+  els.administrationContext.hidden = !systemAdministrationView;
   selectedId = currentView === "mentor" ? routeMentorId : selectedId;
   mentorRouteIntent = currentView === "mentor" ? nestedMentorRoute?.[2] || "" : "";
   mentorRouteCaseId = currentView === "mentor" ? nestedMentorRoute?.[3] || "" : "";
@@ -5900,8 +5967,8 @@ function applyRoute() {
     els.pageTitle.textContent = isNewParent ? "Registrera förälder" : "Föräldrakort";
     els.breadcrumb.textContent = isNewParent ? "Start / Föräldrar / Registrera förälder" : "Start / Föräldrar / Föräldrakort";
   } else if (currentView === "learning") {
-    els.pageTitle.textContent = route.id ? "Utbildningsinnehåll" : "Utbildning";
-    els.breadcrumb.textContent = route.id ? `${mentorSession ? "Min portal" : "Start"} / Utbildning / Innehåll` : `${mentorSession ? "Min portal" : "Start"} / Utbildning`;
+    els.pageTitle.textContent = route.id ? "Utbildningsdel" : "Utbildning";
+    els.breadcrumb.textContent = route.id ? `${mentorSession ? "Min portal" : "Start"} / Utbildning / Del` : `${mentorSession ? "Min portal" : "Start"} / Utbildning`;
   } else if (currentView === "mentor-home") {
     els.pageTitle.textContent = "Min översikt";
     els.breadcrumb.textContent = "Min portal / Översikt";
@@ -5939,8 +6006,8 @@ function applyRoute() {
     els.pageTitle.textContent = "Stödområden";
     els.breadcrumb.textContent = "Start / Systemadministration / Stödområden";
   } else if (currentView === "learning-admin") {
-    els.pageTitle.textContent = route.id ? "Utbildningsinnehåll" : "Utbildningsbibliotek";
-    els.breadcrumb.textContent = route.id ? "Start / Systemadministration / Utbildningsinnehåll / Innehåll" : "Start / Systemadministration / Utbildningsinnehåll";
+    els.pageTitle.textContent = route.id ? "Redigera utbildningsdel" : "Administrera utbildning";
+    els.breadcrumb.textContent = route.id ? "Systemadministration / Administrera utbildning / Del" : "Systemadministration / Administrera utbildning";
   } else if (currentView === "support-admin") {
     els.pageTitle.textContent = "Supportärenden";
     els.breadcrumb.textContent = "Start / Systemadministration / Supportärenden";
