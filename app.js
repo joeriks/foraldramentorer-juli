@@ -36,8 +36,9 @@ import {
   stableHash,
   supportProfileRequirements
 } from "./case-domain.js?v=20260818-completeness-v29";
+import { calendarDate, calendarDateKey, calendarMonthDays } from "./calendar-domain.js?v=20260820-calendar-v1";
 import { marked } from "./vendor/marked/marked.esm.js";
-import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260819-information-v3";
+import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260820-calendar-v4";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
 import {
   DEFAULT_TENANT_LEARNING_SELECTION,
@@ -54,7 +55,7 @@ import {
   findSupportKnowledge,
   localSupportResponse,
   supportCategoryLabel
-} from "./support-domain.js?v=20260819-information-v2";
+} from "./support-domain.js?v=20260820-calendar-v3";
 import {
   MENTOR_EXPERIENCE_LEVELS,
   SUPPORT_AREA_CATEGORIES,
@@ -119,6 +120,20 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "95",
+    date: "2026-08-20",
+    title: "Samlad kalender för planerat arbete",
+    flow: "Kalender → ärende eller aktivitet",
+    simplified: "Möten och tidsfrister behöver inte längre sökas fram i flera ärenden. Kalendern samlar befintliga datum i en stor månadsvy och en mobil agenda utan att skapa en parallell registrering.",
+    retained: "Möten och förfallodatum registreras fortfarande i sitt ärende eller sin aktivitet. Ansvar, historik, status och direktlänkar till rätt arbetsvy finns kvar.",
+    changes: [
+      "Kalender har lagts till som en egen huvudvy i desktop- och mobilnavigeringen.",
+      "Möten, öppna aktiviteters förfallodatum och öppna ärendens förfallodatum visas tillsammans.",
+      "Månad, innehållstyp och ansvarig kan filtreras, och varje post öppnar rätt ärende eller aktivitet.",
+      "På små skärmar visas samma innehåll som en dagsgrupperad agenda."
+    ]
+  },
   {
     version: "94",
     date: "2026-08-20",
@@ -979,6 +994,9 @@ let caseTypeFilter = "";
 let newCaseTypePreset = "";
 let casePage = 1;
 let dashboardQueueMode = "mine";
+let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let calendarOwnerFilter = "all";
+const calendarTypeFilters = new Set(["meeting", "activity", "case"]);
 let candidateModal;
 let currentView = "dashboard";
 let renderedDetailId = null;
@@ -1034,6 +1052,7 @@ const els = {
   currentUserRole: document.querySelector("#currentUserRole"),
   testUserTypeSelect: document.querySelector("#testUserTypeSelect"),
   navDashboard: document.querySelector("#navDashboard"),
+  navCalendar: document.querySelector("#navCalendar"),
   navIncomingContact: document.querySelector("#navIncomingContact"),
   navPresentation: document.querySelector("#navPresentation"),
   navIntake: document.querySelector("#navIntake"),
@@ -1060,6 +1079,15 @@ const els = {
   navRoutines: document.querySelector("#navRoutines"),
   navVersions: document.querySelector("#navVersions"),
   dashboardView: document.querySelector("#dashboardView"),
+  calendarView: document.querySelector("#calendarView"),
+  calendarMonthTitle: document.querySelector("#calendarMonthTitle"),
+  calendarPreviousButton: document.querySelector("#calendarPreviousButton"),
+  calendarTodayButton: document.querySelector("#calendarTodayButton"),
+  calendarNextButton: document.querySelector("#calendarNextButton"),
+  calendarOwnerFilter: document.querySelector("#calendarOwnerFilter"),
+  calendarSummary: document.querySelector("#calendarSummary"),
+  calendarGrid: document.querySelector("#calendarGrid"),
+  calendarAgenda: document.querySelector("#calendarAgenda"),
   versionsView: document.querySelector("#versionsView"),
   presentationView: document.querySelector("#presentationView"),
   casesView: document.querySelector("#casesView"),
@@ -4747,6 +4775,155 @@ function renderCaseNumberingAdministration() {
   updateCaseNumberingPreview();
 }
 
+const CALENDAR_TYPE_LABELS = {
+  meeting: "Möte",
+  activity: "Aktivitet",
+  case: "Ärende"
+};
+
+function calendarEntries() {
+  const caseById = new Map(cases.map((caseRecord) => [caseRecord.id, caseRecord]));
+  const entries = [];
+  const meetingTypeLabels = {
+    certification_interview: "Intervju inför godkännande",
+    follow_up: "Uppföljning",
+    other: "Möte"
+  };
+
+  for (const meeting of caseMeetings.filter((item) => !item.supersededByMeetingId && item.occurredAt)) {
+    const caseRecord = caseById.get(meeting.caseId);
+    if (!caseRecord) continue;
+    const ownerIds = new Set([...(meeting.participantHandlerIds || []), meeting.createdBy, responsibleHandler(caseRecord)?.id].filter(Boolean));
+    entries.push({
+      id: `meeting-${meeting.id}`,
+      type: "meeting",
+      dateKey: calendarDateKey(meeting.occurredAt),
+      time: new Intl.DateTimeFormat("sv-SE", { hour: "2-digit", minute: "2-digit" }).format(calendarDate(meeting.occurredAt)),
+      title: meetingTypeLabels[meeting.meetingType] || "Möte",
+      meta: `${caseRecord.number} · ${caseMeetingStatusLabel(meeting)}`,
+      href: `#/case/${caseRecord.id}/meetings`,
+      ownerIds: [...ownerIds],
+      completed: caseMeetingStatus(meeting) === "completed",
+      overdue: false
+    });
+  }
+
+  for (const activity of caseActivities.filter((item) => item.dueDate && !["completed", "not_applicable"].includes(item.status))) {
+    const caseRecord = caseById.get(activity.caseId);
+    if (!caseRecord || caseRecord.status === "closed") continue;
+    const owner = effectiveActivityHandler(activity, caseRecord);
+    entries.push({
+      id: `activity-${activity.id}`,
+      type: "activity",
+      dateKey: calendarDateKey(activity.dueDate),
+      time: "",
+      title: activity.title,
+      meta: caseRecord.number,
+      href: `#/case/${caseRecord.id}/activities/${activity.id}`,
+      ownerIds: owner?.id ? [owner.id] : [],
+      completed: false,
+      overdue: calendarDateKey(activity.dueDate) < calendarDateKey(new Date())
+    });
+  }
+
+  for (const caseRecord of cases.filter((item) => item.dueDate && item.status !== "closed")) {
+    const owner = responsibleHandler(caseRecord);
+    entries.push({
+      id: `case-${caseRecord.id}`,
+      type: "case",
+      dateKey: calendarDateKey(caseRecord.dueDate),
+      time: "",
+      title: caseRecord.title,
+      meta: `${caseRecord.number} · Ärendet förfaller`,
+      href: `#/case/${caseRecord.id}`,
+      ownerIds: owner?.id ? [owner.id] : [],
+      completed: false,
+      overdue: calendarDateKey(caseRecord.dueDate) < calendarDateKey(new Date())
+    });
+  }
+
+  return entries
+    .filter((entry) => entry.dateKey && calendarTypeFilters.has(entry.type))
+    .filter((entry) => {
+      if (calendarOwnerFilter === "all") return true;
+      const ownerId = calendarOwnerFilter === "mine" ? currentActorId() : calendarOwnerFilter;
+      return entry.ownerIds.includes(ownerId);
+    })
+    .sort((left, right) => left.dateKey.localeCompare(right.dateKey) || left.time.localeCompare(right.time) || left.title.localeCompare(right.title, "sv"));
+}
+
+function calendarEntryMarkup(entry) {
+  const classes = ["calendar-entry", `calendar-entry-${entry.type}`];
+  if (entry.completed) classes.push("is-completed");
+  if (entry.overdue) classes.push("is-overdue");
+  const accessibleLabel = `${CALENDAR_TYPE_LABELS[entry.type]}: ${entry.title}. ${entry.meta}`;
+  return `<a class="${classes.join(" ")}" href="${escapeHtml(entry.href)}" aria-label="${escapeHtml(accessibleLabel)}" title="${escapeHtml(accessibleLabel)}">
+    ${entry.time ? `<time>${escapeHtml(entry.time)}</time>` : ""}
+    <span class="calendar-entry-title">${escapeHtml(entry.title)}</span>
+    <small>${escapeHtml(entry.meta)}</small>
+  </a>`;
+}
+
+function groupCalendarEntries(entries) {
+  const groups = new Map();
+  for (const entry of entries) {
+    if (!groups.has(entry.dateKey)) groups.set(entry.dateKey, []);
+    groups.get(entry.dateKey).push(entry);
+  }
+  return groups;
+}
+
+function renderCalendarOwnerFilter() {
+  const selected = calendarOwnerFilter;
+  els.calendarOwnerFilter.innerHTML = '<option value="all">Alla handläggare</option><option value="mine">Mina poster</option>';
+  for (const handler of [...handlers].filter((item) => item.active !== false).sort((left, right) => left.name.localeCompare(right.name, "sv"))) {
+    const option = document.createElement("option");
+    option.value = handler.id;
+    option.textContent = handler.name;
+    els.calendarOwnerFilter.append(option);
+  }
+  els.calendarOwnerFilter.value = [...els.calendarOwnerFilter.options].some((option) => option.value === selected) ? selected : "all";
+  calendarOwnerFilter = els.calendarOwnerFilter.value;
+}
+
+function renderCalendar() {
+  renderCalendarOwnerFilter();
+  const monthName = new Intl.DateTimeFormat("sv-SE", { month: "long", year: "numeric" }).format(calendarCursor);
+  els.calendarMonthTitle.textContent = monthName.charAt(0).toLocaleUpperCase("sv-SE") + monthName.slice(1);
+  const entries = calendarEntries();
+  const monthPrefix = calendarDateKey(calendarCursor).slice(0, 7);
+  const monthEntries = entries.filter((entry) => entry.dateKey.startsWith(monthPrefix));
+  const overdueCount = monthEntries.filter((entry) => entry.overdue).length;
+  els.calendarSummary.textContent = monthEntries.length === 1
+    ? `1 post i månaden${overdueCount ? " · 1 försenad" : ""}`
+    : `${monthEntries.length} poster i månaden${overdueCount ? ` · ${overdueCount} försenade` : ""}`;
+
+  const entriesByDate = groupCalendarEntries(entries);
+  const todayKey = calendarDateKey(new Date());
+  els.calendarGrid.innerHTML = calendarMonthDays(calendarCursor).map((date) => {
+    const dateKey = calendarDateKey(date);
+    const dayEntries = entriesByDate.get(dateKey) || [];
+    const inMonth = date.getMonth() === calendarCursor.getMonth();
+    const dayLabel = new Intl.DateTimeFormat("sv-SE", { weekday: "long", day: "numeric", month: "long" }).format(date);
+    return `<section class="calendar-day${inMonth ? "" : " is-outside-month"}${dateKey === todayKey ? " is-today" : ""}" role="gridcell" aria-label="${escapeHtml(dayLabel)}">
+      <time class="calendar-day-number" datetime="${dateKey}">${date.getDate()}${dateKey === todayKey ? '<span class="visually-hidden">, idag</span>' : ""}</time>
+      <div class="calendar-day-entries">${dayEntries.slice(0, 4).map(calendarEntryMarkup).join("")}${dayEntries.length > 4 ? `<span class="calendar-more">+ ${dayEntries.length - 4} till</span>` : ""}</div>
+    </section>`;
+  }).join("");
+
+  const agendaGroups = groupCalendarEntries(monthEntries);
+  els.calendarAgenda.innerHTML = agendaGroups.size
+    ? [...agendaGroups].map(([dateKey, dayEntries]) => {
+      const date = calendarDate(dateKey);
+      const heading = new Intl.DateTimeFormat("sv-SE", { weekday: "long", day: "numeric", month: "long" }).format(date);
+      return `<section class="calendar-agenda-day${dateKey === todayKey ? " is-today" : ""}">
+        <h3><time datetime="${dateKey}">${escapeHtml(heading.charAt(0).toLocaleUpperCase("sv-SE") + heading.slice(1))}</time></h3>
+        <div>${dayEntries.map(calendarEntryMarkup).join("")}</div>
+      </section>`;
+    }).join("")
+    : '<p class="calendar-empty">Inga kalenderposter matchar urvalet den här månaden.</p>';
+}
+
 function renderVersions() {
   els.versionHistoryList.innerHTML = APP_VERSION_HISTORY.map((item) => `
     <article class="version-history-item">
@@ -4783,6 +4960,7 @@ function renderAll() {
   renderSummary();
   const viewRenderer = {
     dashboard: () => { renderPipeline(); renderDashboard(); },
+    calendar: renderCalendar,
     versions: renderVersions,
     presentation: renderPresentation,
     cases: renderCases,
@@ -5508,7 +5686,7 @@ function applyRoute() {
   const routeCaseId = nestedCaseRoute?.[1] || route.id;
   const routeMentorId = nestedMentorRoute?.[1] || route.id;
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "calendar", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
   selectedId = currentView === "mentor" ? routeMentorId : selectedId;
   mentorRouteIntent = currentView === "mentor" ? nestedMentorRoute?.[2] || "" : "";
   mentorRouteCaseId = currentView === "mentor" ? nestedMentorRoute?.[3] || "" : "";
@@ -5544,6 +5722,7 @@ function applyRoute() {
   }
 
   els.dashboardView.hidden = currentView !== "dashboard";
+  els.calendarView.hidden = currentView !== "calendar";
   els.versionsView.hidden = currentView !== "versions";
   els.presentationView.hidden = currentView !== "presentation";
   els.casesView.hidden = currentView !== "cases";
@@ -5567,7 +5746,7 @@ function applyRoute() {
 
   const mentorSession = isMentorSession();
   const publicSession = isPublicSession();
-  for (const navigationItem of [els.navDashboard, els.navPresentation, els.navIntake, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navLearning, els.navAdministration]) {
+  for (const navigationItem of [els.navDashboard, els.navCalendar, els.navPresentation, els.navIntake, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navLearning, els.navAdministration]) {
     navigationItem.hidden = mentorSession || publicSession;
   }
   document.querySelectorAll(".sidebar-nav > .nav-link.disabled").forEach((navigationItem) => {
@@ -5589,6 +5768,7 @@ function applyRoute() {
   });
 
   els.navDashboard.classList.toggle("active", currentView === "dashboard");
+  els.navCalendar.classList.toggle("active", currentView === "calendar");
   els.navPresentation.classList.toggle("active", currentView === "presentation");
   els.navIntake.classList.toggle("active", currentView === "cases" && caseTypeFilter === "incoming-contact");
   els.navCases.classList.toggle("active", (currentView === "cases" && !caseTypeFilter) || currentView === "case");
@@ -5617,6 +5797,9 @@ function applyRoute() {
   if (currentView === "dashboard") {
     els.pageTitle.textContent = "Översikt";
     els.breadcrumb.textContent = "Start / Översikt";
+  } else if (currentView === "calendar") {
+    els.pageTitle.textContent = "Kalender";
+    els.breadcrumb.textContent = "Start / Kalender";
   } else if (currentView === "versions") {
     els.pageTitle.textContent = "Versioner";
     els.breadcrumb.textContent = "Start / Systemadministration / Versioner";
@@ -10384,9 +10567,43 @@ els.publicPortalView.addEventListener("submit", async (event) => {
   await refresh();
 });
 
+els.calendarPreviousButton.addEventListener("click", () => {
+  calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
+  renderCalendar();
+});
+
+els.calendarTodayButton.addEventListener("click", () => {
+  const today = new Date();
+  calendarCursor = new Date(today.getFullYear(), today.getMonth(), 1);
+  renderCalendar();
+});
+
+els.calendarNextButton.addEventListener("click", () => {
+  calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1);
+  renderCalendar();
+});
+
+els.calendarOwnerFilter.addEventListener("change", () => {
+  calendarOwnerFilter = els.calendarOwnerFilter.value;
+  renderCalendar();
+});
+
+document.querySelectorAll("[data-calendar-type-filter]").forEach((input) => {
+  input.addEventListener("change", () => {
+    if (input.checked) calendarTypeFilters.add(input.dataset.calendarTypeFilter);
+    else calendarTypeFilters.delete(input.dataset.calendarTypeFilter);
+    renderCalendar();
+  });
+});
+
 els.navDashboard.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/dashboard");
+});
+
+els.navCalendar.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/calendar");
 });
 
 els.navIntake.addEventListener("click", (event) => {

@@ -812,6 +812,8 @@ Förslaget beräknas från länkat följdärende, ärendetyp och `nextCaseTypeId
 
 `Översikt` ska visa arbetskön före processöversikten. Arbetskön har filtren `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden` och visar kolumnerna `Ärende` och `Nästa aktivitet`. Processöversikten visar antal öppna ärenden per ärendetyp. Centrala flöden visas direkt och sekundära samband kan fällas ut.
 
+`Kalender` ska vara en separat huvudvy som projicerar befintliga `CaseMeeting.occurredAt`, öppna `CaseActivity.dueDate` och öppna `Case.dueDate`. Kalendern får inte skapa en parallell datumkälla. Månad, posttyp och ansvarig ska kunna filtreras. Varje post ska länka till sitt ärende, sin aktivitet eller ärendets mötesflik. Desktop visar en månadsmatris med måndag som första veckodag; mobil visar samma filtrerade poster i en dagsgrupperad agenda.
+
 Ärenderegistret ska kunna sökas och filtreras på ärendetyp och status. Kolumnerna är `Ärende`, `Person`, `Läge` och `Ansvarig`; flera närliggande uppgifter får kombineras i samma cell för att begränsa bredden.
 
 Grid- och flexbarn ska kunna krympa med `min-width: 0`. Ärendeflödet ska använda två kolumner vid mellanbredder och vertikal layout på mobil. Korttitlar får inte delas mitt i ord. Filter ska radbrytas på mobil. Breda tabeller får ha horisontell skroll inom `.table-responsive`, men `documentElement.scrollWidth` får inte överstiga `clientWidth` vid 1280 × 720 eller 390 × 844.

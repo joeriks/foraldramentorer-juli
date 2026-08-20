@@ -221,6 +221,10 @@ Varje köpost ska visa ärende, relevant personkoppling, nästa aktivitet och va
 
 **I systemet:** [Öppna Översikt och arbetskö](feature:dashboard.work-queue)
 
+Kalendern samlar bokade och genomförda möten samt öppna aktiviteters och ärendens förfallodatum. Den är en planerings- och navigeringsvy; datum ändras alltid i mötet, aktiviteten eller ärendet där uppgiften hör hemma. Handläggaren kan filtrera på innehållstyp och ansvarig och öppna varje kalenderpost direkt i rätt arbetsvy.
+
+**I systemet:** [Öppna Kalender](feature:calendar.view)
+
 ### 5.2 Öppna och bedöma ett ärende
 
 När handläggaren öppnar ett ärende ska fliken `Arbete` direkt besvara:

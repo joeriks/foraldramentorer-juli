@@ -1,5 +1,6 @@
 export const FEATURE_LINKS = Object.freeze({
   "dashboard.work-queue": Object.freeze({ href: "#/dashboard" }),
+  "calendar.view": Object.freeze({ href: "#/calendar" }),
   "intake.list": Object.freeze({ href: "#/intake" }),
   "cases.list": Object.freeze({ href: "#/cases" }),
   "case.create": Object.freeze({ href: "#/case/new" }),

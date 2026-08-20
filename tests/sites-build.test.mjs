@@ -17,6 +17,8 @@ test("serves the application shell", async () => {
   const html = await response.text();
   assert.match(html, /FöräldraMentorer/);
   assert.match(html, /id="dashboardView"/);
+  assert.match(html, /id="calendarView"/);
+  assert.match(html, /id="navCalendar"[^>]*href="#\/calendar"/);
   assert.match(html, /id="caseFlowBoard"/);
   assert.match(html, /id="navIncomingContact"[^>]*sidebar-subaction-link/);
   assert.match(html, /id="navIntake"/);
@@ -130,6 +132,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /function completeIncomingContactWithCase/);
   assert.match(scriptText, /function prefillCaseFromIncomingContact/);
   assert.match(scriptText, /APP_VERSION_HISTORY/);
+  assert.match(scriptText, /version: "95"/);
   assert.match(scriptText, /version: "93"/);
   assert.match(scriptText, /Informationsmaterial som följer de aktuella arbetsflödena/);
   assert.match(scriptText, /function renderVersions/);
@@ -193,6 +196,11 @@ test("serves application assets and returns 404 for unknown files", async () => 
   const domain = await worker.fetch(new Request("https://example.test/case-domain.js"), {}, context);
   assert.equal(domain.status, 200);
   assert.match(await domain.text(), /deriveCaseStatus/);
+
+  const calendarDomain = await worker.fetch(new Request("https://example.test/calendar-domain.js"), {}, context);
+  assert.equal(calendarDomain.status, 200);
+  assert.match(calendarDomain.headers.get("content-type"), /^text\/javascript/);
+  assert.match(await calendarDomain.text(), /calendarMonthDays/);
 
   const learningDomain = await worker.fetch(new Request("https://example.test/learning-domain.js"), {}, context);
   assert.equal(learningDomain.status, 200);

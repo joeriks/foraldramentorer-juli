@@ -23,6 +23,13 @@ export const SUPPORT_KNOWLEDGE = [
     href: "#/cases"
   },
   {
+    id: "calendar",
+    title: "Kalender och tidsfrister",
+    keywords: ["kalender", "möte", "möten", "förfallodatum", "tidsfrist", "planering", "agenda"],
+    answer: "Kalender samlar bokade och genomförda möten samt öppna aktiviteters och ärendens förfallodatum. Filtrera på typ eller ansvarig och öppna posten för att komma till rätt ärende eller aktivitet. Ändra själva datumet i källposten; kalendern uppdateras då automatiskt.",
+    href: "#/calendar"
+  },
+  {
     id: "incoming-contact",
     title: "Registrera inkommande kontakt",
     keywords: ["inkommande kontakt", "kontaktmottagning", "telefonsamtal", "e-post", "nästa steg", "registrera kontakt"],

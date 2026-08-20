@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260820-collapsed-case-header-v94">
+    <link rel="stylesheet" href="styles.css?v=20260820-calendar-v95">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -17,6 +17,7 @@
         </div>
         <nav class="sidebar-nav nav nav-pills flex-column gap-1">
           <a id="navDashboard" class="nav-link" href="#/dashboard">Översikt</a>
+          <a id="navCalendar" class="nav-link" href="#/calendar">Kalender</a>
           <a id="navIntake" class="nav-link" href="#/intake">Kontaktmottagning</a>
           <button id="navIncomingContact" class="sidebar-subaction-link" type="button"><span aria-hidden="true">+</span> Registrera kontakt</button>
           <a id="navCases" class="nav-link" href="#/cases">Ärenden</a>
@@ -66,6 +67,7 @@
                   <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-support">Sök stöd</a></li>
                   <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-learning">Råd och material</a></li>
                   <li><a class="dropdown-item" href="#/dashboard">Översikt</a></li>
+                  <li><a class="dropdown-item" href="#/calendar">Kalender</a></li>
                   <li><a class="dropdown-item" href="#/intake">Kontaktmottagning</a></li>
                   <li><button id="mobileIncomingContact" type="button" class="dropdown-item ps-4">+ Registrera kontakt</button></li>
                   <li><a class="dropdown-item" href="#/cases">Ärenden</a></li>
@@ -223,6 +225,43 @@
                 </div>
               </div>
             </details>
+          </section>
+
+          <section id="calendarView" class="view-stack" hidden>
+            <section class="calendar-shell" aria-labelledby="calendarMonthTitle">
+              <header class="calendar-toolbar">
+                <div>
+                  <div class="record-type">Planering</div>
+                  <h2 id="calendarMonthTitle" class="h4 mb-0"></h2>
+                </div>
+                <div class="calendar-navigation" role="group" aria-label="Byt månad">
+                  <button id="calendarPreviousButton" type="button" class="btn btn-outline-secondary" aria-label="Föregående månad" title="Föregående månad">&larr;</button>
+                  <button id="calendarTodayButton" type="button" class="btn btn-outline-secondary">Idag</button>
+                  <button id="calendarNextButton" type="button" class="btn btn-outline-secondary" aria-label="Nästa månad" title="Nästa månad">&rarr;</button>
+                </div>
+              </header>
+              <div class="calendar-filters">
+                <fieldset class="calendar-type-filters">
+                  <legend>Visa</legend>
+                  <label class="calendar-filter-option calendar-filter-meeting"><input type="checkbox" data-calendar-type-filter="meeting" checked> Möten</label>
+                  <label class="calendar-filter-option calendar-filter-activity"><input type="checkbox" data-calendar-type-filter="activity" checked> Aktiviteter</label>
+                  <label class="calendar-filter-option calendar-filter-case"><input type="checkbox" data-calendar-type-filter="case" checked> Ärenden</label>
+                </fieldset>
+                <div class="calendar-owner-filter">
+                  <label for="calendarOwnerFilter">Ansvarig</label>
+                  <select id="calendarOwnerFilter" class="form-select form-select-sm">
+                    <option value="all">Alla handläggare</option>
+                    <option value="mine">Mina poster</option>
+                  </select>
+                </div>
+                <p id="calendarSummary" class="calendar-summary mb-0" role="status"></p>
+              </div>
+              <div class="calendar-weekdays" aria-hidden="true">
+                <span>Måndag</span><span>Tisdag</span><span>Onsdag</span><span>Torsdag</span><span>Fredag</span><span>Lördag</span><span>Söndag</span>
+              </div>
+              <div id="calendarGrid" class="calendar-grid" role="grid" aria-labelledby="calendarMonthTitle"></div>
+              <div id="calendarAgenda" class="calendar-agenda" aria-label="Kalender som agenda"></div>
+            </section>
           </section>
 
           <section id="versionsView" class="view-stack" hidden>
@@ -2115,6 +2154,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260820-collapsed-case-header-v94"></script>
+    <script type="module" src="app.js?v=20260820-calendar-v95"></script>
   </body>
 </html>
