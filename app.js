@@ -121,6 +121,20 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "96",
+    date: "2026-08-20",
+    title: "Tydliga tidpunkter i mentorns ärendelista",
+    flow: "Mentorpost -> ärenden -> avslut",
+    simplified: "Ärendets status och relevanta tidpunkt visas nu tillsammans. Användaren behöver inte öppna ett avslutat ärende för att se när det avslutades.",
+    retained: "Ärendets fullständiga historik, ansvar, nästa aktivitet och direktlänk finns kvar. Mentorpostens egen ändringstid hålls fortsatt skild från ändringar i länkade ärenden.",
+    changes: [
+      "Avslutade ärenden visar datum och tid för avslutet direkt under statusen.",
+      "Öppna ärenden visar i samma läge när ärendet senast ändrades.",
+      "Mentorhuvudets etikett har förtydligats till Mentorpost ändrad.",
+      "Avslutskommandonas regel att avslutstid och ärendets ändringstid uppdateras tillsammans täcks av regressionstest."
+    ]
+  },
+  {
     version: "95",
     date: "2026-08-20",
     title: "Samlad kalender för planerat arbete",
@@ -8526,11 +8540,15 @@ function renderMentorCases(candidate) {
   for (const caseRecord of mentorCases) {
     const owner = responsibleHandler(caseRecord);
     const nextActivity = nextCaseActivity(caseRecord);
+    const isClosed = normalizeCaseStatus(caseRecord.status) === "closed";
+    const statusTimestamp = isClosed
+      ? `Avslutat ${formatDateTime(caseRecord.closedAt || caseRecord.updatedAt)}`
+      : `Senast ändrad ${formatDateTime(caseRecord.updatedAt || caseRecord.createdAt)}`;
     const row = document.createElement("tr");
     row.innerHTML = `
       <td><a class="case-number-link" href="#/case/${escapeHtml(caseRecord.id)}">${escapeHtml(caseRecord.number)}</a></td>
       <td>${escapeHtml(caseRecord.type)}</td>
-      <td><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></td>
+      <td><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseStatusLabel(caseRecord.status))}</span><small class="d-block text-secondary mt-1">${escapeHtml(statusTimestamp)}</small></td>
       <td>${escapeHtml(owner?.name || "Ej tilldelad")}</td>
       <td>${escapeHtml(nextActivity?.title || "Ingen återstående")}</td>
     `;

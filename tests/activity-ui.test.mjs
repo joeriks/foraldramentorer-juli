@@ -97,3 +97,16 @@ test("distinguishes a booked interview from a completed interview", () => {
   assert.match(app, /activity\.status === "not_started" && workInputState && workInputState !== "not_started"\) return "Pågår"/);
   assert.match(app, /Ett genomfört möte kan inte ha en tidpunkt i framtiden/);
 });
+
+test("shows case timestamps in the mentor case list and keeps closure audit fields aligned", () => {
+  assert.match(html, /<dt>Mentorpost ändrad<\/dt><dd id="selectedUpdatedMeta"/);
+  assert.match(app, /const isClosed = normalizeCaseStatus\(caseRecord\.status\) === "closed"/);
+  assert.match(app, /`Avslutat \$\{formatDateTime\(caseRecord\.closedAt \|\| caseRecord\.updatedAt\)\}`/);
+  assert.match(app, /`Senast ändrad \$\{formatDateTime\(caseRecord\.updatedAt \|\| caseRecord\.createdAt\)\}`/);
+
+  const lifecycleStart = app.indexOf("function changeCaseLifecycleCommand");
+  const lifecycleEnd = app.indexOf("function caseCloseReasonOptions", lifecycleStart);
+  const lifecycleCommand = app.slice(lifecycleStart, lifecycleEnd);
+  assert.match(lifecycleCommand, /closedAt: now, closedBy: CURRENT_USER_ID/);
+  assert.match(lifecycleCommand, /updatedAt: now,\s*updatedBy: CURRENT_USER_ID/);
+});

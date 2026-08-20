@@ -134,6 +134,8 @@ interface CaseRecord {
 
 Ansvarig handläggare lagras endast som en assignment. `CaseRecord` får inte innehålla ett duplicerat fält för ansvarig.
 
+När ett ärende avslutas ska `closedAt` och `updatedAt` sättas till samma kommandotidpunkt och `closedBy` respektive `updatedBy` till den användare som utför kommandot. Senare tillåtna ändringar kan flytta `updatedAt`, men får inte skriva över den ursprungliga avslutstidpunkten. I personposters länkade ärendelistor visas avslutstid för avslutade ärenden och senaste ändringstid för övriga ärenden. Personpostens egen `updatedAt` är ett separat revisionsfält.
+
 ```ts
 interface CaseHandlerAssignment {
   id: string;

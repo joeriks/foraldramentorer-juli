@@ -716,6 +716,8 @@ Används efter ett uttryckligt ställningstagande när handläggningen tillfäll
 
 Avslut kräver strukturerad avslutsorsak, motivering och beslutsfattare. Återstående aktiviteter blir `Ej aktuella`. Ärendet och dess historik tas inte bort.
 
+Avslutskommandot registrerar datum och tid för avslutet och uppdaterar samtidigt ärendets `Senast ändrad`. I en mentor- eller föräldrapost visas denna tid på det länkade ärendet; personpostens egen ändringstid ändras bara om personuppgifter eller personens verksamhetsstatus också ändras.
+
 ### När alla aktiviteter är klara
 
 Ett ärende är inte avslutat bara för att alla aktiviteter är avslutade. Ärendet ligger kvar som pågående tills handläggaren väljer nästa verksamhetssteg. Systemet visar ett beslutsläge med de alternativ som är relevanta för ärendetypen:
