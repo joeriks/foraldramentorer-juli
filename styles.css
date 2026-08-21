@@ -1578,6 +1578,206 @@ body.is-system-administration .sidebar-menu-group {
   overscroll-behavior-inline: contain;
 }
 
+.meeting-register-body {
+  display: grid;
+  min-width: 0;
+  gap: var(--app-space-3);
+}
+
+.meeting-register-filters {
+  display: grid;
+  grid-template-columns: minmax(14rem, 2fr) minmax(10rem, 1fr) minmax(12rem, 1fr);
+  min-width: 0;
+  gap: var(--app-space-3);
+  align-items: end;
+}
+
+.meeting-register-filters > div {
+  min-width: 0;
+}
+
+.meeting-register-table-wrap {
+  min-width: 0;
+}
+
+.meeting-register-table {
+  min-width: 56rem;
+}
+
+.meeting-register-table th,
+.meeting-register-table td {
+  vertical-align: middle;
+}
+
+.meeting-register-date time,
+.meeting-register-title,
+.meeting-register-case,
+.meeting-register-participants,
+.meeting-register-communication {
+  display: block;
+}
+
+.meeting-register-date time,
+.meeting-register-title {
+  font-weight: 650;
+}
+
+.meeting-register-date small,
+.meeting-register-case,
+.meeting-register-participants + small,
+.meeting-register-communication {
+  margin-top: 0.2rem;
+  color: var(--app-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.meeting-register-title,
+.meeting-register-participants,
+.meeting-register-communication {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+@media (max-width: 767.98px) {
+  .meeting-register-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.communication-register-body,
+.communication-composer-body {
+  display: grid;
+  min-width: 0;
+  gap: var(--app-space-3);
+}
+
+.communication-provider-notice,
+.communication-demo-notice {
+  padding: var(--app-space-3);
+  border-left: 4px solid #a45f19;
+  background: #fff7e8;
+  color: #56340e;
+  font-size: 0.875rem;
+}
+
+.communication-register-filters {
+  display: grid;
+  grid-template-columns: minmax(15rem, 2fr) minmax(10rem, 1fr) minmax(13rem, 1fr);
+  min-width: 0;
+  gap: var(--app-space-3);
+  align-items: end;
+}
+
+.communication-register-filters > div {
+  min-width: 0;
+}
+
+.communication-register-table {
+  min-width: 72rem;
+}
+
+.communication-provider-label,
+.communication-delivery-detail,
+.communication-message-cell > span,
+.communication-context-cell > *,
+.communication-party-cell {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--app-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.communication-message-cell {
+  max-width: 22rem;
+}
+
+.communication-message-cell > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.communication-message-cell details {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+}
+
+.communication-message-cell details p {
+  margin: 0.45rem 0;
+  color: var(--app-text);
+  white-space: pre-wrap;
+}
+
+.communication-channel-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--app-space-2);
+}
+
+.communication-channel-options label {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  gap: var(--app-space-2);
+  padding: var(--app-space-2) var(--app-space-3);
+  border: 1px solid var(--app-border);
+  background: #fff;
+  cursor: pointer;
+}
+
+.communication-channel-options label:has(input:checked) {
+  border-color: var(--app-primary);
+  box-shadow: inset 3px 0 var(--app-primary);
+  background: #eef6f8;
+}
+
+.communication-context-summary {
+  padding: var(--app-space-2) var(--app-space-3);
+  border-left: 3px solid var(--app-primary);
+  background: #eef6f8;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.interaction-system-communications {
+  display: grid;
+  gap: var(--app-space-2);
+}
+
+.interaction-system-communication-list {
+  display: grid;
+  gap: var(--app-space-2);
+}
+
+.interaction-system-communication {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: var(--app-space-3);
+  padding: var(--app-space-2) 0;
+  border-top: 1px solid var(--app-border);
+}
+
+.interaction-system-communication time,
+.interaction-system-communication p,
+.interaction-system-communication small {
+  color: var(--app-text-muted);
+  font-size: 0.78rem;
+}
+
+.interaction-system-communication p {
+  margin: 0.2rem 0;
+}
+
+@media (max-width: 767.98px) {
+  .communication-register-filters,
+  .communication-channel-options,
+  .interaction-system-communication {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .system-status {
   display: flex;
   flex-wrap: wrap;

@@ -775,7 +775,13 @@ Använd `Boka möte` för en framtida kontakt och `Registrera genomförd kontakt
 
 Mötet beskriver ett planerat eller genomfört intervjutillfälle, en uppföljning eller annan avstämning. När ett ärende väljs föreslår systemet förälder, mentor och ansvarig handläggare som deltagare. Förslaget kan justeras och handläggaren kan vara administrativt ansvarig utan att delta.
 
-Vid bokning registreras start- och sluttid, mötesform, plats eller möteslänk, deltagare och valfri kallelsetext. Prototypen förbereder kallelsen men skickar den inte. Efter mötestiden väljs utfallet `Genomfört`, `Inställt` eller `Uteblev`. Faktisk närvaro registreras bara för ett genomfört möte och hålls skild från kallelsesvaren. En saklig anteckning och nästa steg gör det tydligt vad som ska hända vidare.
+Vid bokning registreras start- och sluttid, mötesform, plats eller möteslänk, deltagare och valfri kallelsetext. Från ett sparat möte kan handläggaren begära ett utskick via systemets gemensamma kommunikationslager. Prototypens e-post- och SMS-system registrerar begäran, mottagare, innehåll, leverantörs-id och demostatus men skickar inget externt. Posten visas både vid mötet och i det globala kommunikationsregistret. Efter mötestiden väljs utfallet `Genomfört`, `Inställt` eller `Uteblev`. Faktisk närvaro registreras bara för ett genomfört möte och hålls skild från kallelsesvaren. En saklig anteckning och nästa steg gör det tydligt vad som ska hända vidare.
+
+### Global kommunikationshistorik
+
+`Kommunikation` visar all tekniskt hanterad kommunikation för kommunen, oavsett om den skapades från ett möte, ett ärende eller den centrala meddelandefunktionen. Varje post visar kanal, riktning, part, verksamhetssamband och leveransläge. Kommunikationsregistret ersätter inte möten, kontakter eller tjänsteanteckningar; det visar vad som faktiskt passerat kommunikationslagret och länkar tillbaka till rätt verksamhetsobjekt.
+
+I första etappen kan handläggaren skapa utgående e-post och SMS. Båda kanalerna går genom demoleverantörer och får därför läget `Registrerad i demo`, aldrig `Skickad` eller `Levererad`. Modellen stödjer även inkommande meddelanden och framtida kanaler. När riktiga leverantörer införs ska samma register visa köad, accepterad, levererad, mottagen eller misslyckad kommunikation baserat på leverantörernas svar.
 
 Ett inställt eller uteblivet möte ligger kvar i historiken. `Boka ny tid` skapar en ny bokning med en hänvisning till den tidigare posten. Ärende-, förälder- och mentorvyerna visar samma kontaktlista med nästa framtida bokning först och därefter övriga kontakter i omvänd kronologisk ordning.
 

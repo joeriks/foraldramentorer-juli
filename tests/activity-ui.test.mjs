@@ -64,7 +64,8 @@ test("shows activities in the first case work tab", () => {
 test("keeps register navigation and row interaction consistent", () => {
   assert.match(html, /id="navMeetings"[^>]*href="#\/meetings"/);
   assert.match(app, /els\.navMeetings\.classList\.toggle\("active", currentView === "meetings"\)/);
-  assert.match(app, /calendarTypeFilters\.add\("meeting"\)/);
+  assert.match(html, /id="meetingsView"/);
+  assert.match(app, /meetings: renderMeetingsRegister/);
   assert.match(html, /id="navIntake"[^>]*href="#\/cases\/incoming-contact"/);
   assert.doesNotMatch(html, /href="#\/intake"/);
   assert.match(app, /const status = route\.params\?\.get\("status"\) \|\| ""/);

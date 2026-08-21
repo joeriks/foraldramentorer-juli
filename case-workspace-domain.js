@@ -127,7 +127,7 @@ function eventCategory(event) {
   const entity = String(event.entityType || "");
   if (entity === "case_note" || type.startsWith("case_note_") || type.startsWith("case_description_")) return "notes";
   if (["activity", "deviation", "decision"].includes(entity) || type.startsWith("activity_") || type.startsWith("deviation_")) return "activities";
-  if (["interaction", "meeting", "incoming_contact"].includes(entity) || /meeting|interaction|contact/.test(type)) return "contacts";
+  if (["interaction", "meeting", "incoming_contact", "communication"].includes(entity) || /meeting|interaction|contact|communication/.test(type)) return "contacts";
   if (entity === "document" || type.includes("document") || type.includes("handling")) return "documents";
   return "system";
 }

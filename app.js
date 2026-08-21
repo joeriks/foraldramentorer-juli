@@ -69,6 +69,14 @@ import {
   suggestedInteractionParticipants,
   validateInteractionForSave
 } from "./interaction-domain.js?v=20260821-interactions-v2";
+import {
+  COMMUNICATION_CHANNEL_LABELS,
+  COMMUNICATION_DIRECTION_LABELS,
+  COMMUNICATION_STATUS_LABELS,
+  createDemoCommunicationProvider,
+  dispatchOutboundCommunication,
+  normalizeCommunicationRecord
+} from "./communication-domain.js?v=20260821-communications-v112";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260820-calendar-v4";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
@@ -120,7 +128,7 @@ import {
 } from "./matching-catalog-domain.js?v=20260821-structured-matching-v1";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
-const DB_VERSION = 11;
+const DB_VERSION = 12;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
 const INCOMING_CONTACTS_STORE = "incomingContacts";
@@ -138,6 +146,7 @@ const ACTIVITY_DEVIATIONS_STORE = "activityDeviations";
 const DEVIATION_DECISIONS_STORE = "deviationDecisions";
 const CASE_MEETINGS_STORE = "caseMeetings";
 const INTERACTIONS_STORE = "interactions";
+const COMMUNICATIONS_STORE = "communications";
 const MENTOR_REPORTS_STORE = "mentorReports";
 const PARENT_CHECK_INS_STORE = "parentCheckIns";
 const COMPENSATION_PERIODS_STORE = "compensationPeriods";
@@ -170,6 +179,34 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "112",
+    date: "2026-08-21",
+    title: "Global kommunikationshantering",
+    flow: "Funktion eller handläggare -> kanaladapter -> leverantörssvar -> global kommunikationshistorik",
+    simplified: "E-post och SMS hanteras nu genom ett gemensamt kommunikationslager i stället för att bara beskrivas i mötesanteckningar.",
+    retained: "Mötenas manuella kommunikationshistorik och befintliga bokningsflöden finns kvar. Demoläget skickar inget utanför prototypen.",
+    changes: [
+      "Ett globalt kommunikationsregister visar kommunikation från hela systemet med kanal, riktning, part, sammanhang och leveransläge.",
+      "E-postdemo och SMS-demo följer samma adapterkontrakt som framtida externa leverantörer och sparar leverantörens meddelande-id och statuskedja.",
+      "Utgående meddelanden kan skapas centralt eller från ett sparat möte och länkas till möte och ärende.",
+      "Datamodellen stöder även inkommande kommunikation och fler framtida kanaler utan att befintliga meddelanden behöver skrivas om."
+    ]
+  },
+  {
+    version: "111",
+    date: "2026-08-21",
+    title: "Möten som sökbart register",
+    flow: "Navigation -> Möten -> sök, filtrera och öppna mötespost",
+    simplified: "Möten visas nu i en samlad tabell för snabb jämförelse och uppföljning, medan kalendern fortsätter vara den visuella tidsöversikten.",
+    retained: "Samma mötesdata, bokningspanel, ärendekoppling, deltagare och kommunikationshistorik används vidare utan dubbelregistrering.",
+    changes: [
+      "Möten har fått ett eget register med datum och tid, ärendesamband, deltagare, läge och organisatör.",
+      "Registret kan sökas och filtreras på mötesläge och organisatör.",
+      "Senaste tidsförfrågan, kallelse, påminnelse eller annan kommunikationshändelse visas direkt i mötesraden.",
+      "Kommande bokade möten prioriteras överst och övriga möten visas med de senaste först."
+    ]
+  },
   {
     version: "110",
     date: "2026-08-21",
@@ -1274,6 +1311,7 @@ let activityDeviations = [];
 let deviationDecisions = [];
 let caseMeetings = [];
 let interactions = [];
+let communications = [];
 let mentorReports = [];
 let parentCheckIns = [];
 let compensationPeriods = [];
@@ -1319,7 +1357,14 @@ let dashboardQueueOwnerFilter = "mine";
 let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let calendarOwnerFilter = "all";
 const calendarTypeFilters = new Set(["meeting", "contact", "activity", "case"]);
+let meetingRegisterSearchTerm = "";
+let meetingRegisterStatusFilter = "";
+let meetingRegisterOwnerFilter = "all";
+let communicationSearchTerm = "";
+let communicationChannelFilter = "";
+let communicationDirectionFilter = "";
 let candidateModal;
+let communicationComposerModal;
 let currentView = "dashboard";
 let renderedDetailId = null;
 let workQueueOnly = false;
@@ -1380,6 +1425,7 @@ const els = {
   navDashboard: document.querySelector("#navDashboard"),
   navCalendar: document.querySelector("#navCalendar"),
   navMeetings: document.querySelector("#navMeetings"),
+  navCommunications: document.querySelector("#navCommunications"),
   navIncomingContact: document.querySelector("#navIncomingContact"),
   navPresentation: document.querySelector("#navPresentation"),
   navIntake: document.querySelector("#navIntake"),
@@ -1410,6 +1456,8 @@ const els = {
   navVersions: document.querySelector("#navVersions"),
   dashboardView: document.querySelector("#dashboardView"),
   calendarView: document.querySelector("#calendarView"),
+  meetingsView: document.querySelector("#meetingsView"),
+  communicationsView: document.querySelector("#communicationsView"),
   calendarMonthTitle: document.querySelector("#calendarMonthTitle"),
   calendarPreviousButton: document.querySelector("#calendarPreviousButton"),
   calendarTodayButton: document.querySelector("#calendarTodayButton"),
@@ -1420,6 +1468,20 @@ const els = {
   calendarSummary: document.querySelector("#calendarSummary"),
   calendarGrid: document.querySelector("#calendarGrid"),
   calendarAgenda: document.querySelector("#calendarAgenda"),
+  meetingRegisterSummary: document.querySelector("#meetingRegisterSummary"),
+  meetingRegisterBookButton: document.querySelector("#meetingRegisterBookButton"),
+  meetingRegisterSearchInput: document.querySelector("#meetingRegisterSearchInput"),
+  meetingRegisterStatusFilter: document.querySelector("#meetingRegisterStatusFilter"),
+  meetingRegisterOwnerFilter: document.querySelector("#meetingRegisterOwnerFilter"),
+  meetingRegisterTableBody: document.querySelector("#meetingRegisterTableBody"),
+  meetingRegisterEmpty: document.querySelector("#meetingRegisterEmpty"),
+  communicationsSummary: document.querySelector("#communicationsSummary"),
+  newCommunicationButton: document.querySelector("#newCommunicationButton"),
+  communicationSearchInput: document.querySelector("#communicationSearchInput"),
+  communicationChannelFilter: document.querySelector("#communicationChannelFilter"),
+  communicationDirectionFilter: document.querySelector("#communicationDirectionFilter"),
+  communicationTableBody: document.querySelector("#communicationTableBody"),
+  communicationEmpty: document.querySelector("#communicationEmpty"),
   versionsView: document.querySelector("#versionsView"),
   presentationView: document.querySelector("#presentationView"),
   casesView: document.querySelector("#casesView"),
@@ -1545,6 +1607,23 @@ const els = {
   interactionCommunicationAtInput: document.querySelector("#interactionCommunicationAtInput"),
   interactionCommunicationCommentInput: document.querySelector("#interactionCommunicationCommentInput"),
   interactionCommunicationHelp: document.querySelector("#interactionCommunicationHelp"),
+  interactionEmailButton: document.querySelector("#interactionEmailButton"),
+  interactionSmsButton: document.querySelector("#interactionSmsButton"),
+  interactionSystemCommunicationList: document.querySelector("#interactionSystemCommunicationList"),
+  interactionSystemCommunicationHelp: document.querySelector("#interactionSystemCommunicationHelp"),
+  communicationComposerModal: document.querySelector("#communicationComposerModal"),
+  communicationComposerForm: document.querySelector("#communicationComposerForm"),
+  communicationComposerTitle: document.querySelector("#communicationComposerTitle"),
+  communicationContextSummary: document.querySelector("#communicationContextSummary"),
+  communicationCaseInput: document.querySelector("#communicationCaseInput"),
+  communicationRecipientNameInput: document.querySelector("#communicationRecipientNameInput"),
+  communicationRecipientAddressLabel: document.querySelector("#communicationRecipientAddressLabel"),
+  communicationRecipientAddressInput: document.querySelector("#communicationRecipientAddressInput"),
+  communicationSubjectField: document.querySelector("#communicationSubjectField"),
+  communicationSubjectInput: document.querySelector("#communicationSubjectInput"),
+  communicationBodyInput: document.querySelector("#communicationBodyInput"),
+  communicationBodyHelp: document.querySelector("#communicationBodyHelp"),
+  communicationSubmitButton: document.querySelector("#communicationSubmitButton"),
   interactionAddCommunicationButton: document.querySelector("#interactionAddCommunicationButton"),
   interactionOutcomeFields: document.querySelector("#interactionOutcomeFields"),
   interactionMeetingOutcomeSection: document.querySelector("#interactionMeetingOutcomeSection"),
@@ -2381,6 +2460,11 @@ function openDatabase() {
       ensureIndex(interactionStore, "tenantStartsAt", ["tenantId", "startsAt"]);
       ensureIndex(interactionStore, "tenantCase", ["tenantId", "caseId"]);
       ensureIndex(interactionStore, "tenantKind", ["tenantId", "kind"]);
+      const communicationStore = ensureStore(COMMUNICATIONS_STORE);
+      ensureIndex(communicationStore, "tenantCreatedAt", ["tenantId", "createdAt"]);
+      ensureIndex(communicationStore, "tenantChannel", ["tenantId", "channel"]);
+      ensureIndex(communicationStore, "tenantDirection", ["tenantId", "direction"]);
+      ensureIndex(communicationStore, "externalMessageId", "externalMessageId");
       const mentorReportStore = ensureStore(MENTOR_REPORTS_STORE);
       ensureIndex(mentorReportStore, "tenantCase", ["tenantId", "caseId"]);
       ensureIndex(mentorReportStore, "tenantOccurredOn", ["tenantId", "occurredOn"]);
@@ -2514,6 +2598,10 @@ function interactionTx(mode = "readonly") {
   return db.transaction(INTERACTIONS_STORE, mode).objectStore(INTERACTIONS_STORE);
 }
 
+function communicationTx(mode = "readonly") {
+  return db.transaction(COMMUNICATIONS_STORE, mode).objectStore(COMMUNICATIONS_STORE);
+}
+
 function mentorReportTx(mode = "readonly") {
   return db.transaction(MENTOR_REPORTS_STORE, mode).objectStore(MENTOR_REPORTS_STORE);
 }
@@ -2624,6 +2712,8 @@ const getAllDeviationDecisions = () => getAllFrom(deviationDecisionTx);
 const getAllCaseMeetings = () => getAllFrom(caseMeetingTx);
 const getAllInteractions = () => getAllFrom(interactionTx);
 const saveInteraction = (value) => putInto(interactionTx, value);
+const getAllCommunications = () => getAllFrom(communicationTx);
+const saveCommunication = (value) => putInto(communicationTx, value);
 const getAllMentorReports = () => getAllFrom(mentorReportTx);
 const clearMentorReports = () => clearStore(mentorReportTx);
 const getAllParentCheckIns = () => getAllFrom(parentCheckInTx);
@@ -3186,7 +3276,7 @@ const CASE_DATA_STORES = [
   CASES_STORE, CASE_ASSIGNMENTS_STORE, CASE_ACTIVITIES_STORE, CASE_DOCUMENTS_STORE, CASE_EVENTS_STORE,
   CASE_DESCRIPTION_VERSIONS_STORE, CASE_NOTES_STORE,
   ACTIVITY_DEVIATIONS_STORE, DEVIATION_DECISIONS_STORE, CASE_MEETINGS_STORE, INTERACTIONS_STORE, MENTOR_REPORTS_STORE,
-  PARENT_CHECK_INS_STORE, COMPENSATION_PERIODS_STORE, CASE_DOCUMENT_BLOBS_STORE, PROCESSED_COMMANDS_STORE
+  COMMUNICATIONS_STORE, PARENT_CHECK_INS_STORE, COMPENSATION_PERIODS_STORE, CASE_DOCUMENT_BLOBS_STORE, PROCESSED_COMMANDS_STORE
 ];
 
 const MATCHING_PROFILE_STORES = [
@@ -4025,7 +4115,7 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
 }
 
 async function loadCaseData() {
-  [cases, caseAssignments, caseActivities, caseDocuments, caseEvents, caseDescriptionVersions, caseNotes, activityDeviations, deviationDecisions, caseMeetings, interactions, mentorReports, parentCheckIns, compensationPeriods] = await Promise.all([
+  [cases, caseAssignments, caseActivities, caseDocuments, caseEvents, caseDescriptionVersions, caseNotes, activityDeviations, deviationDecisions, caseMeetings, interactions, communications, mentorReports, parentCheckIns, compensationPeriods] = await Promise.all([
     getAllCases(),
     getAllCaseAssignments(),
     getAllCaseActivities(),
@@ -4037,10 +4127,14 @@ async function loadCaseData() {
     getAllDeviationDecisions(),
     getAllCaseMeetings(),
     getAllInteractions(),
+    getAllCommunications(),
     getAllMentorReports(),
     getAllParentCheckIns(),
     getAllCompensationPeriods()
   ]);
+  communications = communications.map(normalizeCommunicationRecord)
+    .filter((record) => record.tenantId === DEFAULT_TENANT_ID)
+    .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
 }
 
 async function ensureCaseDescriptionHistory() {
@@ -5675,11 +5769,8 @@ function renderCalendarOwnerFilter() {
 }
 
 function renderCalendar() {
-  const meetingsOnly = currentView === "meetings";
-  els.calendarLogContactButton.hidden = meetingsOnly;
   document.querySelectorAll("[data-calendar-type-filter]").forEach((input) => {
     input.checked = calendarTypeFilters.has(input.dataset.calendarTypeFilter);
-    input.closest("label").hidden = meetingsOnly && input.dataset.calendarTypeFilter !== "meeting";
   });
   renderCalendarOwnerFilter();
   const monthName = new Intl.DateTimeFormat("sv-SE", { month: "long", year: "numeric" }).format(calendarCursor);
@@ -5716,6 +5807,231 @@ function renderCalendar() {
       </section>`;
     }).join("")
     : '<p class="calendar-empty">Inga kalenderposter matchar urvalet den här månaden.</p>';
+}
+
+function renderMeetingRegisterOwnerFilter() {
+  const selected = meetingRegisterOwnerFilter;
+  els.meetingRegisterOwnerFilter.innerHTML = '<option value="all">Alla handläggare</option><option value="mine">Mina möten</option>';
+  for (const handler of [...handlers].filter((item) => item.active !== false).sort((left, right) => left.name.localeCompare(right.name, "sv"))) {
+    const option = document.createElement("option");
+    option.value = handler.id;
+    option.textContent = handler.name;
+    els.meetingRegisterOwnerFilter.append(option);
+  }
+  els.meetingRegisterOwnerFilter.value = [...els.meetingRegisterOwnerFilter.options].some((option) => option.value === selected) ? selected : "all";
+  meetingRegisterOwnerFilter = els.meetingRegisterOwnerFilter.value;
+}
+
+function meetingRegisterRecords() {
+  const query = meetingRegisterSearchTerm.trim().toLocaleLowerCase("sv-SE");
+  const now = Date.now();
+  return allInteractions()
+    .filter((interaction) => interaction.kind === "meeting")
+    .filter((interaction) => !meetingRegisterStatusFilter || interaction.status === meetingRegisterStatusFilter)
+    .filter((interaction) => {
+      if (meetingRegisterOwnerFilter === "all") return true;
+      const ownerId = meetingRegisterOwnerFilter === "mine" ? currentActorId() : meetingRegisterOwnerFilter;
+      return interaction.organizerId === ownerId;
+    })
+    .filter((interaction) => {
+      if (!query) return true;
+      const caseRecord = cases.find((item) => item.id === interaction.caseId);
+      const searchValue = [
+        interaction.title,
+        interaction.location,
+        handlerNameById(interaction.organizerId),
+        caseRecord?.number,
+        caseRecord?.title,
+        caseRecord?.type,
+        ...interaction.participants.flatMap((participant) => [participant.displayName, participant.roleLabel, participant.phone, participant.email])
+      ].filter(Boolean).join(" ").toLocaleLowerCase("sv-SE");
+      return searchValue.includes(query);
+    })
+    .sort((left, right) => {
+      const leftTime = new Date(left.startsAt || 0).getTime();
+      const rightTime = new Date(right.startsAt || 0).getTime();
+      const leftUpcoming = left.status === "scheduled" && leftTime >= now;
+      const rightUpcoming = right.status === "scheduled" && rightTime >= now;
+      if (leftUpcoming !== rightUpcoming) return leftUpcoming ? -1 : 1;
+      return leftUpcoming ? leftTime - rightTime : rightTime - leftTime;
+    });
+}
+
+function openMeetingRegisterRecord(interaction) {
+  openInteractionForm(interaction.status === "scheduled" ? "scheduled" : "completed", interaction.caseId || "", interaction.id);
+}
+
+function renderMeetingsRegister() {
+  renderMeetingRegisterOwnerFilter();
+  els.meetingRegisterSearchInput.value = meetingRegisterSearchTerm;
+  els.meetingRegisterStatusFilter.value = meetingRegisterStatusFilter;
+  const records = meetingRegisterRecords();
+  els.meetingRegisterSummary.textContent = records.length === 1 ? "1 möte visas." : `${records.length} möten visas.`;
+  els.meetingRegisterTableBody.replaceChildren();
+  for (const interaction of records) {
+    const row = document.createElement("tr");
+    const caseRecord = cases.find((item) => item.id === interaction.caseId);
+    const participants = interaction.participants.map((participant) => participant.displayName).filter(Boolean);
+    const latestSystemCommunication = [...communicationsForInteraction(interaction.id)]
+      .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0];
+    const latestManualCommunication = [...(interaction.communicationHistory || [])]
+      .sort((left, right) => new Date(right.occurredAt || 0) - new Date(left.occurredAt || 0))[0];
+    const caseMarkup = caseRecord
+      ? `<a class="meeting-register-case" href="#/case/${escapeHtml(caseRecord.id)}">${escapeHtml(caseRecord.number)} · ${escapeHtml(caseRecord.type)}</a>`
+      : '<span class="meeting-register-case text-secondary">Fristående möte</span>';
+    const mode = ({ physical: "Fysiskt", digital: "Digitalt", phone: "Telefon" })[interaction.mode] || "Mötesform ej angiven";
+    row.innerHTML = `<td class="meeting-register-date"><time datetime="${escapeHtml(interaction.startsAt || "")}">${escapeHtml(formatDateTime(interaction.startsAt))}</time><small>${escapeHtml(mode)}</small></td>
+      <td><strong class="meeting-register-title">${escapeHtml(interaction.title || "Möte")}</strong>${caseMarkup}</td>
+      <td><span class="meeting-register-participants">${escapeHtml(participants.slice(0, 3).join(", ") || "Inga deltagare angivna")}</span>${participants.length > 3 ? `<small>+ ${participants.length - 3} till</small>` : ""}</td>
+      <td><span class="badge ${interactionStatusBadge(interaction.status)}">${escapeHtml(INTERACTION_STATUS_LABELS[interaction.status] || interaction.status)}</span>${latestSystemCommunication ? `<small class="meeting-register-communication">Senast: ${escapeHtml(COMMUNICATION_CHANNEL_LABELS[latestSystemCommunication.channel] || latestSystemCommunication.channel)} · ${escapeHtml(COMMUNICATION_STATUS_LABELS[latestSystemCommunication.status] || latestSystemCommunication.status)} · ${escapeHtml(formatDateTime(latestSystemCommunication.createdAt))}</small>` : latestManualCommunication ? `<small class="meeting-register-communication">Senast: ${escapeHtml(INTERACTION_COMMUNICATION_LABELS[latestManualCommunication.type] || INTERACTION_COMMUNICATION_LABELS.other)} · ${escapeHtml(formatDateTime(latestManualCommunication.occurredAt))}</small>` : '<small class="meeting-register-communication">Ingen kommunikation registrerad</small>'}</td>
+      <td>${escapeHtml(handlerNameById(interaction.organizerId))}</td>
+      <td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-open-meeting-register="${escapeHtml(interaction.id)}">Öppna</button></td>`;
+    row.querySelector("[data-open-meeting-register]").addEventListener("click", () => openMeetingRegisterRecord(interaction));
+    makeRegisterRowInteractive(row, `Öppna möte ${interaction.title || formatDateTime(interaction.startsAt)}`, () => openMeetingRegisterRecord(interaction));
+    els.meetingRegisterTableBody.append(row);
+  }
+  els.meetingRegisterEmpty.hidden = records.length > 0;
+  els.meetingRegisterTableBody.closest(".table-responsive").hidden = records.length === 0;
+}
+
+function communicationStatusBadge(status) {
+  if (["delivered", "received"].includes(status)) return "text-bg-success";
+  if (status === "failed") return "text-bg-danger";
+  if (status === "registered_demo") return "text-bg-warning";
+  return "text-bg-secondary";
+}
+
+function communicationLink(record, entityType) {
+  return record.links.find((link) => link.entityType === entityType) || null;
+}
+
+function communicationsForInteraction(interactionId) {
+  return communications.filter((record) => record.links.some((link) => link.entityType === "interaction" && link.entityId === interactionId));
+}
+
+function communicationPartyLabel(record) {
+  if (record.direction === "incoming") return [record.sender?.name, record.sender?.address].filter(Boolean).join(" · ") || "Okänd avsändare";
+  return record.recipients.map((recipient) => [recipient.name, recipient.address].filter(Boolean).join(" · ")).filter(Boolean).join(", ") || "Mottagare saknas";
+}
+
+function communicationContextMarkup(record) {
+  const caseLink = communicationLink(record, "case");
+  const interactionLink = communicationLink(record, "interaction");
+  const parts = [];
+  if (caseLink) parts.push(`<a href="#/case/${escapeHtml(caseLink.entityId)}">${escapeHtml(caseLink.label || "Ärende")}</a>`);
+  if (interactionLink) parts.push(`<span>${escapeHtml(interactionLink.label || "Möte")}</span>`);
+  return parts.length ? parts.join("") : '<span class="text-secondary">Ingen koppling</span>';
+}
+
+function filteredCommunications() {
+  const query = communicationSearchTerm.trim().toLocaleLowerCase("sv-SE");
+  return communications.filter((record) => {
+    if (communicationChannelFilter && record.channel !== communicationChannelFilter) return false;
+    if (communicationDirectionFilter && record.direction !== communicationDirectionFilter) return false;
+    if (!query) return true;
+    const searchValue = [
+      record.subject,
+      record.body,
+      record.sender?.name,
+      record.sender?.address,
+      ...record.recipients.flatMap((recipient) => [recipient.name, recipient.address]),
+      ...record.links.map((link) => link.label),
+      record.externalMessageId
+    ].filter(Boolean).join(" ").toLocaleLowerCase("sv-SE");
+    return searchValue.includes(query);
+  });
+}
+
+function renderCommunications() {
+  els.communicationSearchInput.value = communicationSearchTerm;
+  els.communicationChannelFilter.value = communicationChannelFilter;
+  els.communicationDirectionFilter.value = communicationDirectionFilter;
+  const records = filteredCommunications();
+  els.communicationsSummary.textContent = records.length === 1 ? "1 kommunikationspost visas." : `${records.length} kommunikationsposter visas.`;
+  els.communicationTableBody.innerHTML = records.map((record) => {
+    const subject = record.subject || (record.channel === "sms" ? "SMS" : "Meddelande");
+    const latestEvent = record.deliveryEvents.at(-1);
+    return `<tr>
+      <td><time datetime="${escapeHtml(record.createdAt || "")}">${escapeHtml(formatDateTime(record.createdAt))}</time></td>
+      <td><strong>${escapeHtml(COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel)}</strong><small class="communication-provider-label">${escapeHtml(record.providerId)}${record.providerMode === "demo" ? " · demo" : ""}</small></td>
+      <td>${escapeHtml(COMMUNICATION_DIRECTION_LABELS[record.direction] || record.direction)}</td>
+      <td class="communication-party-cell">${escapeHtml(communicationPartyLabel(record))}</td>
+      <td class="communication-context-cell">${communicationContextMarkup(record)}</td>
+      <td class="communication-message-cell"><strong>${escapeHtml(subject)}</strong><span>${escapeHtml(record.body)}</span><details><summary>Visa hela meddelandet</summary><p>${escapeHtml(record.body)}</p>${record.externalMessageId ? `<small>Leverantörens id: ${escapeHtml(record.externalMessageId)}</small>` : ""}</details></td>
+      <td><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(COMMUNICATION_STATUS_LABELS[record.status] || record.status)}</span>${latestEvent?.detail ? `<small class="communication-delivery-detail">${escapeHtml(latestEvent.detail)}</small>` : ""}</td>
+    </tr>`;
+  }).join("");
+  els.communicationEmpty.hidden = records.length > 0;
+  els.communicationTableBody.closest(".table-responsive").hidden = records.length === 0;
+}
+
+function renderInteractionSystemCommunications(interactionId = els.interactionForm.dataset.interactionId) {
+  const records = interactionId ? communicationsForInteraction(interactionId) : [];
+  els.interactionEmailButton.disabled = !interactionId;
+  els.interactionSmsButton.disabled = !interactionId;
+  els.interactionSystemCommunicationHelp.textContent = interactionId
+    ? "Demoleverantörerna registrerar kommandot men skickar inget externt."
+    : "Spara mötet innan ett meddelande kan länkas till det.";
+  els.interactionSystemCommunicationList.innerHTML = records.length
+    ? records.map((record) => `<article class="interaction-system-communication"><time datetime="${escapeHtml(record.createdAt || "")}">${escapeHtml(formatDateTime(record.createdAt))}</time><div><strong>${escapeHtml(COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel)} · ${escapeHtml(communicationPartyLabel(record))}</strong><p>${escapeHtml(record.subject || record.body)}</p><small>${escapeHtml(COMMUNICATION_STATUS_LABELS[record.status] || record.status)}</small></div></article>`).join("")
+    : '<p class="small text-secondary mb-0">Inga systemmeddelanden är registrerade för mötet.</p>';
+  const manualCount = interactionDraftItems("communicationHistory").length;
+  els.interactionCommunicationCount.textContent = manualCount + records.length;
+}
+
+function communicationChannelFromForm() {
+  return els.communicationComposerForm.querySelector('input[name="communicationChannel"]:checked')?.value || "email";
+}
+
+function suggestedCommunicationRecipient(interaction, channel) {
+  const contactKey = channel === "email" ? "email" : "phone";
+  return interaction?.participants.find((participant) => participant.partyType !== "handler" && participant[contactKey])
+    || interaction?.participants.find((participant) => participant[contactKey])
+    || null;
+}
+
+function updateCommunicationComposerChannel({ applySuggestion = false } = {}) {
+  const channel = communicationChannelFromForm();
+  const isEmail = channel === "email";
+  els.communicationRecipientAddressLabel.textContent = isEmail ? "E-postadress" : "Telefonnummer";
+  els.communicationRecipientAddressInput.type = isEmail ? "email" : "tel";
+  els.communicationRecipientAddressInput.autocomplete = isEmail ? "email" : "tel";
+  els.communicationSubjectField.hidden = !isEmail;
+  els.communicationSubjectInput.required = isEmail;
+  els.communicationSubmitButton.textContent = isEmail ? "Registrera via e-postdemo" : "Registrera via SMS-demo";
+  els.communicationBodyHelp.textContent = isEmail ? "Texten registreras hos e-postdemot." : "Texten registreras hos SMS-demot.";
+  if (!applySuggestion) return;
+  const interaction = allInteractions().find((item) => item.id === els.communicationComposerForm.dataset.interactionId);
+  const recipient = suggestedCommunicationRecipient(interaction, channel);
+  els.communicationRecipientNameInput.value = recipient?.displayName || "";
+  els.communicationRecipientAddressInput.value = recipient?.[isEmail ? "email" : "phone"] || "";
+  els.communicationComposerForm.dataset.recipientPartyType = recipient?.partyType || "";
+  els.communicationComposerForm.dataset.recipientPartyId = recipient?.partyId || "";
+}
+
+function openCommunicationComposer({ channel = "email", interaction = null } = {}) {
+  els.communicationComposerForm.reset();
+  els.communicationComposerForm.dataset.interactionId = interaction?.id || "";
+  els.communicationComposerForm.dataset.recipientPartyType = "";
+  els.communicationComposerForm.dataset.recipientPartyId = "";
+  const channelInput = els.communicationComposerForm.querySelector(`input[name="communicationChannel"][value="${channel}"]`);
+  if (channelInput) channelInput.checked = true;
+  els.communicationCaseInput.innerHTML = '<option value="">Ingen ärendekoppling</option>';
+  for (const caseRecord of [...cases].sort((left, right) => left.number.localeCompare(right.number, "sv"))) {
+    const option = document.createElement("option");
+    option.value = caseRecord.id;
+    option.textContent = `${caseRecord.number} · ${caseRecord.type} · ${caseRecord.title}`;
+    els.communicationCaseInput.append(option);
+  }
+  els.communicationCaseInput.value = interaction?.caseId || "";
+  els.communicationContextSummary.hidden = !interaction;
+  els.communicationContextSummary.textContent = interaction ? `Kopplas till mötet: ${interaction.title || "Möte"}` : "";
+  els.communicationComposerTitle.textContent = channel === "sms" ? "Nytt SMS" : "Ny e-post";
+  els.communicationSubjectInput.value = interaction ? `Möte: ${interaction.title || "Möte"}` : "";
+  els.communicationBodyInput.value = interaction?.invitationText || "";
+  updateCommunicationComposerChannel({ applySuggestion: true });
+  communicationComposerModal ||= bootstrap.Modal.getOrCreateInstance(els.communicationComposerModal);
+  communicationComposerModal.show();
 }
 
 function renderVersions() {
@@ -5755,7 +6071,8 @@ function renderAll() {
   const viewRenderer = {
     dashboard: () => { renderPipeline(); renderDashboard(); },
     calendar: renderCalendar,
-    meetings: renderCalendar,
+    meetings: renderMeetingsRegister,
+    communications: renderCommunications,
     versions: renderVersions,
     presentation: renderPresentation,
     cases: renderCases,
@@ -6488,11 +6805,8 @@ function applyRoute() {
   const routeCaseId = nestedCaseRoute?.[1] || route.id;
   const routeMentorId = nestedMentorRoute?.[1] || route.id;
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "calendar", "meetings", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
-  if (currentView === "meetings" && previousView !== "meetings") {
-    calendarTypeFilters.clear();
-    calendarTypeFilters.add("meeting");
-  } else if (currentView === "calendar" && previousView !== "calendar") {
+  currentView = ["dashboard", "calendar", "meetings", "communications", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
+  if (currentView === "calendar" && previousView !== "calendar") {
     calendarTypeFilters.clear();
     ["meeting", "contact", "activity", "case"].forEach((type) => calendarTypeFilters.add(type));
   }
@@ -6539,7 +6853,9 @@ function applyRoute() {
   }
 
   els.dashboardView.hidden = currentView !== "dashboard";
-  els.calendarView.hidden = !["calendar", "meetings"].includes(currentView);
+  els.calendarView.hidden = currentView !== "calendar";
+  els.meetingsView.hidden = currentView !== "meetings";
+  els.communicationsView.hidden = currentView !== "communications";
   els.versionsView.hidden = currentView !== "versions";
   els.presentationView.hidden = currentView !== "presentation";
   els.casesView.hidden = currentView !== "cases";
@@ -6564,7 +6880,7 @@ function applyRoute() {
 
   const mentorSession = isMentorSession();
   const publicSession = isPublicSession();
-  for (const navigationItem of [els.navDashboard, els.navCalendar, els.navMeetings, els.navPresentation, els.navIntake, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navParentSupportCases, els.navLearning, els.navAdministration]) {
+  for (const navigationItem of [els.navDashboard, els.navCalendar, els.navMeetings, els.navCommunications, els.navPresentation, els.navIntake, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navParentSupportCases, els.navLearning, els.navAdministration]) {
     navigationItem.hidden = mentorSession || publicSession;
   }
   document.querySelectorAll(".sidebar-nav > .nav-link.disabled").forEach((navigationItem) => {
@@ -6588,6 +6904,7 @@ function applyRoute() {
   els.navDashboard.classList.toggle("active", currentView === "dashboard");
   els.navCalendar.classList.toggle("active", currentView === "calendar");
   els.navMeetings.classList.toggle("active", currentView === "meetings");
+  els.navCommunications.classList.toggle("active", currentView === "communications");
   els.navPresentation.classList.toggle("active", currentView === "presentation");
   const currentCaseTypeId = currentView === "case"
     ? cases.find((caseRecord) => caseRecord.id === routeCaseId)?.caseTypeId || ""
@@ -6633,6 +6950,9 @@ function applyRoute() {
   } else if (currentView === "meetings") {
     els.pageTitle.textContent = "Möten";
     els.breadcrumb.textContent = "Start / Möten";
+  } else if (currentView === "communications") {
+    els.pageTitle.textContent = "Kommunikation";
+    els.breadcrumb.textContent = "Start / Kommunikation";
   } else if (currentView === "versions") {
     els.pageTitle.textContent = "Versioner";
     els.breadcrumb.textContent = "Start / Systemadministration / Versioner";
@@ -12062,7 +12382,7 @@ function communicationHistoryFromForm() {
 function renderInteractionCommunicationHistory() {
   const history = interactionDraftItems("communicationHistory")
     .sort((left, right) => new Date(left.occurredAt) - new Date(right.occurredAt));
-  els.interactionCommunicationCount.textContent = history.length;
+  els.interactionCommunicationCount.textContent = history.length + communicationsForInteraction(els.interactionForm.dataset.interactionId).length;
   els.interactionCommunicationList.innerHTML = history.length
     ? history.map((item) => `<article class="interaction-communication-item${item.pending ? " is-pending" : ""}"><time datetime="${escapeHtml(item.occurredAt)}">${escapeHtml(formatDateTime(item.occurredAt))}</time><div><strong>${escapeHtml(INTERACTION_COMMUNICATION_LABELS[item.type] || INTERACTION_COMMUNICATION_LABELS.other)}</strong><p>${escapeHtml(item.comment)}</p><small>${escapeHtml(handlerNameById(item.createdBy) || item.createdBy || "System")}${item.pending ? " · sparas med mötet" : ""}</small></div>${item.pending ? `<button type="button" class="btn btn-link btn-sm" data-remove-communication="${escapeHtml(item.id)}">Ta bort</button>` : ""}</article>`).join("")
     : '<p class="small text-secondary mb-0">Ingen kommunikation har registrerats ännu.</p>';
@@ -12172,7 +12492,7 @@ function openInteractionForm(intent = "scheduled", caseId = "", interactionId = 
   els.interactionLocationInput.value = existing?.location || "";
   els.interactionInvitationInput.value = existing?.invitationText || "";
   els.interactionInvitationDetails.open = Boolean(existing?.invitationText || existing?.participants?.some((participant) => participant.responseStatus && participant.responseStatus !== "no_response"));
-  els.interactionCommunicationDetails.open = Boolean(existing?.communicationHistory?.length);
+  els.interactionCommunicationDetails.open = Boolean(existing?.communicationHistory?.length || communicationsForInteraction(existing?.id).length);
   els.interactionCommunicationAtInput.value = localDateTimeValue();
   els.interactionCommunicationCommentInput.value = "";
   els.interactionCommunicationHelp.textContent = "Händelsen sparas tillsammans med mötet.";
@@ -12196,6 +12516,7 @@ function openInteractionForm(intent = "scheduled", caseId = "", interactionId = 
   }
   renderExternalParticipants();
   renderInteractionCommunicationHistory();
+  renderInteractionSystemCommunications(existing?.id || "");
   updateInteractionFormState();
   els.interactionForm.dataset.dirty = "false";
   els.interactionForm.querySelector(".interaction-form-scroll").scrollTop = 0;
@@ -12321,6 +12642,7 @@ async function saveDirectInteraction(interaction) {
 
 els.dashboardBookMeetingButton.addEventListener("click", () => openInteractionForm("scheduled"));
 els.calendarBookMeetingButton.addEventListener("click", () => openInteractionForm("scheduled"));
+els.meetingRegisterBookButton.addEventListener("click", () => openInteractionForm("scheduled"));
 els.calendarLogContactButton.addEventListener("click", () => openInteractionForm("completed"));
 els.parentBookMeetingButton.addEventListener("click", () => openInteractionForParty("parent", selectedParentId));
 els.mentorBookMeetingButton.addEventListener("click", () => openInteractionForParty("mentor", selectedId));
@@ -12539,6 +12861,116 @@ els.calendarOwnerFilter.addEventListener("change", () => {
   renderCalendar();
 });
 
+els.meetingRegisterSearchInput.addEventListener("input", () => {
+  meetingRegisterSearchTerm = els.meetingRegisterSearchInput.value;
+  renderMeetingsRegister();
+});
+
+els.meetingRegisterStatusFilter.addEventListener("change", () => {
+  meetingRegisterStatusFilter = els.meetingRegisterStatusFilter.value;
+  renderMeetingsRegister();
+});
+
+els.meetingRegisterOwnerFilter.addEventListener("change", () => {
+  meetingRegisterOwnerFilter = els.meetingRegisterOwnerFilter.value;
+  renderMeetingsRegister();
+});
+
+els.communicationSearchInput.addEventListener("input", () => {
+  communicationSearchTerm = els.communicationSearchInput.value;
+  renderCommunications();
+});
+
+els.communicationChannelFilter.addEventListener("change", () => {
+  communicationChannelFilter = els.communicationChannelFilter.value;
+  renderCommunications();
+});
+
+els.communicationDirectionFilter.addEventListener("change", () => {
+  communicationDirectionFilter = els.communicationDirectionFilter.value;
+  renderCommunications();
+});
+
+els.newCommunicationButton.addEventListener("click", () => openCommunicationComposer());
+els.interactionEmailButton.addEventListener("click", () => {
+  const interaction = allInteractions().find((item) => item.id === els.interactionForm.dataset.interactionId);
+  if (interaction) openCommunicationComposer({ channel: "email", interaction });
+});
+els.interactionSmsButton.addEventListener("click", () => {
+  const interaction = allInteractions().find((item) => item.id === els.interactionForm.dataset.interactionId);
+  if (interaction) openCommunicationComposer({ channel: "sms", interaction });
+});
+
+els.communicationComposerForm.querySelectorAll('input[name="communicationChannel"]').forEach((input) => input.addEventListener("change", () => {
+  els.communicationComposerTitle.textContent = input.value === "sms" ? "Nytt SMS" : "Ny e-post";
+  updateCommunicationComposerChannel({ applySuggestion: true });
+}));
+
+[els.communicationRecipientNameInput, els.communicationRecipientAddressInput].forEach((input) => input.addEventListener("input", () => {
+  els.communicationComposerForm.dataset.recipientPartyType = "";
+  els.communicationComposerForm.dataset.recipientPartyId = "";
+}));
+
+els.communicationComposerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!els.communicationComposerForm.reportValidity()) return;
+  const channel = communicationChannelFromForm();
+  const interaction = allInteractions().find((item) => item.id === els.communicationComposerForm.dataset.interactionId);
+  const caseRecord = cases.find((item) => item.id === els.communicationCaseInput.value);
+  const actor = handlers.find((handler) => [handler.id, handler.userId].includes(currentActorId()));
+  const links = [];
+  if (caseRecord) links.push({ entityType: "case", entityId: caseRecord.id, label: `${caseRecord.number} · ${caseRecord.type}` });
+  if (interaction) links.push({ entityType: "interaction", entityId: interaction.id, label: interaction.title || "Möte" });
+  els.communicationSubmitButton.disabled = true;
+  els.communicationSubmitButton.textContent = "Behandlar i demo...";
+  try {
+    const record = await dispatchOutboundCommunication({
+      draft: {
+        tenantId: DEFAULT_TENANT_ID,
+        recipientName: els.communicationRecipientNameInput.value,
+        recipientAddress: els.communicationRecipientAddressInput.value,
+        recipientPartyType: els.communicationComposerForm.dataset.recipientPartyType || null,
+        recipientPartyId: els.communicationComposerForm.dataset.recipientPartyId || null,
+        sender: actor ? { name: actor.name, address: channel === "email" ? actor.email || "kommun@demo.local" : actor.phone || "SMS demo" } : { name: "Kommunen", address: channel === "email" ? "kommun@demo.local" : "SMS demo" },
+        subject: els.communicationSubjectInput.value,
+        body: els.communicationBodyInput.value,
+        links,
+        createdBy: currentActorId()
+      },
+      provider: createDemoCommunicationProvider(channel)
+    });
+    if (caseRecord) {
+      const now = record.updatedAt;
+      const updatedCase = { ...caseRecord, version: Number(caseRecord.version || 1) + 1, updatedAt: now, updatedBy: currentActorId() };
+      await atomicPut({
+        [COMMUNICATIONS_STORE]: [record],
+        [CASES_STORE]: [updatedCase],
+        [CASE_EVENTS_STORE]: [caseEventRecord({
+          caseId: caseRecord.id,
+          eventType: "communication_registered",
+          entityType: "communication",
+          entityId: record.id,
+          message: `${COMMUNICATION_CHANNEL_LABELS[channel]} registrerades via demo till ${els.communicationRecipientNameInput.value}. Ingen extern leverans gjordes.`,
+          idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now
+        })]
+      });
+    } else {
+      await saveCommunication(record);
+    }
+    communicationComposerModal.hide();
+    markSaved();
+    await refresh();
+    if (interaction) renderInteractionSystemCommunications(interaction.id);
+    showFeedback(`${COMMUNICATION_CHANNEL_LABELS[channel]} har behandlats av demot och registrerats. Inget skickades externt.`);
+  } catch (error) {
+    console.error("Kunde inte behandla kommunikationen", error);
+    showFeedback(error?.message || "Kommunikationen kunde inte registreras.");
+  } finally {
+    els.communicationSubmitButton.disabled = false;
+    updateCommunicationComposerChannel();
+  }
+});
+
 document.querySelectorAll("[data-calendar-type-filter]").forEach((input) => {
   input.addEventListener("change", () => {
     if (input.checked) calendarTypeFilters.add(input.dataset.calendarTypeFilter);
@@ -12581,6 +13013,11 @@ els.navCalendar.addEventListener("click", (event) => {
 els.navMeetings.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/meetings");
+});
+
+els.navCommunications.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/communications");
 });
 
 els.navIntake.addEventListener("click", (event) => {

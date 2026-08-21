@@ -611,6 +611,16 @@ Statusarna `cancelled` och `no_show` uppfyller aldrig ett aktivitetskrav på bok
 
 `CaseMeeting` och äldre mötesposter läses under övergången genom en kompatibilitetsprojektion till `Interaction`. Nya ärendekopplade möten skriver båda representationerna tills alla befintliga läsmodeller använder den kanoniska interaktionsposten.
 
+### 8.7 Global kommunikationshantering
+
+`CommunicationRecord` är den kanoniska posten för kommunikation som passerar en teknisk kanal in i eller ut ur systemet. Den är skild från `Interaction`: mötet eller kontakttillfället beskriver verksamhetshändelsen, medan kommunikationsposten beskriver det meddelande som en kanaladapter tog emot eller försökte leverera. Samma kommunikationspost kan länkas till ärende, möte, aktivitet eller annan verksamhetspost utan att innehållet kopieras dit.
+
+Varje post ska minst innehålla tenant, riktning, kanal, leverantör, leverantörsläge, extern meddelandeidentitet, avsändare, mottagare, ämne/innehåll, objektlänkar, aktuell leveransstatus samt en append-only-lista med leveranshändelser. En utgående post skapas genom ett sändningskommando till en kanaladapter. En inkommande post skapas genom motsvarande mottagningskommando från leverantörens webhook eller inkorgskoppling. Gränssnittet får inte skapa en fristående loggrad som påstår att ett meddelande har skickats.
+
+Prototypens `email-demo` och `sms-demo` implementerar samma adapterkontrakt som framtida produktionsleverantörer. De returnerar ett externt demo-id och status `registered_demo`, men utför ingen nätverksleverans. Produktionsadaptrar ska köras serverbaserat, hålla leverantörshemligheter utanför klienten, verifiera inkommande signaturer, använda idempotensnycklar och översätta leveranskvittens till samma gemensamma statusmodell.
+
+Det globala kommunikationsregistret är en läsmodell över samtliga `CommunicationRecord` för aktuell tenant. Objektvyer, exempelvis mötet eller ärendet, visar filtrerade utdrag ur samma poster. De får inte lagra en separat redigerbar kopia av kommunikationshistoriken.
+
 En rättelse av en handling skapar en ny version via `supersedesDocumentId`; den tidigare versionen skrivs inte över. När en handling registreras från en aktivitet sätts både `caseId` och `activityId`. Den visas då både i ärendets handlingslista och som underlag på aktiviteten. En tjänsteanteckning saknar filobjekt, medan en uppladdad fil ska få metadata, kontrollsumma och filinnehåll registrerade som en sammanhållen operation utan tomma platshållarposter.
 
 ### 4.5 Händelser och kommandospårning
@@ -1221,7 +1231,7 @@ Denna specifikation definierar inte:
 
 - Kommunens formella diarieförings- eller arkiveringsregler.
 - Slutlig informationsklassning och gallringsplan; värdena `normal` och `restricted` är tekniska platshållare tills organisationens klassningsmodell har fastställts.
-- Integration med e-arkiv, BankID, e-post eller externa register.
+- Produktionsleverantör, autentisering, webhookadress och gallringsregler för e-post, SMS, e-arkiv, BankID och externa register. Prototypens e-post- och SMS-adaptrar utför ingen extern leverans.
 - Exakt beslutsdelegation mellan kommunala roller.
 
 Dessa delar måste fastställas tillsammans med verksamhetsansvarig, informationssäkerhetsansvarig och kommunens jurist innan produktionssättning.

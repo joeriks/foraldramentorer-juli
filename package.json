@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-sites.mjs",
-    "test": "npm run build && node --test tests/sites-build.test.mjs tests/activity-ui.test.mjs tests/calendar-ui.test.mjs tests/interaction-domain.test.mjs tests/guided-activity-domain.test.mjs tests/case-workspace-domain.test.mjs tests/case-workspace-ui.test.mjs tests/case-domain.test.mjs tests/critical-workflows.test.mjs tests/definition-administration.test.mjs tests/feature-links.test.mjs tests/learning-domain.test.mjs tests/learning-ui.test.mjs tests/support-domain.test.mjs tests/support-area-domain.test.mjs tests/matching-catalog-domain.test.mjs tests/matching-profile-domain.test.mjs tests/prototype-data.test.mjs"
+    "test": "npm run build && node --test tests/sites-build.test.mjs tests/activity-ui.test.mjs tests/calendar-ui.test.mjs tests/interaction-domain.test.mjs tests/communication-domain.test.mjs tests/communication-ui.test.mjs tests/guided-activity-domain.test.mjs tests/case-workspace-domain.test.mjs tests/case-workspace-ui.test.mjs tests/case-domain.test.mjs tests/critical-workflows.test.mjs tests/definition-administration.test.mjs tests/feature-links.test.mjs tests/learning-domain.test.mjs tests/learning-ui.test.mjs tests/support-domain.test.mjs tests/support-area-domain.test.mjs tests/matching-catalog-domain.test.mjs tests/matching-profile-domain.test.mjs tests/prototype-data.test.mjs"
   },
   "dependencies": {
     "marked": "16.2.1"

@@ -210,6 +210,8 @@ Handlingar kan gälla hela ärendet eller kopplas till en viss aktivitet. Koppli
 
 Själva samtalet, mejlet, besöket eller mötet lagras samtidigt som ett gemensamt kontakttillfälle. Ett planerat möte kan vara fristående eller kopplas till ett ärende. När ett ärende väljs föreslås kända parter och ansvarig handläggare, men organisatör och deltagare kan justeras var för sig. Kallelsesvar registreras separat från faktisk närvaro. Ett ärendekopplat kontakttillfälle visas i kalendern och ärendets historik utan att behöva registreras på nytt.
 
+Teknisk kommunikation via e-post, SMS och framtida kanaler hanteras i ett separat globalt kommunikationslager. Det registrerar sändnings- och mottagningskommandon, leverantörens meddelande-id och statuskedja och länkar posten till exempelvis möte och ärende. Mötet beskriver alltså vad som ska hända, medan kommunikationsposten visar vad systemets kanal faktiskt har hanterat. I prototypen används e-post- och SMS-demo som registrerar men inte levererar externt.
+
 Mötesutfall anges som genomfört, inställt eller uteblivet. En ombokning blir en ny bokning så att den ursprungliga händelsen finns kvar. Samma kronologiska kontaktlista visas på ärendet samt på berörd förälder och mentor, med nästa planerade kontakt överst.
 
 ### Stödärende och matchning

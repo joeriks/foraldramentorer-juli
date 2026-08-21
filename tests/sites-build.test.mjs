@@ -18,6 +18,7 @@ test("serves the application shell", async () => {
   assert.match(html, /FöräldraMentorer/);
   assert.match(html, /id="dashboardView"/);
   assert.match(html, /id="calendarView"/);
+  assert.match(html, /id="meetingsView"/);
   assert.match(html, /id="navCalendar"[^>]*href="#\/calendar"/);
   assert.match(html, /id="navMeetings"[^>]*href="#\/meetings"/);
   assert.match(html, /id="caseFlowBoard"/);

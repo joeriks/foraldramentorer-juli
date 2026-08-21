@@ -42,6 +42,20 @@ test("calendar entries open the existing source records", () => {
   assert.match(app, /version: "95"/);
 });
 
+test("keeps meetings in a dedicated searchable register", () => {
+  assert.match(html, /id="meetingsView"/);
+  assert.match(html, /id="meetingRegisterSearchInput"/);
+  assert.match(html, /id="meetingRegisterStatusFilter"/);
+  assert.match(html, /id="meetingRegisterOwnerFilter"/);
+  assert.match(html, /id="meetingRegisterTableBody"/);
+  assert.match(app, /function renderMeetingsRegister\(\)/);
+  assert.match(app, /\.filter\(\(interaction\) => interaction\.kind === "meeting"\)/);
+  assert.match(app, /meetings: renderMeetingsRegister/);
+  assert.match(app, /els\.calendarView\.hidden = currentView !== "calendar"/);
+  assert.match(app, /els\.meetingsView\.hidden = currentView !== "meetings"/);
+  assert.match(styles, /\.meeting-register-table \{\s*min-width: 56rem;/);
+});
+
 test("offers a shared flow for planned meetings and completed contacts", () => {
   assert.match(html, /id="interactionOffcanvas"/);
   assert.match(html, /id="calendarBookMeetingButton"/);

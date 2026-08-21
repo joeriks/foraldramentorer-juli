@@ -10,6 +10,7 @@ const sourceFiles = [
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
   ["/calendar-domain.js", "calendar-domain.js", "text/javascript; charset=utf-8"],
   ["/interaction-domain.js", "interaction-domain.js", "text/javascript; charset=utf-8"],
+  ["/communication-domain.js", "communication-domain.js", "text/javascript; charset=utf-8"],
   ["/guided-activity-domain.js", "guided-activity-domain.js", "text/javascript; charset=utf-8"],
   ["/case-workspace-domain.js", "case-workspace-domain.js", "text/javascript; charset=utf-8"],
   ["/support-area-domain.js", "support-area-domain.js", "text/javascript; charset=utf-8"],
