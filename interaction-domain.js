@@ -65,6 +65,7 @@ export function suggestedInteractionParticipants({ parent = null, mentor = null,
 
 export function normalizeInteraction(record = {}) {
   const startsAt = record.startsAt || record.occurredAt || record.createdAt || null;
+  const reminderOffset = Number(record.reminder?.offsetMinutes);
   return {
     ...record,
     kind: record.kind || "meeting",
@@ -84,6 +85,10 @@ export function normalizeInteraction(record = {}) {
     title: String(record.title || "").trim(),
     location: String(record.location || "").trim(),
     invitationText: String(record.invitationText || "").trim(),
+    reminder: {
+      enabled: Boolean(record.reminder?.enabled),
+      offsetMinutes: [60, 120, 1440, 2880].includes(reminderOffset) ? reminderOffset : 1440
+    },
     communicationHistory: Array.isArray(record.communicationHistory)
       ? record.communicationHistory.filter((item) => item?.comment && item?.occurredAt).map((item) => ({
         id: String(item.id || ""),
@@ -116,6 +121,7 @@ export function interactionFromCaseMeeting(meeting, participants = []) {
     mode: meeting.mode,
     location: meeting.location,
     invitationText: meeting.invitationText,
+    reminder: meeting.reminder,
     communicationHistory: meeting.communicationHistory,
     summary: meeting.summary,
     nextStep: meeting.nextStep,

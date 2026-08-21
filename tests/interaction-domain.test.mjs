@@ -122,3 +122,10 @@ test("preserves structured participant contacts and meeting communication", () =
   assert.equal(normalized.communicationHistory[0].createdBy, "handler-sara");
   assert.equal("pending" in normalized.communicationHistory[0], false);
 });
+
+test("normalizes a meeting reminder without enabling legacy meetings", () => {
+  const legacy = normalizeInteraction({ kind: "meeting" });
+  assert.deepEqual(legacy.reminder, { enabled: false, offsetMinutes: 1440 });
+  const scheduled = normalizeInteraction({ kind: "meeting", reminder: { enabled: true, offsetMinutes: 120 } });
+  assert.deepEqual(scheduled.reminder, { enabled: true, offsetMinutes: 120 });
+});

@@ -20,6 +20,54 @@ export const COMMUNICATION_STATUS_LABELS = {
   registered_demo: "Registrerad i demo"
 };
 
+export const MEETING_REMINDER_OFFSETS = [60, 120, 1440, 2880];
+
+export function normalizeMeetingReminder(reminder = {}) {
+  const offsetMinutes = Number(reminder.offsetMinutes);
+  return {
+    enabled: Boolean(reminder.enabled),
+    offsetMinutes: MEETING_REMINDER_OFFSETS.includes(offsetMinutes) ? offsetMinutes : 1440
+  };
+}
+
+export function meetingReminderJobs({ interactions = [], communications = [], now = Date.now() } = {}) {
+  const nowTime = new Date(now).getTime();
+  const existingKeys = new Set(communications.map((record) => record.automationKey).filter(Boolean));
+  const jobs = [];
+  for (const interaction of interactions) {
+    const reminder = normalizeMeetingReminder(interaction.reminder);
+    const startsAt = new Date(interaction.startsAt || 0).getTime();
+    const triggerAt = startsAt - reminder.offsetMinutes * 60 * 1000;
+    if (interaction.kind !== "meeting" || interaction.status !== "scheduled" || !reminder.enabled) continue;
+    if (!Number.isFinite(startsAt) || nowTime < triggerAt || nowTime >= startsAt) continue;
+    const seenRecipients = new Set();
+    for (const participant of interaction.participants || []) {
+      const channel = participant.email ? "email" : participant.phone ? "sms" : null;
+      const address = channel === "email" ? participant.email : participant.phone;
+      if (!channel || !address) continue;
+      const recipientKey = `${channel}:${String(address).trim().toLocaleLowerCase("sv-SE")}`;
+      if (seenRecipients.has(recipientKey)) continue;
+      seenRecipients.add(recipientKey);
+      const automationKey = ["meeting-reminder", interaction.id, interaction.startsAt, reminder.offsetMinutes, recipientKey].join(":");
+      if (existingKeys.has(automationKey)) continue;
+      jobs.push({
+        automationKey,
+        automationType: "meeting_reminder",
+        scheduledFor: new Date(triggerAt).toISOString(),
+        channel,
+        interaction,
+        recipient: {
+          name: participant.displayName || "Mötesdeltagare",
+          address: String(address).trim(),
+          partyType: participant.partyType || null,
+          partyId: participant.partyId || null
+        }
+      });
+    }
+  }
+  return jobs;
+}
+
 const requiredText = (value, message) => {
   const text = String(value || "").trim();
   if (!text) throw new Error(message);
@@ -35,6 +83,9 @@ export function normalizeCommunicationRecord(record = {}) {
     providerId: record.providerId || "manual",
     providerMode: record.providerMode || "live",
     externalMessageId: record.externalMessageId || null,
+    automationKey: record.automationKey || null,
+    automationType: record.automationType || null,
+    scheduledFor: record.scheduledFor || null,
     status: record.status || (record.direction === "incoming" ? "received" : "queued"),
     sender: record.sender ? {
       name: String(record.sender.name || "").trim(),
@@ -99,6 +150,9 @@ export async function dispatchOutboundCommunication({
     channel: provider.channel,
     providerId: provider.id,
     providerMode: provider.mode || "live",
+    automationKey: draft.automationKey || null,
+    automationType: draft.automationType || null,
+    scheduledFor: draft.scheduledFor || null,
     status: "queued",
     sender: draft.sender || null,
     recipients: [{

@@ -70,11 +70,16 @@
 .interaction-form-actions {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.5rem;
   padding: 0.85rem 1rem;
   border-top: 1px solid var(--app-border);
   background: #fff;
+}
+
+.interaction-send-message {
+  margin-right: auto;
 }
 
 .interaction-mode-switch {
@@ -307,6 +312,11 @@
   .interaction-form-actions .btn {
     flex: 1 1 0;
   }
+
+  .interaction-form-actions .interaction-send-message {
+    flex-basis: 100%;
+    margin-right: 0;
+  }
 }
 
 .incoming-contact-meta {
@@ -480,6 +490,7 @@ body {
   --app-space-2: 0.75rem;
   --app-space-3: 1rem;
   --app-space-4: 1.5rem;
+  --app-space-5: 2rem;
   --app-radius: 0.375rem;
   --app-primary: #315f7d;
   --app-primary-hover: #284f68;
@@ -1652,6 +1663,17 @@ body.is-system-administration .sidebar-menu-group {
   gap: var(--app-space-3);
 }
 
+#communicationRegisterPanel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.communication-register-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .communication-provider-notice,
 .communication-demo-notice {
   padding: var(--app-space-3);
@@ -1674,40 +1696,243 @@ body.is-system-administration .sidebar-menu-group {
 }
 
 .communication-register-table {
-  min-width: 72rem;
+  min-width: 58rem;
 }
 
-.communication-provider-label,
-.communication-delivery-detail,
-.communication-message-cell > span,
+.communication-register-table th:last-child,
+.communication-register-table td:last-child {
+  width: 5.5rem;
+  white-space: nowrap;
+}
+
+.communication-message-cell > span:not(.communication-channel-badge),
 .communication-context-cell > *,
-.communication-party-cell {
+.communication-party-cell small,
+.communication-party-cell strong {
   display: block;
   margin-top: 0.2rem;
-  color: var(--app-text-muted);
   font-size: 0.78rem;
   line-height: 1.35;
 }
 
-.communication-message-cell {
-  max-width: 22rem;
+.communication-message-cell > span:not(.communication-channel-badge),
+.communication-context-cell > *,
+.communication-party-cell small {
+  color: var(--app-text-muted);
 }
 
-.communication-message-cell > span {
+.communication-party-cell strong {
+  color: var(--app-text);
+  font-weight: 600;
+}
+
+.communication-date-cell {
+  width: 9rem;
+  white-space: nowrap;
+}
+
+.communication-message-cell {
+  width: 32%;
+  max-width: 26rem;
+}
+
+.communication-message-cell > strong {
+  display: block;
+  margin-top: 0.3rem;
+}
+
+.communication-message-cell > span:not(.communication-channel-badge) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.communication-message-cell details {
-  margin-top: 0.35rem;
-  font-size: 0.78rem;
+.communication-channel-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid #b8ccd5;
+  border-radius: 999px;
+  color: #254e60;
+  background: #f3f8fa;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
-.communication-message-cell details p {
-  margin: 0.45rem 0;
-  color: var(--app-text);
+.communication-automation-label {
+  display: inline-flex;
+  margin-left: 0.35rem;
+  color: #4b5560;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.communication-detail-header {
+  display: grid;
+  gap: var(--app-space-3);
+}
+
+.communication-detail-back {
+  width: fit-content;
+  font-size: 0.875rem;
+}
+
+.communication-detail-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--app-space-3);
+}
+
+.communication-detail-heading > div {
+  min-width: 0;
+}
+
+.communication-detail-heading h2 {
+  overflow-wrap: anywhere;
+}
+
+.communication-detail-body {
+  display: grid;
+  min-width: 0;
+  gap: var(--app-space-4);
+}
+
+.communication-detail-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(15rem, 0.75fr);
+  gap: var(--app-space-4);
+  padding-bottom: var(--app-space-4);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.communication-detail-overview dl,
+.communication-technical-details dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--app-space-3);
+  margin: 0;
+}
+
+.communication-detail-overview dt,
+.communication-technical-details dt,
+.communication-detail-subject span,
+.communication-detail-links span {
+  color: var(--app-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.communication-detail-overview dd,
+.communication-technical-details dd {
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.communication-detail-recipients,
+.communication-detail-links,
+.communication-delivery-timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.communication-detail-recipients li {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.35rem 0;
+}
+
+.communication-detail-recipients span {
+  color: var(--app-text-muted);
+  font-size: 0.8rem;
+}
+
+.communication-detail-section {
+  min-width: 0;
+}
+
+.communication-detail-section > h3 {
+  margin-bottom: var(--app-space-3);
+}
+
+.communication-detail-subject {
+  display: grid;
+  gap: 0.15rem;
+  margin-bottom: var(--app-space-3);
+}
+
+.communication-detail-message {
+  min-height: 7rem;
+  padding: var(--app-space-4);
+  border-left: 4px solid var(--app-primary);
+  background: #f6f9fa;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.communication-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(18rem, 1.2fr);
+  gap: var(--app-space-5);
+  padding-top: var(--app-space-4);
+  border-top: 1px solid var(--app-border);
+}
+
+.communication-detail-links {
+  display: grid;
+  gap: var(--app-space-2);
+}
+
+.communication-detail-links li {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.communication-delivery-timeline {
+  display: grid;
+  gap: var(--app-space-3);
+}
+
+.communication-delivery-timeline li {
+  display: grid;
+  grid-template-columns: 0.8rem minmax(0, 1fr);
+  gap: var(--app-space-2);
+}
+
+.communication-delivery-marker {
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-top: 0.3rem;
+  border: 2px solid var(--app-primary);
+  border-radius: 50%;
+  background: #fff;
+}
+
+.communication-delivery-timeline time,
+.communication-delivery-timeline p {
+  display: block;
+  margin: 0.15rem 0 0;
+  color: var(--app-text-muted);
+  font-size: 0.8rem;
+}
+
+.communication-technical-details {
+  padding-top: var(--app-space-3);
+  border-top: 1px solid var(--app-border);
+}
+
+.communication-technical-details summary {
+  color: var(--app-primary);
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.communication-technical-details dl {
+  margin-top: var(--app-space-3);
 }
 
 .communication-channel-options {
@@ -1746,6 +1971,25 @@ body.is-system-administration .sidebar-menu-group {
   gap: var(--app-space-2);
 }
 
+.meeting-reminder-settings {
+  display: grid;
+  gap: var(--app-space-2);
+  padding: var(--app-space-3) 0;
+  border-top: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.meeting-reminder-options {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.7fr) minmax(0, 1.3fr);
+  align-items: end;
+  gap: var(--app-space-3);
+}
+
+.meeting-reminder-options > * {
+  min-width: 0;
+}
+
 .interaction-system-communication-list {
   display: grid;
   gap: var(--app-space-2);
@@ -1773,8 +2017,18 @@ body.is-system-administration .sidebar-menu-group {
 @media (max-width: 767.98px) {
   .communication-register-filters,
   .communication-channel-options,
-  .interaction-system-communication {
+  .interaction-system-communication,
+  .meeting-reminder-options,
+  .communication-detail-overview,
+  .communication-detail-grid,
+  .communication-detail-overview dl,
+  .communication-technical-details dl {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .communication-detail-message {
+    min-height: 0;
+    padding: var(--app-space-3);
   }
 }
 

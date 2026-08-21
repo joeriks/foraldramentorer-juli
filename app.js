@@ -75,8 +75,10 @@ import {
   COMMUNICATION_STATUS_LABELS,
   createDemoCommunicationProvider,
   dispatchOutboundCommunication,
+  meetingReminderJobs,
+  normalizeMeetingReminder,
   normalizeCommunicationRecord
-} from "./communication-domain.js?v=20260821-communications-v112";
+} from "./communication-domain.js?v=20260821-reminders-v114";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260820-calendar-v4";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
@@ -179,6 +181,35 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "114",
+    date: "2026-08-21",
+    title: "Automatiska mötespåminnelser",
+    flow: "Bokat möte -> påminnelseregel -> e-post- eller SMS-adapter -> global kommunikationshistorik",
+    simplified: "Handläggaren aktiverar en påminnelse direkt på mötet och väljer bara när den ska gå. Systemet väljer e-post i första hand och annars SMS.",
+    retained: "Mötesbokning, deltagare, kallelsetext, manuella meddelanden och kommunikationshistorik fungerar som tidigare. Demoläget gör ingen extern leverans.",
+    changes: [
+      "Nya möten föreslår automatiskt en påminnelse en dag före mötestiden.",
+      "Påminnelser kan stängas av eller ändras till två dagar, två timmar eller en timme före mötet.",
+      "Schemaläggaren kör när prototypen är aktiv och när den öppnas, men skickar aldrig efter att mötet har börjat.",
+      "Varje påminnelse har en stabil automatiseringsnyckel så att omladdning eller flera kontroller inte skapar dubletter.",
+      "Kommunikation har flyttats längst ned i desktop- och mobilnavigationen."
+    ]
+  },
+  {
+    version: "113",
+    date: "2026-08-21",
+    title: "Enklare kommunikationsregister",
+    flow: "Kommunikationsregister -> kommunikationsdetalj samt möte -> skicka meddelande",
+    simplified: "Kommunikationsregistret visar nu bara det som behövs för att hitta rätt post. Meddelandeinnehåll, leveranshistorik och tekniska uppgifter har flyttats till en tydlig detaljvy.",
+    retained: "Samma globala kommunikationsdata, sökning, filter, mötes- och ärendekopplingar samt e-post- och SMS-demo används vidare.",
+    changes: [
+      "Tabellen har fått färre kolumner, kortare sammanfattningar och en tydlig åtgärd för att öppna posten.",
+      "Varje kommunikationspost har en egen detaljadress med hela meddelandet, parter, kopplingar och kronologisk leveranshistorik.",
+      "Sparade möten har en synlig Skicka meddelande-knapp som öppnar kommunikationen med möte, ärende och deltagare förifyllda.",
+      "Detaljvyn fungerar som en sammanhållen läsyta på både desktop och mobil."
+    ]
+  },
   {
     version: "112",
     date: "2026-08-21",
@@ -1365,6 +1396,8 @@ let communicationChannelFilter = "";
 let communicationDirectionFilter = "";
 let candidateModal;
 let communicationComposerModal;
+let meetingReminderSchedulerRunning = false;
+let meetingReminderTimerId = null;
 let currentView = "dashboard";
 let renderedDetailId = null;
 let workQueueOnly = false;
@@ -1458,6 +1491,10 @@ const els = {
   calendarView: document.querySelector("#calendarView"),
   meetingsView: document.querySelector("#meetingsView"),
   communicationsView: document.querySelector("#communicationsView"),
+  communicationRegisterPanel: document.querySelector("#communicationRegisterPanel"),
+  communicationDetailPanel: document.querySelector("#communicationDetailPanel"),
+  communicationDetailHeader: document.querySelector("#communicationDetailHeader"),
+  communicationDetailContent: document.querySelector("#communicationDetailContent"),
   calendarMonthTitle: document.querySelector("#calendarMonthTitle"),
   calendarPreviousButton: document.querySelector("#calendarPreviousButton"),
   calendarTodayButton: document.querySelector("#calendarTodayButton"),
@@ -1598,6 +1635,10 @@ const els = {
   interactionInvitationFields: document.querySelector("#interactionInvitationFields"),
   interactionInvitationInput: document.querySelector("#interactionInvitationInput"),
   interactionCopyInvitationButton: document.querySelector("#interactionCopyInvitationButton"),
+  interactionReminderEnabledInput: document.querySelector("#interactionReminderEnabledInput"),
+  interactionReminderOffsetInput: document.querySelector("#interactionReminderOffsetInput"),
+  interactionReminderOptions: document.querySelector("#interactionReminderOptions"),
+  interactionReminderSummary: document.querySelector("#interactionReminderSummary"),
   interactionResponseSection: document.querySelector("#interactionResponseSection"),
   interactionResponseFields: document.querySelector("#interactionResponseFields"),
   interactionCommunicationDetails: document.querySelector("#interactionCommunicationDetails"),
@@ -1609,6 +1650,7 @@ const els = {
   interactionCommunicationHelp: document.querySelector("#interactionCommunicationHelp"),
   interactionEmailButton: document.querySelector("#interactionEmailButton"),
   interactionSmsButton: document.querySelector("#interactionSmsButton"),
+  interactionSendMessageButton: document.querySelector("#interactionSendMessageButton"),
   interactionSystemCommunicationList: document.querySelector("#interactionSystemCommunicationList"),
   interactionSystemCommunicationHelp: document.querySelector("#interactionSystemCommunicationHelp"),
   communicationComposerModal: document.querySelector("#communicationComposerModal"),
@@ -4920,6 +4962,7 @@ async function refresh() {
   supportTickets = (await getAllSupportTickets())
     .filter((ticket) => ticket.tenantId === DEFAULT_TENANT_ID)
     .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
+  await processDueMeetingReminders();
   renderAll();
   document.body.dataset.refreshDurationMs = String(Date.now() - refreshStartedAt);
 }
@@ -5923,6 +5966,170 @@ function communicationContextMarkup(record) {
   return parts.length ? parts.join("") : '<span class="text-secondary">Ingen koppling</span>';
 }
 
+function communicationDetailContextMarkup(record) {
+  if (!record.links.length) return '<p class="text-secondary mb-0">Ingen koppling till ärende eller möte.</p>';
+  return `<ul class="communication-detail-links">${record.links.map((link) => {
+    if (link.entityType === "case") {
+      return `<li><span>Ärende</span><a href="#/case/${escapeHtml(link.entityId)}">${escapeHtml(link.label || "Öppna ärendet")}</a></li>`;
+    }
+    if (link.entityType === "interaction") {
+      return `<li><span>Möte</span><button type="button" class="btn btn-link p-0" data-open-communication-meeting="${escapeHtml(link.entityId)}">${escapeHtml(link.label || "Öppna mötet")}</button></li>`;
+    }
+    return `<li><span>${escapeHtml(link.entityType)}</span><strong>${escapeHtml(link.label || link.entityId)}</strong></li>`;
+  }).join("")}</ul>`;
+}
+
+function meetingReminderOffsetLabel(offsetMinutes) {
+  return ({ 60: "en timme", 120: "två timmar", 1440: "en dag", 2880: "två dagar" })[offsetMinutes] || `${offsetMinutes} minuter`;
+}
+
+function meetingReminderBody(interaction) {
+  const location = interaction.location ? ` Plats eller länk: ${interaction.location}.` : "";
+  return `Påminnelse om ${interaction.title || "mötet"} ${formatDateTime(interaction.startsAt)}.${location}`;
+}
+
+function saveAutomatedCommunicationIfMissing(record) {
+  const caseLink = communicationLink(record, "case");
+  const storeNames = [COMMUNICATIONS_STORE, ...(caseLink ? [CASES_STORE, CASE_EVENTS_STORE] : [])];
+  let inserted = false;
+  let updatedCase = null;
+  let caseEvent = null;
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeNames, "readwrite");
+    const communicationStore = transaction.objectStore(COMMUNICATIONS_STORE);
+    const existingRequest = communicationStore.getAll();
+    existingRequest.onsuccess = () => {
+      if (existingRequest.result.some((item) => item.automationKey === record.automationKey)) return;
+      communicationStore.put(record);
+      inserted = true;
+      if (!caseLink) return;
+      const caseStore = transaction.objectStore(CASES_STORE);
+      const caseRequest = caseStore.get(caseLink.entityId);
+      caseRequest.onsuccess = () => {
+        if (!caseRequest.result) return;
+        updatedCase = {
+          ...caseRequest.result,
+          version: Number(caseRequest.result.version || 1) + 1,
+          updatedAt: record.updatedAt,
+          updatedBy: "system"
+        };
+        caseStore.put(updatedCase);
+        caseEvent = {
+          id: crypto.randomUUID(),
+          tenantId: DEFAULT_TENANT_ID,
+          caseId: caseLink.entityId,
+          eventType: "automatic_reminder_registered",
+          schemaVersion: 1,
+          entityType: "communication",
+          entityId: record.id,
+          actorId: "system",
+          occurredAt: record.updatedAt,
+          correlationId: record.automationKey,
+          idempotencyKey: record.automationKey,
+          payload: { message: `Automatisk påminnelse via ${COMMUNICATION_CHANNEL_LABELS[record.channel]} registrerades till ${record.recipients[0]?.name || "mötesdeltagare"}.` }
+        };
+        transaction.objectStore(CASE_EVENTS_STORE).put(caseEvent);
+      };
+    };
+    existingRequest.onerror = () => transaction.abort();
+    transaction.oncomplete = () => resolve({ inserted, updatedCase, caseEvent });
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || existingRequest.error);
+  });
+}
+
+async function processDueMeetingReminders(now = new Date()) {
+  if (meetingReminderSchedulerRunning || isMentorSession() || isPublicSession()) return 0;
+  meetingReminderSchedulerRunning = true;
+  let insertedCount = 0;
+  try {
+    const jobs = meetingReminderJobs({ interactions: allInteractions(), communications, now });
+    for (const job of jobs) {
+      const caseRecord = cases.find((item) => item.id === job.interaction.caseId);
+      const links = [
+        ...(caseRecord ? [{ entityType: "case", entityId: caseRecord.id, label: `${caseRecord.number} · ${caseRecord.type}` }] : []),
+        { entityType: "interaction", entityId: job.interaction.id, label: job.interaction.title || "Möte" }
+      ];
+      const record = await dispatchOutboundCommunication({
+        draft: {
+          tenantId: DEFAULT_TENANT_ID,
+          recipientName: job.recipient.name,
+          recipientAddress: job.recipient.address,
+          recipientPartyType: job.recipient.partyType,
+          recipientPartyId: job.recipient.partyId,
+          sender: { name: "FöräldraMentorer", address: job.channel === "email" ? "kommun@demo.local" : "SMS demo" },
+          subject: `Påminnelse: ${job.interaction.title || "Möte"}`,
+          body: meetingReminderBody(job.interaction),
+          links,
+          automationKey: job.automationKey,
+          automationType: job.automationType,
+          scheduledFor: job.scheduledFor,
+          createdBy: "system"
+        },
+        provider: createDemoCommunicationProvider(job.channel)
+      });
+      const result = await saveAutomatedCommunicationIfMissing(record);
+      if (!result.inserted) continue;
+      communications.push(record);
+      if (result.updatedCase) cases = cases.map((item) => item.id === result.updatedCase.id ? result.updatedCase : item);
+      if (result.caseEvent) caseEvents.unshift(result.caseEvent);
+      insertedCount += 1;
+    }
+    if (insertedCount) communications.sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
+  } catch (error) {
+    console.error("Kunde inte behandla automatiska mötespåminnelser", error);
+  } finally {
+    meetingReminderSchedulerRunning = false;
+  }
+  return insertedCount;
+}
+
+async function runMeetingReminderScheduler() {
+  const insertedCount = await processDueMeetingReminders();
+  if (!insertedCount) return;
+  markSaved();
+  if (currentView === "communications") renderCommunications();
+  if (currentView === "meetings") renderMeetingsRegister();
+}
+
+function startMeetingReminderScheduler() {
+  if (meetingReminderTimerId) return;
+  meetingReminderTimerId = window.setInterval(runMeetingReminderScheduler, 60 * 1000);
+}
+
+function renderCommunicationDetail(record) {
+  if (!record) {
+    els.communicationDetailHeader.innerHTML = '<div class="record-type">Kommunikation</div><h2 id="communicationDetailTitle" class="h5 mb-0">Kommunikationsposten finns inte</h2>';
+    els.communicationDetailContent.innerHTML = '<p class="text-secondary mb-0">Posten kan ha tagits bort eller så är länken felaktig.</p>';
+    return;
+  }
+  const subject = record.subject || (record.channel === "sms" ? "SMS-meddelande" : "Meddelande");
+  const channel = COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel;
+  const direction = COMMUNICATION_DIRECTION_LABELS[record.direction] || record.direction;
+  const status = COMMUNICATION_STATUS_LABELS[record.status] || record.status;
+  const sender = [record.sender?.name, record.sender?.address].filter(Boolean).join(" · ") || "Avsändare saknas";
+  const recipients = record.recipients.length
+    ? record.recipients.map((recipient) => `<li><strong>${escapeHtml(recipient.name || recipient.address)}</strong>${recipient.name && recipient.address ? `<span>${escapeHtml(recipient.address)}</span>` : ""}</li>`).join("")
+    : '<li class="text-secondary">Mottagare saknas</li>';
+  const events = [...record.deliveryEvents].sort((left, right) => new Date(left.occurredAt || 0) - new Date(right.occurredAt || 0));
+  els.communicationDetailHeader.innerHTML = `<div class="communication-detail-heading"><div><div class="record-type">${record.automationType === "meeting_reminder" ? "Automatisk påminnelse · " : ""}${escapeHtml(channel)} · ${escapeHtml(direction)}</div><h2 id="communicationDetailTitle" class="h5 mb-1">${escapeHtml(subject)}</h2><p class="text-secondary mb-0"><time datetime="${escapeHtml(record.createdAt || "")}">${escapeHtml(formatDateTime(record.createdAt))}</time></p></div><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(status)}</span></div>`;
+  els.communicationDetailContent.innerHTML = `
+    <section class="communication-detail-overview" aria-label="Kommunikationsöversikt">
+      <dl><div><dt>Kanal</dt><dd>${escapeHtml(channel)}</dd></div><div><dt>Riktning</dt><dd>${escapeHtml(direction)}</dd></div><div><dt>Avsändare</dt><dd>${escapeHtml(sender)}</dd></div><div><dt>Registrerad av</dt><dd>${escapeHtml(handlerNameById(record.createdBy) || record.createdBy || "System")}</dd></div></dl>
+      <div><h3 class="h6">Mottagare</h3><ul class="communication-detail-recipients">${recipients}</ul></div>
+    </section>
+    <section class="communication-detail-section">
+      <h3 class="h6">Meddelande</h3>
+      ${record.subject ? `<div class="communication-detail-subject"><span>Ämne</span><strong>${escapeHtml(record.subject)}</strong></div>` : ""}
+      <div class="communication-detail-message">${escapeHtml(record.body)}</div>
+    </section>
+    <section class="communication-detail-grid">
+      <div class="communication-detail-section"><h3 class="h6">Kopplingar</h3>${communicationDetailContextMarkup(record)}</div>
+      <div class="communication-detail-section"><h3 class="h6">Leveranshistorik</h3><ol class="communication-delivery-timeline">${events.length ? events.map((event) => `<li><span class="communication-delivery-marker" aria-hidden="true"></span><div><strong>${escapeHtml(COMMUNICATION_STATUS_LABELS[event.status] || event.status)}</strong><time datetime="${escapeHtml(event.occurredAt || "")}">${escapeHtml(formatDateTime(event.occurredAt))}</time>${event.detail ? `<p>${escapeHtml(event.detail)}</p>` : ""}</div></li>`).join("") : '<li class="text-secondary">Ingen leveranshändelse registrerad.</li>'}</ol></div>
+    </section>
+    <details class="communication-technical-details"><summary>Tekniska uppgifter</summary><dl><div><dt>Leverantör</dt><dd>${escapeHtml(record.providerId)}${record.providerMode === "demo" ? " · demo" : ""}</dd></div><div><dt>Externt meddelande-id</dt><dd>${escapeHtml(record.externalMessageId || "Saknas")}</dd></div>${record.automationType ? `<div><dt>Automatisering</dt><dd>${record.automationType === "meeting_reminder" ? "Mötespåminnelse" : escapeHtml(record.automationType)}</dd></div><div><dt>Planerad tid</dt><dd>${escapeHtml(formatDateTime(record.scheduledFor))}</dd></div>` : ""}<div><dt>Kommunikations-id</dt><dd>${escapeHtml(record.id)}</dd></div><div><dt>Senast ändrad</dt><dd>${escapeHtml(formatDateTime(record.updatedAt || record.createdAt))}</dd></div></dl></details>`;
+}
+
 function filteredCommunications() {
   const query = communicationSearchTerm.trim().toLocaleLowerCase("sv-SE");
   return communications.filter((record) => {
@@ -5936,31 +6143,39 @@ function filteredCommunications() {
       record.sender?.address,
       ...record.recipients.flatMap((recipient) => [recipient.name, recipient.address]),
       ...record.links.map((link) => link.label),
-      record.externalMessageId
+      record.externalMessageId,
+      record.automationType === "meeting_reminder" ? "automatisk påminnelse" : ""
     ].filter(Boolean).join(" ").toLocaleLowerCase("sv-SE");
     return searchValue.includes(query);
   });
 }
 
 function renderCommunications() {
+  const selectedRecordId = parseRoute().id;
+  els.communicationRegisterPanel.hidden = Boolean(selectedRecordId);
+  els.communicationDetailPanel.hidden = !selectedRecordId;
+  if (selectedRecordId) {
+    renderCommunicationDetail(communications.find((record) => record.id === selectedRecordId));
+    return;
+  }
   els.communicationSearchInput.value = communicationSearchTerm;
   els.communicationChannelFilter.value = communicationChannelFilter;
   els.communicationDirectionFilter.value = communicationDirectionFilter;
   const records = filteredCommunications();
   els.communicationsSummary.textContent = records.length === 1 ? "1 kommunikationspost visas." : `${records.length} kommunikationsposter visas.`;
-  els.communicationTableBody.innerHTML = records.map((record) => {
+  els.communicationTableBody.replaceChildren();
+  for (const record of records) {
     const subject = record.subject || (record.channel === "sms" ? "SMS" : "Meddelande");
-    const latestEvent = record.deliveryEvents.at(-1);
-    return `<tr>
-      <td><time datetime="${escapeHtml(record.createdAt || "")}">${escapeHtml(formatDateTime(record.createdAt))}</time></td>
-      <td><strong>${escapeHtml(COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel)}</strong><small class="communication-provider-label">${escapeHtml(record.providerId)}${record.providerMode === "demo" ? " · demo" : ""}</small></td>
-      <td>${escapeHtml(COMMUNICATION_DIRECTION_LABELS[record.direction] || record.direction)}</td>
-      <td class="communication-party-cell">${escapeHtml(communicationPartyLabel(record))}</td>
+    const row = document.createElement("tr");
+    row.innerHTML = `<td class="communication-date-cell"><time datetime="${escapeHtml(record.createdAt || "")}">${escapeHtml(formatDateTime(record.createdAt))}</time></td>
+      <td class="communication-message-cell"><span class="communication-channel-badge">${escapeHtml(COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel)}</span>${record.automationType === "meeting_reminder" ? '<span class="communication-automation-label">Automatisk</span>' : ""}<strong>${escapeHtml(subject)}</strong><span>${escapeHtml(record.body)}</span></td>
+      <td class="communication-party-cell"><small>${escapeHtml(COMMUNICATION_DIRECTION_LABELS[record.direction] || record.direction)}</small><strong>${escapeHtml(communicationPartyLabel(record))}</strong></td>
       <td class="communication-context-cell">${communicationContextMarkup(record)}</td>
-      <td class="communication-message-cell"><strong>${escapeHtml(subject)}</strong><span>${escapeHtml(record.body)}</span><details><summary>Visa hela meddelandet</summary><p>${escapeHtml(record.body)}</p>${record.externalMessageId ? `<small>Leverantörens id: ${escapeHtml(record.externalMessageId)}</small>` : ""}</details></td>
-      <td><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(COMMUNICATION_STATUS_LABELS[record.status] || record.status)}</span>${latestEvent?.detail ? `<small class="communication-delivery-detail">${escapeHtml(latestEvent.detail)}</small>` : ""}</td>
-    </tr>`;
-  }).join("");
+      <td><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(COMMUNICATION_STATUS_LABELS[record.status] || record.status)}</span></td>
+      <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/communications/${escapeHtml(record.id)}">Öppna</a></td>`;
+    makeRegisterRowInteractive(row, `Öppna kommunikation ${subject}`, () => { window.location.hash = `#/communications/${record.id}`; });
+    els.communicationTableBody.append(row);
+  }
   els.communicationEmpty.hidden = records.length > 0;
   els.communicationTableBody.closest(".table-responsive").hidden = records.length === 0;
 }
@@ -5985,9 +6200,20 @@ function communicationChannelFromForm() {
 
 function suggestedCommunicationRecipient(interaction, channel) {
   const contactKey = channel === "email" ? "email" : "phone";
-  return interaction?.participants.find((participant) => participant.partyType !== "handler" && participant[contactKey])
+  const participant = interaction?.participants.find((item) => item.partyType !== "handler" && item[contactKey])
     || interaction?.participants.find((participant) => participant[contactKey])
     || null;
+  if (participant) return participant;
+  const previousRecipient = [...communicationsForInteraction(interaction?.id)]
+    .filter((record) => record.channel === channel && record.recipients.length)
+    .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0]
+    ?.recipients[0];
+  return previousRecipient ? {
+    displayName: previousRecipient.name,
+    [contactKey]: previousRecipient.address,
+    partyType: previousRecipient.partyType,
+    partyId: previousRecipient.partyId
+  } : null;
 }
 
 function updateCommunicationComposerChannel({ applySuggestion = false } = {}) {
@@ -6951,8 +7177,11 @@ function applyRoute() {
     els.pageTitle.textContent = "Möten";
     els.breadcrumb.textContent = "Start / Möten";
   } else if (currentView === "communications") {
-    els.pageTitle.textContent = "Kommunikation";
-    els.breadcrumb.textContent = "Start / Kommunikation";
+    const communicationRecord = route.id ? communications.find((record) => record.id === route.id) : null;
+    els.pageTitle.textContent = route.id ? "Kommunikationsdetalj" : "Kommunikation";
+    els.breadcrumb.textContent = route.id
+      ? `Start / Kommunikation / ${communicationRecord?.subject || COMMUNICATION_CHANNEL_LABELS[communicationRecord?.channel] || "Detalj"}`
+      : "Start / Kommunikation";
   } else if (currentView === "versions") {
     els.pageTitle.textContent = "Versioner";
     els.breadcrumb.textContent = "Start / Systemadministration / Versioner";
@@ -11641,7 +11870,7 @@ async function registerDocumentCommand({ caseRecord, activityId, type, title, do
 function registerCaseMeetingCommand({
   caseRecord, existing = null, meetingType, meetingStatus = "scheduled", occurredAt, endsAt = null,
   mode, activityId, title = "", location = "", invitationText = "", communicationHistory = [], participants = null,
-  organizerId = CURRENT_USER_ID, summary, nextStep = "", rescheduledFromInteractionId = null
+  reminder = { enabled: false, offsetMinutes: 1440 }, organizerId = CURRENT_USER_ID, summary, nextStep = "", rescheduledFromInteractionId = null
 }) {
   if (meetingStatus === "completed" && new Date(occurredAt).getTime() > Date.now()) {
     return Promise.reject(Object.assign(new Error("Ett genomfört möte kan inte ha en tidpunkt i framtiden."), { code: "MEETING_DATE_IN_FUTURE" }));
@@ -11675,6 +11904,7 @@ function registerCaseMeetingCommand({
         title: title || ({ certification_interview: "Intervju inför godkännande", follow_up: "Uppföljning", other: "Möte" })[meetingType] || "Möte",
         location,
         invitationText,
+        reminder: normalizeMeetingReminder(reminder),
         communicationHistory,
         summary,
         nextStep,
@@ -11709,6 +11939,7 @@ function registerCaseMeetingCommand({
         mode,
         location,
         invitationText,
+        reminder: normalizeMeetingReminder(reminder),
         communicationHistory,
         summary,
         nextStep,
@@ -12432,6 +12663,34 @@ function updateInteractionFormState({ applyCaseSuggestions = false } = {}) {
           ? "Skapa bokning"
           : "Spara kontakt";
   els.interactionCopyInvitationButton.disabled = !els.interactionInvitationInput.value.trim();
+  const reminder = normalizeMeetingReminder({
+    enabled: scheduled && els.interactionReminderEnabledInput.checked,
+    offsetMinutes: els.interactionReminderOffsetInput.value
+  });
+  els.interactionReminderOptions.hidden = !reminder.enabled;
+  els.interactionReminderOffsetInput.disabled = !reminder.enabled;
+  if (reminder.enabled) {
+    const startsAt = new Date(els.interactionStartInput.value).getTime();
+    const triggerAt = startsAt - reminder.offsetMinutes * 60 * 1000;
+    const contactCount = interactionParticipantsFromForm("scheduled")
+      .filter((participant) => participant.email || participant.phone).length;
+    const alreadyRegistered = communicationsForInteraction(els.interactionForm.dataset.interactionId)
+      .some((record) => record.automationType === "meeting_reminder"
+        && record.automationKey?.includes(`:${els.interactionStartInput.value}:${reminder.offsetMinutes}:`));
+    els.interactionReminderSummary.textContent = alreadyRegistered
+      ? "Påminnelsen för den här mötestiden har registrerats."
+      : !contactCount
+        ? "Lägg till e-post eller telefon för minst en deltagare."
+        : Number.isFinite(triggerAt) && triggerAt <= Date.now() && startsAt > Date.now()
+          ? `Påminnelsetiden (${meetingReminderOffsetLabel(reminder.offsetMinutes)} före) har passerat. Påminnelsen behandlas när mötet sparas.`
+        : Number.isFinite(triggerAt)
+          ? `Planerad ${formatDateTime(new Date(triggerAt).toISOString())} till ${contactCount} ${contactCount === 1 ? "deltagare" : "deltagare"}.`
+          : "Ange mötets datum och tid.";
+  } else {
+    els.interactionReminderSummary.textContent = "Ingen automatisk påminnelse är planerad.";
+  }
+  const savedInteraction = allInteractions().find((item) => item.id === els.interactionForm.dataset.interactionId);
+  els.interactionSendMessageButton.hidden = !savedInteraction || savedInteraction.kind !== "meeting";
 
   const caseRecord = cases.find((item) => item.id === els.interactionCaseInput.value);
   els.interactionCaseHelp.textContent = caseRecord
@@ -12491,7 +12750,10 @@ function openInteractionForm(intent = "scheduled", caseId = "", interactionId = 
   els.interactionModeInput.value = existing?.mode || "physical";
   els.interactionLocationInput.value = existing?.location || "";
   els.interactionInvitationInput.value = existing?.invitationText || "";
-  els.interactionInvitationDetails.open = Boolean(existing?.invitationText || existing?.participants?.some((participant) => participant.responseStatus && participant.responseStatus !== "no_response"));
+  const reminder = normalizeMeetingReminder(existing?.reminder || { enabled: !existing && resolvedIntent === "scheduled", offsetMinutes: 1440 });
+  els.interactionReminderEnabledInput.checked = reminder.enabled;
+  els.interactionReminderOffsetInput.value = String(reminder.offsetMinutes);
+  els.interactionInvitationDetails.open = Boolean(reminder.enabled || existing?.invitationText || existing?.participants?.some((participant) => participant.responseStatus && participant.responseStatus !== "no_response"));
   els.interactionCommunicationDetails.open = Boolean(existing?.communicationHistory?.length || communicationsForInteraction(existing?.id).length);
   els.interactionCommunicationAtInput.value = localDateTimeValue();
   els.interactionCommunicationCommentInput.value = "";
@@ -12653,12 +12915,17 @@ els.interactionCaseInput.addEventListener("change", () => {
   const linkedActivity = caseActivities.find((activity) => activity.id === els.interactionForm.dataset.activityId);
   if (linkedActivity && linkedActivity.caseId !== els.interactionCaseInput.value) els.interactionForm.dataset.activityId = "";
   updateInteractionFormState({ applyCaseSuggestions: true });
+  updateInteractionFormState();
 });
 els.interactionKindInput.addEventListener("change", () => updateInteractionFormState());
+els.interactionReminderEnabledInput.addEventListener("change", () => updateInteractionFormState());
+els.interactionReminderOffsetInput.addEventListener("change", () => updateInteractionFormState());
+els.interactionStartInput.addEventListener("change", () => updateInteractionFormState());
 [els.interactionParentInput, els.interactionMentorInput, els.interactionHandlerInput]
   .forEach((input) => input.addEventListener("change", () => {
     els.interactionParentInput.setCustomValidity("");
     renderInteractionParticipantStates();
+    updateInteractionFormState();
   }));
 els.interactionAddExternalParticipantButton.addEventListener("click", () => {
   const displayName = els.interactionExternalNameInput.value.trim();
@@ -12678,6 +12945,7 @@ els.interactionAddExternalParticipantButton.addEventListener("click", () => {
   [els.interactionExternalNameInput, els.interactionExternalRoleInput, els.interactionExternalPhoneInput, els.interactionExternalEmailInput].forEach((input) => { input.value = ""; });
   renderExternalParticipants();
   renderInteractionParticipantStates();
+  updateInteractionFormState();
   els.interactionForm.dataset.dirty = "true";
 });
 els.interactionExternalParticipantList.addEventListener("click", (event) => {
@@ -12686,6 +12954,7 @@ els.interactionExternalParticipantList.addEventListener("click", (event) => {
   setInteractionDraftItems("externalParticipants", externalParticipantsFromForm().filter((participant) => participant.id !== button.dataset.removeExternalParticipant));
   renderExternalParticipants();
   renderInteractionParticipantStates();
+  updateInteractionFormState();
   els.interactionForm.dataset.dirty = "true";
 });
 els.interactionAddCommunicationButton.addEventListener("click", () => {
@@ -12776,6 +13045,10 @@ els.interactionForm.addEventListener("submit", async (event) => {
     mode: interactionKind === "meeting" ? els.interactionModeInput.value : interactionKind,
     location: els.interactionLocationInput.value.trim(),
     invitationText: els.interactionInvitationInput.value.trim(),
+    reminder: normalizeMeetingReminder({
+      enabled: status === "scheduled" && els.interactionReminderEnabledInput.checked,
+      offsetMinutes: els.interactionReminderOffsetInput.value
+    }),
     communicationHistory: communicationHistoryFromForm(),
     summary: els.interactionSummaryInput.value.trim(),
     nextStep: els.interactionNextStepInput.value.trim(),
@@ -12798,6 +13071,7 @@ els.interactionForm.addEventListener("submit", async (event) => {
         title: common.title,
         location: common.location,
         invitationText: common.invitationText,
+        reminder: common.reminder,
         communicationHistory: common.communicationHistory,
         participants,
         organizerId: common.organizerId,
@@ -12899,6 +13173,28 @@ els.interactionEmailButton.addEventListener("click", () => {
 els.interactionSmsButton.addEventListener("click", () => {
   const interaction = allInteractions().find((item) => item.id === els.interactionForm.dataset.interactionId);
   if (interaction) openCommunicationComposer({ channel: "sms", interaction });
+});
+
+els.interactionSendMessageButton.addEventListener("click", () => {
+  const interaction = allInteractions().find((item) => item.id === els.interactionForm.dataset.interactionId);
+  if (!interaction) return;
+  const previousChannel = [...communicationsForInteraction(interaction.id)]
+    .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0))[0]?.channel;
+  const channel = interaction.participants.some((participant) => participant.email)
+    ? "email"
+    : interaction.participants.some((participant) => participant.phone)
+      ? "sms"
+      : ["email", "sms"].includes(previousChannel)
+        ? previousChannel
+        : "email";
+  openCommunicationComposer({ channel, interaction });
+});
+
+els.communicationDetailContent.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-open-communication-meeting]");
+  if (!button) return;
+  const interaction = allInteractions().find((item) => item.id === button.dataset.openCommunicationMeeting);
+  if (interaction) openMeetingRegisterRecord(interaction);
 });
 
 els.communicationComposerForm.querySelectorAll('input[name="communicationChannel"]').forEach((input) => input.addEventListener("change", () => {
@@ -16373,6 +16669,10 @@ window.addEventListener("hashchange", () => {
   renderAll();
 });
 
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") runMeetingReminderScheduler();
+});
+
 openDatabase()
   .then(async (database) => {
     const modalElement = document.querySelector("#candidateModal");
@@ -16398,6 +16698,7 @@ openDatabase()
       window.location.hash = "#/dashboard";
     }
     await refresh();
+    startMeetingReminderScheduler();
     if (sessionStorage.getItem(SUPPORT_PANEL_SESSION_KEY) === "true") {
       bootstrap.Offcanvas.getOrCreateInstance(els.supportOffcanvas).show();
     }

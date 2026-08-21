@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   createDemoCommunicationProvider,
   dispatchOutboundCommunication,
+  meetingReminderJobs,
+  normalizeMeetingReminder,
   recordInboundCommunication
 } from "../communication-domain.js";
 
@@ -62,4 +64,41 @@ test("the shared model accepts incoming provider messages", () => {
 test("channel providers reject commands for another channel", async () => {
   const smsProvider = createDemoCommunicationProvider("sms");
   await assert.rejects(() => smsProvider.send({ channel: "email" }), /kanal stämmer inte/);
+});
+
+test("meeting reminders become due once and choose email before sms", () => {
+  const interaction = {
+    id: "meeting-1",
+    kind: "meeting",
+    status: "scheduled",
+    startsAt: "2026-08-22T10:00:00.000Z",
+    reminder: { enabled: true, offsetMinutes: 1440 },
+    participants: [
+      { partyType: "parent", partyId: "parent-1", displayName: "Eva", email: "eva@example.se", phone: "0701111111" },
+      { partyType: "mentor", partyId: "mentor-1", displayName: "Bo", phone: "0702222222" }
+    ]
+  };
+  const jobs = meetingReminderJobs({ interactions: [interaction], now: "2026-08-21T10:00:00.000Z" });
+  assert.deepEqual(jobs.map((job) => job.channel), ["email", "sms"]);
+  assert.equal(jobs[0].scheduledFor, "2026-08-21T10:00:00.000Z");
+  assert.match(jobs[0].automationKey, /^meeting-reminder:meeting-1:/);
+
+  const repeated = meetingReminderJobs({
+    interactions: [interaction],
+    communications: [{ automationKey: jobs[0].automationKey }, { automationKey: jobs[1].automationKey }],
+    now: "2026-08-21T10:05:00.000Z"
+  });
+  assert.equal(repeated.length, 0);
+});
+
+test("meeting reminders ignore disabled, completed and past meetings", () => {
+  const base = {
+    id: "meeting-2", kind: "meeting", status: "scheduled", startsAt: "2026-08-22T10:00:00.000Z",
+    reminder: normalizeMeetingReminder({ enabled: true, offsetMinutes: 999 }),
+    participants: [{ displayName: "Eva", email: "eva@example.se" }]
+  };
+  assert.equal(base.reminder.offsetMinutes, 1440);
+  assert.equal(meetingReminderJobs({ interactions: [{ ...base, reminder: { enabled: false, offsetMinutes: 1440 } }], now: "2026-08-21T10:00:00.000Z" }).length, 0);
+  assert.equal(meetingReminderJobs({ interactions: [{ ...base, status: "completed" }], now: "2026-08-21T10:00:00.000Z" }).length, 0);
+  assert.equal(meetingReminderJobs({ interactions: [base], now: "2026-08-22T10:01:00.000Z" }).length, 0);
 });

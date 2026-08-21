@@ -590,6 +590,10 @@ interface Interaction {
   mode: "physical" | "digital" | "phone" | "email" | "visit" | "other";
   location: string;
   invitationText: string;
+  reminder: {
+    enabled: boolean;
+    offsetMinutes: 60 | 120 | 1440 | 2880;
+  };
   summary: string;
   nextStep: string;
   rescheduledFromInteractionId: string | null;
@@ -620,6 +624,10 @@ Varje post ska minst innehålla tenant, riktning, kanal, leverantör, leverantö
 Prototypens `email-demo` och `sms-demo` implementerar samma adapterkontrakt som framtida produktionsleverantörer. De returnerar ett externt demo-id och status `registered_demo`, men utför ingen nätverksleverans. Produktionsadaptrar ska köras serverbaserat, hålla leverantörshemligheter utanför klienten, verifiera inkommande signaturer, använda idempotensnycklar och översätta leveranskvittens till samma gemensamma statusmodell.
 
 Det globala kommunikationsregistret är en läsmodell över samtliga `CommunicationRecord` för aktuell tenant. Objektvyer, exempelvis mötet eller ärendet, visar filtrerade utdrag ur samma poster. De får inte lagra en separat redigerbar kopia av kommunikationshistoriken.
+
+Automatiska mötespåminnelser använder samma sändningskommando och kanaladaptrar som manuella meddelanden. En påminnelseregel lagras på `Interaction` som aktiv/inaktiv och antal minuter före start. När regeln förfaller skapas en vanlig `CommunicationRecord` med `automationType = "meeting_reminder"`, `scheduledFor` och en stabil `automationKey` som omfattar möte, mötestid, tidsavstånd, kanal och mottagare. Skrivningen kontrollerar nyckeln i en serialiserad transaktion så att omladdning eller samtidiga klientkontroller inte skapar dubletter. Inställda, genomförda, uteblivna eller redan påbörjade möten genererar aldrig en påminnelse.
+
+Prototypens schemaläggare kör när kommunportalen öppnas, när fliken åter blir aktiv och därefter en gång per minut. Den använder endast demoleverantörerna. I en produktionsmiljö ska samma urvals- och idempotensregler köras i en serverbaserad bakgrundsprocess som inte är beroende av en öppen webbläsare.
 
 En rättelse av en handling skapar en ny version via `supersedesDocumentId`; den tidigare versionen skrivs inte över. När en handling registreras från en aktivitet sätts både `caseId` och `activityId`. Den visas då både i ärendets handlingslista och som underlag på aktiviteten. En tjänsteanteckning saknar filobjekt, medan en uppladdad fil ska få metadata, kontrollsumma och filinnehåll registrerade som en sammanhållen operation utan tomma platshållarposter.
 
