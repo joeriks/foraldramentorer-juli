@@ -40,20 +40,25 @@ test("the highest active profile is selected", () => {
 
 test("mentor profile projects to the existing read model", () => {
   const built = buildMentorMatchingProfile({
-    tenantId: "t1", mentor: { id: "m1", area: "Norr", availability: "Kvällar", languages: "Svenska", supportAreas: [{ areaId: "school-absence", confidenceLevel: "good", experienceLevels: ["lived"] }] },
+    tenantId: "t1", mentor: { id: "m1", area: "Norr", geographicAreaIds: ["norr"], availability: "Kvällar", availabilitySlotIds: ["physical-weekday-evening"], languageEntries: [{ languageId: "svenska", label: "Svenska" }], supportAreas: [{ areaId: "school-absence", confidenceLevel: "good", experienceLevels: ["lived"] }] },
     profileId: "mp1", actorId: "h1", now
   });
   const view = projectMentorMatchingProfile(built.profile, built.supportAreas, built.languages);
   assert.equal(view.languages, "Svenska");
+  assert.deepEqual(view.languageIds, ["svenska"]);
+  assert.deepEqual(view.geographicAreaIds, ["norr"]);
+  assert.deepEqual(view.availabilitySlotIds, ["physical-weekday-evening"]);
   assert.equal(view.supportAreas[0].confidenceLevel, "good");
   assert.equal(view.matchingProfile.version, 1);
 });
 
 test("matching snapshot freezes both profiles and overlap", () => {
-  const mentor = buildMentorMatchingProfile({ tenantId: "t1", mentor: { id: "m1", supportAreas: [{ areaId: "school-absence" }], languages: "Svenska" }, profileId: "mp1", actorId: "h1", now });
-  const support = buildSupportMatchingProfile({ tenantId: "t1", supportCase: { id: "s1", parentId: "p1", details: { supportAreaIds: ["school-absence", "boundaries"], languages: "Svenska" } }, profileId: "sp1", actorId: "h1", now });
+  const mentor = buildMentorMatchingProfile({ tenantId: "t1", mentor: { id: "m1", supportAreas: [{ areaId: "school-absence" }], languages: "Svenska", geographicAreaIds: ["norr"], availabilitySlotIds: ["phone-weekday"] }, profileId: "mp1", actorId: "h1", now });
+  const support = buildSupportMatchingProfile({ tenantId: "t1", supportCase: { id: "s1", parentId: "p1", details: { supportAreaIds: ["school-absence", "boundaries"], languages: "Svenska", geographicAreaIds: ["norr"], availabilitySlotIds: ["phone-weekday"] } }, profileId: "sp1", actorId: "h1", now });
   const snapshot = buildMatchingSnapshot({ tenantId: "t1", matchingCase: { id: "c1", supportCaseId: "s1", mentorId: "m1", parentId: "p1" }, mentorProfile: mentor.profile, mentorAreas: mentor.supportAreas, mentorLanguages: mentor.languages, supportProfile: support.profile, supportAreas: support.supportAreas, supportLanguages: support.languages, snapshotId: "snap1", actorId: "h1", now });
   mentor.supportAreas[0].supportAreaId = "boundaries";
   assert.deepEqual(snapshot.overlapSupportAreaIds, ["school-absence"]);
   assert.equal(snapshot.mentorProfile.supportAreas[0].supportAreaId, "school-absence");
+  assert.deepEqual(snapshot.mentorProfile.geographicAreaIds, ["norr"]);
+  assert.deepEqual(snapshot.supportProfile.availabilitySlotIds, ["phone-weekday"]);
 });

@@ -132,7 +132,10 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /function completeIncomingContactWithCase/);
   assert.match(scriptText, /function prefillCaseFromIncomingContact/);
   assert.match(scriptText, /APP_VERSION_HISTORY/);
+  assert.match(scriptText, /version: "99"/);
   assert.match(scriptText, /version: "98"/);
+  assert.match(scriptText, /geographic-areas/);
+  assert.match(scriptText, /function renderGeographicAreaAdministration/);
   assert.match(scriptText, /version: "97"/);
   assert.match(scriptText, /version: "96"/);
   assert.match(scriptText, /version: "95"/);

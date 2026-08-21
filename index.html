@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260820-learning-admin-context-v98">
+    <link rel="stylesheet" href="styles.css?v=20260821-structured-matching-v99">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -42,6 +42,7 @@
               <a id="navCaseNumbering" class="nav-link" href="#/case-numbering">Ärendenummer</a>
               <a id="navCaseTypes" class="nav-link" href="#/case-types">Ärendetyper</a>
               <a id="navSupportAreas" class="nav-link" href="#/support-areas">Stödområden</a>
+              <a id="navGeographicAreas" class="nav-link" href="#/geographic-areas">Geografiska områden</a>
               <a id="navLearningAdmin" class="nav-link" href="#/learning-admin">Administrera utbildning</a>
               <a id="navSupportAdmin" class="nav-link" href="#/support-admin">Supportärenden</a>
               <a id="navPresentation" class="nav-link" href="#/presentation">Demoläge</a>
@@ -82,6 +83,7 @@
                   <li><a class="dropdown-item" href="#/case-numbering">Ärendenummer</a></li>
                   <li><a class="dropdown-item" href="#/case-types">Ärendetyper</a></li>
                   <li><a class="dropdown-item" href="#/support-areas">Stödområden</a></li>
+                  <li><a class="dropdown-item" href="#/geographic-areas">Geografiska områden</a></li>
                   <li><a class="dropdown-item" href="#/learning-admin">Administrera utbildning</a></li>
                   <li><a class="dropdown-item" href="#/support-admin">Supportärenden</a></li>
                   <li><a class="dropdown-item" href="#/presentation">Demoläge</a></li>
@@ -631,13 +633,21 @@
                               <label class="form-label" for="needsTargetGroupInput">Målgrupp</label>
                               <input id="needsTargetGroupInput" class="form-control form-control-sm" placeholder="Exempel: vårdnadshavare med barn 6–12 år">
                             </div>
-                            <div class="col-md-6">
-                              <label class="form-label" for="needsAreaInput">Geografiskt område</label>
-                              <input id="needsAreaInput" class="form-control form-control-sm" placeholder="Exempel: Öster eller hela kommunen">
+                            <div class="col-12" id="caseGeographicAreaField">
+                              <label class="form-label mb-1">Geografiska områden</label>
+                              <div id="caseGeographicAreaChoices" class="structured-option-grid"></div>
+                              <input id="needsAreaInput" type="hidden">
                             </div>
-                            <div class="col-md-6">
-                              <label class="form-label" for="needsLanguagesInput">Språkbehov</label>
-                              <input id="needsLanguagesInput" class="form-control form-control-sm" placeholder="Exempel: arabiska och svenska">
+                            <div class="col-12" id="caseLanguagesField">
+                              <label class="form-label mb-1">Språkbehov</label>
+                              <div id="caseLanguageChoices" class="structured-option-grid"></div>
+                              <input id="needsLanguagesInput" type="hidden">
+                            </div>
+                            <div class="col-12" id="caseAvailabilityField">
+                              <label class="form-label mb-1">Önskad tillgänglighet</label>
+                              <div id="caseAvailabilityChoices" class="structured-option-grid"></div>
+                              <label class="form-label small mt-2" for="caseAvailabilityNoteInput">Kompletterande uppgift <span class="text-secondary fw-normal">(valfritt)</span></label>
+                              <input id="caseAvailabilityNoteInput" class="form-control form-control-sm" placeholder="Exempel: kan även ses digitalt efter överenskommelse">
                             </div>
                             <div class="col-md-3">
                               <label class="form-label" for="needsDesiredCountInput">Önskat antal mentorer</label>
@@ -1474,6 +1484,17 @@
             </div>
           </section>
 
+          <section id="geographicAreasAdministrationView" hidden>
+            <div class="card">
+              <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-start gap-3"><div><h2 class="h5 mb-1">Geografiska områden</h2><p class="text-secondary mb-0">Hantera de områden som används i stöd- och mentormatchning.</p></div><div id="geographicAreaAdminSummary" class="small text-secondary"></div></div>
+              <div class="card-body border-bottom"><div class="alert alert-light border mb-0"><strong>Ändringar bevarar historiken</strong><p class="mb-0 mt-1">Inaktiverade områden kan inte väljas i nya registreringar, men ligger kvar i tidigare profiler, ärenden och matchningsögonblick.</p></div></div>
+              <form id="geographicAreaCreateForm" class="card-body border-bottom">
+                <div class="row g-2 align-items-end"><div class="col-md"><label class="form-label" for="geographicAreaNameInput">Nytt område</label><input id="geographicAreaNameInput" class="form-control" maxlength="80" required placeholder="Områdets namn"></div><div class="col-md-auto"><button type="submit" class="btn btn-primary">Lägg till område</button></div></div>
+              </form>
+              <div id="geographicAreaAdminList" class="geographic-area-admin-list"></div>
+            </div>
+          </section>
+
           <section id="supportAdministrationView" hidden>
             <div class="card">
               <div class="card-header bg-white d-flex flex-wrap gap-3 justify-content-between align-items-start">
@@ -1707,7 +1728,7 @@
                         <div><dt>Kontaktuppgift</dt><dd id="contactDetailsFact"></dd></div>
                         <div><dt>Informationsstatus</dt><dd id="informationStatusFact"></dd></div>
                         <div><dt>Intresseanteckning</dt><dd id="interestNoteFact"></dd></div>
-                        <div><dt>Område</dt><dd id="areaFact"></dd></div>
+                        <div><dt>Geografiska områden</dt><dd id="areaFact"></dd></div>
                         <div><dt>Språk</dt><dd id="languageFact"></dd></div>
                         <div><dt>Tillgänglighet</dt><dd id="availabilityFact"></dd></div>
                       </dl>
@@ -1732,9 +1753,9 @@
                         <div><dt><label for="editContactDetailsInput">Kontaktuppgift</label></dt><dd><input id="editContactDetailsInput" class="form-control form-control-sm" autocomplete="off" placeholder="Telefon eller e-post"></dd></div>
                         <div><dt><label for="editInformationStatusInput">Informationsstatus</label></dt><dd><select id="editInformationStatusInput" class="form-select form-select-sm"><option value="">Välj status</option><option value="provided">Information lämnad</option><option value="pending">Information ska lämnas</option><option value="not_applicable">Ej aktuell</option></select></dd></div>
                         <div><dt><label for="editInterestNoteInput">Intresseanteckning</label></dt><dd><textarea id="editInterestNoteInput" class="form-control form-control-sm" rows="2" placeholder="Kort notering om intresset"></textarea></dd></div>
-                        <div><dt><label for="editAreaInput">Område <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="editAreaInput" class="form-control form-control-sm" autocomplete="off"></dd></div>
-                        <div><dt><label for="editLanguagesInput">Språk <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="editLanguagesInput" class="form-control form-control-sm" autocomplete="off"></dd></div>
-                        <div><dt><label for="editAvailabilityInput">Tillgänglighet <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="editAvailabilityInput" class="form-control form-control-sm" autocomplete="off"></dd></div>
+                        <div><dt>Geografiska områden <span class="text-secondary fw-normal">(valfritt)</span></dt><dd><div id="mentorGeographicAreasEdit" class="structured-option-grid"></div></dd></div>
+                        <div><dt>Språk <span class="text-secondary fw-normal">(valfritt)</span></dt><dd><div id="mentorLanguagesEdit" class="structured-option-grid"></div></dd></div>
+                        <div><dt>Tillgänglighet <span class="text-secondary fw-normal">(valfritt)</span></dt><dd><div id="mentorAvailabilityEdit" class="structured-option-grid"></div><label class="form-label small mt-2" for="mentorAvailabilityNoteInput">Kompletterande uppgift</label><input id="mentorAvailabilityNoteInput" class="form-control form-control-sm" autocomplete="off" placeholder="Exempel: varierar mellan veckor"></dd></div>
                       </dl>
                       <div id="mentorEditorDuplicatePanel" class="alert alert-warning mt-3 mb-0" hidden></div>
                     </section>
@@ -2178,6 +2199,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260820-learning-admin-context-v98"></script>
+    <script type="module" src="app.js?v=20260821-structured-matching-v99"></script>
   </body>
 </html>

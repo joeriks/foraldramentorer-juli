@@ -213,6 +213,8 @@ interface CaseTypeRelationshipDefinition {
 
 Stödområden är en versionsstyrd referensdomän som återanvänds i stödärenden, mentorprofiler och matchning. Tekniska ID:n är globala och stabila. Kommunen kan välja ur katalogen men får inte skapa lokala fritext-ID:n som gör data inkompatibla mellan kommuner.
 
+Geografiska områden är däremot en kommunägd katalog eftersom lokala områdesnamn varierar. Varje post har ett stabilt lokalt ID, ett visningsnamn och aktiv status. Språk och återkommande tillgänglighetsfönster kommer från gemensamma kataloger. Mentorprofil och stödprofil lagrar ID-listor; visningsnamn och äldre fritext är projektioner för läsning och bakåtkompatibilitet.
+
 ```ts
 interface SupportAreaDefinition {
   id: string;
@@ -320,7 +322,7 @@ interface MatchingAssessmentSnapshot {
 }
 ```
 
-En mentor har högst en aktiv matchningsprofil, men tidigare versioner bevaras. Profilen är den auktoritativa datakällan för matchningsuppgifter; mentorposten innehåller person- och godkännandeuppgifter. Stödområden och språk är underposter till profilen och får därför variera oberoende av mentorpostens livscykel.
+En mentor har högst en aktiv matchningsprofil, men tidigare versioner bevaras. Profilen är den auktoritativa datakällan för matchningsuppgifter; mentorposten innehåller person- och godkännandeuppgifter. Stödområden och språk är underposter till profilen. Geografiska områden och tillgänglighetsfönster lagras som stabila ID-listor på profilversionen och får därför variera oberoende av mentorpostens livscykel.
 
 Mentorn markerar endast områden där hen vill bli matchad. `confidenceLevel` är den primära självskattningen av hur trygg mentorn är att ge vardagsnära stöd inom området. Erfarenhetsgrunderna är sekundärt underlag: `lived` betyder egen eller närståendes erfarenhet, `practical` betyder erfarenhet av att stödja andra och `trained` betyder utbildning eller yrkeserfarenhet. Minst en grund krävs för ett valt område. Uppgifterna innebär inte professionell behörighet.
 
@@ -839,6 +841,8 @@ Inaktivering motsvarar säker borttagning: den publicerade versionen pensioneras
 De inbyggda kärntypernas namn, skapandeväg, föräldrakoppling och aktivitetsstruktur är strukturellt skyddade eftersom särskilda domänkommandon och valideringar är knutna till deras stabila ID:n. På motsvarande sätt är inbyggda aktivitetsmallars namn, resultatkoder och registreringskrav skyddade. Handledande texter och uttryckligen valbara verksamhetsfält får versionshanteras utan att kärnreglerna ändras. Egna typer och mallar kan administreras inom den generella modellen.
 
 Stödområdesvyn ska visa den centrala katalogen grupperad efter kategori samt två lokala val per område: `Används av kommunen` och `Visas publikt`. Tekniskt ID, kategori och central betydelse är skrivskyddade. Om ett område inaktiveras ska gränssnittet förklara att historiska registreringar bevaras. Kommunen ska inte behöva administrera egna fält, regler eller matchningsalgoritmer för varje område.
+
+Vyn `Geografiska områden` ska låta samordnaren lägga till, byta namn på och inaktivera lokala områden. Inaktivering är säker borttagning: området döljs i nya val men behåller ID och senast sparat namn i profiler, ärenden och matchningsögonblick. Ett befintligt ID får aldrig återanvändas för ett annat område.
 
 Kommunen får redigera de fält som uttryckligen är verksamhetskonfiguration. Tekniskt ID, lagringsnycklar och systemstyrda relationer är skrivskyddade. Varje sparad ändring skapar en ny publicerad version och pensionerar den föregående; historiska ärenden och aktiviteter behåller sina versionsreferenser.
 

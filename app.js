@@ -74,10 +74,21 @@ import {
   buildSupportMatchingProfile,
   normalizeLanguageEntries,
   projectMentorMatchingProfile
-} from "./matching-profile-domain.js?v=20260809-matching-profiles-v1";
+} from "./matching-profile-domain.js?v=20260821-structured-matching-v2";
+import {
+  AVAILABILITY_OPTIONS,
+  LANGUAGE_OPTIONS,
+  defaultTenantGeographicAreas,
+  geographicAreaLabels,
+  normalizeSelectionIds,
+  selectedOptionLabels,
+  selectionsOverlap,
+  slugifyCatalogLabel,
+  structuredLanguageEntries
+} from "./matching-catalog-domain.js?v=20260821-structured-matching-v1";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
-const DB_VERSION = 8;
+const DB_VERSION = 9;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
 const INCOMING_CONTACTS_STORE = "incomingContacts";
@@ -105,6 +116,7 @@ const LEARNING_PROGRESS_STORE = "learningProgress";
 const PUBLIC_SUPPORT_REQUESTS_STORE = "publicSupportRequests";
 const SUPPORT_TICKETS_STORE = "supportTickets";
 const TENANT_SUPPORT_AREA_SELECTION_STORE = "tenantSupportAreaSelection";
+const TENANT_GEOGRAPHIC_AREAS_STORE = "tenantGeographicAreas";
 const TENANT_SETTINGS_STORE = "tenantSettings";
 const MENTOR_MATCHING_PROFILES_STORE = "mentorMatchingProfiles";
 const MENTOR_MATCHING_AREAS_STORE = "mentorMatchingSupportAreas";
@@ -115,7 +127,7 @@ const SUPPORT_MATCHING_LANGUAGES_STORE = "supportMatchingLanguages";
 const MATCHING_SNAPSHOTS_STORE = "matchingSnapshots";
 const SYSTEM_CASE_TYPE_IDS = new Set(CASE_TYPE_DEFINITIONS.map((definition) => definition.id));
 const SYSTEM_ACTIVITY_TEMPLATE_IDS = new Set(ACTIVITY_TEMPLATES.map((definition) => definition.id));
-const SYSTEM_ADMINISTRATION_VIEWS = new Set(["administration", "handler", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "presentation", "routines", "versions"]);
+const SYSTEM_ADMINISTRATION_VIEWS = new Set(["administration", "handler", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "presentation", "routines", "versions"]);
 const SUPPORT_PANEL_SESSION_KEY = "foraldramentorer.supportPanelOpen";
 const LEARNING_SELECTION_INITIALIZED_ID = "__selection_initialized__";
 let CURRENT_USER_ID = "handler-sara";
@@ -123,6 +135,20 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "99",
+    date: "2026-08-21",
+    title: "Strukturerade matchningskriterier",
+    flow: "Systemadministration -> geografiska områden / Stödärende och mentorprofil -> matchning",
+    simplified: "Geografiska områden, språk och återkommande tillgänglighet väljs nu ur tydliga listor. Det gör registreringen mer enhetlig och mentorurvalet lättare att förstå.",
+    retained: "Stödområden är fortsatt en separat del av behovsbedömningen. Äldre fritext, tidigare profiler, matchningsögonblick och handläggarens professionella helhetsbedömning finns kvar.",
+    changes: [
+      "Samordnaren kan lägga till, döpa om och inaktivera kommunens geografiska områden utan att ändra historiska registreringar.",
+      "Mentorprofilen och stödärendet använder gemensamma val för geografiska områden, språk och tidsfönster.",
+      "Matchningslistan jämför gemensamma ID:n exakt och visar vilka strukturerade punkter som överlappar.",
+      "Historiska poster utan strukturerade värden fortsätter att använda sin tidigare fritext som reserv."
+    ]
+  },
   {
     version: "98",
     date: "2026-08-20",
@@ -701,8 +727,11 @@ const seedCandidates = [
   {
     name: "Anna Lind",
     area: "Centrum",
+    geographicAreaIds: ["vilunda"],
     languages: "Svenska, engelska",
+    languageIds: ["svenska", "engelska"],
     availability: "Vardagskvällar",
+    availabilitySlotIds: ["physical-weekday-evening"],
     coordinator: "Maja Ekström",
     status: "Utbildning pågår",
     checks: {
@@ -720,8 +749,11 @@ const seedCandidates = [
   {
     name: "Bo Karlsson",
     area: "Väster",
+    geographicAreaIds: ["runby-ed"],
     languages: "Svenska",
+    languageIds: ["svenska"],
     availability: "Dagtid",
+    availabilitySlotIds: ["physical-weekday-day"],
     coordinator: "Maja Ekström",
     status: "Redo för intervju",
     checks: {
@@ -739,8 +771,11 @@ const seedCandidates = [
   {
     name: "Samira Haddad",
     area: "Öster",
+    geographicAreaIds: ["odenslunda-fresta"],
     languages: "Svenska, arabiska",
+    languageIds: ["svenska", "arabiska"],
     availability: "Helgförmiddagar",
+    availabilitySlotIds: ["physical-saturday", "physical-sunday"],
     coordinator: "Jonas Berg",
     status: "Godkänd",
     checks: {
@@ -758,8 +793,11 @@ const seedCandidates = [
   {
     name: "Karin Nyström",
     area: "Norr",
+    geographicAreaIds: ["bollstanas"],
     languages: "Svenska, finska",
+    languageIds: ["svenska", "finska"],
     availability: "Tisdagar och torsdagar dagtid",
+    availabilitySlotIds: ["physical-weekday-day"],
     coordinator: "Jonas Berg",
     status: "Anmäld",
     checks: {
@@ -777,8 +815,11 @@ const seedCandidates = [
   {
     name: "Leif Andersson",
     area: "Söder",
+    geographicAreaIds: ["smedby"],
     languages: "Svenska",
+    languageIds: ["svenska"],
     availability: "Måndag kväll och lördag förmiddag",
+    availabilitySlotIds: ["physical-weekday-evening", "physical-saturday"],
     coordinator: "Maja Ekström",
     status: "Kontrollerad",
     checks: {
@@ -796,8 +837,11 @@ const seedCandidates = [
   {
     name: "Fatima El-Masri",
     area: "Centrum",
+    geographicAreaIds: ["vilunda"],
     languages: "Svenska, arabiska, engelska",
+    languageIds: ["svenska", "arabiska", "engelska"],
     availability: "Vardagskvällar",
+    availabilitySlotIds: ["physical-weekday-evening"],
     coordinator: "Sara Lind",
     status: "Utbildning pågår",
     checks: {
@@ -815,8 +859,11 @@ const seedCandidates = [
   {
     name: "Gunnar Pettersson",
     area: "Väster",
+    geographicAreaIds: ["runby-ed"],
     languages: "Svenska, tyska",
+    languageIds: ["svenska"],
     availability: "Dagtid vardagar",
+    availabilitySlotIds: ["physical-weekday-day"],
     coordinator: "Sara Lind",
     status: "Redo för intervju",
     checks: {
@@ -834,8 +881,11 @@ const seedCandidates = [
   {
     name: "Mikael Holm",
     area: "Norr",
+    geographicAreaIds: ["apotekskogen-hasselgatan"],
     languages: "Svenska, persiska",
+    languageIds: ["svenska", "persiska-dari"],
     availability: "Helger",
+    availabilitySlotIds: ["physical-saturday", "physical-sunday"],
     coordinator: "Jonas Berg",
     status: "Kontrollerad",
     checks: {
@@ -858,16 +908,22 @@ const seedCandidates10 = [
     ...seedCandidates[3],
     name: "Elin Berg",
     area: "Söder",
+    geographicAreaIds: ["skalby-brunnby-vik"],
     languages: "Svenska, engelska",
+    languageIds: ["svenska", "engelska"],
     availability: "Kvällstid vardagar",
+    availabilitySlotIds: ["physical-weekday-evening"],
     coordinator: "Sara Lind"
   },
   {
     ...seedCandidates[2],
     name: "Omar Rahimi",
     area: "Öster",
+    geographicAreaIds: ["odenslunda-fresta"],
     languages: "Svenska, dari",
+    languageIds: ["svenska", "persiska-dari"],
     availability: "Dagtid och helger",
+    availabilitySlotIds: ["physical-weekday-day", "physical-saturday", "physical-sunday"],
     coordinator: "Maja Ekström",
     notes: "Godkänd mentor med erfarenhet av stöd kring etablering och myndighetskontakter."
   }
@@ -1085,6 +1141,7 @@ let publicSupportRequests = [];
 let lastPublicSupportRequestId = "";
 let supportTickets = [];
 let tenantSupportAreaSelection = [];
+let tenantGeographicAreas = [];
 let caseNumberSettings = null;
 let lastSupportExchange = null;
 let supportTicketStatusFilter = "all";
@@ -1113,6 +1170,7 @@ const els = {
   navParents: document.querySelector("#navParents"),
   navLearning: document.querySelector("#navLearning"),
   navSupportAreas: document.querySelector("#navSupportAreas"),
+  navGeographicAreas: document.querySelector("#navGeographicAreas"),
   navMentorHome: document.querySelector("#navMentorHome"),
   navMentorAssignments: document.querySelector("#navMentorAssignments"),
   navMentorLearning: document.querySelector("#navMentorLearning"),
@@ -1232,6 +1290,11 @@ const els = {
   supportAreasAdministrationView: document.querySelector("#supportAreasAdministrationView"),
   supportAreaAdminSummary: document.querySelector("#supportAreaAdminSummary"),
   supportAreaAdminGroups: document.querySelector("#supportAreaAdminGroups"),
+  geographicAreasAdministrationView: document.querySelector("#geographicAreasAdministrationView"),
+  geographicAreaAdminSummary: document.querySelector("#geographicAreaAdminSummary"),
+  geographicAreaCreateForm: document.querySelector("#geographicAreaCreateForm"),
+  geographicAreaNameInput: document.querySelector("#geographicAreaNameInput"),
+  geographicAreaAdminList: document.querySelector("#geographicAreaAdminList"),
   supportTicketTableBody: document.querySelector("#supportTicketTableBody"),
   supportTicketStatusFilter: document.querySelector("#supportTicketStatusFilter"),
   supportLauncher: document.querySelector("#supportLauncher"),
@@ -1403,6 +1466,13 @@ const els = {
   desiredOutcomeInput: document.querySelector("#desiredOutcomeInput"),
   needsAreaInput: document.querySelector("#needsAreaInput"),
   needsLanguagesInput: document.querySelector("#needsLanguagesInput"),
+  caseGeographicAreaField: document.querySelector("#caseGeographicAreaField"),
+  caseGeographicAreaChoices: document.querySelector("#caseGeographicAreaChoices"),
+  caseLanguagesField: document.querySelector("#caseLanguagesField"),
+  caseLanguageChoices: document.querySelector("#caseLanguageChoices"),
+  caseAvailabilityField: document.querySelector("#caseAvailabilityField"),
+  caseAvailabilityChoices: document.querySelector("#caseAvailabilityChoices"),
+  caseAvailabilityNoteInput: document.querySelector("#caseAvailabilityNoteInput"),
   needsDesiredCountInput: document.querySelector("#needsDesiredCountInput"),
   needsDesiredDateInput: document.querySelector("#needsDesiredDateInput"),
   caseOwnerInput: document.querySelector("#caseOwnerInput"),
@@ -1702,9 +1772,10 @@ const els = {
   mentorSupportAreasRead: document.querySelector("#mentorSupportAreasRead"),
   mentorMatchingProfileMeta: document.querySelector("#mentorMatchingProfileMeta"),
   mentorSupportAreasEdit: document.querySelector("#mentorSupportAreasEdit"),
-  editAreaInput: document.querySelector("#editAreaInput"),
-  editLanguagesInput: document.querySelector("#editLanguagesInput"),
-  editAvailabilityInput: document.querySelector("#editAvailabilityInput"),
+  mentorGeographicAreasEdit: document.querySelector("#mentorGeographicAreasEdit"),
+  mentorLanguagesEdit: document.querySelector("#mentorLanguagesEdit"),
+  mentorAvailabilityEdit: document.querySelector("#mentorAvailabilityEdit"),
+  mentorAvailabilityNoteInput: document.querySelector("#mentorAvailabilityNoteInput"),
   statusSelect: document.querySelector("#statusSelect"),
   coordinatorInput: document.querySelector("#coordinatorInput"),
   coordinatorFieldRow: document.querySelector("#coordinatorFieldRow"),
@@ -1994,6 +2065,7 @@ function openDatabase() {
       ensureIndex(supportTicketStore, "tenantCreatedAt", ["tenantId", "createdAt"]);
       ensureIndex(supportTicketStore, "tenantStatus", ["tenantId", "status"]);
       ensureStore(TENANT_SUPPORT_AREA_SELECTION_STORE, { keyPath: ["tenantId", "supportAreaId"] });
+      ensureStore(TENANT_GEOGRAPHIC_AREAS_STORE, { keyPath: ["tenantId", "id"] });
       ensureStore(TENANT_SETTINGS_STORE, { keyPath: "tenantId" });
       const mentorProfileStore = ensureStore(MENTOR_MATCHING_PROFILES_STORE);
       ensureIndex(mentorProfileStore, "mentorId", "mentorId");
@@ -2134,6 +2206,10 @@ function tenantSupportAreaSelectionTx(mode = "readonly") {
   return db.transaction(TENANT_SUPPORT_AREA_SELECTION_STORE, mode).objectStore(TENANT_SUPPORT_AREA_SELECTION_STORE);
 }
 
+function tenantGeographicAreaTx(mode = "readonly") {
+  return db.transaction(TENANT_GEOGRAPHIC_AREAS_STORE, mode).objectStore(TENANT_GEOGRAPHIC_AREAS_STORE);
+}
+
 function tenantSettingsTx(mode = "readonly") {
   return db.transaction(TENANT_SETTINGS_STORE, mode).objectStore(TENANT_SETTINGS_STORE);
 }
@@ -2223,6 +2299,9 @@ const clearSupportTickets = () => clearStore(supportTicketTx);
 const getAllTenantSupportAreaSelections = () => getAllFrom(tenantSupportAreaSelectionTx);
 const saveTenantSupportAreaSelection = (value) => putInto(tenantSupportAreaSelectionTx, value);
 const clearTenantSupportAreaSelections = () => clearStore(tenantSupportAreaSelectionTx);
+const getAllTenantGeographicAreas = () => getAllFrom(tenantGeographicAreaTx);
+const saveTenantGeographicArea = (value) => putInto(tenantGeographicAreaTx, value);
+const clearTenantGeographicAreas = () => clearStore(tenantGeographicAreaTx);
 const getAllMentorMatchingProfiles = () => getAllFrom(mentorMatchingProfileTx);
 const getAllMentorMatchingAreas = () => getAllFrom(mentorMatchingAreaTx);
 const getAllMentorMatchingLanguages = () => getAllFrom(mentorMatchingLanguageTx);
@@ -2350,6 +2429,71 @@ async function loadSupportAreaSelection() {
   }
 }
 
+async function loadGeographicAreas() {
+  tenantGeographicAreas = (await getAllTenantGeographicAreas())
+    .filter((area) => area.tenantId === DEFAULT_TENANT_ID);
+  if (!tenantGeographicAreas.length) {
+    await Promise.all(defaultTenantGeographicAreas(DEFAULT_TENANT_ID).map(saveTenantGeographicArea));
+    tenantGeographicAreas = (await getAllTenantGeographicAreas())
+      .filter((area) => area.tenantId === DEFAULT_TENANT_ID);
+  }
+  tenantGeographicAreas.sort((left, right) => left.label.localeCompare(right.label, "sv"));
+}
+
+function activeGeographicAreas() {
+  return tenantGeographicAreas.filter((area) => area.active !== false);
+}
+
+function renderStructuredChoices(host, options, selectedIds, dataAttribute, legacyText = "") {
+  if (!host) return;
+  const selected = new Set(normalizeSelectionIds(selectedIds));
+  host.innerHTML = options.map(([id, label, inactive = false]) => `<label class="form-check"><input class="form-check-input" type="checkbox" data-${dataAttribute}="${escapeHtml(id)}" ${selected.has(id) ? "checked" : ""} ${inactive && !selected.has(id) ? "disabled" : ""}><span class="form-check-label">${escapeHtml(label)}${inactive ? ' <span class="text-secondary">(inaktivt)</span>' : ""}</span></label>`).join("")
+    + (!selected.size && legacyText ? `<p class="small text-secondary mb-0">Tidigare fritext: ${escapeHtml(legacyText)}. Välj strukturerade alternativ när uppgiften uppdateras.</p>` : "");
+}
+
+function selectedStructuredIds(host, dataAttribute) {
+  return host ? [...host.querySelectorAll(`[data-${dataAttribute}]:checked`)].map((input) => input.getAttribute(`data-${dataAttribute}`)) : [];
+}
+
+function geographicAreaOptions(selectedIds = []) {
+  const selected = new Set(normalizeSelectionIds(selectedIds));
+  return tenantGeographicAreas
+    .filter((area) => area.active !== false || selected.has(area.id))
+    .map((area) => [area.id, area.label, area.active === false]);
+}
+
+function languageOptions(selectedIds = [], entries = [], legacyText = "") {
+  const known = new Map(LANGUAGE_OPTIONS);
+  const stored = normalizeLanguageEntries(entries?.length ? entries : legacyText);
+  const storedLabels = new Map(stored.map((entry) => [entry.languageId, entry.label]));
+  const options = [...LANGUAGE_OPTIONS];
+  for (const id of normalizeSelectionIds(selectedIds)) {
+    if (!known.has(id)) options.push([id, storedLabels.get(id) || id, true]);
+  }
+  return options;
+}
+
+function structuredMatchingValues({ geographicAreaIds = [], languageIds = [], availabilitySlotIds = [], availabilityNote = "", previous = null } = {}) {
+  const areaLabels = geographicAreaLabels(geographicAreaIds, tenantGeographicAreas);
+  const normalizedLanguageIds = normalizeSelectionIds(languageIds);
+  const knownLanguageEntries = structuredLanguageEntries(normalizedLanguageIds);
+  const previousLanguageEntries = normalizeLanguageEntries(previous?.languageEntries?.length ? previous.languageEntries : previous?.languages);
+  const languageEntriesById = new Map([...previousLanguageEntries, ...knownLanguageEntries].map((entry) => [entry.languageId, entry]));
+  const languageEntries = normalizedLanguageIds.map((id) => languageEntriesById.get(id)).filter(Boolean);
+  const languageLabels = languageEntries.map((entry) => entry.label);
+  const availabilityLabels = selectedOptionLabels(availabilitySlotIds, AVAILABILITY_OPTIONS);
+  return {
+    geographicAreaIds: normalizeSelectionIds(geographicAreaIds),
+    languageIds: normalizedLanguageIds,
+    languageEntries,
+    availabilitySlotIds: normalizeSelectionIds(availabilitySlotIds),
+    availabilityNote: String(availabilityNote || "").trim(),
+    area: areaLabels.join(", ") || previous?.area || "",
+    languages: languageLabels.join(", ") || previous?.languages || "",
+    availability: [...availabilityLabels, String(availabilityNote || "").trim()].filter(Boolean).join(", ") || previous?.availability || ""
+  };
+}
+
 function enabledSupportAreas() {
   return selectedSupportAreas(tenantSupportAreaSelection, "enabled");
 }
@@ -2395,6 +2539,26 @@ function normalizeMentorSupportAreas(entries) {
         verifiedBy: entry.verifiedBy || null
       };
     });
+}
+
+function renderMentorStructuredMatchingEditor(candidate = null) {
+  const geographicAreaIds = normalizeSelectionIds(candidate?.geographicAreaIds);
+  const languageIds = normalizeSelectionIds(candidate?.languageIds || candidate?.languageEntries?.map((entry) => entry.languageId));
+  const availabilitySlotIds = normalizeSelectionIds(candidate?.availabilitySlotIds);
+  renderStructuredChoices(els.mentorGeographicAreasEdit, geographicAreaOptions(geographicAreaIds), geographicAreaIds, "mentor-geographic-area", candidate?.area);
+  renderStructuredChoices(els.mentorLanguagesEdit, languageOptions(languageIds, candidate?.languageEntries, candidate?.languages), languageIds, "mentor-language", candidate?.languages);
+  renderStructuredChoices(els.mentorAvailabilityEdit, AVAILABILITY_OPTIONS, availabilitySlotIds, "mentor-availability", candidate?.availability);
+  els.mentorAvailabilityNoteInput.value = candidate?.availabilityNote || "";
+}
+
+function mentorStructuredMatchingFromEditor(previous = null) {
+  return structuredMatchingValues({
+    geographicAreaIds: selectedStructuredIds(els.mentorGeographicAreasEdit, "mentor-geographic-area"),
+    languageIds: selectedStructuredIds(els.mentorLanguagesEdit, "mentor-language"),
+    availabilitySlotIds: selectedStructuredIds(els.mentorAvailabilityEdit, "mentor-availability"),
+    availabilityNote: els.mentorAvailabilityNoteInput.value,
+    previous
+  });
 }
 
 function renderMentorSupportAreaEditor(candidate = null) {
@@ -3244,6 +3408,9 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
     for (let needIndex = 0; needIndex < needsForParent; needIndex += 1) {
       const workflowIndex = records[CASES_STORE].filter((item) => item.caseTypeId === "parent-support").length;
       const [supportPurpose, desiredOutcome, supportAreaIds] = supportExamples[(parentIndex + needIndex) % supportExamples.length];
+      const geographicAreaIds = [["vilunda"], ["odenslunda-fresta"], ["runby-ed"], ["bollstanas"], ["smedby"]][parentIndex % 5];
+      const languageIds = parentIndex % 3 === 0 ? ["svenska", "arabiska"] : ["svenska"];
+      const availabilitySlotIds = parentIndex % 2 ? ["physical-weekday-evening"] : ["physical-weekday-day"];
       const phase = count === 1 ? 0 : workflowIndex % 5;
       const supportProfileComplete = phase !== 2;
       const supportCaseId = crypto.randomUUID();
@@ -3294,8 +3461,13 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
           supportAreaIds: supportProfileComplete ? [...supportAreaIds] : [supportAreaIds[0]],
           supportAreaStatus: supportProfileComplete ? "confirmed" : "preliminary",
           area: parent.area,
+          geographicAreaIds,
           languages: parent.languages,
+          languageIds,
+          languageEntries: structuredLanguageEntries(languageIds),
           availability: parent.availability,
+          availabilitySlotIds,
+          availabilityNote: "",
           preferredMeetingModes: parentIndex % 2 ? ["digital", "phone"] : ["physical", "phone"],
           sharedExperiencePreference: parentIndex % 3 === 0 ? "important" : "helpful",
           complementarySupport: parentIndex % 4 === 0
@@ -4202,6 +4374,7 @@ async function refresh() {
   const refreshStartedAt = Date.now();
   await loadCaseNumberSettings();
   await loadSupportAreaSelection();
+  await loadGeographicAreas();
   await loadCaseTypeDefinitions();
   await loadActivityTemplateDefinitions();
   handlers = await getAllHandlers();
@@ -4887,6 +5060,15 @@ function renderSupportAreaAdministration() {
   }).join("");
 }
 
+function renderGeographicAreaAdministration() {
+  const activeCount = activeGeographicAreas().length;
+  els.geographicAreaAdminSummary.textContent = `${activeCount} aktiva · ${tenantGeographicAreas.length - activeCount} inaktiva`;
+  els.geographicAreaAdminList.innerHTML = tenantGeographicAreas.map((area) => `<form class="geographic-area-admin-row" data-geographic-area-form="${escapeHtml(area.id)}">
+    <div><label class="form-label" for="geographic-area-${escapeHtml(area.id)}">Namn</label><input id="geographic-area-${escapeHtml(area.id)}" class="form-control" name="label" maxlength="80" required value="${escapeHtml(area.label)}"><div class="form-text">Tekniskt ID: ${escapeHtml(area.id)}</div></div>
+    <div><label class="form-check form-switch"><input class="form-check-input" type="checkbox" name="active" ${area.active !== false ? "checked" : ""}><span class="form-check-label">Aktivt</span></label><button type="submit" class="btn btn-outline-primary btn-sm">Spara</button></div>
+  </form>`).join("");
+}
+
 function selectedCaseNumberMode() {
   return els.caseNumberingForm.querySelector('input[name="caseNumberMode"]:checked')?.value || "sequential";
 }
@@ -5111,6 +5293,7 @@ function renderAll() {
     "case-types": selectedActivityTypeId ? renderActivityTypeAdministration : renderCaseTypeAdministration,
     "activity-types": renderActivityTypeAdministration,
     "support-areas": renderSupportAreaAdministration,
+    "geographic-areas": renderGeographicAreaAdministration,
     "learning-admin": renderLearningAdministration,
     "support-admin": renderSupportAdministration,
     "mentor-home": renderMentorPortal,
@@ -5753,7 +5936,7 @@ async function loadRoutinesDocument(sectionKey = "") {
   els.routinesContent.innerHTML = '<p class="text-secondary">Läser in rutindokumentet...</p>';
 
   try {
-    const response = await fetch("./docs/verksamhetsfloden-och-handlaggningsrutiner.md?v=20260808-completion-and-learning-v4");
+    const response = await fetch("./docs/verksamhetsfloden-och-handlaggningsrutiner.md?v=20260821-structured-matching-v5");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const markdown = await response.text();
     els.routinesContent.innerHTML = marked.parse(markdown, { gfm: true });
@@ -5818,7 +6001,7 @@ function applyRoute() {
   const routeCaseId = nestedCaseRoute?.[1] || route.id;
   const routeMentorId = nestedMentorRoute?.[1] || route.id;
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "calendar", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "calendar", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
   const systemAdministrationView = SYSTEM_ADMINISTRATION_VIEWS.has(currentView);
   document.body.classList.toggle("is-system-administration", systemAdministrationView);
   els.administrationContext.hidden = !systemAdministrationView;
@@ -5876,6 +6059,7 @@ function applyRoute() {
   els.caseTypesAdministrationView.hidden = currentView !== "case-types" || Boolean(nestedActivityRoute);
   els.activityTypesAdministrationView.hidden = currentView !== "activity-types" && !nestedActivityRoute;
   els.supportAreasAdministrationView.hidden = currentView !== "support-areas";
+  els.geographicAreasAdministrationView.hidden = currentView !== "geographic-areas";
   els.learningAdministrationView.hidden = currentView !== "learning-admin";
   els.supportAdministrationView.hidden = currentView !== "support-admin";
   els.routinesView.hidden = currentView !== "routines";
@@ -5914,11 +6098,12 @@ function applyRoute() {
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
   els.navParents.classList.toggle("active", currentView === "parents" || currentView === "parent");
   els.navLearning.classList.toggle("active", currentView === "learning");
-  els.navAdministration.classList.toggle("active", ["administration", "case-numbering", "case-types", "activity-types", "support-areas", "learning-admin", "support-admin", "presentation", "routines", "versions", "handler"].includes(currentView));
+  els.navAdministration.classList.toggle("active", ["administration", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "presentation", "routines", "versions", "handler"].includes(currentView));
   els.navHandlers.classList.toggle("active", currentView === "administration" || currentView === "handler");
   els.navCaseNumbering.classList.toggle("active", currentView === "case-numbering");
   els.navCaseTypes.classList.toggle("active", ["case-types", "activity-types"].includes(currentView));
   els.navSupportAreas.classList.toggle("active", currentView === "support-areas");
+  els.navGeographicAreas.classList.toggle("active", currentView === "geographic-areas");
   els.navLearningAdmin.classList.toggle("active", currentView === "learning-admin");
   els.navSupportAdmin.classList.toggle("active", currentView === "support-admin");
   els.navRoutines.classList.toggle("active", currentView === "routines");
@@ -6005,6 +6190,9 @@ function applyRoute() {
   } else if (currentView === "support-areas") {
     els.pageTitle.textContent = "Stödområden";
     els.breadcrumb.textContent = "Start / Systemadministration / Stödområden";
+  } else if (currentView === "geographic-areas") {
+    els.pageTitle.textContent = "Geografiska områden";
+    els.breadcrumb.textContent = "Start / Systemadministration / Geografiska områden";
   } else if (currentView === "learning-admin") {
     els.pageTitle.textContent = route.id ? "Redigera utbildningsdel" : "Administrera utbildning";
     els.breadcrumb.textContent = route.id ? "Systemadministration / Administrera utbildning / Del" : "Systemadministration / Administrera utbildning";
@@ -7207,6 +7395,29 @@ function caseDetailInput(fieldId) {
   }[fieldId] || null;
 }
 
+function renderCaseStructuredMatchingEditor(caseRecord = null) {
+  const details = caseRecord?.details || {};
+  const geographicAreaIds = normalizeSelectionIds(details.geographicAreaIds);
+  const languageIds = normalizeSelectionIds(details.languageIds || details.languageEntries?.map((entry) => entry.languageId));
+  const availabilitySlotIds = normalizeSelectionIds(details.availabilitySlotIds);
+  renderStructuredChoices(els.caseGeographicAreaChoices, geographicAreaOptions(geographicAreaIds), geographicAreaIds, "case-geographic-area", details.area);
+  renderStructuredChoices(els.caseLanguageChoices, languageOptions(languageIds, details.languageEntries, details.languages), languageIds, "case-language", details.languages);
+  renderStructuredChoices(els.caseAvailabilityChoices, AVAILABILITY_OPTIONS, availabilitySlotIds, "case-availability", details.availability);
+  els.caseAvailabilityNoteInput.value = details.availabilityNote || "";
+  els.needsAreaInput.value = details.area || "";
+  els.needsLanguagesInput.value = details.languages || "";
+}
+
+function caseStructuredMatchingFromEditor(previous = null) {
+  return structuredMatchingValues({
+    geographicAreaIds: selectedStructuredIds(els.caseGeographicAreaChoices, "case-geographic-area"),
+    languageIds: selectedStructuredIds(els.caseLanguageChoices, "case-language"),
+    availabilitySlotIds: selectedStructuredIds(els.caseAvailabilityChoices, "case-availability"),
+    availabilityNote: els.caseAvailabilityNoteInput.value,
+    previous
+  });
+}
+
 function configuredDetailFields(caseType) {
   const enabled = new Set(caseType?.detailFieldIds || []);
   return CASE_DETAIL_FIELD_DEFINITIONS.filter((field) => enabled.has(field.id));
@@ -7280,13 +7491,16 @@ function renderCaseTypeGuidance(caseRecord = null) {
   els.needsAnalysisFields.hidden = detailFields.length === 0;
   const supportAreaField = els.caseSupportAreaChoices?.closest("#caseSupportAreaField");
   if (supportAreaField) supportAreaField.hidden = caseType?.id !== "parent-support";
+  els.caseAvailabilityField.hidden = caseType?.id !== "parent-support";
   renderSupportAreaChoices(els.caseSupportAreaChoices, caseRecord?.caseTypeId === "parent-support" ? supportAreaIdsForCase(caseRecord) : [], { name: "caseSupportArea" });
   for (const field of CASE_DETAIL_FIELD_DEFINITIONS) {
     const input = caseDetailInput(field.id);
     if (!input) continue;
-    input.closest("[class*='col-md']").hidden = !detailFields.some((item) => item.id === field.id);
+    const fieldContainer = input.closest(".col-12, [class*='col-md']");
+    if (fieldContainer) fieldContainer.hidden = !detailFields.some((item) => item.id === field.id);
     input.value = caseRecord?.details?.[field.id] ?? "";
   }
+  renderCaseStructuredMatchingEditor(caseType?.id === "parent-support" ? caseRecord : null);
   els.caseDescriptionInput.required = needsAnalysis;
   els.caseDescriptionLabel.textContent = needsAnalysis ? "Kort beskrivning av behovet" : "Kort beskrivning";
 
@@ -9573,9 +9787,7 @@ function renderNewCandidateDetail() {
   els.editContactDetailsInput.required = true;
   els.editInformationStatusInput.required = true;
   els.editInterestNoteInput.required = true;
-  els.editAreaInput.value = "";
-  els.editLanguagesInput.value = "";
-  els.editAvailabilityInput.value = "";
+  renderMentorStructuredMatchingEditor();
   renderMentorSupportAreaEditor();
   els.statusSelect.innerHTML = "";
   const statusOption = document.createElement("option");
@@ -9666,9 +9878,7 @@ function setPersonEditMode(editing) {
     els.editContactDetailsInput.required = false;
     els.editInformationStatusInput.required = false;
     els.editInterestNoteInput.required = false;
-    els.editAreaInput.value = candidate.area || "";
-    els.editLanguagesInput.value = candidate.languages || "";
-    els.editAvailabilityInput.value = candidate.availability || "";
+    renderMentorStructuredMatchingEditor(candidate);
     renderMentorSupportAreaEditor(candidate);
     els.statusSelect.value = candidate.status || STATUSES[0];
     els.coordinatorInput.value = candidate.coordinatorId || "";
@@ -10303,7 +10513,7 @@ function registerCaseMeetingCommand({ caseRecord, existing = null, meetingType, 
 
 function updateMentorProfileCommand({ candidate, caseRecord, profilePatch, coordinatorId }) {
   const nextCandidate = { ...candidate, ...profilePatch };
-  const changesMatchingProfile = ["area", "languages", "availability", "supportAreas", "meetingModes", "availableAssignmentCapacity"]
+  const changesMatchingProfile = ["area", "languages", "availability", "geographicAreaIds", "languageIds", "languageEntries", "availabilitySlotIds", "availabilityNote", "supportAreas", "meetingModes", "availableAssignmentCapacity"]
     .some((field) => Object.prototype.hasOwnProperty.call(profilePatch, field));
   const previousProfile = changesMatchingProfile ? mentorMatchingProfile(candidate.id) : null;
   const profileId = changesMatchingProfile ? crypto.randomUUID() : null;
@@ -10612,6 +10822,7 @@ function newCandidateFromEditor(caseNumber) {
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   const coordinator = handlers.find((handler) => handler.id === els.coordinatorInput.value);
+  const structuredMatching = mentorStructuredMatchingFromEditor();
   return {
     id,
     tenantId: DEFAULT_TENANT_ID,
@@ -10621,9 +10832,7 @@ function newCandidateFromEditor(caseNumber) {
     contactDetails: els.editContactDetailsInput.value.trim(),
     informationStatus: els.editInformationStatusInput.value,
     interestNote: els.editInterestNoteInput.value.trim(),
-    area: els.editAreaInput.value.trim(),
-    languages: els.editLanguagesInput.value.trim(),
-    availability: els.editAvailabilityInput.value.trim(),
+    ...structuredMatching,
     supportAreas: mentorSupportAreasFromEditor(),
     coordinatorId: coordinator?.id || "",
     coordinator: coordinator?.name || "",
@@ -11919,10 +12128,22 @@ function matchingMentorAssessment(candidate, supportCase, overlap = null) {
   const supportLanguages = supportLanguageRows.length
     ? supportLanguageRows.map((entry) => entry.label)
     : normalizeLanguageEntries(supportCase?.details?.languages || parent?.languages).map((entry) => entry.label);
-  const mentorLanguages = normalizeLanguageEntries(candidate.languages).map((entry) => entry.label);
-  const sharedLanguages = supportLanguages.filter((language) => mentorLanguages.some((mentorLanguage) => matchingTextComparable(mentorLanguage) === matchingTextComparable(language)));
+  const supportLanguageIds = supportLanguageRows.length
+    ? supportLanguageRows.map((entry) => entry.languageId)
+    : normalizeLanguageEntries(supportCase?.details?.languageEntries?.length ? supportCase.details.languageEntries : supportCase?.details?.languages || parent?.languages).map((entry) => entry.languageId);
+  const mentorLanguageEntries = normalizeLanguageEntries(candidate.languageEntries?.length ? candidate.languageEntries : candidate.languages);
+  const mentorLanguageIds = new Set(mentorLanguageEntries.map((entry) => entry.languageId));
+  const sharedLanguageIds = supportLanguageIds.filter((id) => mentorLanguageIds.has(id));
+  const supportLanguageLabels = new Map((supportLanguageRows.length ? supportLanguageRows : normalizeLanguageEntries(supportCase?.details?.languageEntries?.length ? supportCase.details.languageEntries : supportCase?.details?.languages || parent?.languages)).map((entry) => [entry.languageId, entry.label]));
+  const sharedLanguages = sharedLanguageIds.map((id) => supportLanguageLabels.get(id)).filter(Boolean);
   const supportArea = supportProfile?.area || supportCase?.details?.area || parent?.area || "";
   const supportAvailability = supportProfile?.availability || supportCase?.details?.availability || parent?.availability || "";
+  const supportGeographicAreaIds = normalizeSelectionIds(supportProfile?.geographicAreaIds || supportCase?.details?.geographicAreaIds);
+  const mentorGeographicAreaIds = normalizeSelectionIds(candidate.geographicAreaIds);
+  const sharedGeographicAreaIds = selectionsOverlap(supportGeographicAreaIds, mentorGeographicAreaIds);
+  const supportAvailabilitySlotIds = normalizeSelectionIds(supportProfile?.availabilitySlotIds || supportCase?.details?.availabilitySlotIds);
+  const mentorAvailabilitySlotIds = normalizeSelectionIds(candidate.availabilitySlotIds);
+  const sharedAvailabilitySlotIds = selectionsOverlap(supportAvailabilitySlotIds, mentorAvailabilitySlotIds);
   const matches = [];
   const missing = [];
 
@@ -11934,14 +12155,18 @@ function matchingMentorAssessment(candidate, supportCase, overlap = null) {
   else if (supportLanguages.length) missing.push({ key: "language", text: `Språk: ${supportLanguages.join(", ")}` });
   else missing.push({ key: "language", text: "Språkbehov saknas i stödärendet" });
 
-  const areaMatches = Boolean(supportArea && candidate.area && matchingTextOverlaps(supportArea, candidate.area));
-  if (areaMatches) matches.push({ key: "area", text: `Geografiskt område: ${candidate.area}` });
+  const areaMatches = supportGeographicAreaIds.length && mentorGeographicAreaIds.length
+    ? sharedGeographicAreaIds.length > 0
+    : Boolean(supportArea && candidate.area && matchingTextOverlaps(supportArea, candidate.area));
+  if (areaMatches) matches.push({ key: "area", text: `Geografiskt område: ${geographicAreaLabels(sharedGeographicAreaIds, tenantGeographicAreas).join(", ") || candidate.area}` });
   else if (!supportArea) missing.push({ key: "area", text: "Geografiskt område saknas i stödärendet" });
   else if (!candidate.area) missing.push({ key: "area", text: "Mentorns geografiska område saknas" });
   else missing.push({ key: "area", text: `Geografiskt område behöver kontrolleras: behov ${supportArea} · mentor ${candidate.area}` });
 
-  const availabilityMatches = Boolean(supportAvailability && candidate.availability && matchingTextOverlaps(supportAvailability, candidate.availability));
-  if (availabilityMatches) matches.push({ key: "availability", text: `Tillgänglighet: ${candidate.availability}` });
+  const availabilityMatches = supportAvailabilitySlotIds.length && mentorAvailabilitySlotIds.length
+    ? sharedAvailabilitySlotIds.length > 0
+    : Boolean(supportAvailability && candidate.availability && matchingTextOverlaps(supportAvailability, candidate.availability));
+  if (availabilityMatches) matches.push({ key: "availability", text: `Tillgänglighet: ${selectedOptionLabels(sharedAvailabilitySlotIds, AVAILABILITY_OPTIONS).join(", ") || candidate.availability}` });
   else if (!supportAvailability) missing.push({ key: "availability", text: "Önskad tillgänglighet saknas i stödärendet" });
   else if (!candidate.availability) missing.push({ key: "availability", text: "Mentorns tillgänglighet saknas" });
   else missing.push({ key: "availability", text: `Tillgänglighet behöver kontrolleras: behov ${supportAvailability} · mentor ${candidate.availability}` });
@@ -11977,8 +12202,8 @@ function matchingMentorCriterionAvailability(supportCase) {
   return {
     support_area: supportAreaIdsForCase(supportCase).length > 0,
     language: languages.length > 0,
-    area: Boolean(supportProfile?.area || supportCase?.details?.area || parent?.area),
-    availability: Boolean(supportProfile?.availability || supportCase?.details?.availability || parent?.availability),
+    area: Boolean(normalizeSelectionIds(supportProfile?.geographicAreaIds || supportCase?.details?.geographicAreaIds).length || supportProfile?.area || supportCase?.details?.area || parent?.area),
+    availability: Boolean(normalizeSelectionIds(supportProfile?.availabilitySlotIds || supportCase?.details?.availabilitySlotIds).length || supportProfile?.availability || supportCase?.details?.availability || parent?.availability),
     capacity: true
   };
 }
@@ -12316,6 +12541,13 @@ async function submitCaseForm(event) {
     }))
   ];
   const configuredDetails = { ...(existingCase?.details || {}) };
+  const structuredMatching = caseType.id === "parent-support"
+    ? caseStructuredMatchingFromEditor(existingCase?.details)
+    : null;
+  if (structuredMatching) {
+    els.needsAreaInput.value = structuredMatching.area;
+    els.needsLanguagesInput.value = structuredMatching.languages;
+  }
   for (const field of configuredDetailFields(caseType)) {
     const input = caseDetailInput(field.id);
     const value = input?.value || "";
@@ -12324,6 +12556,7 @@ async function submitCaseForm(event) {
       : (value.trim?.() || value || null);
   }
   if (caseType.id === "parent-support") {
+    Object.assign(configuredDetails, structuredMatching);
     configuredDetails.supportAreaIds = selectedSupportAreaIdsFrom(els.caseSupportAreaChoices, "caseSupportArea");
     configuredDetails.supportAreaStatus = configuredDetails.supportAreaIds.length ? "confirmed" : "to_confirm";
   }
@@ -13394,14 +13627,13 @@ els.personEditForm.addEventListener("submit", async (event) => {
   const candidate = selectedCandidate();
   if (!candidate) return;
   const coordinator = handlers.find((handler) => handler.id === els.coordinatorInput.value);
+  const structuredMatching = mentorStructuredMatchingFromEditor(candidate);
   const profilePatch = {
     name: els.editNameInput.value.trim(),
     contactDetails: els.editContactDetailsInput.value.trim(),
     informationStatus: els.editInformationStatusInput.value,
     interestNote: els.editInterestNoteInput.value.trim(),
-    area: els.editAreaInput.value.trim(),
-    languages: els.editLanguagesInput.value.trim(),
-    availability: els.editAvailabilityInput.value.trim(),
+    ...structuredMatching,
     supportAreas: mentorSupportAreasFromEditor()
   };
   const certificationCase = cases.find((item) => item.mentorId === candidate.id && item.caseTypeId === "mentor-certification");
@@ -13703,7 +13935,7 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
 els.resetButton.addEventListener("click", async () => {
   const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata? Mentorärenden tas bort och grundhandläggarna återställs. Åtgärden kan inte ångras.");
   if (!confirmed) return;
-  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStores(MATCHING_PROFILE_STORES), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests(), clearSupportTickets(), clearTenantSupportAreaSelections()]);
+  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStores(MATCHING_PROFILE_STORES), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests(), clearSupportTickets(), clearTenantSupportAreaSelections(), clearTenantGeographicAreas()]);
   await ensureDefaultHandlers();
   selectedId = null;
   markSaved();
@@ -13816,6 +14048,59 @@ els.supportAreasAdministrationView.addEventListener("change", async (event) => {
   });
   markSaved();
   showFeedback("Kommunens urval av stödområden har uppdaterats.");
+  await refresh();
+});
+
+els.geographicAreaCreateForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!canAdministerDefinitions()) {
+    showFeedback("Endast samordnare kan administrera geografiska områden.");
+    return;
+  }
+  const label = els.geographicAreaNameInput.value.trim();
+  const duplicate = tenantGeographicAreas.some((area) => area.label.localeCompare(label, "sv", { sensitivity: "base" }) === 0);
+  if (duplicate) {
+    els.geographicAreaNameInput.setCustomValidity("Det finns redan ett område med det namnet.");
+    els.geographicAreaNameInput.reportValidity();
+    return;
+  }
+  els.geographicAreaNameInput.setCustomValidity("");
+  const baseId = slugifyCatalogLabel(label) || "omrade";
+  let id = baseId;
+  let suffix = 2;
+  while (tenantGeographicAreas.some((area) => area.id === id)) id = `${baseId}-${suffix++}`;
+  const now = new Date().toISOString();
+  await saveTenantGeographicArea({ tenantId: DEFAULT_TENANT_ID, id, label, active: true, createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID });
+  els.geographicAreaCreateForm.reset();
+  markSaved();
+  showFeedback("Det geografiska området har lagts till.");
+  await refresh();
+});
+
+els.geographicAreaNameInput.addEventListener("input", () => els.geographicAreaNameInput.setCustomValidity(""));
+
+els.geographicAreaAdminList.addEventListener("submit", async (event) => {
+  const form = event.target.closest("[data-geographic-area-form]");
+  if (!form) return;
+  event.preventDefault();
+  if (!canAdministerDefinitions()) {
+    showFeedback("Endast samordnare kan administrera geografiska områden.");
+    return;
+  }
+  const area = tenantGeographicAreas.find((item) => item.id === form.dataset.geographicAreaForm);
+  if (!area) return;
+  const labelInput = form.elements.label;
+  const label = labelInput.value.trim();
+  const duplicate = tenantGeographicAreas.some((item) => item.id !== area.id && item.label.localeCompare(label, "sv", { sensitivity: "base" }) === 0);
+  if (duplicate) {
+    labelInput.setCustomValidity("Det finns redan ett område med det namnet.");
+    labelInput.reportValidity();
+    return;
+  }
+  labelInput.setCustomValidity("");
+  await saveTenantGeographicArea({ ...area, label, active: form.elements.active.checked, updatedAt: new Date().toISOString(), updatedBy: CURRENT_USER_ID });
+  markSaved();
+  showFeedback(form.elements.active.checked ? "Området har sparats." : "Området har inaktiverats. Historiska registreringar är oförändrade.");
   await refresh();
 });
 

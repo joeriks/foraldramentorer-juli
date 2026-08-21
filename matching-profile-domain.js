@@ -77,6 +77,9 @@ export function buildMentorMatchingProfile({ tenantId, mentor, profileId, previo
     status: "active",
     area: normalizeText(mentor.area) || null,
     availability: normalizeText(mentor.availability) || null,
+    geographicAreaIds: [...new Set(Array.isArray(mentor.geographicAreaIds) ? mentor.geographicAreaIds : [])],
+    availabilitySlotIds: [...new Set(Array.isArray(mentor.availabilitySlotIds) ? mentor.availabilitySlotIds : [])],
+    availabilityNote: normalizeText(mentor.availabilityNote) || null,
     meetingModes: Array.isArray(mentor.meetingModes) ? [...new Set(mentor.meetingModes)] : [],
     availableAssignmentCapacity: mentor.availableAssignmentCapacity == null ? null : Number(mentor.availableAssignmentCapacity),
     createdAt: now,
@@ -90,7 +93,7 @@ export function buildMentorMatchingProfile({ tenantId, mentor, profileId, previo
     mentorId: mentor.id,
     ...entry
   }));
-  const languages = normalizeLanguageEntries(mentor.languages).map((entry) => ({
+  const languages = normalizeLanguageEntries(mentor.languageEntries?.length ? mentor.languageEntries : mentor.languages).map((entry) => ({
     tenantId,
     profileId,
     mentorId: mentor.id,
@@ -110,6 +113,9 @@ export function buildSupportMatchingProfile({ tenantId, supportCase, profileId, 
     status: "active",
     area: normalizeText(details.area) || null,
     availability: normalizeText(details.availability) || null,
+    geographicAreaIds: [...new Set(Array.isArray(details.geographicAreaIds) ? details.geographicAreaIds : [])],
+    availabilitySlotIds: [...new Set(Array.isArray(details.availabilitySlotIds) ? details.availabilitySlotIds : [])],
+    availabilityNote: normalizeText(details.availabilityNote) || null,
     preferredMeetingModes: Array.isArray(details.preferredMeetingModes) ? [...new Set(details.preferredMeetingModes)] : [],
     sharedExperiencePreference: details.sharedExperiencePreference || null,
     complementarySupport: details.complementarySupport ? JSON.parse(JSON.stringify(details.complementarySupport)) : null,
@@ -125,7 +131,7 @@ export function buildSupportMatchingProfile({ tenantId, supportCase, profileId, 
     supportAreaId,
     priority: index === 0 ? "primary" : "additional"
   }));
-  const languages = normalizeLanguageEntries(details.languages, { firstIsPreferred: true }).map((entry) => ({
+  const languages = normalizeLanguageEntries(details.languageEntries?.length ? details.languageEntries : details.languages, { firstIsPreferred: true }).map((entry) => ({
     tenantId,
     profileId,
     supportCaseId: supportCase.id,
@@ -141,6 +147,11 @@ export function projectMentorMatchingProfile(profile, supportAreas, languages) {
   return {
     area: profile.area || "",
     availability: profile.availability || "",
+    geographicAreaIds: [...(profile.geographicAreaIds || [])],
+    availabilitySlotIds: [...(profile.availabilitySlotIds || [])],
+    availabilityNote: profile.availabilityNote || "",
+    languageIds: languageRows.map((entry) => entry.languageId),
+    languageEntries: languageRows.map((entry) => ({ languageId: entry.languageId, label: entry.label })),
     languages: languageRows.map((entry) => entry.label).join(", "),
     supportAreas: areaRows.map((entry) => ({
       areaId: entry.supportAreaId,
@@ -175,6 +186,9 @@ export function buildMatchingSnapshot({ tenantId, matchingCase, mentorProfile, m
       version: supportProfile.version,
       area: supportProfile.area,
       availability: supportProfile.availability,
+      geographicAreaIds: [...(supportProfile.geographicAreaIds || [])],
+      availabilitySlotIds: [...(supportProfile.availabilitySlotIds || [])],
+      availabilityNote: supportProfile.availabilityNote || null,
       supportAreas: (supportAreas || []).filter((entry) => entry.profileId === supportProfile.id).map((entry) => ({ ...entry })),
       languages: (supportLanguages || []).filter((entry) => entry.profileId === supportProfile.id).map((entry) => ({ ...entry }))
     } : null,
@@ -183,6 +197,9 @@ export function buildMatchingSnapshot({ tenantId, matchingCase, mentorProfile, m
       version: mentorProfile.version,
       area: mentorProfile.area,
       availability: mentorProfile.availability,
+      geographicAreaIds: [...(mentorProfile.geographicAreaIds || [])],
+      availabilitySlotIds: [...(mentorProfile.availabilitySlotIds || [])],
+      availabilityNote: mentorProfile.availabilityNote || null,
       supportAreas: (mentorAreas || []).filter((entry) => entry.profileId === mentorProfile.id).map((entry) => ({ ...entry })),
       languages: (mentorLanguages || []).filter((entry) => entry.profileId === mentorProfile.id).map((entry) => ({ ...entry }))
     } : null,

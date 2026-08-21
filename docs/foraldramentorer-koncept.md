@@ -50,8 +50,8 @@ Syfte: Ge samordnaren ett beslutsstöd för att hitta rätt mentor till rätt f�
 
 Delfunktioner:
 
-- Mentor- och föräldraprofiler.
-- Hårda kriterier: område, språk, tillgänglighet och kapacitet.
+- Mentorprofil och stödprofil för det aktuella stödärendet.
+- Strukturerade grundkriterier: kommunens geografiska områden, språk, återkommande tillgänglighetsfönster och kapacitet.
 - Mjuka kriterier: erfarenhetsområden, behovsområden och intressen.
 - Toppförslag med matchningsgrad.
 - Kort motivering till varför en match föreslås.
@@ -61,7 +61,7 @@ Delfunktioner:
 - Avstämning efter första mötet och efter cirka fyra veckor.
 - Odramatisk om-matchning om kemin inte fungerar.
 
-Matchningen använder en gemensam katalog med stödområden. Kommunen väljer sitt lokala och publika urval, föräldern anger vad det aktuella stödärendet gäller och mentorn anger relevanta erfarenhetsområden. Systemet visar överlappning som beslutsunderlag men fattar inte matchningsbeslut. Praktiska förutsättningar, parternas önskemål och handläggarens professionella bedömning är fortfarande avgörande.
+Matchningen använder en gemensam katalog med stödområden. Kommunen väljer sitt lokala och publika urval, föräldern anger vad det aktuella stödärendet gäller och mentorn anger relevanta erfarenhetsområden. Kommunen administrerar dessutom sina geografiska områden, medan språk och återkommande tillgänglighet väljs ur gemensamma listor. Systemet jämför stabila ID:n och visar överlappning som beslutsunderlag men fattar inte matchningsbeslut. Praktiska förutsättningar, parternas önskemål och handläggarens professionella bedömning är fortfarande avgörande.
 
 ### 3. Uppdragshantering och kommunikation
 

@@ -511,6 +511,8 @@ Föräldern registreras som en egen person. Varje avgränsat stödbehov hanteras
 
 Stödområden används som en gemensam, kontrollerad begreppslista genom hela flödet. Kommunen väljer vilka områden som används internt och vilka som visas i den publika stödansökan. Förälderns val hör till det aktuella stödärendets matchningsunderlag, inte till en permanent beskrivning av personen. Mentorn har en aktiv, versionshanterad matchningsprofil och markerar endast områden där hen vill bli matchad. Självskattad trygghet att ge vardagsnära stöd är primärt underlag; erfarenhetsgrund är sekundärt. Överlappning mellan dessa uppgifter är ett öppet beslutsunderlag, aldrig ett automatiskt beslut.
 
+Geografiska områden, språk och återkommande tillgänglighetsfönster registreras som strukturerade val i både stödärendets och mentorns matchningsprofil. Samordnaren administrerar kommunens geografiska områden under systemadministration. Ett område som inte längre används inaktiveras i stället för att raderas, så att tidigare matchningar fortfarande kan förstås.
+
 ### 10.1 Registrera förälder och stödärende
 
 1. Handläggaren söker först efter en befintlig förälder för att undvika dubbletter.
@@ -542,7 +544,7 @@ Det valda stödärendet ska därefter innehålla tillräckliga och aktuella uppg
 - stödets avgränsade syfte,
 - önskat resultat,
 - minst ett bekräftat stödområde ur kommunens katalog,
-- kända grundkriterier, exempelvis språk, område och praktisk tillgänglighet,
+- kända grundkriterier valda ur katalogerna för språk, geografiskt område och återkommande tillgänglighet,
 - kontaktstatus och om föräldern vill medverka i matchningen,
 - ansvarig handläggare och nästa planerade kontakt.
 
@@ -558,7 +560,7 @@ När matchningen startas fryser systemet en ögonblicksbild av stödärendets oc
 2. Systemet visar en sök- och filtrerbar lista över godkända och tillgängliga mentorer.
 3. På varje mentor visas vilka aktiva kriterier som matchar och vilka uppgifter som saknas eller behöver kontrolleras.
 4. Handläggaren kan tillfälligt avaktivera enskilda kriterier för att bredda urvalet. Avaktiveringen ändrar inte det sparade stödunderlaget och ska vara synlig i bedömningen.
-5. Handläggaren bedömer språk, geografi, tillgänglighet, erfarenhetsnivå, parternas önskemål och andra relevanta kriterier samt dokumenterar kort varför en match föreslås. Avsaknad av registrerad överlappning är en upplysning, inte ett automatiskt avslag.
+5. Handläggaren bedömer strukturerad överlappning i språk, geografi och tillgänglighet tillsammans med erfarenhetsnivå, parternas önskemål och andra relevanta kriterier samt dokumenterar kort varför en match föreslås. Avsaknad av registrerad överlappning är en upplysning, inte ett automatiskt avslag.
 6. Föräldern och mentorn kontaktas var för sig enligt kommunens rutin.
 7. Första mötet bokas och registreras.
 8. Båda parters återkoppling dokumenteras utan onödiga samtalsdetaljer.

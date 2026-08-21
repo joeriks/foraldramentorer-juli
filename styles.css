@@ -5416,6 +5416,48 @@ body.is-system-administration .sidebar-menu-group {
   color: var(--bs-secondary-color);
 }
 
+.structured-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: .45rem .8rem;
+  min-width: 0;
+}
+
+.structured-option-grid .form-check {
+  min-width: 0;
+  margin: 0;
+  padding: .55rem .65rem .55rem 2rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: .25rem;
+  background: var(--bs-body-bg);
+}
+
+.structured-option-grid .form-check-label {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.geographic-area-admin-list {
+  display: grid;
+}
+
+.geographic-area-admin-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: end;
+  padding: 1rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.geographic-area-admin-row:last-child {
+  border-bottom: 0;
+}
+
+.geographic-area-admin-row .form-check {
+  margin-bottom: .45rem;
+}
+
 @media (max-width: 767.98px) {
   .support-area-choice-list,
   .support-area-facts,
@@ -5424,7 +5466,8 @@ body.is-system-administration .sidebar-menu-group {
   }
 
   .mentor-support-area-row,
-  .support-area-admin-row {
+  .support-area-admin-row,
+  .geographic-area-admin-row {
     grid-template-columns: 1fr;
     gap: .6rem;
   }
