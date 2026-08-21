@@ -211,7 +211,7 @@ flowchart LR
 
 ### 5.1 Börja arbetsdagen
 
-Handläggaren öppnar `Översikt`. Arbetskön ligger först och bygger på samma ärende- och aktivitetsdata som register och ärendekort. Köerna är `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden`. Varje rad visar ärendet och nästa aktivitet och leder direkt till rätt arbetsyta.
+Handläggaren öppnar `Översikt`. Arbetskön ligger först och bygger på samma ärende- och aktivitetsdata som register och ärendekort. Köerna är `Aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden`. För `Aktiviteter`, `Försenade` och `Ställningstaganden` kan handläggaren visa alla ärendeansvariga, sina egna ärenden eller en vald handläggares ärenden. `Otilldelade` saknar ansvarig och påverkas därför inte av ansvarigfiltret. Varje rad visar ärendet och nästa aktivitet och leder direkt till rätt arbetsyta.
 
 Rekommenderad arbetsordning är att först bedöma ställningstaganden och försenade aktiviteter och därefter fortsätta med egna aktiviteter. Samordnaren kontrollerar dessutom kön `Otilldelade` och fördelar arbetet. Om ett bevakningsdatum passeras visas aktiviteten som försenad.
 

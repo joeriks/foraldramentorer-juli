@@ -814,7 +814,7 @@ Förslaget beräknas från länkat följdärende, ärendetyp och `nextCaseTypeId
 
 ### 10.7 Översikt, register och responsivitet
 
-`Översikt` ska visa arbetskön före processöversikten. Arbetskön har filtren `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden` och visar kolumnerna `Ärende` och `Nästa aktivitet`. Processöversikten visar antal öppna ärenden per ärendetyp. Centrala flöden visas direkt och sekundära samband kan fällas ut.
+`Översikt` ska visa arbetskön före processöversikten. Arbetskön har köfiltren `Aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden` och visar kolumnerna `Ärende` och `Nästa aktivitet`. Ett separat ansvarigfilter ska kunna visa alla ärendeansvariga, inloggad handläggares ärenden eller en vald handläggares ärenden. Filtret gäller alla köer utom `Otilldelade`, där det ska vara inaktiverat. Processöversikten visar antal öppna ärenden per ärendetyp. Centrala flöden visas direkt och sekundära samband kan fällas ut.
 
 `Kalender` ska vara en separat huvudvy som projicerar befintliga `CaseMeeting.occurredAt`, öppna `CaseActivity.dueDate` och öppna `Case.dueDate`. Kalendern får inte skapa en parallell datumkälla. Månad, posttyp och ansvarig ska kunna filtreras. Varje post ska länka till sitt ärende, sin aktivitet eller ärendets mötesflik. Desktop visar en månadsmatris med måndag som första veckodag; mobil visar samma filtrerade poster i en dagsgrupperad agenda.
 

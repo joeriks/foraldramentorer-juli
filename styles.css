@@ -1359,6 +1359,32 @@ body.is-system-administration .sidebar-menu-group {
   table-layout: fixed;
 }
 
+.dashboard-queue-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-2) var(--app-space-3);
+  align-items: end;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.dashboard-queue-filters {
+  flex-wrap: wrap;
+}
+
+.dashboard-queue-owner-filter {
+  display: grid;
+  flex: 0 1 15rem;
+  gap: 0.2rem;
+  min-width: min(100%, 13rem);
+}
+
+.dashboard-queue-owner-filter label {
+  color: var(--bs-secondary-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .dashboard-queue-table th:first-child,
 .dashboard-queue-table td:first-child {
   width: 42%;
@@ -4850,6 +4876,15 @@ body.is-system-administration .sidebar-menu-group {
   .dashboard-queue-filters {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .dashboard-queue-toolbar {
+    align-items: stretch;
+  }
+
+  .dashboard-queue-owner-filter {
+    flex-basis: 100%;
     width: 100%;
   }
 

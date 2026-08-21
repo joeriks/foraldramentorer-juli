@@ -136,6 +136,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "100",
+    date: "2026-08-21",
+    title: "Arbetskö per ärendeansvarig",
+    flow: "Översikt -> arbetskö -> ärende",
+    simplified: "Arbetskön kan nu visas för alla ärendeansvariga, den inloggade användaren eller en vald handläggare på samma sätt som kalendern.",
+    retained: "Aktiviteter, otilldelade poster, försenade poster och ställningstaganden är kvar som separata köer. Ärendenas ansvar och aktiviteter ändras inte av filtret.",
+    changes: [
+      "Ett ansvarigfilter med Alla, Mina och namngivna handläggare har lagts till i arbetskön.",
+      "Ansvarigfiltret gäller även Försenade och Ställningstaganden.",
+      "I kön Otilldelade är ansvarigfiltret inaktiverat eftersom posterna saknar ansvarig."
+    ]
+  },
+  {
     version: "99",
     date: "2026-08-21",
     title: "Strukturerade matchningskriterier",
@@ -1098,7 +1111,8 @@ let caseStatusFilter = "";
 let caseTypeFilter = "";
 let newCaseTypePreset = "";
 let casePage = 1;
-let dashboardQueueMode = "mine";
+let dashboardQueueMode = "activities";
+let dashboardQueueOwnerFilter = "mine";
 let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let calendarOwnerFilter = "all";
 const calendarTypeFilters = new Set(["meeting", "activity", "case"]);
@@ -1389,6 +1403,7 @@ const els = {
   pipelineGrid: document.querySelector("#pipelineBoard .pipeline-grid"),
   actionTableBody: document.querySelector("#actionTableBody"),
   actionQueueSummary: document.querySelector("#actionQueueSummary"),
+  dashboardQueueOwnerFilter: document.querySelector("#dashboardQueueOwnerFilter"),
   openActionQueueButton: document.querySelector("#openActionQueueButton"),
   myActivitiesQueueButton: document.querySelector("#myActivitiesQueueButton"),
   unassignedQueueButton: document.querySelector("#unassignedQueueButton"),
@@ -6703,8 +6718,31 @@ function renderCaseFlowBoard(openCases) {
   ` : "");
 }
 
+function renderDashboardQueueOwnerFilter() {
+  const selected = dashboardQueueOwnerFilter;
+  els.dashboardQueueOwnerFilter.innerHTML = '<option value="all">Alla ärendeansvariga</option><option value="mine">Mina ärenden</option>';
+  for (const handler of [...handlers].filter((item) => item.active !== false).sort((left, right) => left.name.localeCompare(right.name, "sv"))) {
+    const option = document.createElement("option");
+    option.value = handler.id;
+    option.textContent = handler.name;
+    els.dashboardQueueOwnerFilter.append(option);
+  }
+  els.dashboardQueueOwnerFilter.value = [...els.dashboardQueueOwnerFilter.options].some((option) => option.value === selected) ? selected : "all";
+  dashboardQueueOwnerFilter = els.dashboardQueueOwnerFilter.value;
+  els.dashboardQueueOwnerFilter.disabled = dashboardQueueMode === "unassigned";
+}
+
+function dashboardQueueOwnerLabel() {
+  if (dashboardQueueMode === "unassigned") return "";
+  if (dashboardQueueOwnerFilter === "all") return " för alla ärendeansvariga";
+  if (dashboardQueueOwnerFilter === "mine") return " i dina ärenden";
+  const handler = handlers.find((item) => item.id === dashboardQueueOwnerFilter);
+  return handler ? ` i ${handler.name}s ärenden` : "";
+}
+
 function renderDashboard() {
   renderIncomingContactTable();
+  renderDashboardQueueOwnerFilter();
   els.actionTableBody.innerHTML = "";
   const openCases = cases.filter((caseRecord) => caseRecord.status !== "closed");
   renderCaseFlowBoard(openCases);
@@ -6714,11 +6752,16 @@ function renderDashboard() {
   const queue = nextActivities.filter(({ caseRecord, activity }) => {
     const effectiveOwner = effectiveActivityHandler(activity, caseRecord);
     if (dashboardQueueMode === "unassigned") return !effectiveOwner;
-    if (dashboardQueueMode === "overdue") {
-      return activityDueState(activity) === "overdue";
-    }
-    if (dashboardQueueMode === "decision") return caseRecord.status === "decision_required" || activityHasBlockingResult(activity);
-    return effectiveOwner?.id === currentActorId();
+    const modeMatches = dashboardQueueMode === "overdue"
+      ? activityDueState(activity) === "overdue"
+      : dashboardQueueMode === "decision"
+        ? caseRecord.status === "decision_required" || activityHasBlockingResult(activity)
+        : true;
+    if (!modeMatches) return false;
+    const caseOwner = responsibleHandler(caseRecord);
+    if (dashboardQueueOwnerFilter === "all") return Boolean(caseOwner);
+    const ownerId = dashboardQueueOwnerFilter === "mine" ? currentActorId() : dashboardQueueOwnerFilter;
+    return caseOwner?.id === ownerId;
   }).sort((left, right) => {
     const leftDue = left.activity.dueDate || "9999-12-31";
     const rightDue = right.activity.dueDate || "9999-12-31";
@@ -6729,27 +6772,28 @@ function renderDashboard() {
   });
   const rows = queue.slice(0, 8);
   const queueLabels = {
-    mine: "aktiviteter i din arbetskö",
+    activities: "aktiviteter",
     unassigned: "otilldelade aktiviteter",
     overdue: "försenade aktiviteter",
     decision: "aktiviteter som kräver ställningstagande"
   };
   const queueSingularLabels = {
-    mine: "aktivitet i din arbetskö",
+    activities: "aktivitet",
     unassigned: "otilldelad aktivitet",
     overdue: "försenad aktivitet",
     decision: "aktivitet som kräver ställningstagande"
   };
+  const ownerLabel = dashboardQueueOwnerLabel();
   els.actionQueueSummary.textContent = queue.length > rows.length
-    ? `Visar ${rows.length} av ${queue.length} ${queueLabels[dashboardQueueMode]}.`
+    ? `Visar ${rows.length} av ${queue.length} ${queueLabels[dashboardQueueMode]}${ownerLabel}.`
     : queue.length === 1
-      ? `1 ${queueSingularLabels[dashboardQueueMode]} behöver hanteras.`
+      ? `1 ${queueSingularLabels[dashboardQueueMode]}${ownerLabel} behöver hanteras.`
       : queue.length > 1
-        ? `${queue.length} ${queueLabels[dashboardQueueMode]} behöver hanteras.`
-        : `Inga ${queueLabels[dashboardQueueMode]} att hantera.`;
+        ? `${queue.length} ${queueLabels[dashboardQueueMode]}${ownerLabel} behöver hanteras.`
+        : `Inga ${queueLabels[dashboardQueueMode]}${ownerLabel} att hantera.`;
   els.openActionQueueButton.hidden = queue.length === 0;
   for (const [mode, button] of [
-    ["mine", els.myActivitiesQueueButton],
+    ["activities", els.myActivitiesQueueButton],
     ["unassigned", els.unassignedQueueButton],
     ["overdue", els.overdueQueueButton],
     ["decision", els.decisionQueueButton]
@@ -10985,7 +11029,8 @@ els.testUserTypeSelect.addEventListener("change", () => {
   } else if (nextType === "public") {
     navigateTo("#/public-home");
   } else {
-    dashboardQueueMode = "mine";
+    dashboardQueueMode = "activities";
+    dashboardQueueOwnerFilter = "mine";
     navigateTo("#/dashboard");
   }
   renderAll();
@@ -13541,7 +13586,7 @@ els.handlerForm.addEventListener("submit", async (event) => {
 els.handlerEmailInput.addEventListener("input", () => els.handlerEmailInput.setCustomValidity(""));
 
 for (const [mode, button] of [
-  ["mine", els.myActivitiesQueueButton],
+  ["activities", els.myActivitiesQueueButton],
   ["unassigned", els.unassignedQueueButton],
   ["overdue", els.overdueQueueButton],
   ["decision", els.decisionQueueButton]
@@ -13551,6 +13596,11 @@ for (const [mode, button] of [
     renderDashboard();
   });
 }
+
+els.dashboardQueueOwnerFilter.addEventListener("change", () => {
+  dashboardQueueOwnerFilter = els.dashboardQueueOwnerFilter.value;
+  renderDashboard();
+});
 
 els.caseSummaryBoard?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-case-summary-status]");

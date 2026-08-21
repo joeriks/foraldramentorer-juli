@@ -159,7 +159,7 @@ När en ny mentor registreras är `Skapa ärende om godkännande` förvalt, men 
 
 ### Översikt, register och ärendekort
 
-Översiktens arbetskö är den primära ingången till det dagliga arbetet. Den kan filtreras på `Mina aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden`. Varje rad visar ärendet och dess nästa aktivitet. Processöversikten visar antal öppna ärenden per ärendetyp och leder till ett register som redan är filtrerat på den valda typen.
+Översiktens arbetskö är den primära ingången till det dagliga arbetet. Den kan växlas mellan `Aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden` och avgränsas till alla ärendeansvariga, egna ärenden eller en vald handläggare. `Otilldelade` visas separat eftersom posterna saknar ansvarig. Varje rad visar ärendet och dess nästa aktivitet. Processöversikten visar antal öppna ärenden per ärendetyp och leder till ett register som redan är filtrerat på den valda typen.
 
 Kalendern ger en stor samlad månadsvy över bokade och genomförda möten samt förfallodatum för öppna aktiviteter och ärenden. Den återanvänder datum från respektive källpost och används för överblick och navigering, inte för separat dubbelregistrering. På mobil visas innehållet som en agenda grupperad per dag.
 

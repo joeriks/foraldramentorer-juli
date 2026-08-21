@@ -41,6 +41,8 @@ test("serves the application shell", async () => {
   assert.match(html, /id="caseTypeFilter"/);
   assert.match(html, /<option value="open">Öppna<\/option>/);
   assert.match(html, /id="decisionQueueButton"/);
+  assert.match(html, /id="dashboardQueueOwnerFilter"/);
+  assert.match(html, />Alla ärendeansvariga</);
   assert.match(html, /id="caseClosureSummary"/);
   assert.match(html, /id="matchingDecisionSummary"/);
   assert.match(html, /id="matchingDetails"/);
@@ -127,6 +129,10 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.doesNotMatch(scriptText, /resultValue:/);
   assert.match(scriptText, /if \(resolveConfirmation\("confirm"\)\) confirmActionModal\.hide\(\)/);
   assert.match(scriptText, /function renderCaseClosureSummary/);
+  assert.match(scriptText, /function renderDashboardQueueOwnerFilter/);
+  assert.match(scriptText, /dashboardQueueOwnerFilter === "all"/);
+  assert.match(scriptText, /dashboardQueueMode === "unassigned"/);
+  assert.match(scriptText, /version: "100"/);
   assert.match(scriptText, /function newCaseButtonLabel/);
   assert.match(scriptText, /function createIncomingContactCase/);
   assert.match(scriptText, /function completeIncomingContactWithCase/);

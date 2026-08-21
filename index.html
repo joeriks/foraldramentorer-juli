@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260821-structured-matching-v99">
+    <link rel="stylesheet" href="styles.css?v=20260821-dashboard-owner-v100">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -165,11 +165,20 @@
                     <a id="openActionQueueButton" class="btn btn-outline-primary btn-sm" href="#/cases">Öppna ärenderegistret</a>
                   </div>
                   <div class="card-body border-bottom py-2">
-                    <div class="btn-group btn-group-sm dashboard-queue-filters" role="group" aria-label="Välj arbetskö">
-                      <button id="myActivitiesQueueButton" type="button" class="btn btn-primary" aria-pressed="true">Mina aktiviteter</button>
-                      <button id="unassignedQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Otilldelade</button>
-                      <button id="overdueQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Försenade</button>
-                      <button id="decisionQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Ställningstaganden</button>
+                    <div class="dashboard-queue-toolbar">
+                      <div class="btn-group btn-group-sm dashboard-queue-filters" role="group" aria-label="Välj arbetskö">
+                        <button id="myActivitiesQueueButton" type="button" class="btn btn-primary" aria-pressed="true">Aktiviteter</button>
+                        <button id="unassignedQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Otilldelade</button>
+                        <button id="overdueQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Försenade</button>
+                        <button id="decisionQueueButton" type="button" class="btn btn-outline-secondary" aria-pressed="false">Ställningstaganden</button>
+                      </div>
+                      <div class="dashboard-queue-owner-filter">
+                        <label for="dashboardQueueOwnerFilter">Ärendeansvarig</label>
+                        <select id="dashboardQueueOwnerFilter" class="form-select form-select-sm">
+                          <option value="all">Alla ärendeansvariga</option>
+                          <option value="mine" selected>Mina ärenden</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                   <div class="table-responsive">
@@ -2199,6 +2208,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260821-structured-matching-v99"></script>
+    <script type="module" src="app.js?v=20260821-dashboard-owner-v100"></script>
   </body>
 </html>
