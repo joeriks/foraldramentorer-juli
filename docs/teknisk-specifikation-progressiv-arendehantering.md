@@ -457,7 +457,7 @@ interface DeviationDecision {
 
 Det får finnas högst en avvikelse per avslutningstillfälle, identifierat av `activityCompletionEventId`, och högst en öppen avvikelse per aktivitet. Ett ställningstagande som ändras kräver särskild behörighet, motivering och en ny `DeviationDecision`.
 
-### 4.4 Handlingar och möten
+### 4.4 Handlingar och kontakttillfällen
 
 ```ts
 interface CaseDocument {
@@ -480,16 +480,36 @@ interface CaseDocument {
   createdBy: string;
 }
 
-interface CaseMeeting {
+interface InteractionParticipant {
+  id: string;
+  partyType: "parent" | "mentor" | "handler" | "external";
+  partyId: string | null;
+  displayName: string;
+  required: boolean;
+  invitationStatus: "not_prepared" | "prepared" | "handed_over";
+  responseStatus: "no_response" | "accepted" | "tentative" | "declined";
+  attendanceStatus: "not_recorded" | "attended" | "did_not_attend";
+}
+
+interface Interaction {
   id: string;
   tenantId: string;
-  caseId: string;
+  kind: "meeting" | "phone" | "email" | "visit" | "other";
+  status: "scheduled" | "completed" | "cancelled" | "no_show";
+  direction: "incoming" | "outgoing" | "not_applicable";
+  startsAt: string;
+  endsAt: string | null;
+  caseId: string | null;
   activityId: string | null;
-  meetingType: "certification_interview" | "follow_up" | "other";
-  occurredAt: string;
-  participantHandlerIds: string[];
-  externalParticipantNames: string[];
+  organizerId: string;
+  participants: InteractionParticipant[];
+  title: string;
+  mode: "physical" | "digital" | "phone" | "email" | "visit" | "other";
+  location: string;
+  invitationText: string;
   summary: string;
+  nextStep: string;
+  rescheduledFromInteractionId: string | null;
   version: number;
   createdAt: string;
   createdBy: string;
@@ -497,6 +517,14 @@ interface CaseMeeting {
   updatedBy: string;
 }
 ```
+
+`Interaction` är den kanoniska posten för både planerade möten och genomförda kontakter. Ärendekopplingen är valfri för ren planering, men `activityId` får endast anges tillsammans med `caseId`. Handläggningsdokumentation, aktivitetsunderlag och statuspåverkan kräver ärendekoppling. Ett planerat möte kan därför skapas fristående och kopplas senare utan att ett konstruerat ärende behöver skapas.
+
+Organisatören är skild från deltagarlistan och kan därför ansvara för bokningen utan att själv delta. Kallelsesvar och faktisk närvaro är skilda uppgifter. Ett bokat möte övergår till samma posts genomförandefas och ska inte registreras en gång till som en separat kontakt. I prototypen betyder `prepared` att en kallelsetext har skapats; systemet får inte påstå att ett meddelande har skickats utan en faktisk e-post- eller kalenderintegration.
+
+Statusarna `cancelled` och `no_show` uppfyller aldrig ett aktivitetskrav på bokat eller genomfört möte. Ombokning skapar en ny `Interaction` vars `rescheduledFromInteractionId` pekar på den inställda eller uteblivna posten. Originalposten och dess historik skrivs inte över av den nya tiden.
+
+`CaseMeeting` och äldre mötesposter läses under övergången genom en kompatibilitetsprojektion till `Interaction`. Nya ärendekopplade möten skriver båda representationerna tills alla befintliga läsmodeller använder den kanoniska interaktionsposten.
 
 En rättelse av en handling skapar en ny version via `supersedesDocumentId`; den tidigare versionen skrivs inte över. När en handling registreras från en aktivitet sätts både `caseId` och `activityId`. Den visas då både i ärendets handlingslista och som underlag på aktiviteten. En tjänsteanteckning saknar filobjekt, medan en uppladdad fil ska få metadata, kontrollsumma och filinnehåll registrerade som en sammanhållen operation utan tomma platshållarposter.
 
@@ -513,6 +541,7 @@ type CaseEventType =
   | "document_registered"
   | "registration_added_to_case"
   | "meeting_registered"
+  | "interaction_registered"
   | "case_paused"
   | "case_resumed"
   | "case_closed"

@@ -204,6 +204,7 @@
                   </div>
                   <div class="card-body d-flex flex-column gap-2">
                     <button id="dashboardIncomingContactButton" type="button" class="btn btn-primary">Registrera kontakt</button>
+                    <button id="dashboardBookMeetingButton" type="button" class="btn btn-outline-primary">Boka möte</button>
                     <button id="dashboardNewCaseButton" type="button" class="btn btn-outline-primary">Nytt ärende</button>
                     <button id="dashboardNewParentButton" type="button" class="btn btn-outline-primary">Registrera förälder</button>
                     <button id="dashboardNewMentorButton" type="button" class="btn btn-outline-primary">Registrera mentor</button>
@@ -254,11 +255,16 @@
                   <button id="calendarTodayButton" type="button" class="btn btn-outline-secondary">Idag</button>
                   <button id="calendarNextButton" type="button" class="btn btn-outline-secondary" aria-label="Nästa månad" title="Nästa månad">&rarr;</button>
                 </div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button id="calendarLogContactButton" type="button" class="btn btn-outline-primary">Registrera genomförd kontakt</button>
+                  <button id="calendarBookMeetingButton" type="button" class="btn btn-primary">Boka möte</button>
+                </div>
               </header>
               <div class="calendar-filters">
                 <fieldset class="calendar-type-filters">
                   <legend>Visa</legend>
                   <label class="calendar-filter-option calendar-filter-meeting"><input type="checkbox" data-calendar-type-filter="meeting" checked> Möten</label>
+                  <label class="calendar-filter-option calendar-filter-contact"><input type="checkbox" data-calendar-type-filter="contact" checked> Kontakter</label>
                   <label class="calendar-filter-option calendar-filter-activity"><input type="checkbox" data-calendar-type-filter="activity" checked> Aktiviteter</label>
                   <label class="calendar-filter-option calendar-filter-case"><input type="checkbox" data-calendar-type-filter="case" checked> Ärenden</label>
                 </fieldset>
@@ -494,6 +500,13 @@
                     <div class="tab-pane fade" id="parentAssignmentCasesPanel" role="tabpanel" aria-labelledby="parentAssignmentCasesTab" tabindex="0"><div class="table-responsive border rounded"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Ärende</th><th>Stödbehov</th><th>Mentor</th><th>Status</th><th>Nästa aktivitet</th></tr></thead><tbody id="parentAssignmentCaseTableBody"></tbody></table></div></div>
                   </div>
                 </section>
+                <section class="record-section mt-4">
+                  <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-3">
+                    <div><h3 class="record-section-title mb-1">Kontakter och möten</h3><p class="small text-secondary mb-0">Nästa planerade kontakt visas först, följd av tidigare kontakter.</p></div>
+                    <button id="parentBookMeetingButton" type="button" class="btn btn-outline-primary btn-sm">Boka möte</button>
+                  </div>
+                  <div id="parentInteractionTimeline" class="interaction-timeline"></div>
+                </section>
               </div>
             </div>
           </section>
@@ -723,7 +736,7 @@
                   <li class="nav-item"><button class="nav-link active" id="case-overview-tab" data-bs-toggle="tab" data-bs-target="#case-overview-pane" type="button">Arbete <span id="caseActivityCount" class="tab-count">0</span></button></li>
                   <li id="assignmentFollowupTabItem" class="nav-item" hidden><button class="nav-link" id="assignment-followup-tab" data-bs-toggle="tab" data-bs-target="#assignment-followup-pane" type="button">Uppföljning <span id="assignmentFollowupCount" class="tab-count">0</span></button></li>
                   <li class="nav-item"><button class="nav-link" id="case-documents-tab" data-bs-toggle="tab" data-bs-target="#case-documents-pane" type="button">Handlingar <span id="caseDocumentCount" class="tab-count">0</span></button></li>
-                  <li class="nav-item"><button class="nav-link" id="case-meetings-tab" data-bs-toggle="tab" data-bs-target="#case-meetings-pane" type="button">Möten <span id="caseMeetingCount" class="tab-count">0</span></button></li>
+                  <li class="nav-item"><button class="nav-link" id="case-meetings-tab" data-bs-toggle="tab" data-bs-target="#case-meetings-pane" type="button">Kontakter <span id="caseMeetingCount" class="tab-count">0</span></button></li>
                   <li class="nav-item"><button class="nav-link" id="case-events-tab" data-bs-toggle="tab" data-bs-target="#case-events-pane" type="button">Logg <span id="caseEventCount" class="tab-count">0</span></button></li>
                 </ul>
                 <div class="tab-content">
@@ -1097,7 +1110,7 @@
                   </section>
                   <section class="tab-pane fade card-body" id="case-meetings-pane">
                     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
-                      <div><h3 class="h6 mb-1">Möten i ärendet</h3><p class="small text-secondary mb-0">Möten registreras och rättas i det ärende där de hör hemma.</p></div>
+                      <div><h3 class="h6 mb-1">Kontakter och möten i ärendet</h3><p class="small text-secondary mb-0">Nästa bokning visas först. Tidigare samtal, mejl, besök och möten finns kvar i samma tidslinje.</p></div>
                       <button id="newCaseMeetingButton" type="button" class="btn btn-primary btn-sm">Boka eller registrera möte</button>
                     </div>
                     <form id="caseMeetingForm" class="inline-editor border rounded mb-3" hidden>
@@ -1113,8 +1126,8 @@
                       </div>
                       <div class="d-flex justify-content-end mt-3"><button id="caseMeetingSubmitButton" type="submit" class="btn btn-primary btn-sm">Spara bokning</button></div>
                     </form>
-                    <div id="caseMeetingsEmpty" class="empty-list border rounded text-secondary">Inga möten har registrerats.</div>
-                    <div id="caseMeetingsList" class="document-list"></div>
+                    <div id="caseMeetingsEmpty" class="empty-list border rounded text-secondary">Inga kontakter eller möten har registrerats.</div>
+                    <div id="caseMeetingsList" class="interaction-timeline"></div>
                   </section>
                   <section class="tab-pane fade card-body" id="case-events-pane">
                     <div class="table-responsive border rounded">
@@ -1733,6 +1746,9 @@
                   <button class="nav-link" id="mentor-learning-tab" data-bs-toggle="tab" data-bs-target="#mentor-learning-pane" type="button" role="tab" aria-controls="mentor-learning-pane" aria-selected="false">Utbildning <span id="mentorLearningTabCount" class="tab-count">0</span></button>
                 </li>
                 <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="mentor-interview-tab" data-bs-toggle="tab" data-bs-target="#mentor-interview-pane" type="button" role="tab" aria-controls="mentor-interview-pane" aria-selected="false">Kontakter <span id="mentorInteractionCount" class="tab-count">0</span></button>
+                </li>
+                <li class="nav-item" role="presentation">
                   <button class="nav-link" id="mentor-log-tab" data-bs-toggle="tab" data-bs-target="#mentor-log-pane" type="button" role="tab" aria-controls="mentor-log-pane" aria-selected="false">Mentorlogg <span id="logTabCount" class="tab-count">0</span></button>
                 </li>
               </ul>
@@ -1873,13 +1889,18 @@
                 </section>
 
                 <section class="tab-pane fade card-body" id="mentor-interview-pane" role="tabpanel" aria-labelledby="mentor-interview-tab" tabindex="0">
-                  <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
+                  <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-3">
+                    <div><h3 class="h6 mb-1">Kontakter och möten</h3><p class="small text-secondary mb-0">Nästa planerade kontakt visas först, följd av tidigare kontakter från mentorns ärenden.</p></div>
+                    <button id="mentorBookMeetingButton" type="button" class="btn btn-outline-primary btn-sm">Boka möte</button>
+                  </div>
+                  <div id="mentorInteractionTimeline" class="interaction-timeline"></div>
+                  <div class="mentor-legacy-meetings d-flex flex-wrap gap-2 justify-content-between align-items-start">
                     <div>
                         <h3 class="h6 mb-1">Mentorns möten</h3>
                         <p class="small text-secondary mb-3">Samlad historik från mentorns ärenden. Registrering och rättelser görs i det ärende som mötet tillhör.</p>
                     </div>
                   </div>
-                  <div class="row g-3 mb-3" hidden>
+                  <div class="mentor-legacy-meetings row g-3 mb-3" hidden>
                     <div class="col-md-6">
                       <label class="form-label" for="interviewDateInput">Intervjutid</label>
                       <input id="interviewDateInput" class="form-control form-control-sm" type="datetime-local">
@@ -1894,7 +1915,7 @@
                       </select>
                     </div>
                   </div>
-                  <div id="interviewCompletion" class="interview-completion form-check border rounded mt-3" hidden>
+                  <div id="interviewCompletion" class="mentor-legacy-meetings interview-completion form-check border rounded mt-3" hidden>
                     <input id="interviewDoneInput" class="form-check-input" type="checkbox">
                     <label class="form-check-label" for="interviewDoneInput">
                       <span>Intervju genomförd</span>
@@ -1902,7 +1923,7 @@
                     </label>
                   </div>
 
-                  <section class="record-section mt-4">
+                  <section class="mentor-legacy-meetings record-section mt-4">
                     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
                       <div>
                         <h3 class="h6 mb-1">Mötesanteckningar</h3>
@@ -2042,6 +2063,45 @@
             <button id="incomingContactOpenCaseButton" type="button" class="btn btn-link px-0 mt-2">Öppna mottagningsärendet</button>
           </details>
         </div>
+      </div>
+    </aside>
+
+    <aside class="offcanvas offcanvas-end interaction-panel" tabindex="-1" id="interactionOffcanvas" aria-labelledby="interactionTitle" data-bs-backdrop="false" data-bs-scroll="true">
+      <div class="offcanvas-header border-bottom">
+        <div><div class="record-type">Planering och kontakt</div><h2 id="interactionTitle" class="offcanvas-title h5 mb-0">Boka möte</h2></div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Stäng"></button>
+      </div>
+      <div class="offcanvas-body">
+        <form id="interactionForm">
+          <fieldset class="interaction-mode-switch mb-4">
+            <legend class="form-label">Vad vill du registrera?</legend>
+            <div class="btn-group w-100" role="group">
+              <input class="btn-check" type="radio" name="interactionIntent" id="interactionScheduledInput" value="scheduled" checked>
+              <label class="btn btn-outline-primary" for="interactionScheduledInput">Planerat möte</label>
+              <input class="btn-check" type="radio" name="interactionIntent" id="interactionCompletedInput" value="completed">
+              <label class="btn btn-outline-primary" for="interactionCompletedInput">Genomförd kontakt</label>
+            </div>
+          </fieldset>
+          <div class="row g-3">
+            <div class="col-12"><label class="form-label" for="interactionCaseInput">Sammanhang <span class="text-secondary fw-normal">(valfritt)</span></label><select id="interactionCaseInput" class="form-select"><option value="">Fristående kontakt</option></select><div id="interactionCaseHelp" class="form-text">Välj ett ärende när kontakten ingår i handläggningen.</div></div>
+            <div class="col-md-6"><label class="form-label" for="interactionOrganizerInput">Organisatör</label><select id="interactionOrganizerInput" class="form-select" required></select></div>
+            <div class="col-12"><label class="form-label" for="interactionTitleInput">Rubrik</label><input id="interactionTitleInput" class="form-control" required autocomplete="off" placeholder="Exempel: Första mötet"></div>
+            <div class="col-md-6"><label class="form-label" for="interactionKindInput">Kontaktform</label><select id="interactionKindInput" class="form-select" required><option value="meeting">Möte</option><option value="phone">Telefonsamtal</option><option value="email">E-post</option><option value="visit">Besök</option><option value="other">Annan kontakt</option></select></div>
+            <div class="col-md-6"><label class="form-label" for="interactionStartInput">Datum och starttid</label><input id="interactionStartInput" class="form-control" type="datetime-local" required></div>
+            <div id="interactionPlanningFields" class="col-12">
+              <div class="row g-3">
+                <div class="col-md-6"><label class="form-label" for="interactionEndInput">Sluttid</label><input id="interactionEndInput" class="form-control" type="datetime-local" required></div>
+                <div class="col-md-6"><label class="form-label" for="interactionModeInput">Mötesform</label><select id="interactionModeInput" class="form-select"><option value="physical">Fysiskt</option><option value="digital">Digitalt</option><option value="phone">Telefon</option></select></div>
+                <div class="col-12"><label class="form-label" for="interactionLocationInput">Plats eller möteslänk <span class="text-secondary fw-normal">(valfritt)</span></label><input id="interactionLocationInput" class="form-control" autocomplete="off"></div>
+              </div>
+            </div>
+            <div class="col-12"><fieldset><legend class="form-label">Deltagare</legend><p class="small text-secondary mb-2">Deltagare föreslås automatiskt när ett ärende väljs. Organisatören behöver inte delta.</p><div class="row g-2"><div class="col-md-4"><label class="form-label small" for="interactionParentInput">Förälder</label><select id="interactionParentInput" class="form-select form-select-sm"><option value="">Ingen</option></select></div><div class="col-md-4"><label class="form-label small" for="interactionMentorInput">Mentor</label><select id="interactionMentorInput" class="form-select form-select-sm"><option value="">Ingen</option></select></div><div class="col-md-4"><label class="form-label small" for="interactionHandlerInput">Deltagande administratör</label><select id="interactionHandlerInput" class="form-select form-select-sm"><option value="">Ingen</option></select></div></div><label class="form-label mt-3" for="interactionExternalInput">Övriga deltagare <span class="text-secondary fw-normal">(valfritt)</span></label><input id="interactionExternalInput" class="form-control" autocomplete="off" placeholder="Namn, separerade med kommatecken"></fieldset></div>
+            <div id="interactionResponseSection" class="col-12"><fieldset><legend class="form-label">Kallelsesvar</legend><div id="interactionResponseFields" class="interaction-attendance-list"></div><p class="form-text">Svar registreras manuellt. Själva kallelsen skickas inte från prototypen.</p></fieldset></div>
+            <div id="interactionInvitationFields" class="col-12"><label class="form-label" for="interactionInvitationInput">Text till kallelsen <span class="text-secondary fw-normal">(valfritt)</span></label><textarea id="interactionInvitationInput" class="form-control" rows="3"></textarea><div class="form-text">Kallelsen förbereds i prototypen men skickas inte automatiskt.</div></div>
+            <div id="interactionOutcomeFields" class="col-12" hidden><fieldset id="interactionMeetingOutcomeSection" class="mb-3" hidden><legend class="form-label">Mötets utfall</legend><div class="interaction-outcome-options"><label><input class="form-check-input" type="radio" name="interactionOutcomeStatus" value="completed" checked><span>Genomfört</span></label><label><input class="form-check-input" type="radio" name="interactionOutcomeStatus" value="cancelled"><span>Inställt</span></label><label><input class="form-check-input" type="radio" name="interactionOutcomeStatus" value="no_show"><span>Uteblev</span></label></div></fieldset><fieldset id="interactionAttendanceSection" class="mb-3" hidden><legend class="form-label">Faktisk närvaro</legend><div id="interactionAttendanceFields" class="interaction-attendance-list"></div><p class="form-text">Kallelsesvar och faktisk närvaro registreras var för sig.</p></fieldset><label class="form-label" for="interactionSummaryInput">Kort anteckning</label><textarea id="interactionSummaryInput" class="form-control" rows="4"></textarea><label class="form-label mt-3" for="interactionNextStepInput">Nästa steg <span class="text-secondary fw-normal">(valfritt)</span></label><textarea id="interactionNextStepInput" class="form-control" rows="2"></textarea></div>
+          </div>
+          <div class="d-flex justify-content-end gap-2 mt-4"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">Avbryt</button><button id="interactionSubmitButton" type="submit" class="btn btn-primary">Skapa bokning</button></div>
+        </form>
       </div>
     </aside>
 

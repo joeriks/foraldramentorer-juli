@@ -737,7 +737,7 @@ Ett särskilt verksamhetskommando kan ha en definierad sammansatt effekt. Exempe
 
 Återöppning är ett särskilt behörighetsstyrt kommando. Användaren anger motivering. Systemet skapar en händelse och återaktiverar inte automatiskt tidigare aktiviteter; användaren väljer vilka nya eller tidigare aktiviteter som ska gälla.
 
-## 14. Handlingar, tjänsteanteckningar och möten
+## 14. Handlingar, tjänsteanteckningar och kontakter
 
 ### När en tjänsteanteckning används
 
@@ -747,9 +747,21 @@ En uppgift som kommer in muntligt eller på annat sätt än genom en handling oc
 
 En handling används för inkommet eller upprättat underlag som behöver hållas samman med ärendet. Handlingen kopplas till ärendet och, när relevant, till aktiviteten eller mötet där den användes.
 
+### Gemensamt kontakttillfälle
+
+Planerade möten, spontana telefonsamtal, e-post och besök använder samma grundläggande kontaktpost. Där lagras tid, kontaktform, deltagare, eventuell ärende- och aktivitetskoppling, sammanfattning och nästa steg. `Inkommande kontakt` är däremot arbetsflödet för mottagning och uppföljning; samtalet eller mejlet är kontakttillfället som initierade flödet.
+
+Använd `Boka möte` för en framtida kontakt och `Registrera genomförd kontakt` när kontakten redan har skett. Ett kontakttillfälle får vara fristående när det endast gäller planering. Koppla det till ett ärende innan det används som handläggningsdokumentation eller aktivitetsunderlag.
+
 ### När ett möte används
 
-Mötet beskriver ett faktiskt intervjutillfälle, en uppföljning eller annan avstämning. Flera möten registreras som separata poster. Ett möte kan ha en kort sammanfattning och valfria handlingar.
+Mötet beskriver ett planerat eller genomfört intervjutillfälle, en uppföljning eller annan avstämning. När ett ärende väljs föreslår systemet förälder, mentor och ansvarig handläggare som deltagare. Förslaget kan justeras och handläggaren kan vara administrativt ansvarig utan att delta.
+
+Vid bokning registreras start- och sluttid, mötesform, plats eller möteslänk, deltagare och valfri kallelsetext. Prototypen förbereder kallelsen men skickar den inte. Efter mötestiden väljs utfallet `Genomfört`, `Inställt` eller `Uteblev`. Faktisk närvaro registreras bara för ett genomfört möte och hålls skild från kallelsesvaren. En saklig anteckning och nästa steg gör det tydligt vad som ska hända vidare.
+
+Ett inställt eller uteblivet möte ligger kvar i historiken. `Boka ny tid` skapar en ny bokning med en hänvisning till den tidigare posten. Ärende-, förälder- och mentorvyerna visar samma kontaktlista med nästa framtida bokning först och därefter övriga kontakter i omvänd kronologisk ordning.
+
+Aktiviteten `Boka första mötet` kan avslutas när en bokning med tid och deltagare finns. Aktiviteten `Genomför intervju` kräver däremot passerad mötestid och en saklig sammanfattning. Flera möten registreras som separata poster och tidigare versioner skrivs inte över.
 
 <div data-routine-illustration="documents-and-meetings"></div>
 

@@ -167,7 +167,7 @@ Under `Föräldrar` finns en direkt genväg till alla ärenden av typen `Stödä
 
 Mentorregistret skiljer på verksamhetsstatus och registerstatus. Det kan filtreras på aktiva eller inaktiva mentorer. En inaktiv mentor är tydligt märkt i listan och kan återaktiveras med ett direkt kommando på mentorkortet; historiken bevaras hela tiden.
 
-Kalendern ger en stor samlad månadsvy över bokade och genomförda möten samt förfallodatum för öppna aktiviteter och ärenden. Den återanvänder datum från respektive källpost och används för överblick och navigering, inte för separat dubbelregistrering. På mobil visas innehållet som en agenda grupperad per dag.
+Kalendern ger en stor samlad månadsvy över bokade och genomförda möten, genomförda kontakter samt förfallodatum för öppna aktiviteter och ärenden. Från kalendern kan handläggaren boka ett möte eller registrera en redan genomförd kontakt. Den återanvänder datum från respektive källpost och används för överblick och navigering, inte för separat dubbelregistrering. På mobil visas innehållet som en agenda grupperad per dag.
 
 Ärenderegistret samlar rubrik, typ och registreringsdatum i kolumnen `Ärende`, personkopplingen i `Person`, status och nästa aktivitet i `Läge` samt handläggare i `Ansvarig`. Tabeller får skrolla inom sin egen yta på små skärmar men ska aldrig göra hela sidan bredare.
 
@@ -201,6 +201,10 @@ Handlingar kan gälla hela ärendet eller kopplas till en viss aktivitet. Koppli
 ### Kontaktmottagning
 
 `Registrera kontakt` är en tydlig underåtgärd i navigationen och finns även på Översikt och i vyn `Kontaktmottagning`. En inkommande kontakt registreras som ett mottagningsärende med kontaktväg, kontaktuppgift, kort saklig anteckning och en fri beskrivning av nästa steg. Den som kontaktar kommunen behöver inte vara en förälder och någon personpost behöver inte skapas under samtalet. Ett stödärende eller annan fortsatt handläggning kan kopplas senare när behovet är tydligt.
+
+Själva samtalet, mejlet, besöket eller mötet lagras samtidigt som ett gemensamt kontakttillfälle. Ett planerat möte kan vara fristående eller kopplas till ett ärende. När ett ärende väljs föreslås kända parter och ansvarig handläggare, men organisatör och deltagare kan justeras var för sig. Kallelsesvar registreras separat från faktisk närvaro. Ett ärendekopplat kontakttillfälle visas i kalendern och ärendets historik utan att behöva registreras på nytt.
+
+Mötesutfall anges som genomfört, inställt eller uteblivet. En ombokning blir en ny bokning så att den ursprungliga händelsen finns kvar. Samma kronologiska kontaktlista visas på ärendet samt på berörd förälder och mentor, med nästa planerade kontakt överst.
 
 ### Stödärende och matchning
 

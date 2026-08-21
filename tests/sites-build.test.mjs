@@ -118,6 +118,9 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.equal(script.headers.get("cache-control"), "no-cache");
   const scriptText = await script.text();
   assert.match(scriptText, /CASE_ACTIVITIES_STORE/);
+  const interactionDomain = await worker.fetch(new Request("https://example.test/interaction-domain.js"), {}, context);
+  assert.equal(interactionDomain.status, 200);
+  assert.match(await interactionDomain.text(), /meetingSatisfiesRequirement/);
   assert.match(scriptText, /#\/case-types\/\$\{encodeURIComponent\(definition\.id\)\}/);
   assert.match(scriptText, /function activityTemplateAdminRoute/);
   assert.match(scriptText, /renderRoutineFlowDiagrams/);

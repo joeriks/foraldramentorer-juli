@@ -9,6 +9,7 @@ const sourceFiles = [
   ["/index.html", "index.html", "text/html; charset=utf-8"],
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
   ["/calendar-domain.js", "calendar-domain.js", "text/javascript; charset=utf-8"],
+  ["/interaction-domain.js", "interaction-domain.js", "text/javascript; charset=utf-8"],
   ["/support-area-domain.js", "support-area-domain.js", "text/javascript; charset=utf-8"],
   ["/matching-profile-domain.js", "matching-profile-domain.js", "text/javascript; charset=utf-8"],
   ["/matching-catalog-domain.js", "matching-catalog-domain.js", "text/javascript; charset=utf-8"],

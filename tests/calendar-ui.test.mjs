@@ -22,11 +22,12 @@ test("exposes calendar navigation, filters and the responsive agenda", () => {
   assert.match(html, /id="navCalendar"[^>]*href="#\/calendar"/);
   assert.match(html, /id="calendarView"/);
   assert.match(html, /data-calendar-type-filter="meeting"/);
+  assert.match(html, /data-calendar-type-filter="contact"/);
   assert.match(html, /data-calendar-type-filter="activity"/);
   assert.match(html, /data-calendar-type-filter="case"/);
   assert.match(html, /id="calendarOwnerFilter"/);
   assert.match(app, /calendar: renderCalendar/);
-  assert.match(app, /caseMeetings\.filter/);
+  assert.match(app, /function allInteractions\(\)/);
   assert.match(app, /caseActivities\.filter/);
   assert.match(app, /cases\.filter/);
   assert.match(styles, /\.calendar-grid \{/);
@@ -39,4 +40,23 @@ test("calendar entries open the existing source records", () => {
   assert.match(app, /#\/case\/\$\{caseRecord\.id\}\/activities\/\$\{activity\.id\}/);
   assert.match(app, /#\/case\/\$\{caseRecord\.id\}/);
   assert.match(app, /version: "95"/);
+});
+
+test("offers a shared flow for planned meetings and completed contacts", () => {
+  assert.match(html, /id="interactionOffcanvas"/);
+  assert.match(html, /id="calendarBookMeetingButton"/);
+  assert.match(html, /id="calendarLogContactButton"/);
+  assert.match(html, /id="interactionOrganizerInput"/);
+  assert.match(html, /id="interactionResponseFields"/);
+  assert.match(html, /name="interactionOutcomeStatus" value="cancelled"/);
+  assert.match(html, /name="interactionOutcomeStatus" value="no_show"/);
+  assert.match(html, /id="interactionAttendanceFields"/);
+  assert.match(html, /id="parentInteractionTimeline"/);
+  assert.match(html, /id="mentorInteractionTimeline"/);
+  assert.match(app, /suggestedMeetingTitle/);
+  assert.match(app, /function renderInteractionTimeline/);
+  assert.match(app, /function rescheduleInteraction/);
+  assert.match(app, /organizerId: els\.interactionOrganizerInput\.value/);
+  assert.match(app, /if \(resolvedIntent === "scheduled"\) startsAt\.setMinutes/);
+  assert.match(app, /Kallelsen är förberedd men inte skickad/);
 });

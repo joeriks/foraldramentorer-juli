@@ -101,7 +101,8 @@ test("distinguishes a booked interview from a completed interview", () => {
   assert.match(html, /id="caseMeetingCompletedInput"/);
   assert.match(app, /function caseMeetingStatus\(meeting\)/);
   assert.match(app, /\{ not_started: "Inte bokad", in_progress: "Bokad", complete: "Genomförd" \}/);
-  assert.match(app, /caseMeetingStatus\(meeting\) === "completed" && meeting\.occurredAt && meeting\.summary\?\.trim\(\)/);
+  assert.match(app, /meetingSatisfiesRequirement/);
+  assert.match(app, /activity\.templateId === "matchingFirstMeeting" \? "scheduled" : "completed"/);
   assert.match(app, /activity\.status === "not_started" && workInputState && workInputState !== "not_started"\) return "Pågår"/);
   assert.match(app, /Ett genomfört möte kan inte ha en tidpunkt i framtiden/);
 });

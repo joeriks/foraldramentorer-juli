@@ -37,6 +37,16 @@ import {
   supportProfileRequirements
 } from "./case-domain.js?v=20260818-completeness-v29";
 import { calendarDate, calendarDateKey, calendarMonthDays } from "./calendar-domain.js?v=20260820-calendar-v1";
+import {
+  INTERACTION_KIND_LABELS,
+  INTERACTION_STATUS_LABELS,
+  interactionFromCaseMeeting,
+  interactionFromIncomingContact,
+  interactionParticipant,
+  meetingSatisfiesRequirement,
+  normalizeInteraction,
+  suggestedInteractionParticipants
+} from "./interaction-domain.js?v=20260821-interactions-v1";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260820-calendar-v4";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
@@ -88,7 +98,7 @@ import {
 } from "./matching-catalog-domain.js?v=20260821-structured-matching-v1";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
-const DB_VERSION = 9;
+const DB_VERSION = 10;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
 const INCOMING_CONTACTS_STORE = "incomingContacts";
@@ -103,6 +113,7 @@ const CASE_EVENTS_STORE = "caseEvents";
 const ACTIVITY_DEVIATIONS_STORE = "activityDeviations";
 const DEVIATION_DECISIONS_STORE = "deviationDecisions";
 const CASE_MEETINGS_STORE = "caseMeetings";
+const INTERACTIONS_STORE = "interactions";
 const MENTOR_REPORTS_STORE = "mentorReports";
 const PARENT_CHECK_INS_STORE = "parentCheckIns";
 const COMPENSATION_PERIODS_STORE = "compensationPeriods";
@@ -135,6 +146,23 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "104",
+    date: "2026-08-21",
+    title: "Gemensamt flöde för möten och kontakter",
+    flow: "Kalender, mötesbokning och kontaktmottagning",
+    simplified: "Planerade möten och redan genomförda kontakter registreras från två tydliga ingångar men använder samma grunddata. Deltagare föreslås automatiskt från valt ärende.",
+    retained: "Befintliga möten, mottagningsärenden, aktivitetskopplingar och historik finns kvar och läses genom en kompatibilitetsmodell.",
+    changes: [
+      "Boka möte har lagts till på Översikt och i Kalender, även för fristående möten.",
+      "Förälder, mentor och ansvarig handläggare föreslås som deltagare när ett ärende väljs.",
+      "Organisatör, deltagare, manuella kallelsesvar och faktisk närvaro hålls isär; prototypen påstår inte att en kallelse har skickats.",
+      "Genomförda telefonsamtal, e-postkontakter och besök kan registreras direkt i Kalender.",
+      "Möten kan markeras som genomförda, inställda eller uteblivna och bokas om utan att den tidigare posten försvinner.",
+      "Ärenden, föräldrar och mentorer visar samma kronologiska kontaktlista med nästa planerade kontakt först.",
+      "Boka första mötet kräver en bokning med deltagare, medan genomförd intervju fortsatt kräver mötesanteckning."
+    ]
+  },
   {
     version: "103",
     date: "2026-08-21",
@@ -1128,6 +1156,7 @@ let caseEvents = [];
 let activityDeviations = [];
 let deviationDecisions = [];
 let caseMeetings = [];
+let interactions = [];
 let mentorReports = [];
 let parentCheckIns = [];
 let compensationPeriods = [];
@@ -1171,7 +1200,7 @@ let dashboardQueueMode = "activities";
 let dashboardQueueOwnerFilter = "mine";
 let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let calendarOwnerFilter = "all";
-const calendarTypeFilters = new Set(["meeting", "activity", "case"]);
+const calendarTypeFilters = new Set(["meeting", "contact", "activity", "case"]);
 let candidateModal;
 let currentView = "dashboard";
 let renderedDetailId = null;
@@ -1264,6 +1293,8 @@ const els = {
   calendarPreviousButton: document.querySelector("#calendarPreviousButton"),
   calendarTodayButton: document.querySelector("#calendarTodayButton"),
   calendarNextButton: document.querySelector("#calendarNextButton"),
+  calendarBookMeetingButton: document.querySelector("#calendarBookMeetingButton"),
+  calendarLogContactButton: document.querySelector("#calendarLogContactButton"),
   calendarOwnerFilter: document.querySelector("#calendarOwnerFilter"),
   calendarSummary: document.querySelector("#calendarSummary"),
   calendarGrid: document.querySelector("#calendarGrid"),
@@ -1325,8 +1356,11 @@ const els = {
   parentSupportCaseTableBody: document.querySelector("#parentSupportCaseTableBody"),
   parentMatchingCaseTableBody: document.querySelector("#parentMatchingCaseTableBody"),
   parentAssignmentCaseTableBody: document.querySelector("#parentAssignmentCaseTableBody"),
+  parentBookMeetingButton: document.querySelector("#parentBookMeetingButton"),
+  parentInteractionTimeline: document.querySelector("#parentInteractionTimeline"),
   mobileIncomingContact: document.querySelector("#mobileIncomingContact"),
   dashboardIncomingContactButton: document.querySelector("#dashboardIncomingContactButton"),
+  dashboardBookMeetingButton: document.querySelector("#dashboardBookMeetingButton"),
   newIncomingContactButton: document.querySelector("#newIncomingContactButton"),
   parentIncomingContactButton: document.querySelector("#parentIncomingContactButton"),
   incomingContactTableBody: document.querySelector("#incomingContactTableBody"),
@@ -1348,6 +1382,36 @@ const els = {
   incomingContactCreateCaseButton: document.querySelector("#incomingContactCreateCaseButton"),
   incomingContactCloseButton: document.querySelector("#incomingContactCloseButton"),
   incomingContactOpenCaseButton: document.querySelector("#incomingContactOpenCaseButton"),
+  interactionOffcanvas: document.querySelector("#interactionOffcanvas"),
+  interactionTitle: document.querySelector("#interactionTitle"),
+  interactionForm: document.querySelector("#interactionForm"),
+  interactionScheduledInput: document.querySelector("#interactionScheduledInput"),
+  interactionCompletedInput: document.querySelector("#interactionCompletedInput"),
+  interactionCaseInput: document.querySelector("#interactionCaseInput"),
+  interactionCaseHelp: document.querySelector("#interactionCaseHelp"),
+  interactionOrganizerInput: document.querySelector("#interactionOrganizerInput"),
+  interactionTitleInput: document.querySelector("#interactionTitleInput"),
+  interactionKindInput: document.querySelector("#interactionKindInput"),
+  interactionStartInput: document.querySelector("#interactionStartInput"),
+  interactionEndInput: document.querySelector("#interactionEndInput"),
+  interactionModeInput: document.querySelector("#interactionModeInput"),
+  interactionLocationInput: document.querySelector("#interactionLocationInput"),
+  interactionPlanningFields: document.querySelector("#interactionPlanningFields"),
+  interactionParentInput: document.querySelector("#interactionParentInput"),
+  interactionMentorInput: document.querySelector("#interactionMentorInput"),
+  interactionHandlerInput: document.querySelector("#interactionHandlerInput"),
+  interactionExternalInput: document.querySelector("#interactionExternalInput"),
+  interactionInvitationFields: document.querySelector("#interactionInvitationFields"),
+  interactionInvitationInput: document.querySelector("#interactionInvitationInput"),
+  interactionResponseSection: document.querySelector("#interactionResponseSection"),
+  interactionResponseFields: document.querySelector("#interactionResponseFields"),
+  interactionOutcomeFields: document.querySelector("#interactionOutcomeFields"),
+  interactionMeetingOutcomeSection: document.querySelector("#interactionMeetingOutcomeSection"),
+  interactionAttendanceSection: document.querySelector("#interactionAttendanceSection"),
+  interactionAttendanceFields: document.querySelector("#interactionAttendanceFields"),
+  interactionSummaryInput: document.querySelector("#interactionSummaryInput"),
+  interactionNextStepInput: document.querySelector("#interactionNextStepInput"),
+  interactionSubmitButton: document.querySelector("#interactionSubmitButton"),
   administrationView: document.querySelector("#administrationView"),
   caseNumberingAdministrationView: document.querySelector("#caseNumberingAdministrationView"),
   caseNumberingForm: document.querySelector("#caseNumberingForm"),
@@ -1876,6 +1940,9 @@ const els = {
   mentorCasesTabCount: document.querySelector("#mentorCasesTabCount"),
   mentorLearningTabCount: document.querySelector("#mentorLearningTabCount"),
   mentorLearningList: document.querySelector("#mentorLearningList"),
+  mentorInteractionCount: document.querySelector("#mentorInteractionCount"),
+  mentorInteractionTimeline: document.querySelector("#mentorInteractionTimeline"),
+  mentorBookMeetingButton: document.querySelector("#mentorBookMeetingButton"),
   mentorCaseTableBody: document.querySelector("#mentorCaseTableBody"),
   newMentorCaseButton: document.querySelector("#newMentorCaseButton"),
   meetingsTabCount: document.querySelector("#meetingsTabCount"),
@@ -2120,6 +2187,10 @@ function openDatabase() {
       const caseMeetingStore = ensureStore(CASE_MEETINGS_STORE);
       ensureIndex(caseMeetingStore, "tenantCase", ["tenantId", "caseId"]);
       ensureIndex(caseMeetingStore, "tenantOccurredAt", ["tenantId", "occurredAt"]);
+      const interactionStore = ensureStore(INTERACTIONS_STORE);
+      ensureIndex(interactionStore, "tenantStartsAt", ["tenantId", "startsAt"]);
+      ensureIndex(interactionStore, "tenantCase", ["tenantId", "caseId"]);
+      ensureIndex(interactionStore, "tenantKind", ["tenantId", "kind"]);
       const mentorReportStore = ensureStore(MENTOR_REPORTS_STORE);
       ensureIndex(mentorReportStore, "tenantCase", ["tenantId", "caseId"]);
       ensureIndex(mentorReportStore, "tenantOccurredOn", ["tenantId", "occurredOn"]);
@@ -2241,6 +2312,10 @@ function caseMeetingTx(mode = "readonly") {
   return db.transaction(CASE_MEETINGS_STORE, mode).objectStore(CASE_MEETINGS_STORE);
 }
 
+function interactionTx(mode = "readonly") {
+  return db.transaction(INTERACTIONS_STORE, mode).objectStore(INTERACTIONS_STORE);
+}
+
 function mentorReportTx(mode = "readonly") {
   return db.transaction(MENTOR_REPORTS_STORE, mode).objectStore(MENTOR_REPORTS_STORE);
 }
@@ -2347,6 +2422,8 @@ const clearCaseEvents = () => clearStore(caseEventTx);
 const getAllActivityDeviations = () => getAllFrom(activityDeviationTx);
 const getAllDeviationDecisions = () => getAllFrom(deviationDecisionTx);
 const getAllCaseMeetings = () => getAllFrom(caseMeetingTx);
+const getAllInteractions = () => getAllFrom(interactionTx);
+const saveInteraction = (value) => putInto(interactionTx, value);
 const getAllMentorReports = () => getAllFrom(mentorReportTx);
 const clearMentorReports = () => clearStore(mentorReportTx);
 const getAllParentCheckIns = () => getAllFrom(parentCheckInTx);
@@ -2904,7 +2981,7 @@ async function updateTenantLearningSelection(contentId, selected) {
 
 const CASE_DATA_STORES = [
   CASES_STORE, CASE_ASSIGNMENTS_STORE, CASE_ACTIVITIES_STORE, CASE_DOCUMENTS_STORE, CASE_EVENTS_STORE,
-  ACTIVITY_DEVIATIONS_STORE, DEVIATION_DECISIONS_STORE, CASE_MEETINGS_STORE, MENTOR_REPORTS_STORE,
+  ACTIVITY_DEVIATIONS_STORE, DEVIATION_DECISIONS_STORE, CASE_MEETINGS_STORE, INTERACTIONS_STORE, MENTOR_REPORTS_STORE,
   PARENT_CHECK_INS_STORE, COMPENSATION_PERIODS_STORE, CASE_DOCUMENT_BLOBS_STORE, PROCESSED_COMMANDS_STORE
 ];
 
@@ -3738,7 +3815,7 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
 }
 
 async function loadCaseData() {
-  [cases, caseAssignments, caseActivities, caseDocuments, caseEvents, activityDeviations, deviationDecisions, caseMeetings, mentorReports, parentCheckIns, compensationPeriods] = await Promise.all([
+  [cases, caseAssignments, caseActivities, caseDocuments, caseEvents, activityDeviations, deviationDecisions, caseMeetings, interactions, mentorReports, parentCheckIns, compensationPeriods] = await Promise.all([
     getAllCases(),
     getAllCaseAssignments(),
     getAllCaseActivities(),
@@ -3747,6 +3824,7 @@ async function loadCaseData() {
     getAllActivityDeviations(),
     getAllDeviationDecisions(),
     getAllCaseMeetings(),
+    getAllInteractions(),
     getAllMentorReports(),
     getAllParentCheckIns(),
     getAllCompensationPeriods()
@@ -5174,33 +5252,109 @@ function renderCaseNumberingAdministration() {
 
 const CALENDAR_TYPE_LABELS = {
   meeting: "Möte",
+  contact: "Kontakt",
   activity: "Aktivitet",
   case: "Ärende"
 };
 
+function participantsForCase(caseRecord) {
+  return suggestedInteractionParticipants({
+    parent: caseParent(caseRecord),
+    mentor: caseMentor(caseRecord),
+    handler: responsibleHandler(caseRecord)
+  });
+}
+
+function allInteractions() {
+  const stored = interactions.map(normalizeInteraction);
+  const sourceKeys = new Set(stored.map((interaction) => `${interaction.sourceType}:${interaction.sourceId}`));
+  const meetingProjections = caseMeetings
+    .filter((meeting) => !meeting.supersededByMeetingId && !sourceKeys.has(`case_meeting:${meeting.id}`))
+    .map((meeting) => interactionFromCaseMeeting({ ...meeting, meetingStatus: caseMeetingStatus(meeting) }, participantsForCase(cases.find((caseRecord) => caseRecord.id === meeting.caseId))));
+  const contactProjections = incomingContacts
+    .filter((contact) => !sourceKeys.has(`incoming_contact:${contact.id}`))
+    .map(interactionFromIncomingContact);
+  return [...stored, ...meetingProjections, ...contactProjections]
+    .sort((left, right) => new Date(right.startsAt || 0) - new Date(left.startsAt || 0));
+}
+
+function interactionsForParty(partyType, partyId) {
+  if (!partyId) return [];
+  const linkedCaseIds = new Set(cases
+    .filter((caseRecord) => partyType === "parent" ? caseRecord.parentId === partyId : caseRecord.mentorId === partyId)
+    .map((caseRecord) => caseRecord.id));
+  return allInteractions().filter((interaction) => linkedCaseIds.has(interaction.caseId)
+    || interaction.participants.some((participant) => participant.partyType === partyType && participant.partyId === partyId));
+}
+
+function interactionStatusBadge(status) {
+  return status === "completed"
+    ? "text-bg-success"
+    : status === "scheduled"
+      ? "text-bg-warning"
+      : status === "no_show"
+        ? "text-bg-danger"
+        : "text-bg-secondary";
+}
+
+function interactionTimelineItemMarkup(interaction, { next = false } = {}) {
+  const caseRecord = cases.find((item) => item.id === interaction.caseId);
+  const participants = interaction.participants.map((participant) => participant.displayName).filter(Boolean).join(", ");
+  const kind = INTERACTION_KIND_LABELS[interaction.kind] || "Kontakt";
+  const status = INTERACTION_STATUS_LABELS[interaction.status] || interaction.status;
+  const rescheduleButton = ["cancelled", "no_show"].includes(interaction.status)
+    ? `<button type="button" class="btn btn-outline-primary btn-sm" data-reschedule-interaction="${escapeHtml(interaction.id)}">Boka ny tid</button>`
+    : "";
+  return `<article class="interaction-timeline-item ${next ? "is-next" : ""}">
+    <div class="interaction-timeline-date"><time datetime="${escapeHtml(interaction.startsAt || "")}">${escapeHtml(formatDateTime(interaction.startsAt))}</time><span>${escapeHtml(kind)}</span></div>
+    <div class="interaction-timeline-content">
+      <div class="d-flex flex-wrap gap-2 align-items-center"><strong>${escapeHtml(interaction.title || kind)}</strong><span class="badge ${interactionStatusBadge(interaction.status)}">${escapeHtml(status)}</span>${next ? '<span class="interaction-next-label">Nästa planerade</span>' : ""}</div>
+      ${caseRecord ? `<a class="small" href="#/case/${escapeHtml(caseRecord.id)}">${escapeHtml(caseRecord.number)} · ${escapeHtml(caseRecord.type)}</a>` : '<small class="text-secondary">Fristående kontakt</small>'}
+      ${participants ? `<small>Deltagare: ${escapeHtml(participants)}</small>` : ""}
+      ${interaction.summary ? `<p>${escapeHtml(interaction.summary)}</p>` : ""}
+      ${interaction.nextStep ? `<small class="interaction-next-step"><strong>Nästa steg:</strong> ${escapeHtml(interaction.nextStep)}</small>` : ""}
+      ${interaction.rescheduledFromInteractionId ? '<small class="text-secondary">Ny bokning efter ett tidigare inställt eller uteblivet möte.</small>' : ""}
+    </div>
+    <div class="interaction-timeline-actions"><button type="button" class="btn btn-outline-secondary btn-sm" data-open-interaction="${escapeHtml(interaction.id)}">Öppna</button>${rescheduleButton}</div>
+  </article>`;
+}
+
+function renderInteractionTimeline(host, records, emptyText = "Inga kontakter eller möten har registrerats.") {
+  if (!host) return;
+  const now = Date.now();
+  const currentRecords = records.filter((interaction) => interaction.startsAt);
+  const nextInteraction = [...currentRecords]
+    .filter((interaction) => interaction.status === "scheduled" && new Date(interaction.startsAt).getTime() >= now)
+    .sort((left, right) => new Date(left.startsAt) - new Date(right.startsAt))[0] || null;
+  const remaining = currentRecords
+    .filter((interaction) => interaction.id !== nextInteraction?.id)
+    .sort((left, right) => new Date(right.startsAt) - new Date(left.startsAt));
+  host.innerHTML = currentRecords.length
+    ? `${nextInteraction ? interactionTimelineItemMarkup(nextInteraction, { next: true }) : ""}${remaining.map((interaction) => interactionTimelineItemMarkup(interaction)).join("")}`
+    : `<div class="empty-list border rounded text-secondary">${escapeHtml(emptyText)}</div>`;
+}
+
 function calendarEntries() {
   const caseById = new Map(cases.map((caseRecord) => [caseRecord.id, caseRecord]));
   const entries = [];
-  const meetingTypeLabels = {
-    certification_interview: "Intervju inför godkännande",
-    follow_up: "Uppföljning",
-    other: "Möte"
-  };
-
-  for (const meeting of caseMeetings.filter((item) => !item.supersededByMeetingId && item.occurredAt)) {
-    const caseRecord = caseById.get(meeting.caseId);
-    if (!caseRecord) continue;
-    const ownerIds = new Set([...(meeting.participantHandlerIds || []), meeting.createdBy, responsibleHandler(caseRecord)?.id].filter(Boolean));
+  for (const interaction of allInteractions().filter((item) => item.startsAt)) {
+    const type = interaction.kind === "meeting" ? "meeting" : "contact";
+    const caseRecord = caseById.get(interaction.caseId);
+    const participantHandlerIds = interaction.participants
+      .filter((participant) => participant.partyType === "handler")
+      .map((participant) => participant.partyId);
+    const ownerIds = new Set([...participantHandlerIds, interaction.organizerId, responsibleHandler(caseRecord)?.id].filter(Boolean));
     entries.push({
-      id: `meeting-${meeting.id}`,
-      type: "meeting",
-      dateKey: calendarDateKey(meeting.occurredAt),
-      time: new Intl.DateTimeFormat("sv-SE", { hour: "2-digit", minute: "2-digit" }).format(calendarDate(meeting.occurredAt)),
-      title: meetingTypeLabels[meeting.meetingType] || "Möte",
-      meta: `${caseRecord.number} · ${caseMeetingStatusLabel(meeting)}`,
-      href: `#/case/${caseRecord.id}/meetings`,
+      id: `interaction-${interaction.id}`,
+      interactionId: interaction.id,
+      type,
+      dateKey: calendarDateKey(interaction.startsAt),
+      time: new Intl.DateTimeFormat("sv-SE", { hour: "2-digit", minute: "2-digit" }).format(calendarDate(interaction.startsAt)),
+      title: interaction.title || INTERACTION_KIND_LABELS[interaction.kind] || "Kontakt",
+      meta: `${caseRecord ? `${caseRecord.number} · ` : ""}${INTERACTION_STATUS_LABELS[interaction.status] || interaction.status}`,
+      href: caseRecord ? `#/case/${caseRecord.id}/meetings` : "#/calendar",
       ownerIds: [...ownerIds],
-      completed: caseMeetingStatus(meeting) === "completed",
+      completed: interaction.status === "completed",
       overdue: false
     });
   }
@@ -5254,7 +5408,7 @@ function calendarEntryMarkup(entry) {
   if (entry.completed) classes.push("is-completed");
   if (entry.overdue) classes.push("is-overdue");
   const accessibleLabel = `${CALENDAR_TYPE_LABELS[entry.type]}: ${entry.title}. ${entry.meta}`;
-  return `<a class="${classes.join(" ")}" href="${escapeHtml(entry.href)}" aria-label="${escapeHtml(accessibleLabel)}" title="${escapeHtml(accessibleLabel)}">
+  return `<a class="${classes.join(" ")}" href="${escapeHtml(entry.href)}" ${entry.interactionId ? `data-calendar-interaction="${escapeHtml(entry.interactionId)}"` : ""} aria-label="${escapeHtml(accessibleLabel)}" title="${escapeHtml(accessibleLabel)}">
     ${entry.time ? `<time>${escapeHtml(entry.time)}</time>` : ""}
     <span class="calendar-entry-title">${escapeHtml(entry.title)}</span>
     <small>${escapeHtml(entry.meta)}</small>
@@ -7097,6 +7251,7 @@ function renderParentDetail() {
     row.innerHTML = `<td><a class="case-number-link" href="#/case/${escapeHtml(assignmentCase.id)}">${escapeHtml(assignmentCase.number)}</a></td><td>${escapeHtml(supportCase?.details?.supportPurpose || supportCase?.title || "Ej kopplat")}</td><td>${escapeHtml(mentor?.name || "Mentor ej vald")}</td><td><span class="${caseStatusBadge(assignmentCase.status)}">${escapeHtml(caseStatusLabel(assignmentCase.status))}</span></td><td>${escapeHtml(nextActivity?.title || "Ingen återstående")}</td>`;
     els.parentAssignmentCaseTableBody.append(row);
   }
+  renderInteractionTimeline(els.parentInteractionTimeline, interactionsForParty("parent", parent.id), "Inga kontakter eller möten är registrerade för föräldern.");
 }
 
 function caseMentor(caseRecord) {
@@ -7141,13 +7296,13 @@ const WORK_INPUT_STATE_LABELS = {
 };
 
 function caseMeetingStatus(meeting) {
-  if (["scheduled", "completed"].includes(meeting?.meetingStatus)) return meeting.meetingStatus;
+  if (["scheduled", "completed", "cancelled", "no_show"].includes(meeting?.meetingStatus)) return meeting.meetingStatus;
   const occurredAt = new Date(meeting?.occurredAt || 0);
   return meeting?.occurredAt && occurredAt.getTime() <= Date.now() && meeting?.summary?.trim() ? "completed" : "scheduled";
 }
 
 function caseMeetingStatusLabel(meeting) {
-  return caseMeetingStatus(meeting) === "completed" ? "Genomfört" : "Bokat";
+  return INTERACTION_STATUS_LABELS[caseMeetingStatus(meeting)] || "Bokat";
 }
 
 function workInputStateClass(state) {
@@ -7187,9 +7342,11 @@ function activityWorkInputSummary(activity, caseRecord) {
       && (meeting.activityId === activity.id || activity.templateId === "interviewDone" && meeting.meetingType === "certification_interview"));
     const latest = latestRecord(records);
     started = records.length > 0;
-    complete = activity.templateId === "interviewDone"
-      ? records.some((meeting) => caseMeetingStatus(meeting) === "completed" && meeting.occurredAt && meeting.summary?.trim())
-      : records.some((meeting) => Boolean(meeting.occurredAt && meeting.summary?.trim()));
+    const meetingRequirement = activity.templateId === "matchingFirstMeeting" ? "scheduled" : "completed";
+    complete = records.some((meeting) => meetingSatisfiesRequirement(
+      interactionFromCaseMeeting({ ...meeting, meetingStatus: caseMeetingStatus(meeting) }, participantsForCase(caseRecord)),
+      meetingRequirement
+    ));
     updatedAt = latest?.updatedAt || latest?.createdAt;
     updatedBy = latest?.updatedBy || latest?.createdBy;
     help = activity.templateId === "matchingFirstMeeting"
@@ -8362,7 +8519,7 @@ function renderCaseDetail() {
   const caseCoHandlers = coHandlers(caseRecord);
   const activities = activitiesForCase(caseRecord.id);
   const documents = currentCaseDocuments().filter((document) => document.caseId === caseRecord.id);
-  const meetingsForCase = caseMeetings.filter((meeting) => meeting.caseId === caseRecord.id);
+  const interactionsForCase = allInteractions().filter((interaction) => interaction.caseId === caseRecord.id);
   const events = caseEvents.filter((item) => item.caseId === caseRecord.id);
   if (selectedCaseActivityId && !activities.some((activity) => activity.id === selectedCaseActivityId)) {
     selectedCaseActivityId = null;
@@ -8409,12 +8566,12 @@ function renderCaseDetail() {
   renderAssignmentFollowup(caseRecord);
   els.caseActivityCount.textContent = activities.length;
   els.caseDocumentCount.textContent = documents.length;
-  els.caseMeetingCount.textContent = meetingsForCase.filter((meeting) => !meeting.supersededByMeetingId).length;
+  els.caseMeetingCount.textContent = interactionsForCase.length;
   els.caseEventCount.textContent = events.length;
 
   renderCaseActivities(caseRecord, activities);
   renderCaseDocuments(documents);
-  renderCaseMeetings(caseRecord, meetingsForCase);
+  renderCaseMeetings(caseRecord, interactionsForCase);
   renderCaseEvents(events);
   renderActivityDetail(caseRecord);
   if (selectedCaseActivityId) {
@@ -8925,10 +9082,9 @@ function renderCaseDocuments(caseDocumentRows) {
   }
 }
 
-function renderCaseMeetings(caseRecord, meetingRows) {
-  meetingRows = meetingRows.filter((meeting) => !meeting.supersededByMeetingId);
-  els.caseMeetingsEmpty.hidden = meetingRows.length > 0;
-  els.caseMeetingsList.innerHTML = "";
+function renderCaseMeetings(caseRecord, interactionRows) {
+  els.caseMeetingsEmpty.hidden = interactionRows.length > 0;
+  els.caseMeetingsList.hidden = interactionRows.length === 0;
   els.caseMeetingActivityInput.innerHTML = '<option value="">Ingen</option>';
   for (const activity of activitiesForCase(caseRecord.id)) {
     const option = document.createElement("option");
@@ -8937,17 +9093,7 @@ function renderCaseMeetings(caseRecord, meetingRows) {
     els.caseMeetingActivityInput.append(option);
   }
   if (!els.caseMeetingDateInput.value) els.caseMeetingDateInput.value = localDateTimeValue();
-  for (const meeting of [...meetingRows].sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt))) {
-    const activity = caseActivities.find((item) => item.id === meeting.activityId);
-    const article = document.createElement("article");
-    article.className = "document-row border rounded";
-    article.innerHTML = `
-      <div><div class="d-flex flex-wrap align-items-center gap-2"><strong>${escapeHtml(({ certification_interview: "Intervju inför godkännande", follow_up: "Uppföljning", other: "Annat möte" })[meeting.meetingType])}</strong><span class="badge ${caseMeetingStatus(meeting) === "completed" ? "text-bg-success" : "text-bg-warning"}">${escapeHtml(caseMeetingStatusLabel(meeting))}</span></div><small>${escapeHtml(formatDateTime(meeting.occurredAt))} · ${escapeHtml(({ physical: "Fysiskt", digital: "Digitalt", phone: "Telefon" })[meeting.mode] || "Ej angivet")}</small>${activity ? `<button type="button" class="document-activity-link" data-open-activity="${escapeHtml(activity.id)}">Kopplad till: ${escapeHtml(activity.title)}</button>` : ""}</div>
-      <div class="text-secondary small">${escapeHtml(meeting.summary || (caseMeetingStatus(meeting) === "scheduled" ? "Ingen sammanfattning ännu." : "Ingen sammanfattning registrerad."))}${meeting.nextStep ? `<span class="d-block mt-1">Nästa steg: ${escapeHtml(meeting.nextStep)}</span>` : ""}</div>
-      <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center"><span class="text-secondary small">Registrerat av ${escapeHtml(handlerNameById(meeting.createdBy))}${meeting.supersedesMeetingId ? " · Rättad version" : ""}</span><button type="button" class="btn btn-outline-secondary btn-sm" data-edit-case-meeting="${escapeHtml(meeting.id)}">Öppna</button></div>
-    `;
-    els.caseMeetingsList.append(article);
-  }
+  renderInteractionTimeline(els.caseMeetingsList, interactionRows);
 }
 
 function closeCaseMeetingForm() {
@@ -9784,6 +9930,9 @@ function renderDetail() {
   els.logTabCount.textContent = candidate.history.length;
   renderMentorCases(candidate);
   renderMentorLearning(candidate);
+  const mentorInteractions = interactionsForParty("mentor", candidate.id);
+  els.mentorInteractionCount.textContent = mentorInteractions.length;
+  renderInteractionTimeline(els.mentorInteractionTimeline, mentorInteractions, "Inga kontakter eller möten är registrerade för mentorn.");
   setPersonEditMode(false);
 
   els.statusSelect.innerHTML = "";
@@ -10597,7 +10746,11 @@ async function registerDocumentCommand({ caseRecord, activityId, type, title, do
   });
 }
 
-function registerCaseMeetingCommand({ caseRecord, existing = null, meetingType, meetingStatus = "scheduled", occurredAt, mode, activityId, summary, nextStep = "" }) {
+function registerCaseMeetingCommand({
+  caseRecord, existing = null, meetingType, meetingStatus = "scheduled", occurredAt, endsAt = null,
+  mode, activityId, title = "", location = "", invitationText = "", participants = null,
+  organizerId = CURRENT_USER_ID, summary, nextStep = "", rescheduledFromInteractionId = null
+}) {
   if (meetingStatus === "completed" && new Date(occurredAt).getTime() > Date.now()) {
     return Promise.reject(Object.assign(new Error("Ett genomfört möte kan inte ha en tidpunkt i framtiden."), { code: "MEETING_DATE_IN_FUTURE" }));
   }
@@ -10606,12 +10759,14 @@ function registerCaseMeetingCommand({ caseRecord, existing = null, meetingType, 
   }
   const now = new Date().toISOString();
   const meetingId = crypto.randomUUID();
+  const interactionId = existing?.interactionId || meetingId;
+  const resolvedParticipants = participants?.length ? participants : participantsForCase(caseRecord);
   return executeCaseCommand({
     commandType: existing ? "revise_meeting" : "register_meeting",
     caseId: caseRecord.id,
     expectedVersion: caseRecord.version,
-    payload: { existingId: existing?.id || null, meetingType, meetingStatus, occurredAt, mode, activityId, summary, nextStep },
-    additionalStores: [CASE_MEETINGS_STORE],
+    payload: { existingId: existing?.id || null, meetingType, meetingStatus, occurredAt, endsAt, mode, activityId, summary, nextStep, rescheduledFromInteractionId },
+    additionalStores: [CASE_MEETINGS_STORE, INTERACTIONS_STORE],
     mutate: ({ currentCase, put, event }) => {
       if (existing) put(CASE_MEETINGS_STORE, { ...existing, supersededByMeetingId: meetingId, updatedAt: now, updatedBy: CURRENT_USER_ID });
       put(CASE_MEETINGS_STORE, {
@@ -10622,11 +10777,20 @@ function registerCaseMeetingCommand({ caseRecord, existing = null, meetingType, 
         meetingType,
         meetingStatus,
         occurredAt,
+        startsAt: occurredAt,
+        endsAt,
         mode,
+        title: title || ({ certification_interview: "Intervju inför godkännande", follow_up: "Uppföljning", other: "Möte" })[meetingType] || "Möte",
+        location,
+        invitationText,
         summary,
         nextStep,
-        participantHandlerIds: [CURRENT_USER_ID],
-        externalParticipantNames: [],
+        rescheduledFromInteractionId,
+        organizerId,
+        participants: resolvedParticipants,
+        participantHandlerIds: resolvedParticipants.filter((participant) => participant.partyType === "handler").map((participant) => participant.partyId),
+        externalParticipantNames: resolvedParticipants.filter((participant) => participant.partyType === "external").map((participant) => participant.displayName),
+        interactionId,
         supersedesMeetingId: existing?.id || null,
         supersededByMeetingId: null,
         version: Number(existing?.version || 0) + 1,
@@ -10635,10 +10799,37 @@ function registerCaseMeetingCommand({ caseRecord, existing = null, meetingType, 
         updatedAt: now,
         updatedBy: CURRENT_USER_ID
       });
+      put(INTERACTIONS_STORE, normalizeInteraction({
+        id: interactionId,
+        tenantId: DEFAULT_TENANT_ID,
+        kind: "meeting",
+        status: meetingStatus,
+        direction: "not_applicable",
+        startsAt: occurredAt,
+        endsAt,
+        caseId: currentCase.id,
+        activityId: activityId || null,
+        organizerId,
+        participants: resolvedParticipants,
+        title: title || ({ certification_interview: "Intervju inför godkännande", follow_up: "Uppföljning", other: "Möte" })[meetingType] || "Möte",
+        mode,
+        location,
+        invitationText,
+        summary,
+        nextStep,
+        rescheduledFromInteractionId,
+        sourceType: "case_meeting",
+        sourceId: meetingId,
+        version: Number(existing?.version || 0) + 1,
+        createdAt: existing?.createdAt || now,
+        createdBy: existing?.createdBy || CURRENT_USER_ID,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_ID
+      }));
       const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
       put(CASES_STORE, updatedCase);
       event(existing ? "meeting_revised" : "meeting_registered", "meeting", meetingId,
-        `${existing ? "Mötesregistreringen rättades" : meetingStatus === "completed" ? "Mötet registrerades som genomfört" : "Mötet bokades"}${summary ? `: ${summary}` : ""}`);
+        `${existing ? "Mötesregistreringen uppdaterades" : meetingStatus === "scheduled" ? "Mötet bokades" : `Mötet registrerades som ${String(INTERACTION_STATUS_LABELS[meetingStatus] || meetingStatus).toLocaleLowerCase("sv-SE")}`}${summary ? `: ${summary}` : ""}`);
       return { caseId: currentCase.id, meetingId, version: updatedCase.version };
     }
   });
@@ -11206,6 +11397,325 @@ els.publicPortalView.addEventListener("submit", async (event) => {
   await refresh();
 });
 
+function populateInteractionSelect(select, records, label, selectedId = "") {
+  select.innerHTML = `<option value="">Ingen</option>`;
+  for (const record of records) {
+    const option = document.createElement("option");
+    option.value = record.id;
+    option.textContent = label(record);
+    select.append(option);
+  }
+  select.value = selectedId || "";
+}
+
+function suggestedMeetingTitle(caseRecord) {
+  if (!caseRecord) return "Möte";
+  if (caseRecord.caseTypeId === "mentor-certification") return "Intervju inför godkännande";
+  if (caseRecord.caseTypeId === "matching") return "Första mötet mellan förälder och mentor";
+  if (caseRecord.caseTypeId === "mentor-assignment") return "Uppföljning av mentoruppdrag";
+  return `Möte: ${caseRecord.title}`.slice(0, 100);
+}
+
+function selectedInteractionOutcomeStatus() {
+  return els.interactionForm.querySelector('input[name="interactionOutcomeStatus"]:checked')?.value || "completed";
+}
+
+function updateInteractionFormState({ applyCaseSuggestions = false } = {}) {
+  const scheduled = els.interactionScheduledInput.checked;
+  const editing = Boolean(els.interactionForm.dataset.interactionId);
+  els.interactionTitle.textContent = editing ? "Öppna kontakt" : scheduled ? "Boka möte" : "Registrera genomförd kontakt";
+  els.interactionPlanningFields.hidden = !scheduled;
+  els.interactionInvitationFields.hidden = !scheduled;
+  els.interactionResponseSection.hidden = !scheduled;
+  els.interactionOutcomeFields.hidden = scheduled;
+  els.interactionEndInput.required = scheduled;
+  els.interactionSummaryInput.required = !scheduled;
+  els.interactionKindInput.disabled = scheduled;
+  if (scheduled) els.interactionKindInput.value = "meeting";
+  const completedMeeting = !scheduled && els.interactionKindInput.value === "meeting" && selectedInteractionOutcomeStatus() === "completed";
+  els.interactionMeetingOutcomeSection.hidden = scheduled || els.interactionKindInput.value !== "meeting";
+  els.interactionAttendanceSection.hidden = !completedMeeting;
+  els.interactionSubmitButton.textContent = editing ? "Spara ändringar" : scheduled ? "Skapa bokning" : "Spara kontakt";
+
+  const caseRecord = cases.find((item) => item.id === els.interactionCaseInput.value);
+  els.interactionCaseHelp.textContent = caseRecord
+    ? `${caseRecord.number} · ${caseRecord.type}. Deltagare från ärendet har föreslagits.`
+    : "Välj ett ärende när kontakten ingår i handläggningen.";
+  if (!caseRecord || !applyCaseSuggestions) return;
+  els.interactionParentInput.value = caseRecord.parentId || "";
+  els.interactionMentorInput.value = caseRecord.mentorId || "";
+  els.interactionOrganizerInput.value = responsibleHandler(caseRecord)?.id || CURRENT_USER_ID;
+  els.interactionHandlerInput.value = responsibleHandler(caseRecord)?.id || "";
+  if (scheduled && (!els.interactionTitleInput.value || els.interactionTitleInput.dataset.suggested === "true")) {
+    els.interactionTitleInput.value = suggestedMeetingTitle(caseRecord);
+    els.interactionTitleInput.dataset.suggested = "true";
+  }
+  renderInteractionParticipantStates();
+}
+
+function openInteractionForm(intent = "scheduled", caseId = "", interactionId = "") {
+  const existing = interactions.find((item) => item.id === interactionId) || allInteractions().find((item) => item.id === interactionId);
+  els.interactionForm.reset();
+  els.interactionForm.dataset.interactionId = existing?.id || "";
+  els.interactionForm.dataset.rescheduledFromInteractionId = "";
+  const resolvedIntent = existing?.status === "scheduled" ? "scheduled" : existing ? "completed" : intent;
+  els.interactionScheduledInput.checked = resolvedIntent === "scheduled";
+  els.interactionCompletedInput.checked = resolvedIntent === "completed";
+  els.interactionCaseInput.innerHTML = '<option value="">Fristående kontakt</option>';
+  for (const caseRecord of [...cases].filter((item) => item.status !== "closed" || [existing?.caseId, caseId].includes(item.id)).sort((left, right) => left.number.localeCompare(right.number, "sv"))) {
+    const option = document.createElement("option");
+    option.value = caseRecord.id;
+    option.textContent = `${caseRecord.number} · ${caseRecord.type} · ${caseRecord.title}`;
+    els.interactionCaseInput.append(option);
+  }
+  populateInteractionSelect(els.interactionParentInput, [...parents].sort((a, b) => a.name.localeCompare(b.name, "sv")), (parent) => parent.name);
+  populateInteractionSelect(els.interactionMentorInput, [...candidates].filter((candidate) => candidate.active !== false).sort((a, b) => a.name.localeCompare(b.name, "sv")), (mentor) => mentor.name);
+  const activeHandlers = [...handlers].filter((handler) => handler.active !== false);
+  populateInteractionSelect(els.interactionOrganizerInput, activeHandlers, (handler) => handler.name, CURRENT_USER_ID);
+  populateInteractionSelect(els.interactionHandlerInput, activeHandlers, (handler) => handler.name);
+  els.interactionCaseInput.value = existing?.caseId || caseId || "";
+  const startsAt = new Date();
+  if (resolvedIntent === "scheduled") startsAt.setMinutes(Math.ceil(startsAt.getMinutes() / 15) * 15, 0, 0);
+  els.interactionStartInput.value = localDateTimeValue(existing?.startsAt || startsAt);
+  els.interactionEndInput.value = localDateTimeValue(existing?.endsAt || new Date(startsAt.getTime() + 60 * 60 * 1000));
+  els.interactionTitleInput.value = existing?.title || (intent === "scheduled" ? "Möte" : "");
+  els.interactionTitleInput.dataset.suggested = existing ? "false" : "true";
+  els.interactionKindInput.value = existing?.kind || (intent === "scheduled" ? "meeting" : "phone");
+  const outcomeInput = els.interactionForm.querySelector(`input[name="interactionOutcomeStatus"][value="${existing?.status || "completed"}"]`)
+    || els.interactionForm.querySelector('input[name="interactionOutcomeStatus"][value="completed"]');
+  if (outcomeInput) outcomeInput.checked = true;
+  els.interactionModeInput.value = existing?.mode || "physical";
+  els.interactionLocationInput.value = existing?.location || "";
+  els.interactionInvitationInput.value = existing?.invitationText || "";
+  els.interactionSummaryInput.value = existing?.summary || "";
+  els.interactionNextStepInput.value = existing?.nextStep || "";
+  updateInteractionFormState({ applyCaseSuggestions: !existing });
+  if (existing) {
+    const participant = (partyType) => existing.participants.find((item) => item.partyType === partyType);
+    els.interactionParentInput.value = participant("parent")?.partyId || "";
+    els.interactionMentorInput.value = participant("mentor")?.partyId || "";
+    els.interactionOrganizerInput.value = existing.organizerId || CURRENT_USER_ID;
+    els.interactionHandlerInput.value = participant("handler")?.partyId || "";
+    els.interactionExternalInput.value = existing.participants.filter((item) => item.partyType === "external").map((item) => item.displayName).join(", ");
+    els.interactionForm.dataset.attendance = JSON.stringify(Object.fromEntries(existing.participants.map((item) => [item.id, item.attendanceStatus])));
+    els.interactionForm.dataset.responses = JSON.stringify(Object.fromEntries(existing.participants.map((item) => [item.id, item.responseStatus])));
+    renderInteractionParticipantStates();
+  } else {
+    els.interactionForm.dataset.attendance = "{}";
+    els.interactionForm.dataset.responses = "{}";
+    renderInteractionParticipantStates();
+  }
+  updateInteractionFormState();
+  bootstrap.Offcanvas.getOrCreateInstance(els.interactionOffcanvas).show();
+  setTimeout(() => (caseId ? els.interactionTitleInput : els.interactionCaseInput).focus(), 150);
+}
+
+function selectedInteractionParticipants() {
+  const participants = [];
+  const parent = parents.find((item) => item.id === els.interactionParentInput.value);
+  const mentor = candidates.find((item) => item.id === els.interactionMentorInput.value);
+  const handler = handlers.find((item) => item.id === els.interactionHandlerInput.value);
+  if (parent) participants.push(interactionParticipant({ partyType: "parent", partyId: parent.id, displayName: parent.name }));
+  if (mentor) participants.push(interactionParticipant({ partyType: "mentor", partyId: mentor.id, displayName: mentor.name }));
+  if (handler) participants.push(interactionParticipant({ partyType: "handler", partyId: handler.id, displayName: handler.name }));
+  for (const displayName of els.interactionExternalInput.value.split(",").map((name) => name.trim()).filter(Boolean)) {
+    participants.push(interactionParticipant({ partyType: "external", displayName }));
+  }
+  return participants;
+}
+
+function renderInteractionAttendance() {
+  if (!els.interactionAttendanceFields) return;
+  const previous = JSON.parse(els.interactionForm.dataset.attendance || "{}");
+  const participants = selectedInteractionParticipants();
+  els.interactionAttendanceFields.innerHTML = participants.length
+    ? participants.map((participant) => `<label class="interaction-attendance-option"><input class="form-check-input" type="checkbox" data-interaction-attendance="${escapeHtml(participant.id)}" ${previous[participant.id] === "did_not_attend" ? "" : "checked"}><span>${escapeHtml(participant.displayName)}</span></label>`).join("")
+    : '<span class="small text-secondary">Lägg till deltagare ovan för att registrera närvaro.</span>';
+}
+
+function renderInteractionResponses() {
+  if (!els.interactionResponseFields) return;
+  const previous = JSON.parse(els.interactionForm.dataset.responses || "{}");
+  const participants = selectedInteractionParticipants();
+  els.interactionResponseFields.innerHTML = participants.length
+    ? participants.map((participant) => `<label class="interaction-response-option"><span>${escapeHtml(participant.displayName)}</span><select class="form-select form-select-sm" data-interaction-response="${escapeHtml(participant.id)}"><option value="no_response" ${previous[participant.id] === "no_response" || !previous[participant.id] ? "selected" : ""}>Inget svar</option><option value="accepted" ${previous[participant.id] === "accepted" ? "selected" : ""}>Tackat ja</option><option value="tentative" ${previous[participant.id] === "tentative" ? "selected" : ""}>Preliminärt</option><option value="declined" ${previous[participant.id] === "declined" ? "selected" : ""}>Tackat nej</option></select></label>`).join("")
+    : '<span class="small text-secondary">Lägg till deltagare ovan för att registrera svar.</span>';
+}
+
+function renderInteractionParticipantStates() {
+  renderInteractionAttendance();
+  renderInteractionResponses();
+}
+
+function interactionParticipantsFromForm(status) {
+  const participants = selectedInteractionParticipants();
+  const attendance = new Map([...els.interactionAttendanceFields.querySelectorAll("[data-interaction-attendance]")]
+    .map((input) => [input.dataset.interactionAttendance, input.checked]));
+  const responses = new Map([...els.interactionResponseFields.querySelectorAll("[data-interaction-response]")]
+    .map((input) => [input.dataset.interactionResponse, input.value]));
+  return participants.map((participant) => ({
+    ...participant,
+    invitationStatus: status === "scheduled" && els.interactionInvitationInput.value.trim() ? "prepared" : participant.invitationStatus,
+    responseStatus: responses.get(participant.id) || participant.responseStatus,
+    attendanceStatus: status === "completed" && els.interactionKindInput.value === "meeting"
+      ? attendance.get(participant.id) ? "attended" : "did_not_attend"
+      : status === "completed" ? "attended" : status === "scheduled" ? participant.attendanceStatus : "not_recorded"
+  }));
+}
+
+function rescheduleInteraction(interactionId) {
+  const source = allInteractions().find((interaction) => interaction.id === interactionId);
+  if (!source || !["cancelled", "no_show"].includes(source.status)) return;
+  openInteractionForm("scheduled", source.caseId || "");
+  els.interactionForm.dataset.rescheduledFromInteractionId = source.id;
+  els.interactionTitleInput.value = source.title || "Möte";
+  els.interactionTitleInput.dataset.suggested = "false";
+  els.interactionModeInput.value = source.mode || "physical";
+  els.interactionLocationInput.value = source.location || "";
+  els.interactionInvitationInput.value = source.invitationText || "";
+  els.interactionOrganizerInput.value = source.organizerId || CURRENT_USER_ID;
+  const participant = (partyType) => source.participants.find((item) => item.partyType === partyType);
+  els.interactionParentInput.value = participant("parent")?.partyId || els.interactionParentInput.value;
+  els.interactionMentorInput.value = participant("mentor")?.partyId || els.interactionMentorInput.value;
+  els.interactionHandlerInput.value = participant("handler")?.partyId || els.interactionHandlerInput.value;
+  els.interactionExternalInput.value = source.participants.filter((item) => item.partyType === "external").map((item) => item.displayName).join(", ");
+  els.interactionCaseHelp.textContent = `${els.interactionCaseHelp.textContent} En ny bokning skapas och den tidigare posten behålls.`;
+  renderInteractionParticipantStates();
+}
+
+function openInteractionForParty(partyType, partyId) {
+  openInteractionForm("scheduled");
+  if (partyType === "parent") els.interactionParentInput.value = partyId;
+  if (partyType === "mentor") els.interactionMentorInput.value = partyId;
+  renderInteractionParticipantStates();
+}
+
+function meetingActivityForCase(caseRecord) {
+  const preferredTemplateIds = caseRecord?.caseTypeId === "mentor-certification"
+    ? ["interviewDone"]
+    : caseRecord?.caseTypeId === "matching"
+      ? ["matchingFirstMeeting"]
+      : [];
+  return activitiesForCase(caseRecord?.id).find((activity) => preferredTemplateIds.includes(activity.templateId) && !["completed", "not_applicable"].includes(activity.status)) || null;
+}
+
+async function saveDirectInteraction(interaction) {
+  const caseRecord = cases.find((item) => item.id === interaction.caseId);
+  if (!caseRecord) {
+    await saveInteraction(interaction);
+    return;
+  }
+  const now = interaction.updatedAt;
+  const updatedCase = { ...caseRecord, version: caseRecord.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
+  await atomicPut({
+    [INTERACTIONS_STORE]: [interaction],
+    [CASES_STORE]: [updatedCase],
+    [CASE_EVENTS_STORE]: [caseEventRecord({
+      caseId: caseRecord.id,
+      eventType: "interaction_registered",
+      entityType: "interaction",
+      entityId: interaction.id,
+      message: `${INTERACTION_KIND_LABELS[interaction.kind] || "Kontakt"} registrerades: ${interaction.title}`,
+      idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now
+    })]
+  });
+}
+
+els.dashboardBookMeetingButton.addEventListener("click", () => openInteractionForm("scheduled"));
+els.calendarBookMeetingButton.addEventListener("click", () => openInteractionForm("scheduled"));
+els.calendarLogContactButton.addEventListener("click", () => openInteractionForm("completed"));
+els.parentBookMeetingButton.addEventListener("click", () => openInteractionForParty("parent", selectedParentId));
+els.mentorBookMeetingButton.addEventListener("click", () => openInteractionForParty("mentor", selectedId));
+els.interactionForm.querySelectorAll('input[name="interactionIntent"]').forEach((input) => input.addEventListener("change", () => updateInteractionFormState()));
+els.interactionForm.querySelectorAll('input[name="interactionOutcomeStatus"]').forEach((input) => input.addEventListener("change", () => updateInteractionFormState()));
+els.interactionCaseInput.addEventListener("change", () => updateInteractionFormState({ applyCaseSuggestions: true }));
+els.interactionKindInput.addEventListener("change", () => updateInteractionFormState());
+[els.interactionParentInput, els.interactionMentorInput, els.interactionHandlerInput, els.interactionExternalInput]
+  .forEach((input) => input.addEventListener("change", renderInteractionParticipantStates));
+els.interactionTitleInput.addEventListener("input", () => { els.interactionTitleInput.dataset.suggested = "false"; });
+els.interactionForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const existingInteraction = interactions.find((item) => item.id === els.interactionForm.dataset.interactionId)
+    || allInteractions().find((item) => item.id === els.interactionForm.dataset.interactionId);
+  const interactionKind = els.interactionScheduledInput.checked ? "meeting" : els.interactionKindInput.value;
+  const status = els.interactionScheduledInput.checked ? "scheduled" : interactionKind === "meeting" ? selectedInteractionOutcomeStatus() : "completed";
+  const startsAt = els.interactionStartInput.value;
+  const endsAt = interactionKind === "meeting" ? els.interactionEndInput.value || null : null;
+  els.interactionStartInput.setCustomValidity(status === "completed" && new Date(startsAt).getTime() > Date.now()
+    ? "En genomförd kontakt kan inte ha en tidpunkt i framtiden."
+    : "");
+  els.interactionEndInput.setCustomValidity(status === "scheduled" && new Date(endsAt) <= new Date(startsAt) ? "Sluttiden måste vara efter starttiden." : "");
+  const participants = interactionParticipantsFromForm(status);
+  els.interactionParentInput.setCustomValidity(status === "scheduled" && !participants.length ? "Lägg till minst en deltagare." : "");
+  if (!els.interactionForm.reportValidity()) return;
+  const now = new Date().toISOString();
+  const caseRecord = cases.find((item) => item.id === els.interactionCaseInput.value);
+  const common = {
+    tenantId: DEFAULT_TENANT_ID,
+    status,
+    startsAt,
+    endsAt,
+    caseId: caseRecord?.id || null,
+    activityId: meetingActivityForCase(caseRecord)?.id || null,
+    organizerId: els.interactionOrganizerInput.value || CURRENT_USER_ID,
+    participants,
+    title: els.interactionTitleInput.value.trim(),
+    mode: interactionKind === "meeting" ? els.interactionModeInput.value : interactionKind,
+    location: els.interactionLocationInput.value.trim(),
+    invitationText: els.interactionInvitationInput.value.trim(),
+    summary: els.interactionSummaryInput.value.trim(),
+    nextStep: els.interactionNextStepInput.value.trim(),
+    rescheduledFromInteractionId: els.interactionForm.dataset.rescheduledFromInteractionId || existingInteraction?.rescheduledFromInteractionId || null
+  };
+  const existingMeeting = existingInteraction?.sourceType === "case_meeting"
+    ? caseMeetings.find((meeting) => meeting.id === existingInteraction.sourceId)
+    : null;
+  if (interactionKind === "meeting" && caseRecord) {
+    await registerCaseMeetingCommand({
+      caseRecord,
+      existing: existingMeeting,
+      meetingType: caseRecord.caseTypeId === "mentor-certification" ? "certification_interview" : caseRecord.caseTypeId === "mentor-assignment" ? "follow_up" : "other",
+      meetingStatus: status,
+      occurredAt: startsAt,
+      endsAt,
+      mode: common.mode,
+      activityId: common.activityId,
+      title: common.title,
+      location: common.location,
+      invitationText: common.invitationText,
+      participants,
+      organizerId: common.organizerId,
+      summary: common.summary,
+      nextStep: common.nextStep,
+      rescheduledFromInteractionId: common.rescheduledFromInteractionId
+    });
+  } else {
+    await saveDirectInteraction(normalizeInteraction({
+      id: existingInteraction?.id || crypto.randomUUID(),
+      ...common,
+      kind: interactionKind,
+      direction: status === "scheduled" ? "not_applicable" : "outgoing",
+      sourceType: existingInteraction?.sourceType || "direct",
+      sourceId: existingInteraction?.sourceId || null,
+      version: Number(existingInteraction?.version || 0) + 1,
+      createdAt: existingInteraction?.createdAt || now,
+      createdBy: existingInteraction?.createdBy || CURRENT_USER_ID,
+      updatedAt: now,
+      updatedBy: CURRENT_USER_ID
+    }));
+  }
+  bootstrap.Offcanvas.getOrCreateInstance(els.interactionOffcanvas).hide();
+  markSaved();
+  await refresh();
+  showFeedback(status === "scheduled"
+    ? "Mötet har bokats. Kallelsen är förberedd men inte skickad."
+    : status === "cancelled"
+      ? "Mötet har markerats som inställt. Den tidigare bokningen finns kvar och kan bokas om."
+      : status === "no_show"
+        ? "Mötet har markerats som uteblivet. Händelsen finns kvar och kan bokas om."
+        : "Kontakten har registrerats.");
+});
+
 els.calendarPreviousButton.addEventListener("click", () => {
   calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
   renderCalendar();
@@ -11234,6 +11744,27 @@ document.querySelectorAll("[data-calendar-type-filter]").forEach((input) => {
     renderCalendar();
   });
 });
+
+[els.calendarGrid, els.calendarAgenda].forEach((container) => container.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-calendar-interaction]");
+  if (!link) return;
+  const interaction = allInteractions().find((item) => item.id === link.dataset.calendarInteraction);
+  if (!interaction) return;
+  event.preventDefault();
+  openInteractionForm(interaction.status === "scheduled" ? "scheduled" : "completed", interaction.caseId || "", interaction.id);
+}));
+
+[els.caseMeetingsList, els.parentInteractionTimeline, els.mentorInteractionTimeline].forEach((container) => container.addEventListener("click", (event) => {
+  const openButton = event.target.closest("[data-open-interaction]");
+  const rescheduleButton = event.target.closest("[data-reschedule-interaction]");
+  const interactionId = openButton?.dataset.openInteraction || rescheduleButton?.dataset.rescheduleInteraction;
+  if (!interactionId) return;
+  if (rescheduleButton) rescheduleInteraction(interactionId);
+  else {
+    const interaction = allInteractions().find((item) => item.id === interactionId);
+    if (interaction) openInteractionForm(interaction.status === "scheduled" ? "scheduled" : "completed", interaction.caseId || "", interaction.id);
+  }
+}));
 
 els.navDashboard.addEventListener("click", (event) => {
   event.preventDefault();
@@ -11451,10 +11982,12 @@ els.incomingContactForm.addEventListener("submit", async (event) => {
   };
   contact.nextStep = els.incomingContactNextStepInput.value.trim();
   contact.parentId = existing?.parentId || incomingContactParentId || null;
+  contact.interactionId = existing?.interactionId || crypto.randomUUID();
   const existingIntakeCase = contact.intakeCaseId ? incomingContactCasePatch(contact, now) : null;
   const intakeCase = contact.intakeCaseId ? { contact, records: existingIntakeCase ? { [CASES_STORE]: [existingIntakeCase] } : {} } : await createIncomingContactCase(contact, now);
   contact = intakeCase.contact;
-  await atomicPut({ [INCOMING_CONTACTS_STORE]: [contact], ...intakeCase.records });
+  const interaction = { ...interactionFromIncomingContact(contact), id: contact.interactionId };
+  await atomicPut({ [INCOMING_CONTACTS_STORE]: [contact], [INTERACTIONS_STORE]: [interaction], ...intakeCase.records });
   await refresh();
   showIncomingContactNextStep(incomingContactById(contact.id));
   showFeedback("Den inkommande kontakten har sparats.");
@@ -13204,10 +13737,11 @@ els.caseMeetingsList.addEventListener("click", (event) => {
   if (!meetingButton) return;
   const meeting = caseMeetings.find((item) => item.id === meetingButton.dataset.editCaseMeeting);
   if (!meeting) return;
-  openCaseMeetingForm(meeting);
+  const interaction = allInteractions().find((item) => item.sourceType === "case_meeting" && item.sourceId === meeting.id);
+  openInteractionForm(caseMeetingStatus(meeting) === "scheduled" ? "scheduled" : "completed", meeting.caseId, interaction?.id || "");
 });
 
-els.newCaseMeetingButton.addEventListener("click", () => openCaseMeetingForm());
+els.newCaseMeetingButton.addEventListener("click", () => openInteractionForm("scheduled", selectedCaseRecordId));
 els.cancelCaseMeetingButton.addEventListener("click", closeCaseMeetingForm);
 els.caseMeetingCompletedInput.addEventListener("change", updateCaseMeetingFormState);
 els.caseMeetingTypeInput.addEventListener("change", updateCaseMeetingFormState);
@@ -13230,8 +13764,14 @@ els.caseMeetingForm.addEventListener("submit", async (event) => {
     meetingType: els.caseMeetingTypeInput.value,
     meetingStatus,
     occurredAt: els.caseMeetingDateInput.value,
+    endsAt: existing?.endsAt || null,
     mode: els.caseMeetingModeInput.value,
     activityId: els.caseMeetingActivityInput.value || null,
+    title: existing?.title || "",
+    location: existing?.location || "",
+    invitationText: existing?.invitationText || "",
+    participants: existing?.participants || null,
+    organizerId: existing?.organizerId || CURRENT_USER_ID,
     summary: els.caseMeetingSummaryInput.value.trim(),
     nextStep: els.caseMeetingNextStepInput.value.trim()
   });
