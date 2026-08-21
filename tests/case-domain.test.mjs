@@ -314,6 +314,10 @@ test("defines handling guidance for every activity template", () => {
   for (const template of ACTIVITY_TEMPLATES) {
     assert.ok(template.workInstruction, `${template.id} should explain how to perform the activity`);
   }
+  const registryCheck = ACTIVITY_TEMPLATES.find((template) => template.id === "registryChecked");
+  assert.match(registryCheck.workInstruction, /identiteten/);
+  assert.match(registryCheck.workInstruction, /Polisens kontrolltjänst/);
+  assert.match(registryCheck.workInstruction, /aldrig uppgifter ur utdraget/);
 });
 
 test("declares which activity results may use quick completion", () => {

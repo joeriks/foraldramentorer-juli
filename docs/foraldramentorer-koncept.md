@@ -192,7 +192,7 @@ Ett avvikande resultat markerar ärendet som `Ställningstagande krävs` och lig
 
 Att den sista aktiviteten avslutas stänger inte ett vanligt ärende och skapar inte automatiskt ett nytt ärende. Systemet visar vad som har sparats och låter handläggaren uttryckligen välja nästa verksamhetssteg. Sammansatta beslut, exempelvis att godkänna en mentor, ska visa och logga samtliga effekter innan de genomförs.
 
-För belastningsregister registreras endast neutrala resultat som Visat och kontrollerat, Inte visat eller Äkthet inte bekräftad. Prototypen ska inte uppmana handläggaren att dokumentera innehållet i ett registerutdrag eller att ladda upp en kopia. Den slutliga rutinen måste fastställas utifrån kommunens verksamhet och tillämpligt lagstöd.
+För belastningsregister registreras endast neutrala resultat som Visat och kontrollerat, Inte visat eller Äkthet inte bekräftad. Aktiviteten ger en kort kontrollinstruktion och en utfällbar checklista med länk till [Polismyndighetens information för arbetsgivare](https://polisen.se/tjanster-tillstand/belastningsregistret/information-till-arbetsgivare-om-registerutdrag/). Prototypen ska inte uppmana handläggaren att dokumentera innehållet i ett registerutdrag eller att ladda upp en kopia. Den slutliga rutinen måste fastställas utifrån kommunens verksamhet och tillämpligt lagstöd.
 
 Förfallodatum används när det finns en beslutad tidsfrist, bokad tid eller överenskommen återkoppling. Försenade och snart förfallna aktiviteter markeras särskilt. Ändringar av ansvarig, status, resultat och förfallodatum registreras automatiskt i ärendets händelselogg.
 

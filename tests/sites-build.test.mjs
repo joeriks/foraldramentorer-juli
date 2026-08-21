@@ -48,6 +48,7 @@ test("serves the application shell", async () => {
   assert.match(html, /id="dashboardNewParentButton"/);
   assert.match(html, /id="mentorActiveFilter"/);
   assert.match(html, /id="reactivateMentorButton"/);
+  assert.match(html, /id="activityDetailGuidanceMore"/);
   assert.match(html, /id="caseClosureSummary"/);
   assert.match(html, /id="matchingDecisionSummary"/);
   assert.match(html, /id="matchingDetails"/);
@@ -139,7 +140,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /mentorActiveFilter === "active"/);
   assert.match(scriptText, /function toggleSelectedCandidateActive/);
   assert.match(scriptText, /`Skapad \$\{formatDate\(createdAt\)\}/);
-  assert.match(scriptText, /version: "102"/);
+  assert.match(scriptText, /version: "103"/);
   assert.match(scriptText, /dashboardQueueOwnerFilter === "all"/);
   assert.match(scriptText, /dashboardQueueMode === "unassigned"/);
   assert.match(scriptText, /version: "100"/);

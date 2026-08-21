@@ -136,6 +136,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "103",
+    date: "2026-08-21",
+    title: "Utökad vägledning för registerkontroll",
+    flow: "Godkännande av mentor -> Kontrollera belastningsregister",
+    simplified: "Aktiviteten ger nu en tydligare kort instruktion och samlar den längre kontrollistan bakom Läs mer.",
+    retained: "Resultatval, avvikelsehantering och förbudet mot att registrera känsligt innehåll ur utdraget är oförändrade.",
+    changes: [
+      "Så gör du beskriver kontroll av rätt utdrag, identitet, aktualitet, fullständighet och äkthet.",
+      "En utfällbar kontrollista har lagts till utan att göra aktivitetsvyn längre från start.",
+      "Vägledningen länkar till Polismyndighetens information för arbetsgivare."
+    ]
+  },
+  {
     version: "102",
     date: "2026-08-21",
     title: "Tydligare register och snabbare registrering",
@@ -669,6 +682,22 @@ const CHECKS = [
 ];
 
 const CHECK_LABELS = Object.fromEntries(CHECKS);
+
+const ACTIVITY_GUIDANCE_MORE = {
+  registryChecked: {
+    summary: "Kontrollera enligt kommunens rutin att rätt registerutdrag visas, att identiteten stämmer och att utdraget är aktuellt och fullständigt. Ett digitalt utdrag ska äkthetskontrolleras i Polisens kontrolltjänst. Registrera endast kontrollens resultat, aldrig uppgifter ur utdraget.",
+    steps: [
+      "Säkerställ enligt kommunens rutin vilken typ av registerutdrag som ska visas för uppdraget.",
+      "Kontrollera personens identitet, att utdraget gäller rätt person och att samtliga sidor visas.",
+      "Kontrollera utfärdandedatum och att utdraget fortfarande är aktuellt enligt den rutin som gäller för uppdraget.",
+      "Kontrollera alltid ett digitalt utdrags äkthet i Polisens kontrolltjänst. Ett pappersutdrag kan inte kontrolleras i den digitala tjänsten.",
+      "Välj aktivitetens resultat. Om utdraget saknas, är fel, för gammalt eller inte kan bekräftas ska avvikelsen hanteras separat.",
+      "Dokumentera inte brott, påföljder eller andra uppgifter ur utdraget i ärendet och spara ingen kopia om inte kommunens fastställda rutin och tillämpliga regler medger det."
+    ],
+    linkHref: "https://polisen.se/tjanster-tillstand/belastningsregistret/information-till-arbetsgivare-om-registerutdrag/",
+    linkLabel: "Läs Polisens information om registerutdrag"
+  }
+};
 
 const CERTIFICATION_ACTIVITIES = [
   ["identityVerified", "Verifiera identitet"],
@@ -1670,6 +1699,8 @@ const els = {
   activityDetailGuidance: document.querySelector("#activityDetailGuidance"),
   activityDetailGuidanceTitle: document.querySelector("#activityDetailGuidanceTitle"),
   activityDetailGuidanceText: document.querySelector("#activityDetailGuidanceText"),
+  activityDetailGuidanceMore: document.querySelector("#activityDetailGuidanceMore"),
+  activityDetailGuidanceMoreContent: document.querySelector("#activityDetailGuidanceMoreContent"),
   activityDetailGuidanceButton: document.querySelector("#activityDetailGuidanceButton"),
   activityWorkInputPanel: document.querySelector("#activityWorkInputPanel"),
   activityWorkInputTitle: document.querySelector("#activityWorkInputTitle"),
@@ -8648,6 +8679,7 @@ function renderActivityWorkInput(activity, caseRecord) {
 function renderActivityGuidance(activity, caseRecord) {
   const mentor = caseMentor(caseRecord);
   const templateGuidance = activityTemplateDefinitionById(activity.templateId, activity.templateVersion)?.workInstruction?.trim() || "";
+  const moreGuidance = ACTIVITY_GUIDANCE_MORE[activity.templateId];
   const identityDataMissing = activity.templateId === "identityVerified"
     && mentor
     && (!mentor.personalNumber || !mentor.identityMethod);
@@ -8655,9 +8687,15 @@ function renderActivityGuidance(activity, caseRecord) {
   els.activityDetailGuidanceButton.dataset.mentorId = identityDataMissing ? mentor.id : "";
   els.activityDetailGuidanceTitle.textContent = "Så gör du";
   els.activityDetailGuidanceText.textContent = [
-    templateGuidance,
+    moreGuidance?.summary || templateGuidance,
     identityDataMissing ? "Personnummer och verifieringssätt saknas och måste registreras på mentorkortet innan resultatet Verifierad kan sparas." : ""
   ].filter(Boolean).join(" ");
+  els.activityDetailGuidanceMore.hidden = !moreGuidance;
+  els.activityDetailGuidanceMore.open = false;
+  els.activityDetailGuidanceMoreContent.innerHTML = moreGuidance ? `
+    <ol>${moreGuidance.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
+    <a href="${escapeHtml(moreGuidance.linkHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(moreGuidance.linkLabel)}</a>
+  ` : "";
   els.activityDetailGuidanceButton.hidden = !identityDataMissing;
   els.activityDetailGuidanceButton.textContent = identityDataMissing ? "Öppna identitetsuppgifter" : "";
 }

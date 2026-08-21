@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260821-register-clarity-v102">
+    <link rel="stylesheet" href="styles.css?v=20260821-registry-guidance-v103">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -825,9 +825,13 @@
                         </div>
                       </div>
                       <aside id="activityDetailGuidance" class="activity-guidance" hidden>
-                        <div>
+                        <div class="activity-guidance-copy">
                           <strong id="activityDetailGuidanceTitle"></strong>
                           <p id="activityDetailGuidanceText" class="mb-0"></p>
+                          <details id="activityDetailGuidanceMore" class="activity-guidance-more" hidden>
+                            <summary>Läs mer...</summary>
+                            <div id="activityDetailGuidanceMoreContent" class="activity-guidance-more-content"></div>
+                          </details>
                         </div>
                         <button id="activityDetailGuidanceButton" type="button" class="btn btn-outline-primary btn-sm"></button>
                       </aside>
@@ -2221,6 +2225,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260821-register-clarity-v102"></script>
+    <script type="module" src="app.js?v=20260821-registry-guidance-v103"></script>
   </body>
 </html>

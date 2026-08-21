@@ -4579,6 +4579,39 @@ body.is-system-administration .sidebar-menu-group {
   color: var(--bs-secondary-color);
 }
 
+.activity-guidance-copy {
+  flex: 1 1 30rem;
+  min-width: 0;
+}
+
+.activity-guidance-more {
+  margin-top: var(--app-space-2);
+}
+
+.activity-guidance-more > summary {
+  width: fit-content;
+  color: var(--app-primary);
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.activity-guidance-more-content {
+  max-width: 54rem;
+  margin-top: var(--app-space-2);
+  color: #33434f;
+}
+
+.activity-guidance-more-content ol {
+  margin-bottom: var(--app-space-2);
+  padding-left: 1.25rem;
+}
+
+.activity-guidance-more-content li + li {
+  margin-top: var(--app-space-1);
+}
+
 .activity-work-input {
   display: flex;
   flex-wrap: wrap;

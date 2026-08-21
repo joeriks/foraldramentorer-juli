@@ -54,7 +54,7 @@ export const ACTIVITY_TEMPLATES = [
     id: "registryChecked",
     version: 1,
     title: "Kontrollera belastningsregister",
-    workInstruction: "Kontrollera att rätt registerutdrag visas, att det är giltigt och att äktheten kan bedömas. Registrera endast kontrollens resultat, inte uppgifter ur utdraget.",
+    workInstruction: "Kontrollera enligt kommunens rutin att rätt registerutdrag visas, att identiteten stämmer och att utdraget är aktuellt och fullständigt. Ett digitalt utdrag ska äkthetskontrolleras i Polisens kontrolltjänst. Registrera endast kontrollens resultat, aldrig uppgifter ur utdraget.",
     quickCompletionResultCodes: ["shown_checked"],
     results: [
       ["shown_checked", "Kontrollerat, inget fortsatt ställningstagande behövs", "acceptable"],

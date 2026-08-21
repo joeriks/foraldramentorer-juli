@@ -20,6 +20,14 @@ test("keeps result, note and completion action in the primary activity flow", ()
   assert.match(html, /<summary>Planering och undantag<\/summary>/);
 });
 
+test("keeps extended registry guidance compact and linked to the police", () => {
+  assert.match(html, /id="activityDetailGuidanceMore"[\s\S]*<summary>Läs mer\.\.\.<\/summary>/);
+  assert.match(app, /ACTIVITY_GUIDANCE_MORE/);
+  assert.match(app, /information-till-arbetsgivare-om-registerutdrag/);
+  assert.match(app, /target="_blank" rel="noopener noreferrer"/);
+  assert.match(styles, /\.activity-guidance-more-content/);
+});
+
 test("completion explains and opens the next activity", () => {
   assert.match(app, /version: "83"/);
   assert.match(app, /function nextOpenActivity\(activity\)/);
