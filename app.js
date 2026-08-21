@@ -78,7 +78,7 @@ import {
   meetingReminderJobs,
   normalizeMeetingReminder,
   normalizeCommunicationRecord
-} from "./communication-domain.js?v=20260821-reminders-v114";
+} from "./communication-domain.js?v=20260821-reminder-catchup-v115";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260820-calendar-v4";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
@@ -181,6 +181,20 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "115",
+    date: "2026-08-21",
+    title: "Försenade utskick tas om hand",
+    flow: "Schemalagd tid -> återstart eller återaktivering -> dubblettkontroll -> kommunikationsleverantör",
+    simplified: "Handläggaren behöver inte bevaka om portalen var öppen exakt när ett automatiskt utskick skulle behandlas.",
+    retained: "Samma påminnelseregler, mottagare, kanalval och kommunikationshistorik används. Avslutade och inställda möten skapar fortfarande inga nya utskick.",
+    changes: [
+      "Schemalagda mötespåminnelser som har förfallit behandlas när portalen öppnas eller åter blir aktiv.",
+      "Missade utskick behandlas i planerad tidsordning, även om mötestiden har passerat men mötet fortfarande är bokat.",
+      "Kommunikationspostens leveranshistorik visar när ett schemalagt utskick behandlades i efterhand.",
+      "Samma automatiseringsnyckel förhindrar att ett försenat utskick registreras mer än en gång."
+    ]
+  },
   {
     version: "114",
     date: "2026-08-21",
@@ -5988,6 +6002,13 @@ function meetingReminderBody(interaction) {
   return `Påminnelse om ${interaction.title || "mötet"} ${formatDateTime(interaction.startsAt)}.${location}`;
 }
 
+function communicationWasProcessedLate(record) {
+  if (!record.scheduledFor || !record.createdAt) return false;
+  const scheduledTime = new Date(record.scheduledFor || 0).getTime();
+  const createdTime = new Date(record.createdAt || 0).getTime();
+  return Number.isFinite(scheduledTime) && Number.isFinite(createdTime) && createdTime > scheduledTime;
+}
+
 function saveAutomatedCommunicationIfMissing(record) {
   const caseLink = communicationLink(record, "case");
   const storeNames = [COMMUNICATIONS_STORE, ...(caseLink ? [CASES_STORE, CASE_EVENTS_STORE] : [])];
@@ -6026,7 +6047,7 @@ function saveAutomatedCommunicationIfMissing(record) {
           occurredAt: record.updatedAt,
           correlationId: record.automationKey,
           idempotencyKey: record.automationKey,
-          payload: { message: `Automatisk påminnelse via ${COMMUNICATION_CHANNEL_LABELS[record.channel]} registrerades till ${record.recipients[0]?.name || "mötesdeltagare"}.` }
+          payload: { message: `Automatisk påminnelse via ${COMMUNICATION_CHANNEL_LABELS[record.channel]} registrerades${communicationWasProcessedLate(record) ? " i efterhand" : ""} till ${record.recipients[0]?.name || "mötesdeltagare"}.` }
         };
         transaction.objectStore(CASE_EVENTS_STORE).put(caseEvent);
       };
@@ -6112,7 +6133,7 @@ function renderCommunicationDetail(record) {
     ? record.recipients.map((recipient) => `<li><strong>${escapeHtml(recipient.name || recipient.address)}</strong>${recipient.name && recipient.address ? `<span>${escapeHtml(recipient.address)}</span>` : ""}</li>`).join("")
     : '<li class="text-secondary">Mottagare saknas</li>';
   const events = [...record.deliveryEvents].sort((left, right) => new Date(left.occurredAt || 0) - new Date(right.occurredAt || 0));
-  els.communicationDetailHeader.innerHTML = `<div class="communication-detail-heading"><div><div class="record-type">${record.automationType === "meeting_reminder" ? "Automatisk påminnelse · " : ""}${escapeHtml(channel)} · ${escapeHtml(direction)}</div><h2 id="communicationDetailTitle" class="h5 mb-1">${escapeHtml(subject)}</h2><p class="text-secondary mb-0"><time datetime="${escapeHtml(record.createdAt || "")}">${escapeHtml(formatDateTime(record.createdAt))}</time></p></div><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(status)}</span></div>`;
+  els.communicationDetailHeader.innerHTML = `<div class="communication-detail-heading"><div><div class="record-type">${record.automationType === "meeting_reminder" ? `Automatisk påminnelse${communicationWasProcessedLate(record) ? " · Behandlad i efterhand" : ""} · ` : ""}${escapeHtml(channel)} · ${escapeHtml(direction)}</div><h2 id="communicationDetailTitle" class="h5 mb-1">${escapeHtml(subject)}</h2><p class="text-secondary mb-0"><time datetime="${escapeHtml(record.createdAt || "")}">${escapeHtml(formatDateTime(record.createdAt))}</time></p></div><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(status)}</span></div>`;
   els.communicationDetailContent.innerHTML = `
     <section class="communication-detail-overview" aria-label="Kommunikationsöversikt">
       <dl><div><dt>Kanal</dt><dd>${escapeHtml(channel)}</dd></div><div><dt>Riktning</dt><dd>${escapeHtml(direction)}</dd></div><div><dt>Avsändare</dt><dd>${escapeHtml(sender)}</dd></div><div><dt>Registrerad av</dt><dd>${escapeHtml(handlerNameById(record.createdBy) || record.createdBy || "System")}</dd></div></dl>
@@ -6168,7 +6189,7 @@ function renderCommunications() {
     const subject = record.subject || (record.channel === "sms" ? "SMS" : "Meddelande");
     const row = document.createElement("tr");
     row.innerHTML = `<td class="communication-date-cell"><time datetime="${escapeHtml(record.createdAt || "")}">${escapeHtml(formatDateTime(record.createdAt))}</time></td>
-      <td class="communication-message-cell"><span class="communication-channel-badge">${escapeHtml(COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel)}</span>${record.automationType === "meeting_reminder" ? '<span class="communication-automation-label">Automatisk</span>' : ""}<strong>${escapeHtml(subject)}</strong><span>${escapeHtml(record.body)}</span></td>
+      <td class="communication-message-cell"><span class="communication-channel-badge">${escapeHtml(COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel)}</span>${record.automationType === "meeting_reminder" ? `<span class="communication-automation-label">${communicationWasProcessedLate(record) ? "Försenad" : "Automatisk"}</span>` : ""}<strong>${escapeHtml(subject)}</strong><span>${escapeHtml(record.body)}</span></td>
       <td class="communication-party-cell"><small>${escapeHtml(COMMUNICATION_DIRECTION_LABELS[record.direction] || record.direction)}</small><strong>${escapeHtml(communicationPartyLabel(record))}</strong></td>
       <td class="communication-context-cell">${communicationContextMarkup(record)}</td>
       <td><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(COMMUNICATION_STATUS_LABELS[record.status] || record.status)}</span></td>
@@ -12681,8 +12702,8 @@ function updateInteractionFormState({ applyCaseSuggestions = false } = {}) {
       ? "Påminnelsen för den här mötestiden har registrerats."
       : !contactCount
         ? "Lägg till e-post eller telefon för minst en deltagare."
-        : Number.isFinite(triggerAt) && triggerAt <= Date.now() && startsAt > Date.now()
-          ? `Påminnelsetiden (${meetingReminderOffsetLabel(reminder.offsetMinutes)} före) har passerat. Påminnelsen behandlas när mötet sparas.`
+        : Number.isFinite(triggerAt) && triggerAt <= Date.now()
+          ? `Påminnelsetiden (${meetingReminderOffsetLabel(reminder.offsetMinutes)} före) har passerat. Utskicket behandlas när mötet sparas.`
         : Number.isFinite(triggerAt)
           ? `Planerad ${formatDateTime(new Date(triggerAt).toISOString())} till ${contactCount} ${contactCount === 1 ? "deltagare" : "deltagare"}.`
           : "Ange mötets datum och tid.";

@@ -69,6 +69,9 @@ test("schedules configurable automatic reminders through the communication syste
   assert.match(app, /saveAutomatedCommunicationIfMissing/);
   assert.match(app, /automationType: job\.automationType/);
   assert.match(app, /window\.setInterval\(runMeetingReminderScheduler, 60 \* 1000\)/);
+  assert.match(app, /communicationWasProcessedLate/);
+  assert.match(app, /Behandlad i efterhand/);
+  assert.match(html, /Missade utskick behandlas när portalen öppnas igen/);
   assert.match(styles, /\.meeting-reminder-settings/);
 });
 

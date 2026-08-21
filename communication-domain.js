@@ -39,7 +39,7 @@ export function meetingReminderJobs({ interactions = [], communications = [], no
     const startsAt = new Date(interaction.startsAt || 0).getTime();
     const triggerAt = startsAt - reminder.offsetMinutes * 60 * 1000;
     if (interaction.kind !== "meeting" || interaction.status !== "scheduled" || !reminder.enabled) continue;
-    if (!Number.isFinite(startsAt) || nowTime < triggerAt || nowTime >= startsAt) continue;
+    if (!Number.isFinite(startsAt) || nowTime < triggerAt) continue;
     const seenRecipients = new Set();
     for (const participant of interaction.participants || []) {
       const channel = participant.email ? "email" : participant.phone ? "sms" : null;
@@ -54,6 +54,7 @@ export function meetingReminderJobs({ interactions = [], communications = [], no
         automationKey,
         automationType: "meeting_reminder",
         scheduledFor: new Date(triggerAt).toISOString(),
+        processedLate: nowTime > triggerAt,
         channel,
         interaction,
         recipient: {
@@ -65,7 +66,7 @@ export function meetingReminderJobs({ interactions = [], communications = [], no
       });
     }
   }
-  return jobs;
+  return jobs.sort((left, right) => new Date(left.scheduledFor) - new Date(right.scheduledFor));
 }
 
 const requiredText = (value, message) => {
@@ -140,6 +141,9 @@ export async function dispatchOutboundCommunication({
 }) {
   if (!provider?.capabilities?.outbound || typeof provider.send !== "function") throw new Error("Leverantören kan inte hantera utgående kommunikation.");
   const createdAt = now();
+  const scheduledTime = draft.scheduledFor ? new Date(draft.scheduledFor).getTime() : NaN;
+  const createdTime = new Date(createdAt).getTime();
+  const processedLate = Number.isFinite(scheduledTime) && Number.isFinite(createdTime) && createdTime > scheduledTime;
   const recipientName = String(draft.recipientName || "").trim();
   const recipientAddress = requiredText(draft.recipientAddress, "Ange mottagarens e-postadress eller telefonnummer.");
   const body = requiredText(draft.body, "Skriv ett meddelande.");
@@ -164,7 +168,14 @@ export async function dispatchOutboundCommunication({
     subject: provider.channel === "email" ? requiredText(draft.subject, "Ange en ämnesrad för e-postmeddelandet.") : "",
     body,
     links: draft.links || [],
-    deliveryEvents: [{ status: "queued", occurredAt: createdAt, actorId: draft.createdBy, detail: "Sändningsbegäran skapades." }],
+    deliveryEvents: [{
+      status: "queued",
+      occurredAt: createdAt,
+      actorId: draft.createdBy,
+      detail: processedLate
+        ? "Det schemalagda utskicket behandlades i efterhand."
+        : "Sändningsbegäran skapades."
+    }],
     createdAt,
     createdBy: draft.createdBy,
     updatedAt: createdAt,

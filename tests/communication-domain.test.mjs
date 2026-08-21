@@ -37,6 +37,29 @@ test("demo providers process outbound commands without claiming external deliver
   assert.doesNotMatch(record.deliveryEvents.at(-1).detail, /levererad/i);
 });
 
+test("late scheduled messages retain their planned time and explain the catch-up", async () => {
+  const record = await dispatchOutboundCommunication({
+    draft: {
+      tenantId: "tenant-demo",
+      recipientName: "Eva Nilsson",
+      recipientAddress: "eva@example.se",
+      subject: "Påminnelse",
+      body: "Välkommen till mötet.",
+      scheduledFor: "2026-08-20T10:00:00.000Z",
+      createdBy: "system"
+    },
+    provider: createDemoCommunicationProvider("email", {
+      idFactory: () => "provider-message-late",
+      now: () => "2026-08-21T10:00:00.000Z"
+    }),
+    idFactory: () => "communication-late",
+    now: () => "2026-08-21T10:00:00.000Z"
+  });
+
+  assert.equal(record.scheduledFor, "2026-08-20T10:00:00.000Z");
+  assert.match(record.deliveryEvents[0].detail, /behandlades i efterhand/i);
+});
+
 test("the shared model accepts incoming provider messages", () => {
   const record = recordInboundCommunication({
     message: {
@@ -91,7 +114,7 @@ test("meeting reminders become due once and choose email before sms", () => {
   assert.equal(repeated.length, 0);
 });
 
-test("meeting reminders ignore disabled, completed and past meetings", () => {
+test("meeting reminders ignore disabled and completed meetings but catch up missed schedules", () => {
   const base = {
     id: "meeting-2", kind: "meeting", status: "scheduled", startsAt: "2026-08-22T10:00:00.000Z",
     reminder: normalizeMeetingReminder({ enabled: true, offsetMinutes: 999 }),
@@ -100,5 +123,26 @@ test("meeting reminders ignore disabled, completed and past meetings", () => {
   assert.equal(base.reminder.offsetMinutes, 1440);
   assert.equal(meetingReminderJobs({ interactions: [{ ...base, reminder: { enabled: false, offsetMinutes: 1440 } }], now: "2026-08-21T10:00:00.000Z" }).length, 0);
   assert.equal(meetingReminderJobs({ interactions: [{ ...base, status: "completed" }], now: "2026-08-21T10:00:00.000Z" }).length, 0);
-  assert.equal(meetingReminderJobs({ interactions: [base], now: "2026-08-22T10:01:00.000Z" }).length, 0);
+  const missed = meetingReminderJobs({ interactions: [base], now: "2026-08-22T10:01:00.000Z" });
+  assert.equal(missed.length, 1);
+  assert.equal(missed[0].processedLate, true);
+  assert.equal(meetingReminderJobs({
+    interactions: [base],
+    communications: [{ automationKey: missed[0].automationKey }],
+    now: "2026-08-23T10:01:00.000Z"
+  }).length, 0);
+});
+
+test("missed meeting reminders are processed oldest first", () => {
+  const participant = { displayName: "Eva", email: "eva@example.se" };
+  const reminders = meetingReminderJobs({
+    interactions: [
+      { id: "later", kind: "meeting", status: "scheduled", startsAt: "2026-08-22T12:00:00.000Z", reminder: { enabled: true, offsetMinutes: 60 }, participants: [participant] },
+      { id: "earlier", kind: "meeting", status: "scheduled", startsAt: "2026-08-21T12:00:00.000Z", reminder: { enabled: true, offsetMinutes: 60 }, participants: [participant] }
+    ],
+    now: "2026-08-23T10:00:00.000Z"
+  });
+
+  assert.deepEqual(reminders.map((job) => job.interaction.id), ["earlier", "later"]);
+  assert.ok(reminders.every((job) => job.processedLate));
 });

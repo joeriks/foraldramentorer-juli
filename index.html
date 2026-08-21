@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260821-reminders-v114">
+    <link rel="stylesheet" href="styles.css?v=20260821-reminder-catchup-v115">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -2278,7 +2278,7 @@
                     <div><label class="form-label small" for="interactionReminderOffsetInput">När?</label><select id="interactionReminderOffsetInput" class="form-select form-select-sm"><option value="2880">Två dagar före</option><option value="1440" selected>En dag före</option><option value="120">Två timmar före</option><option value="60">En timme före</option></select></div>
                     <p id="interactionReminderSummary" class="small text-secondary mb-0"></p>
                   </div>
-                  <p class="form-text mb-0">E-post används i första hand, annars SMS. I prototypen registreras påminnelsen via demoleverantören när appen är aktiv; inget skickas externt.</p>
+                  <p class="form-text mb-0">E-post används i första hand, annars SMS. Missade utskick behandlas när portalen öppnas igen. I prototypen registreras allt via demoleverantören; inget skickas externt.</p>
                 </section>
                 <div id="interactionResponseSection"><fieldset><legend class="form-label">Kallelsesvar</legend><div id="interactionResponseFields" class="interaction-attendance-list"></div><p class="form-text">Registrera svar manuellt efter att kallelsen har skickats.</p></fieldset></div>
               </div>
@@ -2516,6 +2516,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260821-reminders-v114"></script>
+    <script type="module" src="app.js?v=20260821-reminder-catchup-v115"></script>
   </body>
 </html>
