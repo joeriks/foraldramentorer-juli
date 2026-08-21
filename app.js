@@ -136,6 +136,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "102",
+    date: "2026-08-21",
+    title: "Tydligare register och snabbare registrering",
+    flow: "Översikt och register",
+    simplified: "Det går snabbare att registrera en förälder, se när ärenden skapades och hitta eller återaktivera inaktiva mentorer.",
+    retained: "Ärende- och mentorposterna använder samma data, statusar och historik som tidigare. Inaktivering raderar fortfarande ingen information.",
+    changes: [
+      "Registrera förälder har lagts till under Skapa nytt på Översikt.",
+      "Ärenderegistret visar alltid skapat datum och, när det är relevant, senast ändrat datum.",
+      "Mentorregistret kan filtreras på aktiva och inaktiva mentorer, och inaktiva mentorer har en tydlig återaktiveringsknapp."
+    ]
+  },
+  {
     version: "101",
     date: "2026-08-21",
     title: "Genväg till föräldrars stödärenden",
@@ -1119,6 +1132,7 @@ let mentorRouteCaseId = "";
 let mentorRouteActivityId = "";
 let searchTerm = "";
 let statusFilter = "";
+let mentorActiveFilter = "";
 let caseSearchTerm = "";
 let caseStatusFilter = "";
 let caseTypeFilter = "";
@@ -1728,6 +1742,7 @@ const els = {
   resetButton: document.querySelector("#resetButton"),
   newCaseButton: document.querySelector("#newCaseButton"),
   dashboardNewCaseButton: document.querySelector("#dashboardNewCaseButton"),
+  dashboardNewParentButton: document.querySelector("#dashboardNewParentButton"),
   dashboardNewMentorButton: document.querySelector("#dashboardNewMentorButton"),
   cancelNewCaseButton: document.querySelector("#cancelNewCaseButton"),
   candidateForm: document.querySelector("#candidateForm"),
@@ -1739,6 +1754,7 @@ const els = {
   mentorListCount: document.querySelector("#mentorListCount"),
   searchInput: document.querySelector("#searchInput"),
   statusFilter: document.querySelector("#statusFilter"),
+  mentorActiveFilter: document.querySelector("#mentorActiveFilter"),
   handlerListCount: document.querySelector("#handlerListCount"),
   handlerSearchInput: document.querySelector("#handlerSearchInput"),
   handlerStatusFilter: document.querySelector("#handlerStatusFilter"),
@@ -1782,6 +1798,8 @@ const els = {
   selectedCaseId: document.querySelector("#selectedCaseId"),
   selectedStatus: document.querySelector("#selectedStatus"),
   selectedName: document.querySelector("#selectedName"),
+  selectedActiveStatus: document.querySelector("#selectedActiveStatus"),
+  reactivateMentorButton: document.querySelector("#reactivateMentorButton"),
   selectedCoordinatorMeta: document.querySelector("#selectedCoordinatorMeta"),
   selectedRegisteredByMeta: document.querySelector("#selectedRegisteredByMeta"),
   selectedCreatedMeta: document.querySelector("#selectedCreatedMeta"),
@@ -5592,6 +5610,8 @@ function filteredCandidates() {
   const term = searchTerm.trim().toLowerCase();
   return candidates.filter((candidate) => {
     const statusMatches = !statusFilter || candidate.status === statusFilter;
+    const activeMatches = !mentorActiveFilter
+      || (mentorActiveFilter === "active" ? candidate.active !== false : candidate.active === false);
     const queueMatches = !workQueueOnly || candidateNeedsAction(candidate);
     const text = [
       candidate.caseNumber,
@@ -5603,7 +5623,7 @@ function filteredCandidates() {
       candidate.coordinator,
       candidate.status
     ].join(" ").toLowerCase();
-    return queueMatches && statusMatches && (!term || text.includes(term));
+    return queueMatches && statusMatches && activeMatches && (!term || text.includes(term));
   });
 }
 
@@ -6299,8 +6319,10 @@ function navigateToCandidateListWithStatus(status) {
 function resetMentorFilters() {
   searchTerm = "";
   statusFilter = "";
+  mentorActiveFilter = "";
   els.searchInput.value = "";
   els.statusFilter.value = "";
+  els.mentorActiveFilter.value = "";
 }
 
 function renderSummary() {
@@ -7424,12 +7446,16 @@ function renderCases() {
     const parent = caseParent(caseRecord);
     const owner = responsibleHandler(caseRecord);
     const nextActivity = nextCaseActivity(caseRecord);
+    const createdAt = caseRecord.createdAt;
+    const updatedAt = caseRecord.updatedAt || createdAt;
+    const hasChanged = createdAt && updatedAt && new Date(updatedAt).getTime() > new Date(createdAt).getTime();
+    const dateLabel = `Skapad ${formatDate(createdAt)}${hasChanged ? ` · Senast ändrad ${formatDate(updatedAt)}` : ""}`;
     const row = document.createElement("tr");
     row.tabIndex = 0;
     row.dataset.caseId = caseRecord.id;
     row.setAttribute("aria-label", `Öppna ärende ${caseRecord.number}: ${caseRecord.title}`);
     row.innerHTML = `
-      <td class="case-register-primary"><span class="case-number-text">${escapeHtml(caseRecord.number)}</span><strong>${escapeHtml(caseRecord.title)}</strong><small>${escapeHtml(caseRecord.type)} · ändrad ${escapeHtml(formatDate(caseRecord.updatedAt))}</small></td>
+      <td class="case-register-primary"><span class="case-number-text">${escapeHtml(caseRecord.number)}</span><strong>${escapeHtml(caseRecord.title)}</strong><small>${escapeHtml(caseRecord.type)}</small><small>${escapeHtml(dateLabel)}</small></td>
       <td>${mentor ? escapeHtml(mentor.name) : parent ? escapeHtml(parent.name) : '<span class="text-secondary">Ej personanknutet</span>'}</td>
       <td class="case-register-state"><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseStatusLabel(caseRecord.status))}</span><small>${escapeHtml(nextActivity?.title || "Ingen återstående aktivitet")}</small></td>
       <td>${escapeHtml(owner?.name || "Ej tilldelad")}</td>
@@ -8981,11 +9007,11 @@ function renderTable() {
 
   for (const candidate of rows) {
     const row = document.createElement("tr");
-    row.className = candidate.id === selectedId ? "active" : "";
+    row.className = [candidate.id === selectedId ? "active" : "", candidate.active === false ? "mentor-register-inactive" : ""].filter(Boolean).join(" ");
     row.innerHTML = `
       <td><span class="case-number-text">${escapeHtml(candidate.caseNumber)}</span><small>${escapeHtml(daysSinceText(candidate.createdAt))}</small></td>
       <td>${escapeHtml(candidate.name)}<small>${escapeHtml(candidate.languages)}</small></td>
-      <td><span class="${statusClass(candidate)}">${escapeHtml(candidate.status)}</span></td>
+      <td><div class="mentor-register-status"><span class="${statusClass(candidate)}">${escapeHtml(candidate.status)}</span>${candidate.active === false ? '<span class="badge rounded-pill text-bg-secondary">Inaktiv</span>' : ""}</div></td>
       <td>${escapeHtml(candidate.area)}</td>
       <td>${escapeHtml(candidate.coordinator || "Ej tilldelad")}</td>
       <td>${escapeHtml(formatDate(candidate.updatedAt || candidate.createdAt))}</td>
@@ -9662,7 +9688,11 @@ function renderDetail() {
   els.detailEmpty.hidden = true;
   els.candidateDetail.hidden = false;
   els.recordMoreActions.hidden = false;
-  els.deleteButton.textContent = candidate.active === false ? "Aktivera mentor" : "Inaktivera mentor";
+  const inactive = candidate.active === false;
+  els.deleteButton.textContent = inactive ? "Aktivera mentor" : "Inaktivera mentor";
+  els.deleteButton.classList.toggle("text-danger", !inactive);
+  els.selectedActiveStatus.hidden = !inactive;
+  els.reactivateMentorButton.hidden = !inactive;
   els.nextActionBar.hidden = false;
   document.querySelectorAll(".detail-tabs .nav-item").forEach((item) => {
     item.hidden = false;
@@ -9831,6 +9861,8 @@ function renderNewCandidateDetail() {
   els.selectedUpdatedMeta.textContent = "Ej sparad";
   els.selectedStatus.textContent = "Ny";
   els.selectedStatus.className = "badge rounded-pill text-bg-secondary";
+  els.selectedActiveStatus.hidden = true;
+  els.reactivateMentorButton.hidden = true;
   els.recordMoreActions.hidden = true;
   els.nextActionBar.hidden = true;
   document.querySelectorAll(".detail-tabs .nav-item").forEach((item, index) => {
@@ -13229,6 +13261,7 @@ els.presentationCommentForm.addEventListener("submit", async (event) => {
 
 els.newCaseButton.addEventListener("click", navigateToNewCandidate);
 els.dashboardNewCaseButton.addEventListener("click", () => navigateToNewCase());
+els.dashboardNewParentButton.addEventListener("click", navigateToNewParent);
 els.dashboardNewMentorButton.addEventListener("click", navigateToNewCandidate);
 
 els.cancelNewCaseButton.addEventListener("click", () => {
@@ -13280,6 +13313,11 @@ els.searchInput.addEventListener("input", () => {
 
 els.statusFilter.addEventListener("change", () => {
   statusFilter = els.statusFilter.value;
+  renderTable();
+});
+
+els.mentorActiveFilter.addEventListener("change", () => {
+  mentorActiveFilter = els.mentorActiveFilter.value;
   renderTable();
 });
 
@@ -13925,7 +13963,7 @@ els.approveButton.addEventListener("click", async () => {
   showFeedback("Mentorn är godkänd.");
 });
 
-els.deleteButton.addEventListener("click", async () => {
+async function toggleSelectedCandidateActive() {
   const candidate = selectedCandidate();
   if (!candidate) return;
   const activating = candidate.active === false;
@@ -13941,7 +13979,10 @@ els.deleteButton.addEventListener("click", async () => {
   markSaved();
   showFeedback(activating ? "Mentorn har aktiverats." : "Mentorn har inaktiverats. Ärendehistoriken är bevarad.");
   await refresh();
-});
+}
+
+els.deleteButton.addEventListener("click", toggleSelectedCandidateActive);
+els.reactivateMentorButton.addEventListener("click", toggleSelectedCandidateActive);
 
 els.exampleDataMenu.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-example-count]");
@@ -13986,8 +14027,10 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
     selectedCaseRecordId = null;
     searchTerm = "";
     statusFilter = "";
+    mentorActiveFilter = "";
     els.searchInput.value = "";
     els.statusFilter.value = "";
+    els.mentorActiveFilter.value = "";
     await refresh();
     markSaved();
     showFeedback(`${datasetName} har laddats med sammanhängande prototypdata.`);

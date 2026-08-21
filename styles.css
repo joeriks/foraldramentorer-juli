@@ -3380,6 +3380,17 @@ body.is-system-administration .sidebar-menu-group {
   line-height: 1.35;
 }
 
+.mentor-register-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-1);
+}
+
+.mentor-register-inactive td {
+  background-color: #f5f6f7;
+  color: var(--bs-secondary-color);
+}
+
 .case-register-table td strong,
 .case-register-table td small,
 .activity-table td strong,

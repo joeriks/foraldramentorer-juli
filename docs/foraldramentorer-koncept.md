@@ -163,6 +163,10 @@ När en ny mentor registreras är `Skapa ärende om godkännande` förvalt, men 
 
 Under `Föräldrar` finns en direkt genväg till alla ärenden av typen `Stödärende för förälder`. Genvägen öppnar samma ärenderegister med ärendetypen förvald.
 
+Ärenderegistret visar när varje ärende skapades och visar även senast ändrat datum när posten har uppdaterats efter registreringen. Under `Skapa nytt` på Översikt finns direktval för att registrera både förälder och mentor.
+
+Mentorregistret skiljer på verksamhetsstatus och registerstatus. Det kan filtreras på aktiva eller inaktiva mentorer. En inaktiv mentor är tydligt märkt i listan och kan återaktiveras med ett direkt kommando på mentorkortet; historiken bevaras hela tiden.
+
 Kalendern ger en stor samlad månadsvy över bokade och genomförda möten samt förfallodatum för öppna aktiviteter och ärenden. Den återanvänder datum från respektive källpost och används för överblick och navigering, inte för separat dubbelregistrering. På mobil visas innehållet som en agenda grupperad per dag.
 
 Ärenderegistret samlar rubrik, typ och registreringsdatum i kolumnen `Ärende`, personkopplingen i `Person`, status och nästa aktivitet i `Läge` samt handläggare i `Ansvarig`. Tabeller får skrolla inom sin egen yta på små skärmar men ska aldrig göra hela sidan bredare.

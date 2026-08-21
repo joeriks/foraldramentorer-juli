@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260821-parent-support-shortcut-v101">
+    <link rel="stylesheet" href="styles.css?v=20260821-register-clarity-v102">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -205,6 +205,7 @@
                   <div class="card-body d-flex flex-column gap-2">
                     <button id="dashboardIncomingContactButton" type="button" class="btn btn-primary">Registrera kontakt</button>
                     <button id="dashboardNewCaseButton" type="button" class="btn btn-outline-primary">Nytt ärende</button>
+                    <button id="dashboardNewParentButton" type="button" class="btn btn-outline-primary">Registrera förälder</button>
                     <button id="dashboardNewMentorButton" type="button" class="btn btn-outline-primary">Registrera mentor</button>
                   </div>
                 </div>
@@ -1148,6 +1149,14 @@
                       <option value="">Alla statusar</option>
                     </select>
                   </div>
+                  <div class="col-md-4 col-xl-3">
+                    <label class="form-label" for="mentorActiveFilter">Registerstatus</label>
+                    <select id="mentorActiveFilter" class="form-select form-select-sm">
+                      <option value="">Alla mentorer</option>
+                      <option value="active">Aktiva</option>
+                      <option value="inactive">Inaktiva</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -1682,6 +1691,8 @@
                   </div>
                   <div class="record-actions d-flex flex-wrap gap-2 justify-content-end align-items-center">
                     <span id="selectedStatus" class="badge text-bg-secondary">Anmäld</span>
+                    <span id="selectedActiveStatus" class="badge text-bg-secondary" hidden>Inaktiv</span>
+                    <button id="reactivateMentorButton" type="button" class="btn btn-primary btn-sm" hidden>Aktivera mentor</button>
                     <div class="dropdown">
                       <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Fler åtgärder</button>
                       <ul class="dropdown-menu dropdown-menu-end">
@@ -2210,6 +2221,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260821-parent-support-shortcut-v101"></script>
+    <script type="module" src="app.js?v=20260821-register-clarity-v102"></script>
   </body>
 </html>
