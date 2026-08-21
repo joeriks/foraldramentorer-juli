@@ -161,6 +161,8 @@ När en ny mentor registreras är `Skapa ärende om godkännande` förvalt, men 
 
 Översiktens arbetskö är den primära ingången till det dagliga arbetet. Den kan växlas mellan `Aktiviteter`, `Otilldelade`, `Försenade` och `Ställningstaganden` och avgränsas till alla ärendeansvariga, egna ärenden eller en vald handläggare. `Otilldelade` visas separat eftersom posterna saknar ansvarig. Varje rad visar ärendet och dess nästa aktivitet. Processöversikten visar antal öppna ärenden per ärendetyp och leder till ett register som redan är filtrerat på den valda typen.
 
+Under `Föräldrar` finns en direkt genväg till alla ärenden av typen `Stödärende för förälder`. Genvägen öppnar samma ärenderegister med ärendetypen förvald.
+
 Kalendern ger en stor samlad månadsvy över bokade och genomförda möten samt förfallodatum för öppna aktiviteter och ärenden. Den återanvänder datum från respektive källpost och används för överblick och navigering, inte för separat dubbelregistrering. På mobil visas innehållet som en agenda grupperad per dag.
 
 Ärenderegistret samlar rubrik, typ och registreringsdatum i kolumnen `Ärende`, personkopplingen i `Person`, status och nästa aktivitet i `Läge` samt handläggare i `Ansvarig`. Tabeller får skrolla inom sin egen yta på små skärmar men ska aldrig göra hela sidan bredare.

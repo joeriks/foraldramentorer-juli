@@ -343,10 +343,14 @@ body {
 }
 
 .sidebar-subaction-link:hover,
-.sidebar-subaction-link:focus-visible {
+.sidebar-subaction-link:focus-visible,
+.sidebar-subaction-link.active {
   border-left-color: #fff;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
+}
+
+.sidebar-subaction-link:focus-visible {
   outline: 2px solid #fff;
   outline-offset: -2px;
 }

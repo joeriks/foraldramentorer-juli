@@ -24,6 +24,8 @@ test("serves the application shell", async () => {
   assert.match(html, /id="navIntake"/);
   assert.match(html, /id="navVersions"/);
   assert.match(html, /id="mobileIncomingContact"/);
+  assert.match(html, /id="navParentSupportCases"[^>]*href="#\/cases\/parent-support"/);
+  assert.match(html, /id="mobileParentSupportCases"[^>]*href="#\/cases\/parent-support"/);
   assert.match(html, /Kontaktmottagning/);
   assert.match(html, />Översikt<\/a>/);
   assert.match(html, /id="versionsView"/);
@@ -130,6 +132,8 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /if \(resolveConfirmation\("confirm"\)\) confirmActionModal\.hide\(\)/);
   assert.match(scriptText, /function renderCaseClosureSummary/);
   assert.match(scriptText, /function renderDashboardQueueOwnerFilter/);
+  assert.match(scriptText, /parentSupportNavigationActive/);
+  assert.match(scriptText, /version: "101"/);
   assert.match(scriptText, /dashboardQueueOwnerFilter === "all"/);
   assert.match(scriptText, /dashboardQueueMode === "unassigned"/);
   assert.match(scriptText, /version: "100"/);

@@ -136,6 +136,19 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "101",
+    date: "2026-08-21",
+    title: "Genväg till föräldrars stödärenden",
+    flow: "Navigation -> Föräldrar -> Stödärenden",
+    simplified: "Stödärenden för föräldrar kan nu öppnas direkt från navigationen utan att först gå via hela ärenderegistret.",
+    retained: "Genvägen använder det befintliga ärenderegistret och samma filtrering, ärendedata och handläggningsflöde som tidigare.",
+    changes: [
+      "Stödärenden har lagts till som genväg under Föräldrar i sidomenyn.",
+      "Samma genväg finns indragen under Föräldrar i mobilmenyn.",
+      "Föräldrasektionen markeras aktiv när listan eller ett stödärende visas."
+    ]
+  },
+  {
     version: "100",
     date: "2026-08-21",
     title: "Arbetskö per ärendeansvarig",
@@ -1182,6 +1195,8 @@ const els = {
   navAssignments: document.querySelector("#navAssignments"),
   navCandidates: document.querySelector("#navCandidates"),
   navParents: document.querySelector("#navParents"),
+  navParentSupportCases: document.querySelector("#navParentSupportCases"),
+  mobileParentSupportCases: document.querySelector("#mobileParentSupportCases"),
   navLearning: document.querySelector("#navLearning"),
   navSupportAreas: document.querySelector("#navSupportAreas"),
   navGeographicAreas: document.querySelector("#navGeographicAreas"),
@@ -6082,7 +6097,7 @@ function applyRoute() {
 
   const mentorSession = isMentorSession();
   const publicSession = isPublicSession();
-  for (const navigationItem of [els.navDashboard, els.navCalendar, els.navPresentation, els.navIntake, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navLearning, els.navAdministration]) {
+  for (const navigationItem of [els.navDashboard, els.navCalendar, els.navPresentation, els.navIntake, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navParentSupportCases, els.navLearning, els.navAdministration]) {
     navigationItem.hidden = mentorSession || publicSession;
   }
   document.querySelectorAll(".sidebar-nav > .nav-link.disabled").forEach((navigationItem) => {
@@ -6111,7 +6126,11 @@ function applyRoute() {
   els.navMatchings.classList.toggle("active", currentView === "cases" && caseTypeFilter === "matching");
   els.navAssignments.classList.toggle("active", currentView === "cases" && caseTypeFilter === "mentor-assignment");
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
-  els.navParents.classList.toggle("active", currentView === "parents" || currentView === "parent");
+  const parentSupportNavigationActive = (currentView === "cases" && caseTypeFilter === "parent-support")
+    || (currentView === "case" && cases.find((caseRecord) => caseRecord.id === routeCaseId)?.caseTypeId === "parent-support");
+  els.navParents.classList.toggle("active", currentView === "parents" || currentView === "parent" || parentSupportNavigationActive);
+  els.navParentSupportCases.classList.toggle("active", parentSupportNavigationActive);
+  els.mobileParentSupportCases.classList.toggle("active", parentSupportNavigationActive);
   els.navLearning.classList.toggle("active", currentView === "learning");
   els.navAdministration.classList.toggle("active", ["administration", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "presentation", "routines", "versions", "handler"].includes(currentView));
   els.navHandlers.classList.toggle("active", currentView === "administration" || currentView === "handler");
