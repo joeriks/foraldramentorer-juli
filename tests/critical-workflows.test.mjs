@@ -212,7 +212,7 @@ test("critical flow: support need becomes an accepted match and a linked mentor 
   mentorContact = transition(mentorContact, "completed", "mentor_accepts");
   activities = replaceActivity(activities, mentorContact);
   const meeting = activities.find((activity) => activity.templateId === "matchingFirstMeeting");
-  activities = replaceActivity(activities, transition(meeting, "completed", "meeting_booked"));
+  activities = replaceActivity(activities, transition(meeting, "completed", "meeting_completed"));
 
   matchingCase.details.parentResponse = "accepted";
   assert.equal(matchingOutcome(matchingCase.details.parentResponse, matchingCase.details.mentorResponse), "waiting");

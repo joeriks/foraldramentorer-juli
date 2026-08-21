@@ -533,7 +533,17 @@
                   <div class="record-actions d-flex flex-wrap gap-2 justify-content-end align-items-center">
                     <span id="selectedCaseStatus" class="badge text-bg-secondary"></span>
                     <button id="editCaseButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
-                    <button id="newCaseActivityButton" type="button" class="btn btn-primary btn-sm">Ny aktivitet</button>
+                    <div id="caseAddMenu" class="dropdown">
+                      <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Lägg till</button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button id="newCaseActivityButton" type="button" class="dropdown-item">Aktivitet</button></li>
+                        <li><button id="addCaseContactButton" type="button" class="dropdown-item">Kontakt</button></li>
+                        <li><button id="addCaseMeetingButton" type="button" class="dropdown-item">Möte</button></li>
+                        <li><button id="addCaseDocumentButton" type="button" class="dropdown-item">Handling</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button id="addCaseNoteButton" type="button" class="dropdown-item">Anteckning om ärendet</button></li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
                 <details id="caseHeaderDetails" class="case-header-details">
@@ -737,7 +747,7 @@
                   <li id="assignmentFollowupTabItem" class="nav-item" hidden><button class="nav-link" id="assignment-followup-tab" data-bs-toggle="tab" data-bs-target="#assignment-followup-pane" type="button">Uppföljning <span id="assignmentFollowupCount" class="tab-count">0</span></button></li>
                   <li class="nav-item"><button class="nav-link" id="case-documents-tab" data-bs-toggle="tab" data-bs-target="#case-documents-pane" type="button">Handlingar <span id="caseDocumentCount" class="tab-count">0</span></button></li>
                   <li class="nav-item"><button class="nav-link" id="case-meetings-tab" data-bs-toggle="tab" data-bs-target="#case-meetings-pane" type="button">Kontakter <span id="caseMeetingCount" class="tab-count">0</span></button></li>
-                  <li class="nav-item"><button class="nav-link" id="case-events-tab" data-bs-toggle="tab" data-bs-target="#case-events-pane" type="button">Logg <span id="caseEventCount" class="tab-count">0</span></button></li>
+                  <li class="nav-item"><button class="nav-link" id="case-events-tab" data-bs-toggle="tab" data-bs-target="#case-events-pane" type="button">Historik <span id="caseEventCount" class="tab-count">0</span></button></li>
                 </ul>
                 <div class="tab-content">
                   <section class="tab-pane fade show active card-body" id="case-overview-pane">
@@ -762,6 +772,46 @@
                         </div>
                       </details>
                     </section>
+                    <section id="caseDescriptionWorkspace" class="case-description-workspace record-section mb-4" aria-labelledby="caseDescriptionWorkspaceTitle">
+                      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                        <div>
+                          <div class="record-type">Ärendets gemensamma nuläge</div>
+                          <h3 id="caseDescriptionWorkspaceTitle" class="record-section-title mb-1">Ärendebeskrivning</h3>
+                          <p id="caseDescriptionMeta" class="small text-secondary mb-0"></p>
+                        </div>
+                        <button id="editCaseDescriptionButton" type="button" class="btn btn-outline-primary btn-sm">Redigera</button>
+                      </div>
+                      <div id="caseDescriptionReadView">
+                        <div id="caseDescriptionContent" class="case-description-content"></div>
+                        <button id="toggleCaseDescriptionButton" type="button" class="btn btn-link btn-sm px-0" hidden>Läs hela</button>
+                      </div>
+                      <form id="caseDescriptionForm" class="case-description-editor mt-3" hidden>
+                        <div class="case-description-toolbar" role="toolbar" aria-label="Formatera ärendebeskrivning">
+                          <button type="button" class="btn btn-outline-secondary btn-sm" data-description-format="heading" title="Rubrik">H</button>
+                          <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" data-description-format="bold" title="Fetstil">B</button>
+                          <button type="button" class="btn btn-outline-secondary btn-sm" data-description-format="list" title="Punktlista">•</button>
+                          <button type="button" class="btn btn-outline-secondary btn-sm" data-description-format="checklist" title="Checklista">☐</button>
+                          <button type="button" class="btn btn-outline-secondary btn-sm" data-description-format="link" title="Länk">Länk</button>
+                        </div>
+                        <label class="visually-hidden" for="caseWorkspaceDescriptionInput">Ärendebeskrivning</label>
+                        <textarea id="caseWorkspaceDescriptionInput" class="form-control" rows="9" required></textarea>
+                        <div class="d-flex justify-content-end gap-2 mt-2">
+                          <button id="cancelCaseDescriptionButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
+                          <button type="submit" class="btn btn-primary btn-sm">Spara beskrivning</button>
+                        </div>
+                      </form>
+                      <details id="caseDescriptionHistory" class="case-description-history mt-3" hidden>
+                        <summary id="caseDescriptionHistorySummary">Tidigare versioner</summary>
+                        <div id="caseDescriptionHistoryList" class="case-description-history-list"></div>
+                      </details>
+                    </section>
+                    <section id="caseRecentHistorySection" class="case-recent-history record-section mb-4" aria-labelledby="caseRecentHistoryTitle">
+                      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <h3 id="caseRecentHistoryTitle" class="record-section-title mb-0">Senaste i ärendet</h3>
+                        <button id="showFullCaseHistoryButton" type="button" class="btn btn-link btn-sm px-0">Visa hela historiken</button>
+                      </div>
+                      <div id="caseRecentHistoryList" class="case-history-list"></div>
+                    </section>
                     <details id="caseSecondaryDetails" class="case-secondary-details">
                       <summary id="caseSecondarySummary">Ärendeuppgifter och fler åtgärder</summary>
                       <div class="case-secondary-content">
@@ -772,7 +822,7 @@
                           <div><dt>Status</dt><dd id="caseStatusFact"></dd></div>
                           <div><dt>Prioritet</dt><dd id="casePriorityFact"></dd></div>
                           <div><dt>Förfallodatum</dt><dd id="caseDueDateFact"></dd></div>
-                          <div><dt>Beskrivning</dt><dd id="caseDescriptionFact"></dd></div>
+                          <div hidden><dt>Beskrivning</dt><dd id="caseDescriptionFact"></dd></div>
                         </dl>
                       </section>
                       <section class="record-section">
@@ -807,7 +857,7 @@
                           <button id="pauseCaseButton" type="button" class="btn btn-outline-secondary btn-sm">Pausa handläggningen</button>
                         </div>
                         <div id="resumeCaseAction" class="case-action-row" hidden>
-                          <div class="case-action-copy"><strong>Återuppta handläggningen</strong><p>Gör det pausade ärendet aktivt igen. Pausorsaken ligger kvar i loggen.</p></div>
+                          <div class="case-action-copy"><strong>Återuppta handläggningen</strong><p>Gör det pausade ärendet aktivt igen. Pausorsaken ligger kvar i historiken.</p></div>
                           <button id="resumeCaseButton" type="button" class="btn btn-outline-primary btn-sm">Återuppta handläggningen</button>
                         </div>
                         <div id="closeCaseAction" class="case-action-row">
@@ -848,6 +898,17 @@
                         </div>
                         <button id="activityDetailGuidanceButton" type="button" class="btn btn-outline-primary btn-sm"></button>
                       </aside>
+                      <section id="guidedActivityPanel" class="guided-activity-panel" hidden>
+                        <div class="guided-activity-heading">
+                          <div>
+                            <div class="record-type">Guidade arbetssteg</div>
+                            <h4 id="guidedActivitySummary" class="h6 mb-1"></h4>
+                            <p id="guidedActivityNextAction" class="small text-secondary mb-0"></p>
+                          </div>
+                          <span id="guidedActivityTemplateVersion" class="badge text-bg-light border"></span>
+                        </div>
+                        <div id="guidedActivitySteps" class="guided-activity-steps"></div>
+                      </section>
                       <section id="activityWorkInputPanel" class="activity-work-input" hidden>
                         <div class="activity-work-input-copy">
                           <div class="d-flex flex-wrap align-items-center gap-2">
@@ -991,10 +1052,17 @@
                           <button id="cancelCaseActivityButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button>
                         </div>
                         <div class="row g-3">
-                          <div class="col-md-6"><label class="form-label" for="activityTitleInput">Rubrik</label><input id="activityTitleInput" class="form-control form-control-sm" required autocomplete="off"></div>
-                          <div class="col-md-3"><label class="form-label" for="activityOwnerInput">Ansvarig</label><select id="activityOwnerInput" class="form-select form-select-sm"></select></div>
-                          <div class="col-md-3"><label class="form-label" for="activityDueDateInput">Förfallodatum</label><input id="activityDueDateInput" class="form-control form-control-sm" type="date"></div>
-                          <div class="col-12"><label class="form-label" for="activityNoteInput">Notering</label><textarea id="activityNoteInput" class="form-control form-control-sm" rows="2"></textarea></div>
+                          <div class="col-12"><label class="form-label" for="activityTitleInput">Rubrik</label><input id="activityTitleInput" class="form-control form-control-sm" required autocomplete="off"></div>
+                          <div class="col-12"><label class="form-label" for="activityInstructionInput">Instruktion <span class="text-secondary fw-normal">(valfritt)</span></label><textarea id="activityInstructionInput" class="form-control form-control-sm" rows="2"></textarea></div>
+                          <div class="col-12">
+                            <details class="case-activity-options">
+                              <summary>Fler alternativ</summary>
+                              <div class="row g-3 mt-1">
+                                <div class="col-md-6"><label class="form-label" for="activityOwnerInput">Ansvarig</label><select id="activityOwnerInput" class="form-select form-select-sm"></select></div>
+                                <div class="col-md-6"><label class="form-label" for="activityDueDateInput">Förfallodatum <span class="text-secondary fw-normal">(valfritt)</span></label><input id="activityDueDateInput" class="form-control form-control-sm" type="date"></div>
+                              </div>
+                            </details>
+                          </div>
                         </div>
                         <div class="d-flex justify-content-end mt-3"><button type="submit" class="btn btn-primary btn-sm">Lägg till aktivitet</button></div>
                       </form>
@@ -1130,12 +1198,12 @@
                     <div id="caseMeetingsList" class="interaction-timeline"></div>
                   </section>
                   <section class="tab-pane fade card-body" id="case-events-pane">
-                    <div class="table-responsive border rounded">
-                      <table class="table table-sm align-middle mb-0 audit-table">
-                        <thead class="table-light"><tr><th>Tidpunkt</th><th>Händelse</th><th>Handläggare</th></tr></thead>
-                        <tbody id="caseEventTableBody"></tbody>
-                      </table>
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                      <div><h3 class="h6 mb-1">Historik</h3><p class="small text-secondary mb-0">Händelser från ärendets aktiviteter, kontakter, handlingar och anteckningar i tidsordning.</p></div>
+                      <button id="historyAddCaseNoteButton" type="button" class="btn btn-outline-primary btn-sm">Ny ärendeanteckning</button>
                     </div>
+                    <div id="caseHistoryFilters" class="case-history-filters btn-group btn-group-sm mb-3" role="group" aria-label="Filtrera historik"></div>
+                    <div id="caseHistoryList" class="case-history-list"></div>
                   </section>
                 </div>
               </div>
@@ -1497,6 +1565,10 @@
                     <h3 class="record-section-title">Tillåtna resultat</h3>
                     <div id="activityTypeResultsFact" class="activity-type-results"></div>
                   </section>
+                  <section id="activityTypeStepsSection" class="record-section" hidden>
+                    <h3 class="record-section-title">Stegmall</h3>
+                    <div id="activityTypeStepsFact" class="activity-type-steps"></div>
+                  </section>
                   <section class="record-section"><h3 class="record-section-title">Påverkan och historik</h3><div id="activityTypeImpactFact"></div></section>
                 </div>
                 <form id="activityTypeAdminForm" hidden>
@@ -1507,6 +1579,13 @@
                     <label class="form-label" for="activityTypeAdminWorkInstructionInput">Handläggningsanvisning</label>
                     <textarea id="activityTypeAdminWorkInstructionInput" class="form-control" rows="5" required></textarea>
                     <div class="form-text">Visas när handläggaren öppnar en aktivitet som bygger på mallen.</div>
+                  </section>
+                  <section id="activityTypeAdminStepsSection" class="record-section" hidden>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                      <div><h3 class="record-section-title mb-1">Stegmall</h3><p class="small text-secondary mb-0">Ändringarna publiceras som en ny version och påverkar bara nya aktiviteter.</p></div>
+                      <button id="addActivityTypeStepButton" type="button" class="btn btn-outline-primary btn-sm">Lägg till steg</button>
+                    </div>
+                    <div id="activityTypeAdminSteps" class="activity-type-step-editor"></div>
                   </section>
                 </form>
               </div>
@@ -2248,6 +2327,32 @@
       </div>
     </div>
 
+    <div class="modal fade" id="caseNoteModal" tabindex="-1" aria-labelledby="caseNoteModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <form id="caseNoteForm" class="modal-content">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow mb-1">Arbetsanteckning</p><h2 id="caseNoteModalTitle" class="modal-title h5">Anteckning om ärendet</h2></div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label" for="caseNoteTargetInput">Vad gäller anteckningen?</label>
+              <select id="caseNoteTargetInput" class="form-select"></select>
+            </div>
+            <div>
+              <label class="form-label" for="caseNoteTextInput">Anteckning</label>
+              <textarea id="caseNoteTextInput" class="form-control" rows="6" required></textarea>
+            </div>
+            <p class="small text-secondary mt-2 mb-0">Formella tjänsteanteckningar registreras fortsatt som handling.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Avbryt</button>
+            <button type="submit" class="btn btn-primary">Spara anteckning</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-labelledby="confirmActionTitle" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content confirm-action-modal">
@@ -2271,7 +2376,7 @@
               <select id="confirmActionResultInput" class="form-select"></select>
             </div>
             <div class="mt-3">
-              <label class="form-label" for="confirmActionNote">Notering <span class="text-secondary fw-normal">(valfritt)</span></label>
+              <label class="form-label" for="confirmActionNote">Notering <span id="confirmActionNoteRequirement" class="text-secondary fw-normal">(valfritt)</span></label>
               <textarea id="confirmActionNote" class="form-control form-control-sm" rows="3" placeholder="Kort notering om underlag, avvikelse eller beslut."></textarea>
             </div>
           </div>
@@ -2285,6 +2390,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260821-registry-guidance-v103"></script>
+    <script type="module" src="app.js?v=20260821-case-workspace-v106"></script>
   </body>
 </html>

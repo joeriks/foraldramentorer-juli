@@ -236,7 +236,19 @@ När handläggaren öppnar ett ärende ska fliken `Arbete` direkt besvara:
 - Vad inväntar kommunen?
 - Vilket underlag finns redan?
 
+Fliken visar därför nästa åtgärd först, därefter ärendebeskrivningen, aktiviteterna och de två eller tre senaste verksamhetshändelserna. Tekniska systemhändelser visas inte i den korta listan. Äldre grunduppgifter och sällan använda ärendeåtgärder ligger kollapsade sist.
+
+Ärendebeskrivningen används för bakgrund, syfte, aktuellt läge och önskat resultat. Handläggaren redigerar den i ett särskilt läge och varje tidigare version kan läsas med användare och tidpunkt. För `Övrigt ärende` är beskrivningen rymlig från början; i styrda ärenden tar den mindre plats tills den behöver läsas eller ändras.
+
+Menyn `Lägg till` ska i första hand styra till rätt verksamhetsobjekt: aktivitet, kontakt, möte eller handling. `Anteckning om ärendet` ligger sist och används bara när informationen inte hör hemma i någon av dessa registreringar.
+
 Handläggaren går därefter till den aktuella aktiviteten, utför arbetet, registrerar relevant resultat och kompletterar med underlag endast när det behövs.
+
+En aktivitet kan vara enkel eller guidad. En enkel aktivitet fungerar som tidigare och visar resultat och anteckning direkt. En guidad aktivitet samlar flera interna arbetssteg i samma aktivitet. Stegen har inte egna ansvariga eller förfallodatum och syns därför inte som separata poster i arbetskön. Om ett moment behöver eget ansvar eller egen bevakning ska handläggaren skapa en vanlig aktivitet.
+
+I en guidad aktivitet visas färdiga steg kompakt och det aktuella steget utvecklat med en tydlig nästa åtgärd. Obligatoriska steg måste bli klara innan handläggaren kan välja aktivitetens slutresultat. Valfria steg kan hoppas över med en registrerad orsak. Ett blockerat steg sätter aktiviteten i vänteläge, men stegets status ersätter aldrig aktivitetens separata verksamhetsresultat.
+
+Den första guidade aktiviteten är `Genomför första mötet` i matchningsflödet: `Förbered`, `Hitta tid`, `Boka och kalla`, `Genomför` och `Dokumentera`. Ett bokat och kopplat möte flyttar aktiviteten till `Genomför`. När samma möte markeras genomfört och har en saklig anteckning blir även `Genomför` och `Dokumentera` klara. Handläggaren väljer därefter aktivitetens slutresultat uttryckligen.
 
 Aktivitetslistan ligger i samma första flik. Den är medvetet kompakt och visar aktivitetens namn, aktuellt läge, registrerat resultat och den kopplade registrering som fortfarande måste färdigställas. Ansvarsundantag, förfallodatum och handlingar visas bara när de är relevanta.
 
@@ -278,7 +290,7 @@ När alla tillämpliga aktiviteter är avslutade och inga ställningstaganden å
 
 - **Översikt:** prioriterar dagens arbete, ger genvägar för att skapa nytt och visar antal öppna ärenden i verksamhetsflödena.
 - **Ärenderegister:** visar den fullständiga, sökbara listan över ärenden. Här väljer användaren vilket ärende som ska öppnas.
-- **Ärendekort:** är den primära arbetsytan för översikt, aktiviteter, handlingar, logg och beslut i ett ärende.
+- **Ärendekort:** är den primära arbetsytan för beskrivning, aktiviteter, handlingar, kontakter, historik och beslut i ett ärende.
 - **Mentorregister och mentorkort:** visar person- och registeruppgifter samt länkar till personens ärenden. Kontroller, möten och beslut ska registreras i rätt ärende och bara sammanfattas på mentorkortet.
 - **Demoläge:** finns under Systemadministration och demonstrerar aktuella funktioner i en förberedd ordning. Återkoppling från ett demosteg registreras som ett utvecklingsförslag i supportkön och får inte blandas med verksamhetsärenden, tjänsteanteckningar eller logghändelser.
 
@@ -739,6 +751,12 @@ Ett särskilt verksamhetskommando kan ha en definierad sammansatt effekt. Exempe
 
 ## 14. Handlingar, tjänsteanteckningar och kontakter
 
+### När en fri ärendeanteckning används
+
+Använd en fri ärendeanteckning endast för saklig arbetsinformation som inte har en bättre strukturerad plats. Ange om den gäller hela ärendet, en aktivitet eller ett kontakttillfälle. Resultat från aktiviteter, mötesutfall, kontaktuppgifter, beslut och dokument ska inte skrivas om i anteckningen eftersom de redan visas i den gemensamma historiken.
+
+En rättelse skapar en ny version och markerar den tidigare som ersatt. Originaltext, författare och tidpunkt ligger kvar. En fri ärendeanteckning är inte en formell tjänsteanteckning.
+
 ### När en tjänsteanteckning används
 
 En uppgift som kommer in muntligt eller på annat sätt än genom en handling och som kan ha betydelse för ett beslut ska dokumenteras med datum och uppgiftslämnare enligt den rutin som gäller. Systemet registrerar dessutom skapad av och skapad tidpunkt.
@@ -828,11 +846,11 @@ Systemet bör inte automatiskt:
 
 ### 16.1 Administration av ärende- och aktivitetsmallar
 
-Samordnaren ska kunna se hur ärendetyper och aktivitetsmallar styr handläggningen. För en ärendetyp visas hjälptext, registreringsanvisning, skapandeväg, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallarna kan öppnas från aktivitetsflödet eller från det samlade mallregistret. En mall är ett gemensamt versionshanterat objekt och kan återanvändas av flera egna ärendetyper. Processkartan skiljer mellan manuellt skapbara ärenden och ärenden som måste startas från en mentorpost, ett stödärende eller en accepterad matchning. För en aktivitetsmall visas handläggningsanvisning, tillåtna statuslägen, avslutsregel, kopplad strukturerad registrering, resultatval och vilka ärendetyper som använder mallen.
+Samordnaren ska kunna se hur ärendetyper och aktivitetsmallar styr handläggningen. För en ärendetyp visas hjälptext, registreringsanvisning, skapandeväg, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Aktivitetsmallarna kan öppnas från aktivitetsflödet eller från det samlade mallregistret. En mall är ett gemensamt versionshanterat objekt och kan återanvändas av flera egna ärendetyper. Processkartan skiljer mellan manuellt skapbara ärenden och ärenden som måste startas från en mentorpost, ett stödärende eller en accepterad matchning. För en aktivitetsmall visas aktivitetsläge, handläggningsanvisning, tillåtna statuslägen, avslutsregel, kopplad strukturerad registrering, resultatval och vilka ärendetyper som använder mallen. För en guidad aktivitet kan systemadministratören lägga till, ordna, redigera och inaktivera steg.
 
 Samordnaren kan skapa egna manuella ärendetyper och egna generella aktivitetsmallar. För en egen ärendetyp går det att välja kompletterande fält, mentorkoppling, aktivitetsmallarnas ordning och föreslagen nästa ärendetyp. Cirkulära flöden blockeras. En egen definition kan inaktiveras när inga aktiva definitioner är beroende av den. Inaktivering döljer definitionen för nya registreringar men raderar aldrig historik.
 
-Kommunen får ändra handledande texter och valbara verksamhetsinställningar. Tekniska ID:n, inbyggda skapandevägar, grundläggande statusregler, resultatkoder, registreringskrav och lagringsnycklar är systemstyrda. Inbyggda kärnflödens struktur är skyddad eftersom särskilda verksamhetsregler använder deras tekniska ID:n. En publicerad ändring skapar en ny version för nya ärenden och aktiviteter; pågående och avslutade poster behåller den version som användes när de skapades. Administrationsvyn visar berörda poster och beroenden före publicering eller inaktivering.
+Kommunen får ändra handledande texter och valbara verksamhetsinställningar. Tekniska ID:n, inbyggda skapandevägar, grundläggande statusregler, resultatkoder, registreringskrav och lagringsnycklar är systemstyrda. Inbyggda kärnflödens struktur är skyddad eftersom särskilda verksamhetsregler använder deras tekniska ID:n. En publicerad ändring skapar en ny version för nya ärenden och aktiviteter; pågående och avslutade poster behåller den version och den stegsnapshot som användes när de skapades. Administrationsvyn visar berörda poster och beroenden före publicering eller inaktivering.
 
 En föreslagen nästa ärendetyp betyder att handläggaren får ett nästa kommando. Den innebär inte att följdärendet skapas automatiskt.
 
@@ -916,6 +934,10 @@ Handläggaren avslutar aktiviteten `Bekräfta att föräldern vill gå vidare`. 
 ### Scenario 14: avslut kräver mer information
 
 Handläggaren öppnar en aktivitet och ser alla möjliga resultat som en lista utan förvalt värde. Om den kopplade registreringen inte är klar är de avslutande resultaten spärrade och vyn visar vad som saknas. När underlaget är klart kan handläggaren välja resultat, komplettera med anteckning och använda knappen som tydligt anger om nästa aktivitet öppnas eller om användaren återgår till ärendet.
+
+### Scenario 15: första mötet genomförs i en guidad aktivitet
+
+Handläggaren öppnar `Genomför första mötet`. Aktiviteten visar vilket av fem steg som är aktuellt och nästa konkreta åtgärd. När ett kopplat möte bokas blir förberedelse, tidssökning och bokning klara utan nya aktiviteter i arbetskön. När mötet senare markeras genomfört med en saklig anteckning blir stegen `Genomför` och `Dokumentera` klara. Systemet visar vem som ändrade varje steg och när, men handläggaren väljer fortfarande aktivitetens slutresultat separat. Om ett obligatoriskt steg blockeras sätts aktiviteten i vänteläge tills hindret har hanterats.
 
 ## 18A. Utbildningsmaterial och rollstyrda ingångar
 

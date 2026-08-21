@@ -32,6 +32,10 @@ test("publishes new versions without rewriting historical records", () => {
   assert.match(app, /templateVersion: template\.version/);
   assert.match(app, /status: "retired"/);
   assert.match(app, /status: "published"/);
+  assert.match(html, /id="activityTypeAdminSteps"/);
+  assert.match(app, /function publishedStepTemplate\(definition\)/);
+  assert.match(app, /stepTemplateVersion/);
+  assert.match(app, /activityTemplateRefs: references/);
 });
 
 test("checks dependencies before inactivation and cycles before publication", () => {

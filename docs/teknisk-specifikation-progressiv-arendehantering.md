@@ -49,6 +49,7 @@ En aktivitet beskriver något som ska utföras eller följas upp inom ärendet.
 - Aktiviteten kan uttryckligen tilldelas en annan handläggare.
 - En avslutad aktivitet har ett strukturerat resultat.
 - Ett avvikande resultat kan skapa behov av ett separat ställningstagande.
+- En aktivitet kan vara enkel eller guidad. Ett aktivitetssteg är ett internt moment och har därför inte egen ansvarig, eget förfallodatum eller en egen rad i arbetskön.
 
 ### 3.3 Handling
 
@@ -186,6 +187,23 @@ interface ActivityTemplateDefinition {
   requiresResultOnCompletion: boolean;
   quickCompletionResultCodes: string[];
   resultDefinitions: ResultDefinition[];
+  activityMode: "simple" | "guided";
+  stepTemplate?: ActivityStepTemplate;
+}
+
+interface ActivityStepTemplate {
+  version: number;
+  steps: ActivityStepDefinition[];
+}
+
+interface ActivityStepDefinition {
+  id: string;
+  title: string;
+  nextAction: string;
+  checkpoint: string;
+  required: boolean;
+  active: boolean;
+  sortOrder: number;
 }
 
 interface ResultDefinition {
@@ -340,6 +358,40 @@ Administrationsvyn för ärendetyper är avsiktligt begränsad. Administratören
 
 Varje sparad ändring publicerar en ny version och pensionerar den tidigare versionen. Nya ärenden använder den nya publicerade versionen. Befintliga ärenden fortsätter använda sin sparade `caseTypeVersion`. Om ett fält tas bort från en ny version döljs det i nya registreringar, men tidigare sparade värden raderas inte.
 
+### 4.1.2 Ärendebeskrivning och arbetsanteckningar
+
+Ärendets aktuella `description` används som läsmodell, medan varje ändring sparas oföränderligt för revision:
+
+```ts
+interface CaseDescriptionVersion {
+  id: string;
+  tenantId: string;
+  caseId: string;
+  text: string;
+  version: number;
+  createdAt: string;
+  createdBy: string;
+}
+
+interface CaseNoteVersion {
+  id: string;
+  tenantId: string;
+  caseId: string;
+  noteId: string;
+  targetType: "case" | "activity" | "interaction";
+  targetId: string | null;
+  text: string;
+  version: number;
+  supersedesVersionId: string | null;
+  createdAt: string;
+  createdBy: string;
+}
+```
+
+En ändring av beskrivningen uppdaterar `Case.description`, ökar ärendets version och skapar `CaseDescriptionVersion` i samma kommando. En rättad anteckning får samma stabila `noteId`, högre `version` och `supersedesVersionId`; den tidigare versionen skrivs aldrig över. Formella tjänsteanteckningar ligger fortsatt i `CaseDocument`.
+
+Historikvyn är en läsprojektion av `CaseEvent` och de versionshanterade anteckningarna. En händelse som endast pekar på en anteckningsversion visas inte som en extra rad. Tekniska händelser finns kvar men markeras och tonas ned.
+
 ### 4.2 Aktiviteter
 
 ```ts
@@ -357,6 +409,7 @@ interface CaseActivity {
   templateId: string;
   templateVersion: number;
   title: string;
+  instruction?: string | null;
   status: ActivityStatus;
   resultCode: string | null;
   resultClassification: "acceptable" | "deviation" | null;
@@ -371,8 +424,38 @@ interface CaseActivity {
   updatedBy: string;
   completedAt: string | null;
   completedBy: string | null;
+  guidedState?: GuidedActivityState;
 }
 ```
+
+En enkel aktivitet saknar `guidedState` och fungerar som tidigare. När en guidad aktivitet skapas kopieras den publicerade stegmallen till en oföränderlig snapshot på aktiviteten:
+
+```ts
+type ActivityStepStatus =
+  | "not_started"
+  | "in_progress"
+  | "complete"
+  | "blocked"
+  | "not_applicable";
+
+interface GuidedActivityState {
+  templateId: string;
+  templateVersion: number;
+  stepTemplateVersion: number;
+  steps: Array<ActivityStepDefinition & {
+    status: ActivityStepStatus;
+    reason: string | null;
+    updatedAt: string | null;
+    updatedBy: string | null;
+    completedAt: string | null;
+    completedBy: string | null;
+  }>;
+}
+```
+
+Snapshoten gör att en publicerad ändring av stegordning, text, obligatoriskhet eller aktivt läge endast påverkar nya aktiviteter. Varje stegändring sparar aktör och tidpunkt och skapar en händelse i ärendeloggen. Ett obligatoriskt steg måste vara `complete`; endast ett valfritt steg får sättas till `not_applicable`, och då krävs en orsak. Om något steg är `blocked` härleds aktivitetens övergripande status till `waiting`. Arbete med separat ansvar eller bevakningsdatum ska fortfarande skapas som en riktig aktivitet.
+
+Aktivitetens resultat är skilt från stegens status. En guidad aktivitet kan inte avslutas förrän samtliga obligatoriska steg är klara, men färdiga steg avslutar aldrig aktiviteten automatiskt.
 
 En aktivitetsmall kan dessutom ange en stabil koppling till en strukturerad registrering:
 
@@ -522,6 +605,8 @@ interface Interaction {
 
 Organisatören är skild från deltagarlistan och kan därför ansvara för bokningen utan att själv delta. Kallelsesvar och faktisk närvaro är skilda uppgifter. Ett bokat möte övergår till samma posts genomförandefas och ska inte registreras en gång till som en separat kontakt. I prototypen betyder `prepared` att en kallelsetext har skapats; systemet får inte påstå att ett meddelande har skickats utan en faktisk e-post- eller kalenderintegration.
 
+För den guidade aktiviteten `Genomför första mötet` fungerar ett ärende- och aktivitetskopplat möte som checkpunkt. En bokning markerar `Förbered`, `Hitta tid` och `Boka och kalla` som klara och gör `Genomför` aktuellt. Status `completed` med en saklig sammanfattning markerar även `Genomför` och `Dokumentera` som klara. Mötesändringen registrerar vilka steg som flyttades, men väljer inte aktivitetens slutresultat.
+
 Statusarna `cancelled` och `no_show` uppfyller aldrig ett aktivitetskrav på bokat eller genomfört möte. Ombokning skapar en ny `Interaction` vars `rescheduledFromInteractionId` pekar på den inställda eller uteblivna posten. Originalposten och dess historik skrivs inte över av den nya tiden.
 
 `CaseMeeting` och äldre mötesposter läses under övergången genom en kompatibilitetsprojektion till `Interaction`. Nya ärendekopplade möten skriver båda representationerna tills alla befintliga läsmodeller använder den kanoniska interaktionsposten.
@@ -534,6 +619,9 @@ En rättelse av en handling skapar en ny version via `supersedesDocumentId`; den
 type CaseEventType =
   | "case_created"
   | "case_updated"
+  | "case_description_updated"
+  | "case_note_created"
+  | "case_note_corrected"
   | "assignment_changed"
   | "activity_updated"
   | "deviation_opened"
@@ -553,7 +641,7 @@ interface CaseEvent {
   caseId: string;
   eventType: CaseEventType;
   schemaVersion: number;
-  entityType: "case" | "activity" | "deviation" | "document" | "meeting" | "assignment" | "decision";
+  entityType: "case" | "case_note" | "activity" | "deviation" | "document" | "meeting" | "interaction" | "assignment" | "decision";
   entityId: string;
   actorId: string;
   occurredAt: string;
@@ -757,6 +845,8 @@ not_applicable -> not_started  (endast återöppningskommando)
 
 En avslutad aktivitet får endast återöppnas med motivering och behörighetskontroll. Resultat och avslutningstid bevaras i händelseloggen, medan aktivitetens aktuella resultat nollställs. En eventuell öppen avvikelse markeras `superseded` i samma transaktion.
 
+För guidade aktiviteter är stegens normala övergångar `not_started -> in_progress -> complete`. Ett steg kan gå från `not_started` eller `in_progress` till `blocked` och åter till `in_progress`. Endast valfria steg kan gå till `not_applicable`. Stegstatus får inte ändras efter att aktiviteten har avslutats annat än genom ett särskilt återöppningskommando.
+
 ### 9.3 Aktivitet och avvikelse
 
 1. Handläggaren avslutar aktiviteten med ett resultat.
@@ -787,7 +877,9 @@ Första vyn för en registrering ska vara ett kort formulär. Efter sparandet vi
 - Relevanta personkopplingar och ansvarig, om de finns.
 - Senaste registrering.
 - Ett primärt rekommenderat nästa steg.
+- En versionshanterad ärendebeskrivning.
 - Aktivitetslistan i den första fliken `Arbete`.
+- De senaste verksamhetsrelevanta händelserna.
 
 Tomma eller irrelevanta faktarader ska inte visas. Ärendenummer, rubrik och status ska alltid vara synliga. Personkopplingar, ansvar, ändringstid och längre vägledning om ärendetypen är stängda från start men kan öppnas vid behov. Sällan använda ärendeuppgifter och åtgärder samlas också i en utfällbar sektion.
 
@@ -795,12 +887,14 @@ Tomma eller irrelevanta faktarader ska inte visas. Ärendenummer, rubrik och sta
 
 När användaren kompletterar ärendet används följande uppdelning:
 
-- Arbete, med nästa steg och samtliga aktiviteter.
+- Arbete, i ordningen nästa åtgärd, ärendebeskrivning, aktiviteter, senaste händelser och kollapsade ärendeuppgifter.
 - Handlingar.
-- Möten.
-- Logg.
+- Kontakter, med möten, telefonsamtal, e-post och besök.
+- Historik, med filtren `Allt`, `Anteckningar`, `Aktiviteter`, `Kontakter`, `Handlingar` och `Systemhändelser`.
 
 Flikarna använder samma ärende-ID och laddar relaterade poster separat.
+
+Menyn `Lägg till` öppnar befintliga registreringskommandon för aktivitet, kontakt, möte och handling samt ett separat kommando för fri ärendeanteckning. En fri aktivitet kräver endast `title`; ansvar ärvs från ärendet om `handlerIdOverride` är null och övriga planeringsfält är valfria.
 
 ### 10.3 Mentorpost
 
@@ -823,7 +917,9 @@ Förslag ska kunna avböjas när ingen verksamhetsregel kräver uppgiften.
 
 ### 10.5 Aktivitetsvy
 
-Aktivitetsvyn ska utgå från det normala flödet `resultat → eventuell anteckning → avslut`. Tillåtna resultat visas som en lista med radioknappar och inget resultat är förvalt. Ett valt resultat kan avmarkeras innan sparande.
+Enkla aktiviteter ska utgå från det normala flödet `resultat → eventuell anteckning → avslut`. Tillåtna resultat visas som en lista med radioknappar och inget resultat är förvalt. Ett valt resultat kan avmarkeras innan sparande.
+
+Guidade aktiviteter visar i stället en kompakt vertikal steglista. Färdiga steg är hopfällda men kan öppnas, och det aktuella steget är normalt utvecklat med relevanta checkpunkter och ett tydligt kommando för nästa åtgärd. Ärendets aktivitetslista visar bara `Steg X av Y`, aktuellt stegnamn och nästa åtgärd; stegen skapar inte egna rader. Resultat och avslut visas separat och är spärrade så länge ett obligatoriskt steg återstår.
 
 Om aktiviteten har ett obligatoriskt `ActivityWorkInputDefinition` och dess härledda läge inte är `complete` ska avslutande resultat vara inaktiverade. Vyn visar kraven för fullständighet och ett direkt kommando till den kopplade registreringen. Domänspecifika lägen får ersätta det generella ordet `Fullständig`; intervju visas exempelvis som `Inte bokad`, `Bokad` eller `Genomförd`, där genomförd kräver passerad mötestid och sammanfattning.
 
@@ -861,9 +957,9 @@ Ett matchningsärende startas från stödärendet och får ett förifyllt namn. 
 
 ### 10.9 Administration av definitioner
 
-Ärendetypsvyn ska visa och versionshantera hjälptext, registreringsanvisning, handläggningsanvisning, mentorkoppling, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Samordnaren kan skapa egna manuella ärendetyper, ordna deras aktivitetsmallar och inaktivera dem. Aktivitetsmallsvyn ska visa handläggningsanvisning, statusregler, avslutsregel, resultatdefinitioner och användande ärendetyper. Där kan samordnaren skapa egna generella aktivitetsmallar och inaktivera mallar som inte längre används av ett aktivt flöde. Äldre konfiguration för listavslut bevaras endast för bakåtkompatibilitet och visas inte i den aktuella administrationen.
+Ärendetypsvyn ska visa och versionshantera hjälptext, registreringsanvisning, handläggningsanvisning, mentorkoppling, kompletterande fält, aktivitetsflöde och föreslagen nästa ärendetyp. Samordnaren kan skapa egna manuella ärendetyper, ordna deras aktivitetsmallar och inaktivera dem. Aktivitetsmallsvyn ska visa aktivitetsläge, handläggningsanvisning, statusregler, avslutsregel, resultatdefinitioner och användande ärendetyper. För en guidad mall kan systemadministratören lägga till, ordna, redigera och inaktivera steg. Där kan samordnaren också skapa egna generella aktivitetsmallar och inaktivera mallar som inte längre används av ett aktivt flöde. Äldre konfiguration för listavslut bevaras endast för bakåtkompatibilitet och visas inte i den aktuella administrationen.
 
-Publicering är versionsstyrd, inte en ändring på plats. Ett nytt ärende sparar `caseTypeId` och exakt `caseTypeVersion`. Varje aktivitet sparar `templateId` och exakt `templateVersion`. När en aktivitetsmall får en ny version ska samordnaren uttryckligen välja den i ärendetypens aktivitetsflöde och publicera en ny ärendetypversion; befintliga referenser uppgraderas inte automatiskt. Pågående och avslutade poster fortsätter läsa namn, vägledning, fält, resultat och nästa ärendetyp från sin sparade version. Ingen automatisk migrering sker.
+Publicering är versionsstyrd, inte en ändring på plats. Ett nytt ärende sparar `caseTypeId` och exakt `caseTypeVersion`. Varje aktivitet sparar `templateId`, exakt `templateVersion` och vid behov en snapshot av `stepTemplateVersion`. När en använd aktivitetsmall publiceras i administrationsvyn skapas även en ny version av de berörda ärendetyperna med referens till den nya aktivitetsmallversionen. Pågående och avslutade ärenden och aktiviteter behåller sina tidigare versionsreferenser och stegsnapshots. Ingen automatisk migrering av historiska poster sker.
 
 Inaktivering motsvarar säker borttagning: den publicerade versionen pensioneras och försvinner från nya val, men historiska poster och revisionsdata raderas inte. En ärendetyp får inte inaktiveras om en aktiv ärendetyp leder till den. En aktivitetsmall får inte inaktiveras om en aktiv ärendetyp använder den. Cirkulära följdflöden ska blockeras före publicering. Administrationsvyn ska före åtgärden visa antal öppna och avslutade poster samt aktiva beroenden.
 
@@ -1071,6 +1167,19 @@ interface CaseRepository {
 - Ett befintligt länkat följdärende öppnas i stället för att en dubblett föreslås.
 - Ett följdärende skapas endast efter ett uttryckligt användarkommando och länkas till ursprungsärendet.
 - Ett sammansatt typbundet beslut visar och loggar alla effekter atomärt.
+
+### Guidade aktiviteter
+
+- Enkla aktiviteter fungerar utan stegdata och med oförändrat resultatflöde.
+- En guidad aktivitet visar aktuellt steg och nästa konkreta åtgärd utan separata köposter för stegen.
+- Obligatoriska steg blockerar aktivitetens slutresultat tills de är klara.
+- Ett blockerat steg sätter aktiviteten i vänteläge och bevarar orsak, aktör och tidpunkt.
+- Ett valfritt steg kan hoppas över endast med registrerad orsak.
+- Ett bokat möte för `Genomför första mötet` flyttar aktiviteten till steget `Genomför`.
+- Ett genomfört möte med anteckning gör även steget `Dokumentera` klart.
+- Aktivitetens slutresultat väljs separat och sätts aldrig automatiskt av ett steg eller möte.
+- En publicerad ändring av stegmallen påverkar endast nya aktiviteter.
+- Första leveransen aktiverar guidning endast för `Genomför första mötet`; registerkontroll, intervju och matchning fortsätter som enkla aktiviteter tills pilotflödet har utvärderats.
 
 ### Avvikelse
 

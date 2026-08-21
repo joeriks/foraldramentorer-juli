@@ -230,6 +230,16 @@ test("defines guided workflows for matching and mentor assignments", () => {
     "matchingDecision"
   ]);
   assert.ok(assignment.suggestedActivities.includes("Följ upp efter fyra veckor"));
+  const firstMeeting = ACTIVITY_TEMPLATES.find((item) => item.id === "matchingFirstMeeting");
+  assert.equal(firstMeeting.title, "Genomför första mötet");
+  assert.equal(firstMeeting.activityMode, "guided");
+  assert.deepEqual(firstMeeting.stepTemplate.steps.filter((step) => step.active).map((step) => step.title), [
+    "Förbered",
+    "Hitta tid",
+    "Boka och kalla",
+    "Genomför",
+    "Dokumentera"
+  ]);
 });
 
 test("uses business outcomes instead of generic completion for matching activities", () => {

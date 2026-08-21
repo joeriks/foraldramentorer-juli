@@ -121,6 +121,9 @@ test("serves application assets and returns 404 for unknown files", async () => 
   const interactionDomain = await worker.fetch(new Request("https://example.test/interaction-domain.js"), {}, context);
   assert.equal(interactionDomain.status, 200);
   assert.match(await interactionDomain.text(), /meetingSatisfiesRequirement/);
+  const guidedActivityDomain = await worker.fetch(new Request("https://example.test/guided-activity-domain.js"), {}, context);
+  assert.equal(guidedActivityDomain.status, 200);
+  assert.match(await guidedActivityDomain.text(), /synchronizeFirstMeetingSteps/);
   assert.match(scriptText, /#\/case-types\/\$\{encodeURIComponent\(definition\.id\)\}/);
   assert.match(scriptText, /function activityTemplateAdminRoute/);
   assert.match(scriptText, /renderRoutineFlowDiagrams/);

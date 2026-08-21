@@ -170,14 +170,25 @@ export const ACTIVITY_TEMPLATES = [
   },
   {
     id: "matchingFirstMeeting",
-    version: 1,
-    title: "Boka första mötet",
+    version: 2,
+    title: "Genomför första mötet",
+    activityMode: "guided",
+    stepTemplate: {
+      version: 1,
+      steps: [
+        { id: "prepare", title: "Förbered", nextAction: "Bekräfta att underlaget är förberett", checkpoint: "prepared", required: true, active: true, sortOrder: 0 },
+        { id: "find-time", title: "Hitta tid", nextAction: "Kom överens om en tid", checkpoint: "time_found", required: true, active: true, sortOrder: 1 },
+        { id: "book-and-invite", title: "Boka och kalla", nextAction: "Boka möte och förbered kallelse", checkpoint: "meeting_scheduled", required: true, active: true, sortOrder: 2 },
+        { id: "conduct", title: "Genomför", nextAction: "Registrera mötesutfall", checkpoint: "meeting_completed", required: true, active: true, sortOrder: 3 },
+        { id: "document", title: "Dokumentera", nextAction: "Dokumentera mötet", checkpoint: "meeting_documented", required: true, active: true, sortOrder: 4 }
+      ]
+    },
     workInput: { kind: "case_meeting", featureKey: "case.meetings", label: "Mötesbokning", required: true },
-    workInstruction: "Kom överens med parterna om datum, kontaktform och praktiska förutsättningar för ett första möte. Registrera bokningen. Använd Väntar om en tid ännu inte är bekräftad; avsluta inte aktiviteten som genomförd enbart för att ett kontaktförsök har gjorts.",
+    workInstruction: "Förbered mötet, hitta en tid, boka och kalla parterna, genomför mötet och dokumentera utfallet. Aktiviteten avslutas först efter ett registrerat slutresultat.",
     results: [
-      ["meeting_booked", "Första mötet bokat", "acceptable"],
-      ["meeting_not_booked", "Mötet kunde inte bokas", "acceptable"],
-      ["rescheduling_needed", "Ombokning behövs", "deviation"]
+      ["meeting_completed", "Första mötet genomfört", "acceptable"],
+      ["meeting_not_completed", "Mötet kunde inte genomföras", "deviation"],
+      ["continued_work_needed", "Fortsatt arbete behövs", "deviation"]
     ]
   },
   {
@@ -298,7 +309,7 @@ export const CASE_TYPE_DEFINITIONS = [
   },
   {
     id: "matching",
-    version: 1,
+    version: 2,
     name: "Matchning",
     creationMode: "support_case",
     nextCaseTypeId: "mentor-assignment",
@@ -309,7 +320,15 @@ export const CASE_TYPE_DEFINITIONS = [
     workInstruction: "Kontrollera mentorens tillgänglighet, erfarenhetsområden och övriga grundkriterier. Dokumentera varför matchningen föreslås och registrera båda parters återkoppling innan beslut om matchning.",
     detailFieldIds: [],
     defaultPriority: "normal",
-    activityTemplateIds: ["matchingEligibility", "matchingProposal", "matchingMentorContact", "matchingFirstMeeting", "matchingPartyResponses", "matchingDecision"]
+    activityTemplateIds: ["matchingEligibility", "matchingProposal", "matchingMentorContact", "matchingFirstMeeting", "matchingPartyResponses", "matchingDecision"],
+    activityTemplateRefs: [
+      { templateId: "matchingEligibility", version: 1 },
+      { templateId: "matchingProposal", version: 1 },
+      { templateId: "matchingMentorContact", version: 1 },
+      { templateId: "matchingFirstMeeting", version: 2 },
+      { templateId: "matchingPartyResponses", version: 1 },
+      { templateId: "matchingDecision", version: 1 }
+    ]
   },
   {
     id: "mentor-assignment",

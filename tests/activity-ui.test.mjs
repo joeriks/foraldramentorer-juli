@@ -54,7 +54,7 @@ test("shows activities in the first case work tab", () => {
   assert.doesNotMatch(html, /id="case-activities-tab"/);
   assert.match(html, /id="case-activities-pane" hidden/);
   assert.match(app, /function prepareCaseWorkView\(\)/);
-  assert.match(app, /els\.caseSecondaryDetails\.before\(els\.caseActivitiesPane\)/);
+  assert.match(app, /els\.caseRecentHistorySection\.before\(els\.caseActivitiesPane\)/);
   assert.match(app, /els\.caseActivitiesPane\.hidden = false/);
   assert.doesNotMatch(app, /\["open_activities", "Visa alla kontroller"/);
 });
@@ -65,7 +65,9 @@ test("keeps the activity list compact and finishes activities in their detail vi
   assert.doesNotMatch(app, /<strong>Gör så här:<\/strong>/);
   assert.doesNotMatch(app, /<strong>Registrerat utfall:<\/strong>/);
   assert.doesNotMatch(app, /activity-completion-meta/);
-  assert.match(app, /const incompleteWorkInput = workInput\?\.required && workInput\.state !== "complete"/);
+  assert.match(app, /function activityCompletionBlocker\(activity, caseRecord\)/);
+  assert.match(app, /incompleteGuidedActivityStep\(activity\)/);
+  assert.match(app, /activityCompletionBlocker\(activity, caseRecord\)/);
   assert.match(app, /class="activity-result-summary">\$\{escapeHtml\(result\)\}/);
 });
 
@@ -90,11 +92,26 @@ test("keeps overview, registers and case headers focused on actionable informati
 
 test("blocks completion results until required registration is complete", () => {
   assert.match(app, /function incompleteRequiredActivityWorkInput\(activity, caseRecord\)/);
+  assert.match(app, /function incompleteGuidedActivityStep\(activity\)/);
+  assert.match(app, /function activityCompletionBlocker\(activity, caseRecord\)/);
   assert.match(app, /workInput\?\.required && workInput\.state !== "complete"/);
   assert.match(app, /activityDetailResultFieldset\.disabled = locked \|\| Boolean\(workInputBlocker\)/);
   assert.doesNotMatch(app, /activityDetailResultFieldset\.disabled = locked;/);
-  assert.match(app, /if \(resultCode && incompleteRequiredActivityWorkInput\(activity, caseRecord\)\) return/);
+  assert.match(app, /if \(resultCode && activityCompletionBlocker\(activity, caseRecord\)\) return/);
   assert.match(app, /Slutför \$\{workInputBlocker\.label\.toLocaleLowerCase\("sv-SE"\)\} ovan innan du kan välja ett avslutande resultat/);
+});
+
+test("shows guided steps without expanding the case activity list", () => {
+  assert.match(html, /id="guidedActivityPanel"/);
+  assert.match(html, /id="guidedActivitySteps"/);
+  assert.match(app, /function renderGuidedActivity\(activity\)/);
+  assert.match(app, /Steg \$\{guidedProgress\.currentIndex \+ 1\} av \$\{guidedProgress\.totalCount\}/);
+  assert.match(app, /Nästa åtgärd:/);
+  assert.match(app, /data-guided-step-status="blocked"/);
+  assert.match(app, /noteRequired: true/);
+  assert.match(app, /confirmActionNote\.reportValidity\(\)/);
+  assert.match(styles, /\.guided-activity-step\.is-current/);
+  assert.match(styles, /@media \(max-width: 767\.98px\)[\s\S]*\.guided-step-next/);
 });
 
 test("distinguishes a booked interview from a completed interview", () => {

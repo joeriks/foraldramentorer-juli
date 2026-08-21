@@ -134,8 +134,8 @@ Prototypens viktigaste funktioner är:
 
 - **Översikt** med arbetskö, genvägar för att skapa nytt och en visuell bild av hur ärendetyperna hänger ihop.
 - Centralt ärenderegister med sökning samt filtrering på ärendetyp och status.
-- Personanknutna och generella ärenden med ansvarig handläggare, aktiviteter, handlingar, möten och fullständig logg.
-- Aktiviteter som handläggarens huvudsakliga arbetsyta, med strukturerade resultat och tydligt nästa steg.
+- Personanknutna och generella ärenden med ansvarig handläggare, versionshanterad beskrivning, aktiviteter, handlingar, kontakter, arbetsanteckningar och fullständig historik.
+- Enkla och guidade aktiviteter som handläggarens huvudsakliga arbetsyta, med strukturerade resultat och tydligt nästa steg.
 - Godkännandeflöde för mentor med kontroller, utbildning, intervju och beslut.
 - Stöd- och matchningsflöde med sökbar mentorlista och synliga matchande respektive saknade kriterier.
 - Kontaktmottagning för inkommande samtal och e-post utan krav på personkoppling.
@@ -149,11 +149,15 @@ Vyerna använder progressiv visning. Det som behövs för nästa normala arbetsm
 
 Stödområden hör till stödbehovet och lagras därför på stödärendet. De ska inte bli permanenta etiketter på föräldern. Mentorns erfarenhetsområden hör däremot till mentorprofilen och kan återanvändas i flera matchningar. När ett uppdrag skapas sparas en ögonblicksbild av de områden som uppdraget avser, så att senare katalogändringar inte skriver om historiken.
 
-Handläggaren arbetar normalt med aktiviteter. När en aktivitet ändras eller slutförs skapar systemet en händelse i loggen med tidpunkt och användare. Ett dokument, meddelande eller annat underlag registreras som en handling och kan kopplas till den aktivitet där underlaget användes.
+Handläggaren arbetar normalt med aktiviteter. När en aktivitet ändras eller slutförs skapar systemet en händelse i historiken med tidpunkt och användare. Ett dokument, meddelande eller annat underlag registreras som en handling och kan kopplas till den aktivitet där underlaget användes.
+
+Ärendebeskrivningen är ärendets långsiktiga nuläge och kan innehålla rubriker, listor, länkar och checklistor. Varje ändring skapar en ny beskrivningsversion; tidigare text bevaras med användare och tidpunkt. En fri ärendeanteckning används endast när informationen saknar en bättre strukturerad plats och kan kopplas till hela ärendet, en aktivitet eller ett kontakttillfälle. En rättelse skapar en ny anteckningsversion. Formella tjänsteanteckningar är fortsatt handlingar och blandas inte ihop med fria arbetsanteckningar.
+
+En aktivitet kan också guida handläggaren genom flera interna arbetssteg utan att varje steg blir en egen post i arbetskön. Sådana steg saknar eget ansvar och eget förfallodatum; de visar i stället aktivitetens progression och nästa konkreta åtgärd. Obligatoriska steg måste vara klara innan aktivitetens separata slutresultat kan registreras. Den första piloten är `Genomför första mötet`, där ett bokat respektive dokumenterat genomfört möte flyttar aktiviteten framåt.
 
 Minnesregel:
 
-> Aktivitet = att göra. Händelse = gjort. Handling = underlaget.
+> Aktivitet = att göra. Händelse = gjort. Handling = formellt underlag. Ärendeanteckning = nödvändig fri arbetsinformation som saknar bättre plats.
 
 När en ny mentor registreras är `Skapa ärende om godkännande` förvalt, men användaren kan välja bort det. Godkännandeärendet använder aktiviteter för identitet, belastningsregister, referenser, utbildning, kunskapsavstämning, kallelse, intervju och beslut. Handläggaren kan även lägga till fria uppföljningsaktiviteter, exempelvis att kontakta mentorn när en referens inte går att nå.
 
@@ -173,7 +177,9 @@ Kalendern ger en stor samlad månadsvy över bokade och genomförda möten, geno
 
 På mentorpostens ärendeflik visas varje öppet ärendes senaste ändringstid och varje avslutat ärendes avslutstid direkt tillsammans med statusen. Mentorpostens egen ändringstid benämns `Mentorpost ändrad` och påverkas bara när mentoruppgifter eller mentorstatus ändras, inte av alla händelser i länkade ärenden.
 
-På ärendekortet är fliken `Arbete` den första arbetsytan och innehåller både nästa rekommenderade steg och hela aktivitetslistan. Handlingar, möten och logg finns i egna flikar. Rubrik, ärendenummer och status ligger kvar i sidhuvudet, medan personkopplingar, ansvar och ändringstid är stängda från start under `Ärendeinformation`. Även den längre beskrivningen av vald ärendetyp kan öppnas vid behov. Sekundära ärendeuppgifter visas endast när de har ett relevant värde eller när användaren öppnar den utfällbara delen för fler åtgärder.
+På ärendekortet är fliken `Arbete` den första arbetsytan. Ordningen är nästa rekommenderade åtgärd, ärendebeskrivning, hela aktivitetslistan, de tre senaste verksamhetshändelserna samt kollapsade ärendeuppgifter och fler åtgärder. Övriga flikar är `Handlingar`, `Kontakter` och `Historik`. Rubrik, ärendenummer och status ligger kvar i sidhuvudet, medan personkopplingar, ansvar och ändringstid är stängda från start under `Ärendeinformation`. Sekundära ärendeuppgifter visas endast när de har ett relevant värde eller när användaren öppnar den utfällbara delen för fler åtgärder.
+
+Menyn `Lägg till` samlar aktivitet, kontakt, möte, handling och sist fri ärendeanteckning. Alla ärendetyper kan få en fri aktivitet med endast rubrik; ansvar ärvs från ärendet och instruktion, särskild ansvarig samt förfallodatum är valfria. Styrda och guidade aktiviteter behåller sina befintliga mallar och regler.
 
 ### Aktiviteter och kommunal handläggningsrutin
 

@@ -35,7 +35,27 @@ import {
   resultOptions,
   stableHash,
   supportProfileRequirements
-} from "./case-domain.js?v=20260818-completeness-v29";
+} from "./case-domain.js?v=20260821-guided-activities-v1";
+import {
+  GUIDED_STEP_STATUS_LABELS,
+  guidedActivityProgress,
+  guidedActivityState,
+  guidedActivityStatus,
+  initializeGuidedActivityState,
+  isGuidedActivityTemplate,
+  synchronizeFirstMeetingSteps,
+  updateGuidedActivityStep
+} from "./guided-activity-domain.js?v=20260821-guided-activities-v1";
+import {
+  CASE_HISTORY_FILTERS,
+  createAdHocActivity,
+  createCaseDescriptionVersion,
+  createCaseNoteVersion,
+  descriptionVersionsForCase,
+  filterCaseHistory,
+  latestRelevantCaseHistory,
+  projectCaseHistory
+} from "./case-workspace-domain.js?v=20260821-case-workspace-v106";
 import { calendarDate, calendarDateKey, calendarMonthDays } from "./calendar-domain.js?v=20260820-calendar-v1";
 import {
   INTERACTION_KIND_LABELS,
@@ -98,7 +118,7 @@ import {
 } from "./matching-catalog-domain.js?v=20260821-structured-matching-v1";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
-const DB_VERSION = 10;
+const DB_VERSION = 11;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
 const INCOMING_CONTACTS_STORE = "incomingContacts";
@@ -110,6 +130,8 @@ const CASE_ASSIGNMENTS_STORE = "caseAssignments";
 const CASE_ACTIVITIES_STORE = "caseActivities";
 const CASE_DOCUMENTS_STORE = "caseDocuments";
 const CASE_EVENTS_STORE = "caseEvents";
+const CASE_DESCRIPTION_VERSIONS_STORE = "caseDescriptionVersions";
+const CASE_NOTES_STORE = "caseNotes";
 const ACTIVITY_DEVIATIONS_STORE = "activityDeviations";
 const DEVIATION_DECISIONS_STORE = "deviationDecisions";
 const CASE_MEETINGS_STORE = "caseMeetings";
@@ -146,6 +168,36 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "106",
+    date: "2026-08-21",
+    title: "Ärendet som sammanhållen arbetsyta",
+    flow: "Ärendebeskrivning, löpande arbete och historik",
+    simplified: "Ärendets viktigaste arbete finns nu i en tydlig ordning på första fliken: nästa åtgärd, beskrivning, aktiviteter och de senaste relevanta händelserna.",
+    retained: "Styrda och guidade aktiviteter, möten, kontakter, handlingar och befintliga testdata fungerar vidare med samma regler. Historiken visar deras poster utan dubbelregistrering.",
+    changes: [
+      "Ärendebeskrivningen kan redigeras i en rymlig vy och tidigare versioner bevaras med handläggare och tidpunkt.",
+      "Menyn Lägg till samlar aktivitet, kontakt, möte, handling och fri ärendeanteckning på ett ställe.",
+      "Fria aktiviteter kräver endast rubrik; instruktion, särskild ansvarig och förfallodatum är valfria.",
+      "Logg heter nu Historik och kan filtreras efter anteckningar, aktiviteter, kontakter, handlingar och systemhändelser.",
+      "Fria arbetsanteckningar kan kopplas till ärendet, en aktivitet eller ett kontakttillfälle och rättas utan att äldre versioner försvinner."
+    ]
+  },
+  {
+    version: "105",
+    date: "2026-08-21",
+    title: "Guidade aktiviteter",
+    flow: "Aktiviteter och möteshandläggning",
+    simplified: "En aktivitet kan nu innehålla flera tydliga arbetssteg utan att varje moment skapar en egen rad i arbetskön. Bara det aktuella steget visas utvecklat.",
+    retained: "Enkla aktiviteter fungerar som tidigare. Pågående aktiviteter behåller sin mallversion och sin egen steghistorik när en administratör publicerar en ny stegmall.",
+    changes: [
+      "Genomför första mötet har fått fem guidade steg: Förbered, Hitta tid, Boka och kalla, Genomför samt Dokumentera.",
+      "Bokade och genomförda möten flyttar aktiviteten framåt automatiskt när rätt checkpunkter finns.",
+      "Obligatoriska steg blockerar aktivitetens slutresultat tills de är klara.",
+      "Blockerade steg sätter aktiviteten i vänteläge och varje stegändring registrerar handläggare och tidpunkt.",
+      "Steg kan ordnas, redigeras och inaktiveras i aktivitetsmallens administration genom en ny publicerad version."
+    ]
+  },
   {
     version: "104",
     date: "2026-08-21",
@@ -754,6 +806,7 @@ const MATCHING_ACTIVITY_TEMPLATE_BY_TITLE = new Map([
   ["Dokumentera matchningsförslag", "matchingProposal"],
   ["Kontakta mentorn", "matchingMentorContact"],
   ["Boka första mötet", "matchingFirstMeeting"],
+  ["Genomför första mötet", "matchingFirstMeeting"],
   ["Registrera parternas återkoppling", "matchingPartyResponses"],
   ["Fatta beslut om matchning", "matchingDecision"]
 ]);
@@ -1153,6 +1206,8 @@ let caseAssignments = [];
 let caseActivities = [];
 let caseDocuments = [];
 let caseEvents = [];
+let caseDescriptionVersions = [];
+let caseNotes = [];
 let activityDeviations = [];
 let deviationDecisions = [];
 let caseMeetings = [];
@@ -1247,6 +1302,8 @@ let supportTicketStatusFilter = "all";
 let activeTestUserType = TEST_USER_TYPES.has(localStorage.getItem(TEST_USER_TYPE_KEY))
   ? localStorage.getItem(TEST_USER_TYPE_KEY)
   : "coordinator";
+let caseHistoryFilter = "all";
+let caseDescriptionExpanded = false;
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
@@ -1507,6 +1564,8 @@ const els = {
   activityTypeWorkInputFact: document.querySelector("#activityTypeWorkInputFact"),
   activityTypeUsageFact: document.querySelector("#activityTypeUsageFact"),
   activityTypeResultsFact: document.querySelector("#activityTypeResultsFact"),
+  activityTypeStepsSection: document.querySelector("#activityTypeStepsSection"),
+  activityTypeStepsFact: document.querySelector("#activityTypeStepsFact"),
   activityTypeImpactFact: document.querySelector("#activityTypeImpactFact"),
   editActivityTypeButton: document.querySelector("#editActivityTypeButton"),
   deactivateActivityTypeButton: document.querySelector("#deactivateActivityTypeButton"),
@@ -1517,6 +1576,9 @@ const els = {
   activityTypeAdminTitleField: document.querySelector("#activityTypeAdminTitleField"),
   activityTypeAdminTitleInput: document.querySelector("#activityTypeAdminTitleInput"),
   activityTypeAdminWorkInstructionInput: document.querySelector("#activityTypeAdminWorkInstructionInput"),
+  activityTypeAdminStepsSection: document.querySelector("#activityTypeAdminStepsSection"),
+  activityTypeAdminSteps: document.querySelector("#activityTypeAdminSteps"),
+  addActivityTypeStepButton: document.querySelector("#addActivityTypeStepButton"),
   handlerDetailEmpty: document.querySelector("#handlerDetailEmpty"),
   handlerDetail: document.querySelector("#handlerDetail"),
   totalCount: document.querySelector("#totalCount"),
@@ -1622,7 +1684,12 @@ const els = {
   cancelCaseCreateButton: document.querySelector("#cancelCaseCreateButton"),
   saveCaseButton: document.querySelector("#saveCaseButton"),
   editCaseButton: document.querySelector("#editCaseButton"),
+  caseAddMenu: document.querySelector("#caseAddMenu"),
   newCaseActivityButton: document.querySelector("#newCaseActivityButton"),
+  addCaseContactButton: document.querySelector("#addCaseContactButton"),
+  addCaseMeetingButton: document.querySelector("#addCaseMeetingButton"),
+  addCaseDocumentButton: document.querySelector("#addCaseDocumentButton"),
+  addCaseNoteButton: document.querySelector("#addCaseNoteButton"),
   completeCaseButton: document.querySelector("#completeCaseButton"),
   editCaseAction: document.querySelector("#editCaseAction"),
   pauseCaseButton: document.querySelector("#pauseCaseButton"),
@@ -1643,6 +1710,21 @@ const els = {
   casePriorityFact: document.querySelector("#casePriorityFact"),
   caseDueDateFact: document.querySelector("#caseDueDateFact"),
   caseDescriptionFact: document.querySelector("#caseDescriptionFact"),
+  caseDescriptionWorkspace: document.querySelector("#caseDescriptionWorkspace"),
+  caseDescriptionMeta: document.querySelector("#caseDescriptionMeta"),
+  caseDescriptionReadView: document.querySelector("#caseDescriptionReadView"),
+  caseDescriptionContent: document.querySelector("#caseDescriptionContent"),
+  toggleCaseDescriptionButton: document.querySelector("#toggleCaseDescriptionButton"),
+  editCaseDescriptionButton: document.querySelector("#editCaseDescriptionButton"),
+  caseDescriptionForm: document.querySelector("#caseDescriptionForm"),
+  caseWorkspaceDescriptionInput: document.querySelector("#caseWorkspaceDescriptionInput"),
+  cancelCaseDescriptionButton: document.querySelector("#cancelCaseDescriptionButton"),
+  caseDescriptionHistory: document.querySelector("#caseDescriptionHistory"),
+  caseDescriptionHistorySummary: document.querySelector("#caseDescriptionHistorySummary"),
+  caseDescriptionHistoryList: document.querySelector("#caseDescriptionHistoryList"),
+  caseRecentHistorySection: document.querySelector("#caseRecentHistorySection"),
+  caseRecentHistoryList: document.querySelector("#caseRecentHistoryList"),
+  showFullCaseHistoryButton: document.querySelector("#showFullCaseHistoryButton"),
   caseOwnerFact: document.querySelector("#caseOwnerFact"),
   caseOrganizationUnitFact: document.querySelector("#caseOrganizationUnitFact"),
   caseCoHandlersFact: document.querySelector("#caseCoHandlersFact"),
@@ -1743,9 +1825,9 @@ const els = {
   caseActivityForm: document.querySelector("#caseActivityForm"),
   cancelCaseActivityButton: document.querySelector("#cancelCaseActivityButton"),
   activityTitleInput: document.querySelector("#activityTitleInput"),
+  activityInstructionInput: document.querySelector("#activityInstructionInput"),
   activityOwnerInput: document.querySelector("#activityOwnerInput"),
   activityDueDateInput: document.querySelector("#activityDueDateInput"),
-  activityNoteInput: document.querySelector("#activityNoteInput"),
   caseActivityTableBody: document.querySelector("#caseActivityTableBody"),
   activityProgressText: document.querySelector("#activityProgressText"),
   activityProgressBar: document.querySelector("#activityProgressBar"),
@@ -1766,6 +1848,11 @@ const els = {
   activityDetailGuidanceMore: document.querySelector("#activityDetailGuidanceMore"),
   activityDetailGuidanceMoreContent: document.querySelector("#activityDetailGuidanceMoreContent"),
   activityDetailGuidanceButton: document.querySelector("#activityDetailGuidanceButton"),
+  guidedActivityPanel: document.querySelector("#guidedActivityPanel"),
+  guidedActivitySummary: document.querySelector("#guidedActivitySummary"),
+  guidedActivityNextAction: document.querySelector("#guidedActivityNextAction"),
+  guidedActivityTemplateVersion: document.querySelector("#guidedActivityTemplateVersion"),
+  guidedActivitySteps: document.querySelector("#guidedActivitySteps"),
   activityWorkInputPanel: document.querySelector("#activityWorkInputPanel"),
   activityWorkInputTitle: document.querySelector("#activityWorkInputTitle"),
   activityWorkInputStatus: document.querySelector("#activityWorkInputStatus"),
@@ -1831,7 +1918,14 @@ const els = {
   caseMeetingSubmitButton: document.querySelector("#caseMeetingSubmitButton"),
   caseMeetingsEmpty: document.querySelector("#caseMeetingsEmpty"),
   caseMeetingsList: document.querySelector("#caseMeetingsList"),
-  caseEventTableBody: document.querySelector("#caseEventTableBody"),
+  caseHistoryFilters: document.querySelector("#caseHistoryFilters"),
+  caseHistoryList: document.querySelector("#caseHistoryList"),
+  historyAddCaseNoteButton: document.querySelector("#historyAddCaseNoteButton"),
+  caseNoteModal: document.querySelector("#caseNoteModal"),
+  caseNoteForm: document.querySelector("#caseNoteForm"),
+  caseNoteModalTitle: document.querySelector("#caseNoteModalTitle"),
+  caseNoteTargetInput: document.querySelector("#caseNoteTargetInput"),
+  caseNoteTextInput: document.querySelector("#caseNoteTextInput"),
   seedButton: document.querySelector("#seedButton"),
   exampleDataMenu: document.querySelector("#exampleDataMenu"),
   resetButton: document.querySelector("#resetButton"),
@@ -2006,6 +2100,7 @@ const els = {
   confirmActionActor: document.querySelector("#confirmActionActor"),
   confirmActionTime: document.querySelector("#confirmActionTime"),
   confirmActionNote: document.querySelector("#confirmActionNote"),
+  confirmActionNoteRequirement: document.querySelector("#confirmActionNoteRequirement"),
   confirmActionAlternativeButton: document.querySelector("#confirmActionAlternativeButton"),
   confirmActionResultRow: document.querySelector("#confirmActionResultRow"),
   confirmActionResultInput: document.querySelector("#confirmActionResultInput"),
@@ -2013,8 +2108,8 @@ const els = {
 };
 
 function prepareCaseWorkView() {
-  if (!els.caseOverviewPane || !els.caseActivitiesPane || !els.caseSecondaryDetails) return;
-  els.caseSecondaryDetails.before(els.caseActivitiesPane);
+  if (!els.caseOverviewPane || !els.caseActivitiesPane || !els.caseRecentHistorySection) return;
+  els.caseRecentHistorySection.before(els.caseActivitiesPane);
   els.caseActivitiesPane.hidden = false;
 }
 
@@ -2051,7 +2146,7 @@ function showCaseFormError(message, field = null) {
   field?.focus({ preventScroll: true });
 }
 
-function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, subjectLabel = "Mentor", subjectValue = "", confirmLabel = "Bekräfta", alternativeLabel = "", resultOptions = [], summaryItems = [], danger = false }) {
+function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName, subjectLabel = "Mentor", subjectValue = "", confirmLabel = "Bekräfta", alternativeLabel = "", resultOptions = [], summaryItems = [], danger = false, noteRequired = false }) {
   if (!confirmActionModal) return Promise.resolve({ confirmed: window.confirm(body), note: "" });
   els.confirmActionEyebrow.textContent = eyebrow;
   els.confirmActionTitle.textContent = title;
@@ -2066,6 +2161,8 @@ function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName
   els.confirmActionActor.textContent = currentUserName();
   els.confirmActionTime.textContent = formatDateTime(new Date().toISOString());
   els.confirmActionNote.value = "";
+  els.confirmActionNote.required = noteRequired;
+  els.confirmActionNoteRequirement.textContent = noteRequired ? "(krävs)" : "(valfritt)";
   els.confirmActionResultRow.hidden = !resultOptions.length;
   els.confirmActionResultInput.required = Boolean(resultOptions.length);
   els.confirmActionResultInput.innerHTML = resultOptions.length
@@ -2087,6 +2184,7 @@ function confirmAction({ eyebrow = "Bekräfta ändring", title, body, mentorName
 function resolveConfirmation(value) {
   if (!pendingConfirmation) return false;
   if (value === "confirm" && !els.confirmActionResultRow.hidden && !els.confirmActionResultInput.reportValidity()) return false;
+  if (value === "confirm" && !els.confirmActionNote.reportValidity()) return false;
   const resolve = pendingConfirmation;
   pendingConfirmation = null;
   resolve({ action: value, confirmed: value === "confirm", note: value === "cancel" ? "" : els.confirmActionNote.value.trim(), resultCode: els.confirmActionResultInput.value });
@@ -2178,6 +2276,13 @@ function openDatabase() {
       ensureIndex(eventStore, "caseId", "caseId");
       ensureIndex(eventStore, "tenantCase", ["tenantId", "caseId"]);
       ensureIndex(eventStore, "tenantOccurredAt", ["tenantId", "occurredAt"]);
+      const descriptionVersionStore = ensureStore(CASE_DESCRIPTION_VERSIONS_STORE);
+      ensureIndex(descriptionVersionStore, "caseId", "caseId");
+      ensureIndex(descriptionVersionStore, "tenantCase", ["tenantId", "caseId"]);
+      const caseNoteStore = ensureStore(CASE_NOTES_STORE);
+      ensureIndex(caseNoteStore, "caseId", "caseId");
+      ensureIndex(caseNoteStore, "tenantCase", ["tenantId", "caseId"]);
+      ensureIndex(caseNoteStore, "noteId", "noteId");
 
       const deviationStore = ensureStore(ACTIVITY_DEVIATIONS_STORE);
       ensureIndex(deviationStore, "tenantActivity", ["tenantId", "activityId"]);
@@ -2300,6 +2405,14 @@ function caseEventTx(mode = "readonly") {
   return db.transaction(CASE_EVENTS_STORE, mode).objectStore(CASE_EVENTS_STORE);
 }
 
+function caseDescriptionVersionTx(mode = "readonly") {
+  return db.transaction(CASE_DESCRIPTION_VERSIONS_STORE, mode).objectStore(CASE_DESCRIPTION_VERSIONS_STORE);
+}
+
+function caseNoteTx(mode = "readonly") {
+  return db.transaction(CASE_NOTES_STORE, mode).objectStore(CASE_NOTES_STORE);
+}
+
 function activityDeviationTx(mode = "readonly") {
   return db.transaction(ACTIVITY_DEVIATIONS_STORE, mode).objectStore(ACTIVITY_DEVIATIONS_STORE);
 }
@@ -2419,6 +2532,8 @@ const clearCaseDocuments = () => clearStore(caseDocumentTx);
 const getAllCaseEvents = () => getAllFrom(caseEventTx);
 const saveCaseEvent = (value) => putInto(caseEventTx, value);
 const clearCaseEvents = () => clearStore(caseEventTx);
+const getAllCaseDescriptionVersions = () => getAllFrom(caseDescriptionVersionTx);
+const getAllCaseNotes = () => getAllFrom(caseNoteTx);
 const getAllActivityDeviations = () => getAllFrom(activityDeviationTx);
 const getAllDeviationDecisions = () => getAllFrom(deviationDecisionTx);
 const getAllCaseMeetings = () => getAllFrom(caseMeetingTx);
@@ -2767,14 +2882,17 @@ function renderMentorSupportAreas(candidate) {
 
 async function loadCaseTypeDefinitions() {
   let stored = await getAllCaseTypeDefinitions();
-  const storedIds = new Set(stored.filter((definition) => definition.tenantId === DEFAULT_TENANT_ID).map((definition) => definition.id));
-  const missing = CASE_TYPE_DEFINITIONS.filter((definition) => !storedIds.has(definition.id));
+  const storedVersions = new Set(stored
+    .filter((definition) => definition.tenantId === DEFAULT_TENANT_ID)
+    .map((definition) => `${definition.id}@${Number(definition.version || 1)}`));
+  const missing = CASE_TYPE_DEFINITIONS.filter((definition) => !storedVersions.has(`${definition.id}@${Number(definition.version || 1)}`));
   if (missing.length) {
     await Promise.all(missing.map((definition) => saveCaseTypeDefinition({
       ...definition,
       tenantId: DEFAULT_TENANT_ID,
       status: "published",
-      activityTemplateRefs: (definition.activityTemplateIds || []).map((templateId) => ({ templateId, version: 1 }))
+      activityTemplateRefs: definition.activityTemplateRefs
+        || (definition.activityTemplateIds || []).map((templateId) => ({ templateId, version: 1 }))
     })));
     stored = await getAllCaseTypeDefinitions();
   }
@@ -2828,8 +2946,8 @@ function caseTypeActivityTemplateRefs(caseType) {
 async function loadActivityTemplateDefinitions() {
   let stored = await getAllActivityTemplateDefinitions();
   const tenantDefinitions = stored.filter((definition) => definition.tenantId === DEFAULT_TENANT_ID);
-  const storedIds = new Set(tenantDefinitions.map((definition) => definition.id));
-  const missing = ACTIVITY_TEMPLATES.filter((definition) => !storedIds.has(definition.id));
+  const storedVersions = new Set(tenantDefinitions.map((definition) => `${definition.id}@${Number(definition.version || 1)}`));
+  const missing = ACTIVITY_TEMPLATES.filter((definition) => !storedVersions.has(`${definition.id}@${Number(definition.version || 1)}`));
   if (missing.length) {
     await Promise.all(missing.map((definition, sortOrder) => saveActivityTemplateDefinition({
       ...definition,
@@ -2981,6 +3099,7 @@ async function updateTenantLearningSelection(contentId, selected) {
 
 const CASE_DATA_STORES = [
   CASES_STORE, CASE_ASSIGNMENTS_STORE, CASE_ACTIVITIES_STORE, CASE_DOCUMENTS_STORE, CASE_EVENTS_STORE,
+  CASE_DESCRIPTION_VERSIONS_STORE, CASE_NOTES_STORE,
   ACTIVITY_DEVIATIONS_STORE, DEVIATION_DECISIONS_STORE, CASE_MEETINGS_STORE, INTERACTIONS_STORE, MENTOR_REPORTS_STORE,
   PARENT_CHECK_INS_STORE, COMPENSATION_PERIODS_STORE, CASE_DOCUMENT_BLOBS_STORE, PROCESSED_COMMANDS_STORE
 ];
@@ -3476,7 +3595,7 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
     matchingEligibility: "Mentorn är godkänd och tillgänglig. Stödområden, språk och praktiska förutsättningar har jämförts med stödärendet.",
     matchingProposal: "Förslaget har dokumenterats utifrån stödbehov, erfarenhetsområden och praktiska förutsättningar.",
     matchingMentorContact: "Mentorn har fått information om uppdragets syfte och praktiska ramar.",
-    matchingFirstMeeting: "Tid och kontaktform för det första mötet har bekräftats med parterna.",
+    matchingFirstMeeting: "Det första mötet har bokats, genomförts och dokumenterats med parterna.",
     matchingPartyResponses: "Parternas svar har registrerats var för sig i matchningsärendet.",
     matchingDecision: "Det samlade matchningsutfallet har registrerats i ärendet."
   };
@@ -3503,17 +3622,17 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
     completed = [], inProgress = [], waiting = [], notApplicable = [], resultCodes = {}, notes = {}, completedBy = CURRENT_USER_ID
   } = {}) => {
     const configuredActivities = [
-      ...(type.activityTemplateIds || []).map((templateId) => {
-        const template = activityTemplateById(templateId);
-        return { templateId, title: template.title };
+      ...caseTypeActivityTemplateRefs(type).map(({ templateId, version: templateVersion }) => {
+        const template = activityTemplateDefinitionById(templateId, templateVersion) || activityTemplateById(templateId);
+        return { templateId, templateVersion, title: template.title };
       }),
-      ...(type.suggestedActivities || []).map((title) => ({ templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, title }))
+      ...(type.suggestedActivities || []).map((title) => ({ templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1, title }))
     ];
     const completedKeys = new Set(completed);
     const inProgressKeys = new Set(inProgress);
     const waitingKeys = new Set(waiting);
     const notApplicableKeys = new Set(notApplicable);
-    const activities = configuredActivities.map(({ templateId, title }, sortOrder) => {
+    const activities = configuredActivities.map(({ templateId, templateVersion, title }, sortOrder) => {
       const key = activityKey(templateId, title);
       const status = completedKeys.has(key)
         ? "completed"
@@ -3525,16 +3644,22 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
               ? "not_applicable"
               : "not_started";
       const resultCode = status === "completed"
-        ? resultCodes[key] || activityTemplateById(templateId).results[0]?.[0] || "completed"
+        ? resultCodes[key] || activityTemplateDefinitionById(templateId, templateVersion)?.results?.[0]?.[0] || "completed"
         : null;
+      const definition = activityTemplateDefinitionById(templateId, templateVersion);
+      const initializedGuidedState = initializeGuidedActivityState(definition, { actorId: completedBy, at: now });
+      const guidedState = initializedGuidedState && status === "completed"
+        ? { ...initializedGuidedState, steps: initializedGuidedState.steps.map((step) => ({ ...step, status: "complete", completedAt: now, completedBy, updatedAt: now, updatedBy: completedBy })) }
+        : initializedGuidedState;
       const activity = {
-        id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, templateId, templateVersion: 1, title,
+        id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId, templateId, templateVersion, title,
         status, resultCode,
-        resultClassification: status === "completed" ? resultClassification(templateId, resultCode) : null,
+        resultClassification: status === "completed" ? activityResultClassification({ templateId, templateVersion }, resultCode) : null,
         handlerIdOverride: null, waitingForParty: status === "waiting" ? "external" : null,
         dueDate: status === "waiting" ? today : null, sortOrder, version: 1,
         createdAt: now, createdBy: completedBy, updatedAt: now, updatedBy: completedBy,
-        completedAt: status === "completed" ? now : null, completedBy: status === "completed" ? completedBy : null
+        completedAt: status === "completed" ? now : null, completedBy: status === "completed" ? completedBy : null,
+        guidedState
       };
       if (status === "completed") addServiceNote(caseId, activity, notes[key] || matchingDemoNotes[key] || workflowDemoNotes[key], completedBy);
       return activity;
@@ -3697,8 +3822,8 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       if (accepted && firstMeetingActivity) {
         records[CASE_MEETINGS_STORE].push({
           id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: matchingCaseId, activityId: firstMeetingActivity.id,
-          meetingType: "other", occurredAt: now, mode: parentIndex % 2 ? "digital" : "physical",
-          summary: "Första mötet är bokat och praktiska förutsättningar har bekräftats med båda parter.",
+          meetingType: "other", meetingStatus: "completed", occurredAt: now, mode: parentIndex % 2 ? "digital" : "physical",
+          summary: "Det första mötet har genomförts. Parterna har bekräftat att de vill gå vidare och de praktiska förutsättningarna är dokumenterade.",
           nextStep: "Mentoruppdraget kan planeras när matchningen har avslutats.",
           participantHandlerIds: [ownerId], externalParticipantNames: [], supersedesMeetingId: null,
           supersededByMeetingId: null, version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId
@@ -3815,12 +3940,14 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
 }
 
 async function loadCaseData() {
-  [cases, caseAssignments, caseActivities, caseDocuments, caseEvents, activityDeviations, deviationDecisions, caseMeetings, interactions, mentorReports, parentCheckIns, compensationPeriods] = await Promise.all([
+  [cases, caseAssignments, caseActivities, caseDocuments, caseEvents, caseDescriptionVersions, caseNotes, activityDeviations, deviationDecisions, caseMeetings, interactions, mentorReports, parentCheckIns, compensationPeriods] = await Promise.all([
     getAllCases(),
     getAllCaseAssignments(),
     getAllCaseActivities(),
     getAllCaseDocuments(),
     getAllCaseEvents(),
+    getAllCaseDescriptionVersions(),
+    getAllCaseNotes(),
     getAllActivityDeviations(),
     getAllDeviationDecisions(),
     getAllCaseMeetings(),
@@ -3829,6 +3956,24 @@ async function loadCaseData() {
     getAllParentCheckIns(),
     getAllCompensationPeriods()
   ]);
+}
+
+async function ensureCaseDescriptionHistory() {
+  const caseIdsWithHistory = new Set(caseDescriptionVersions.map((item) => item.caseId));
+  const missing = cases
+    .filter((caseRecord) => !caseIdsWithHistory.has(caseRecord.id) && caseRecord.description?.trim())
+    .map((caseRecord) => createCaseDescriptionVersion({
+      id: crypto.randomUUID(),
+      tenantId: caseRecord.tenantId || DEFAULT_TENANT_ID,
+      caseId: caseRecord.id,
+      text: caseRecord.description,
+      version: 1,
+      createdAt: caseRecord.createdAt || caseRecord.updatedAt,
+      createdBy: caseRecord.createdBy || "system"
+    }));
+  if (!missing.length) return;
+  await atomicPut({ [CASE_DESCRIPTION_VERSIONS_STORE]: missing });
+  caseDescriptionVersions.push(...missing);
 }
 
 async function loadMatchingProfileData() {
@@ -4069,6 +4214,8 @@ function normalizedActivity(activity, normalizedCases) {
     ? MATCHING_ACTIVITY_TEMPLATE_BY_TITLE.get(activity.title)
     : null;
   const templateId = migratedMatchingTemplateId || storedTemplateId;
+  const templateVersion = Number(activity.templateVersion || 1);
+  const templateDefinition = activityTemplateDefinitionById(templateId, templateVersion);
   const status = normalizeActivityStatus(activity.status);
   const storedResultCode = activity.resultCode || activity.result || null;
   let migratedCompletedResult = MATCHING_LEGACY_COMPLETED_RESULTS[templateId];
@@ -4096,10 +4243,10 @@ function normalizedActivity(activity, normalizedCases) {
     ...activity,
     tenantId: activity.tenantId || caseRecord?.tenantId || DEFAULT_TENANT_ID,
     templateId,
-    templateVersion: Number(activity.templateVersion || 1),
+    templateVersion,
     status,
     resultCode,
-    resultClassification: resultCode ? resultClassification(templateId, resultCode) : null,
+    resultClassification: resultCode ? activity.resultClassification || activityResultClassification({ templateId, templateVersion: activity.templateVersion }, resultCode) : null,
     handlerIdOverride: activity.handlerIdOverride ?? (legacyHandlerId && legacyHandlerId !== caseOwnerId ? legacyHandlerId : null),
     waitingForParty: status === "waiting" ? activity.waitingForParty || "external" : null,
     dueDate: activity.dueDate || null,
@@ -4108,7 +4255,11 @@ function normalizedActivity(activity, normalizedCases) {
     createdBy: actorId(activity.createdBy),
     updatedBy: actorId(activity.updatedBy || activity.completedBy || activity.createdBy),
     completedAt: status === "completed" ? activity.completedAt || activity.updatedAt : null,
-    completedBy: status === "completed" ? actorId(activity.completedBy || activity.updatedBy) : null
+    completedBy: status === "completed" ? actorId(activity.completedBy || activity.updatedBy) : null,
+    guidedState: activity.guidedState || initializeGuidedActivityState(templateDefinition, {
+      actorId: actorId(activity.createdBy),
+      at: activity.createdAt || new Date().toISOString()
+    })
   };
 }
 
@@ -4291,8 +4442,8 @@ function caseClosureDetails(caseRecord) {
   const result = decision ? activityResultLabel(decision) : "";
   const outcome = caseRecord.closeNote || (decision && result ? `${decision.title}: ${result}` : "Ärendet avslutades utan angivet utfall");
   const storage = decision
-    ? `Resultatet "${result || "Ej angivet"}", avslutstid och registrerande användare har sparats i ärendet. Avslutet finns även i fliken Logg.`
-    : "Avslutsorsak, motivering, avslutstid och registrerande användare har sparats i ärendet och i fliken Logg.";
+    ? `Resultatet "${result || "Ej angivet"}", avslutstid och registrerande användare har sparats i ärendet. Avslutet finns även i fliken Historik.`
+    : "Avslutsorsak, motivering, avslutstid och registrerande användare har sparats i ärendet och i fliken Historik.";
   const mentor = caseMentor(caseRecord);
   let effect = "Ingen separat personpost ändrades automatiskt av avslutet.";
   if (caseRecord.caseTypeId === "mentor-certification" && decision?.resultCode === "approved" && mentor) {
@@ -4570,6 +4721,7 @@ async function refresh() {
   await loadCaseData();
   await migrateCaseDomainV6();
   await loadCaseData();
+  await ensureCaseDescriptionHistory();
   await loadMatchingProfileData();
   await ensureMatchingProfileRecords();
   projectMatchingProfiles();
@@ -7289,6 +7441,19 @@ function activityResultOptions(activity) {
     || ACTIVITY_RESULT_OPTIONS.default;
 }
 
+function activityDefinition(activity) {
+  return activityTemplateDefinitionById(activity?.templateId, activity?.templateVersion);
+}
+
+function activityResultClassification(activity, resultCode) {
+  return activityDefinition(activity)?.results?.find(([code]) => code === resultCode)?.[2]
+    || resultClassification(activity?.templateId, resultCode);
+}
+
+function guidedProgressForActivity(activity) {
+  return guidedActivityProgress(activity, activityDefinition(activity));
+}
+
 const WORK_INPUT_STATE_LABELS = {
   not_started: "Inte påbörjad",
   in_progress: "Påbörjad",
@@ -7448,6 +7613,16 @@ function activityWorkInputSummary(activity, caseRecord) {
 function incompleteRequiredActivityWorkInput(activity, caseRecord) {
   const workInput = activityWorkInputSummary(activity, caseRecord);
   return workInput?.required && workInput.state !== "complete" ? workInput : null;
+}
+
+function incompleteGuidedActivityStep(activity) {
+  const progress = guidedProgressForActivity(activity);
+  const step = progress?.incompleteRequired?.[0];
+  return step ? { kind: "guided_step", label: `steget ${step.title}`, step } : null;
+}
+
+function activityCompletionBlocker(activity, caseRecord) {
+  return incompleteGuidedActivityStep(activity) || incompleteRequiredActivityWorkInput(activity, caseRecord);
 }
 
 function defaultCompletedResult(activity) {
@@ -7779,7 +7954,8 @@ function renderCaseTypeGuidance(caseRecord = null) {
   }
   renderCaseStructuredMatchingEditor(caseType?.id === "parent-support" ? caseRecord : null);
   els.caseDescriptionInput.required = needsAnalysis;
-  els.caseDescriptionLabel.textContent = needsAnalysis ? "Kort beskrivning av behovet" : "Kort beskrivning";
+  els.caseDescriptionLabel.textContent = caseType?.id === "other" ? "Ärendebeskrivning" : needsAnalysis ? "Kort beskrivning av behovet" : "Kort beskrivning";
+  els.caseDescriptionInput.rows = caseType?.id === "other" ? 8 : 3;
 
   const titlePlaceholders = {
     "parent-support": "Exempel: Stöd kring skolfrånvaro",
@@ -8138,7 +8314,7 @@ function renderCaseTransitionPanel(caseRecord) {
   if (isCertification) {
     els.caseWorkGuidance.hidden = true;
     els.caseTransitionTitle.textContent = "Vad är nästa steg i mentorprövningen?";
-    els.caseTransitionHelp.textContent = "Arbeta med nästa kontroll eller avvikelse. Hela kontrollkedjan visas direkt nedan; handlingar, möten och logg finns i egna flikar.";
+    els.caseTransitionHelp.textContent = "Arbeta med nästa kontroll eller avvikelse. Hela kontrollkedjan visas direkt nedan; handlingar, kontakter och historik finns i egna flikar.";
     renderCertificationCaseChoices(caseRecord);
   }
   if (isNeedsAnalysis) {
@@ -8459,6 +8635,7 @@ function renderCaseDetail() {
   els.caseReadView.hidden = creating || caseEditMode;
   for (const element of document.querySelectorAll(".case-advanced-field")) element.hidden = creating && !caseEditMode;
   els.newCaseActivityButton.hidden = creating || caseEditMode || Boolean(selectedCaseActivityId);
+  els.caseAddMenu.hidden = creating || caseEditMode || Boolean(selectedCaseActivityId);
   els.editCaseButton.hidden = creating || caseEditMode;
   els.saveCaseButton.textContent = creating ? "Spara registrering" : "Spara ändringar";
   els.caseTypeInput.disabled = !creating;
@@ -8511,6 +8688,13 @@ function renderCaseDetail() {
     return;
   }
 
+  if (els.caseDescriptionWorkspace.dataset.caseId !== caseRecord.id) {
+    els.caseDescriptionWorkspace.dataset.caseId = caseRecord.id;
+    caseDescriptionExpanded = false;
+    els.caseDescriptionForm.hidden = true;
+    els.caseDescriptionReadView.hidden = false;
+  }
+
   const mentor = caseMentor(caseRecord);
   const parent = caseParent(caseRecord);
   const supportCase = caseSupportCase(caseRecord);
@@ -8525,6 +8709,7 @@ function renderCaseDetail() {
     selectedCaseActivityId = null;
   }
   els.newCaseActivityButton.hidden = caseEditMode || Boolean(selectedCaseActivityId);
+  els.caseAddMenu.hidden = caseEditMode || Boolean(selectedCaseActivityId);
 
   els.selectedCaseType.textContent = caseRecord.type;
   els.selectedCaseNumber.textContent = caseRecord.number;
@@ -8552,7 +8737,7 @@ function renderCaseDetail() {
   els.caseCreatedFact.textContent = `${formatDateTime(caseRecord.createdAt)} av ${handlerNameById(caseRecord.createdBy)}`;
   setRecordFactVisibility(els.casePriorityFact, caseRecord.priority && caseRecord.priority !== "normal");
   setRecordFactVisibility(els.caseDueDateFact, Boolean(caseRecord.dueDate));
-  setRecordFactVisibility(els.caseDescriptionFact, Boolean(caseRecord.description?.trim()));
+  setRecordFactVisibility(els.caseDescriptionFact, false);
   setRecordFactVisibility(els.caseCoHandlersFact, caseCoHandlers.length > 0);
   setRecordFactVisibility(els.caseMentorFact, Boolean(mentor));
   setRecordFactVisibility(els.caseParentFact, Boolean(parent));
@@ -8567,12 +8752,12 @@ function renderCaseDetail() {
   els.caseActivityCount.textContent = activities.length;
   els.caseDocumentCount.textContent = documents.length;
   els.caseMeetingCount.textContent = interactionsForCase.length;
-  els.caseEventCount.textContent = events.length;
 
   renderCaseActivities(caseRecord, activities);
   renderCaseDocuments(documents);
   renderCaseMeetings(caseRecord, interactionsForCase);
-  renderCaseEvents(events);
+  renderCaseDescription(caseRecord);
+  renderCaseHistory(caseRecord);
   renderActivityDetail(caseRecord);
   if (selectedCaseActivityId) {
     requestAnimationFrame(() => bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show());
@@ -8659,7 +8844,7 @@ function renderActivityCompletionDecision(caseRecord, applicableActivities, open
   if (!ready) return;
   const decision = activityCompletionDecision(caseRecord);
   els.activityCaseReadyTitle.textContent = "Alla aktiviteter är klara – ärendet är fortfarande öppet";
-  els.activityCaseReadyText.textContent = "Aktivitetsresultaten, tidpunkterna och registrerande användare har sparats i ärendet och dess logg. Inget följdärende skapades och ingen person- eller mentorpost ändrades när den sista aktiviteten avslutades.";
+  els.activityCaseReadyText.textContent = "Aktivitetsresultaten, tidpunkterna och registrerande användare har sparats i ärendets historik. Inget följdärende skapades och ingen person- eller mentorpost ändrades när den sista aktiviteten avslutades.";
   els.activityCaseReadyNextText.innerHTML = `<strong>Nästa steg:</strong> ${escapeHtml(decision.nextText)}`;
   els.activityCaseReadyPrimaryButton.textContent = decision.primaryLabel;
   els.activityCaseReadyPrimaryButton.dataset.action = decision.primaryAction;
@@ -8720,9 +8905,10 @@ function renderCaseActivities(caseRecord, activities) {
   for (const activity of visibleActivities) {
     const documents = activityDocuments(activity.id);
     const workInput = activityWorkInputSummary(activity, caseRecord);
+    const guidedProgress = guidedProgressForActivity(activity);
     const handler = effectiveActivityHandler(activity, caseRecord);
     const result = activity.status === "completed" ? activityResultLabel(activity) : "";
-    const incompleteWorkInput = workInput?.required && workInput.state !== "complete" ? workInput : null;
+    const incompleteWorkInput = !guidedProgress && workInput?.required && workInput.state !== "complete" ? workInput : null;
     const activityMeta = [
       activity.handlerIdOverride || !handler ? `Ansvarig: ${handler?.name || "Ej tilldelad"}` : "",
       activity.dueDate ? `Förfallodatum: ${activityDueLabel(activity)}` : "",
@@ -8738,6 +8924,7 @@ function renderCaseActivities(caseRecord, activities) {
           <div>
             <button type="button" class="activity-title-button" data-open-activity="${escapeHtml(activity.id)}">${escapeHtml(activity.title)}</button>
             ${result ? `<small class="activity-result-summary">${escapeHtml(result)}</small>` : ""}
+            ${guidedProgress ? `<small class="activity-guided-summary">${guidedProgress.currentStep ? `Steg ${guidedProgress.currentIndex + 1} av ${guidedProgress.totalCount}: ${escapeHtml(guidedProgress.currentStep.title)}` : `${guidedProgress.completedCount} av ${guidedProgress.totalCount} steg klara`}</small><small class="activity-guided-next">Nästa åtgärd: ${escapeHtml(guidedProgress.nextAction)}</small>` : ""}
             ${incompleteWorkInput ? `<small class="activity-linked-input"><span>Komplettera:</span> <a href="${escapeHtml(incompleteWorkInput.href || "#")}">${escapeHtml(incompleteWorkInput.label)}</a> <span class="badge ${escapeHtml(incompleteWorkInput.stateClass)}">${escapeHtml(incompleteWorkInput.stateLabel)}</span></small>` : ""}
             ${activityMeta.length ? `<small class="activity-list-meta">${activityMeta.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</small>` : ""}
           </div>
@@ -8767,6 +8954,7 @@ function renderActivityDetail(caseRecord) {
   if (activity.completedAt) auditParts.push(`Avslutad ${formatDateTime(activity.completedAt)} av ${handlerNameById(activity.completedBy)}`);
   els.activityDetailAudit.textContent = auditParts.join(" · ");
   renderActivityGuidance(activity, caseRecord);
+  renderGuidedActivity(activity);
   renderActivityWorkInput(activity, caseRecord);
   els.activityDetailStatus.textContent = activityWorkStateLabel(activity, caseRecord);
   els.activityDetailStatus.className = activityHasBlockingResult(activity)
@@ -8819,8 +9007,9 @@ function renderActivityDetail(caseRecord) {
 
 function renderActivityWorkInput(activity, caseRecord) {
   const workInput = activityWorkInputSummary(activity, caseRecord);
-  els.activityWorkInputPanel.hidden = !workInput;
-  if (!workInput) return;
+  const guided = Boolean(guidedProgressForActivity(activity));
+  els.activityWorkInputPanel.hidden = !workInput || guided;
+  if (!workInput || guided) return;
   els.activityWorkInputTitle.textContent = workInput.label;
   els.activityWorkInputStatus.textContent = workInput.stateLabel;
   els.activityWorkInputStatus.className = `badge ${workInput.stateClass}`;
@@ -8835,7 +9024,9 @@ function renderActivityWorkInput(activity, caseRecord) {
 
 function renderActivityGuidance(activity, caseRecord) {
   const mentor = caseMentor(caseRecord);
-  const templateGuidance = activityTemplateDefinitionById(activity.templateId, activity.templateVersion)?.workInstruction?.trim() || "";
+  const templateGuidance = activity.instruction?.trim()
+    || activityTemplateDefinitionById(activity.templateId, activity.templateVersion)?.workInstruction?.trim()
+    || "";
   const moreGuidance = ACTIVITY_GUIDANCE_MORE[activity.templateId];
   const identityDataMissing = activity.templateId === "identityVerified"
     && mentor
@@ -8855,6 +9046,78 @@ function renderActivityGuidance(activity, caseRecord) {
   ` : "";
   els.activityDetailGuidanceButton.hidden = !identityDataMissing;
   els.activityDetailGuidanceButton.textContent = identityDataMissing ? "Öppna identitetsuppgifter" : "";
+}
+
+function guidedStepStatusClass(status) {
+  if (status === "complete") return "text-bg-success";
+  if (status === "blocked") return "text-bg-warning";
+  if (status === "in_progress") return "text-bg-primary";
+  if (status === "not_applicable") return "text-bg-light border text-secondary";
+  return "text-bg-secondary";
+}
+
+function guidedStepCheckpointText(step) {
+  return ({
+    prepared: "Checkpunkt: mötesunderlaget är förberett.",
+    time_found: "Checkpunkt: parterna har kommit överens om en tid.",
+    meeting_scheduled: "Checkpunkt: ett möte med deltagare och tid är bokat.",
+    meeting_completed: "Checkpunkt: mötet är registrerat som genomfört.",
+    meeting_documented: "Checkpunkt: det genomförda mötet har en saklig anteckning."
+  })[step.checkpoint] || "Checkpunkt: steget har bekräftats av handläggaren.";
+}
+
+function latestMeetingForGuidedActivity(activity) {
+  return caseMeetings
+    .filter((meeting) => meeting.caseId === activity.caseId && !meeting.supersededByMeetingId && (!meeting.activityId || meeting.activityId === activity.id))
+    .sort((left, right) => new Date(right.updatedAt || right.occurredAt || 0) - new Date(left.updatedAt || left.occurredAt || 0))[0] || null;
+}
+
+function renderGuidedActivity(activity) {
+  const progress = guidedProgressForActivity(activity);
+  els.guidedActivityPanel.hidden = !progress;
+  if (!progress) {
+    els.guidedActivitySteps.innerHTML = "";
+    return;
+  }
+  const locked = ["completed", "not_applicable"].includes(activity.status);
+  const latestMeeting = latestMeetingForGuidedActivity(activity);
+  els.guidedActivitySummary.textContent = progress.currentStep
+    ? `Steg ${progress.currentIndex + 1} av ${progress.totalCount}: ${progress.currentStep.title}`
+    : `${progress.completedCount} av ${progress.totalCount} steg klara`;
+  els.guidedActivityNextAction.textContent = `Nästa åtgärd: ${progress.nextAction}`;
+  els.guidedActivityTemplateVersion.textContent = `Stegmall ${progress.state.stepTemplateVersion}`;
+  els.guidedActivitySteps.innerHTML = progress.steps.map((step, index) => {
+    const current = step.id === progress.currentStep?.id;
+    const updatedMeta = step.status === "not_started"
+      ? "Inte påbörjat"
+      : `${formatDateTime(step.updatedAt)} av ${actorNameById(step.updatedBy)}`;
+    const meetingAction = current && step.status !== "blocked" && step.checkpoint === "meeting_scheduled"
+      ? `<button type="button" class="btn btn-primary btn-sm" data-guided-book-meeting="${escapeHtml(activity.id)}">Boka möte</button>`
+      : current && step.status !== "blocked" && ["meeting_completed", "meeting_documented"].includes(step.checkpoint) && latestMeeting
+        ? `<button type="button" class="btn btn-primary btn-sm" data-guided-open-interaction="${escapeHtml(latestMeeting.interactionId || latestMeeting.id)}">Öppna mötet</button>`
+        : current && step.status !== "blocked" && !["meeting_scheduled", "meeting_completed", "meeting_documented"].includes(step.checkpoint)
+          ? `<button type="button" class="btn btn-primary btn-sm" data-guided-step-status="complete" data-guided-step-id="${escapeHtml(step.id)}">Markera steg klart</button>`
+          : "";
+    const stateActions = current && !locked
+      ? `${step.status === "blocked"
+        ? `<button type="button" class="btn btn-outline-primary btn-sm" data-guided-step-status="in_progress" data-guided-step-id="${escapeHtml(step.id)}">Fortsätt steg</button>`
+        : `<button type="button" class="btn btn-outline-secondary btn-sm" data-guided-step-status="blocked" data-guided-step-id="${escapeHtml(step.id)}">Blockera steg</button>`}
+        ${!step.required ? `<button type="button" class="btn btn-link btn-sm" data-guided-step-status="not_applicable" data-guided-step-id="${escapeHtml(step.id)}">Hoppa över</button>` : ""}`
+      : "";
+    return `<details class="guided-activity-step ${current ? "is-current" : ""} ${step.status === "complete" ? "is-complete" : ""}" ${current ? "open" : ""}>
+      <summary>
+        <span class="guided-step-number" aria-hidden="true">${index + 1}</span>
+        <span class="guided-step-title">${escapeHtml(step.title)}</span>
+        <span class="badge ${guidedStepStatusClass(step.status)}">${escapeHtml(GUIDED_STEP_STATUS_LABELS[step.status] || step.status)}</span>
+      </summary>
+      <div class="guided-step-body">
+        <p class="mb-1">${escapeHtml(guidedStepCheckpointText(step))}</p>
+        ${step.reason ? `<p class="guided-step-reason mb-1"><strong>Orsak:</strong> ${escapeHtml(step.reason)}</p>` : ""}
+        <p class="small text-secondary mb-2">${escapeHtml(updatedMeta)}</p>
+        ${current ? `<div class="guided-step-next"><span><strong>Nästa åtgärd</strong><br>${escapeHtml(step.nextAction)}</span><div class="d-flex flex-wrap gap-2">${meetingAction}${stateActions}</div></div>` : ""}
+      </div>
+    </details>`;
+  }).join("");
 }
 
 function activityDetailFormSnapshot() {
@@ -8889,10 +9152,10 @@ function updateActivityDetailDirtyState() {
   const caseRecord = cases.find((item) => item.id === activity?.caseId);
   const nextActivity = nextOpenActivity(activity);
   const classification = activity && nextStatus === "completed"
-    ? resultClassification(activity.templateId, els.activityDetailResultInput.value)
+    ? activityResultClassification(activity, els.activityDetailResultInput.value)
     : null;
   const requiresNote = nextStatus === "not_applicable" || classification === "deviation";
-  const workInputBlocker = activity && caseRecord ? incompleteRequiredActivityWorkInput(activity, caseRecord) : null;
+  const workInputBlocker = activity && caseRecord ? activityCompletionBlocker(activity, caseRecord) : null;
   const blocker = requiresNote && !els.activityDetailNoteInput.value.trim()
     ? "Skriv en tjänsteanteckning för att registrera resultatet"
     : nextStatus === "waiting" && !els.activityDetailWaitingForInput.value
@@ -8942,7 +9205,7 @@ function setActivityResultSelection(resultCode) {
   const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
   if (!activity) return;
   const caseRecord = cases.find((item) => item.id === activity.caseId);
-  if (resultCode && incompleteRequiredActivityWorkInput(activity, caseRecord)) return;
+  if (resultCode && activityCompletionBlocker(activity, caseRecord)) return;
   els.activityDetailResultInput.value = resultCode;
   for (const input of els.activityDetailResultOptions.querySelectorAll('input[type="radio"]')) {
     input.checked = input.value === resultCode;
@@ -8959,7 +9222,7 @@ function renderActivityStateControls(activity) {
   const status = els.activityDetailStatusInput.value;
   const locked = ["completed", "not_applicable"].includes(activity.status);
   const caseRecord = cases.find((item) => item.id === activity.caseId);
-  const workInputBlocker = !locked ? incompleteRequiredActivityWorkInput(activity, caseRecord) : null;
+  const workInputBlocker = !locked ? activityCompletionBlocker(activity, caseRecord) : null;
   els.activityDetailResultFieldset.disabled = locked || Boolean(workInputBlocker);
   els.activityDetailResultFieldset.classList.toggle("activity-result-action-blocked", Boolean(workInputBlocker));
   els.activityOpenStateActions.hidden = locked;
@@ -8978,7 +9241,7 @@ function renderActivityStateControls(activity) {
     : activity.templateId === "registryChecked"
     ? "Välj särskilt ställningstagande om kontrollen behöver bedömas vidare. Dokumentera inte registerutdragets innehåll."
     : status === "completed"
-      ? resultClassification(activity.templateId, els.activityDetailResultInput.value) === "deviation"
+      ? activityResultClassification(activity, els.activityDetailResultInput.value) === "deviation"
         ? "Komplettera med en tjänsteanteckning. När resultatet registreras öppnas ställningstagandet."
         : "Komplettera vid behov med en tjänsteanteckning och avsluta aktiviteten nedan."
       : "Välj resultat när arbetet är klart. Aktiviteten avslutas automatiskt.";
@@ -9006,7 +9269,7 @@ function updateActivityValidationState() {
   const waiting = els.activityDetailStatusInput.value === "waiting";
   const notApplicable = els.activityDetailStatusInput.value === "not_applicable";
   const requiresNote = Boolean(activity
-    && (notApplicable || completed && resultClassification(activity.templateId, els.activityDetailResultInput.value) === "deviation"));
+    && (notApplicable || completed && activityResultClassification(activity, els.activityDetailResultInput.value) === "deviation"));
 
   els.activityDetailNoteRequirement.hidden = !requiresNote;
   els.activityDetailNoteRequirement.textContent = notApplicable ? "(krävs när aktiviteten inte är aktuell)" : "(krävs för detta resultat)";
@@ -9021,7 +9284,7 @@ function updateActivityValidationState() {
       ? "Ange en kort motivering till varför aktiviteten inte är aktuell."
       : "Ange en kort notering när resultatet kräver ställningstagande."
     : "");
-  const workInputBlocker = activity && caseRecord ? incompleteRequiredActivityWorkInput(activity, caseRecord) : null;
+  const workInputBlocker = activity && caseRecord ? activityCompletionBlocker(activity, caseRecord) : null;
   if (completed && workInputBlocker) {
     resultValidationMessage = `Komplettera ${workInputBlocker.label.toLocaleLowerCase("sv-SE")} innan aktiviteten avslutas.`;
   }
@@ -9137,18 +9400,87 @@ function updateCaseMeetingFormState() {
   els.caseMeetingSubmitButton.textContent = completed ? "Registrera genomfört möte" : "Spara bokning";
 }
 
-function renderCaseEvents(events) {
-  els.caseEventTableBody.innerHTML = "";
-  for (const item of events) {
-    const row = document.createElement("tr");
-    row.innerHTML = `<td>${escapeHtml(formatDateTime(item.occurredAt || item.createdAt))}</td><td>${escapeHtml(item.payload?.message || item.text || item.eventType)}</td><td>${escapeHtml(handlerNameById(item.actorId))}</td>`;
-    els.caseEventTableBody.append(row);
+function renderCaseMarkdown(source) {
+  return marked.parse(prepareLearningMarkdown(source), { gfm: true });
+}
+
+function renderCaseDescription(caseRecord) {
+  const versions = descriptionVersionsForCase(caseDescriptionVersions, caseRecord.id);
+  const current = versions[0] || null;
+  const source = caseRecord.description?.trim() || "Ingen beskrivning har registrerats ännu.";
+  const long = source.length > 520 || source.split("\n").length > 8;
+  const naturallyExpanded = caseRecord.caseTypeId === "other";
+  els.caseDescriptionContent.innerHTML = renderCaseMarkdown(source);
+  els.caseDescriptionContent.classList.toggle("is-collapsed", long && !caseDescriptionExpanded && !naturallyExpanded);
+  els.caseDescriptionContent.classList.toggle("is-empty", !caseRecord.description?.trim());
+  els.toggleCaseDescriptionButton.hidden = !long || naturallyExpanded;
+  els.toggleCaseDescriptionButton.textContent = caseDescriptionExpanded ? "Visa mindre" : "Läs hela";
+  els.caseDescriptionMeta.textContent = current
+    ? `Version ${current.version} · ${formatDateTime(current.createdAt)} av ${handlerNameById(current.createdBy)}`
+    : "Ingen version sparad";
+  els.caseDescriptionHistory.hidden = versions.length < 2;
+  els.caseDescriptionHistorySummary.textContent = `${versions.length - 1} tidigare ${versions.length - 1 === 1 ? "version" : "versioner"}`;
+  els.caseDescriptionHistoryList.innerHTML = versions.slice(1).map((version) => `
+    <details class="case-description-version">
+      <summary>Version ${escapeHtml(version.version)} · ${escapeHtml(formatDateTime(version.createdAt))} av ${escapeHtml(handlerNameById(version.createdBy))}</summary>
+      <div class="case-description-version-content">${renderCaseMarkdown(version.text || "Beskrivningen var tom.")}</div>
+    </details>
+  `).join("");
+  els.editCaseDescriptionButton.hidden = caseRecord.status === "closed";
+}
+
+function historyTargetLabel(item) {
+  if (item.targetType === "activity") {
+    return `Aktivitet: ${caseActivities.find((activity) => activity.id === item.targetId)?.title || "Borttagen aktivitet"}`;
   }
-  if (!events.length) {
-    const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="3" class="text-secondary">Inga händelser har registrerats.</td>';
-    els.caseEventTableBody.append(row);
+  if (item.targetType === "interaction") {
+    const interaction = allInteractions().find((entry) => entry.id === item.targetId);
+    return `Kontakt: ${interaction?.title || "Tidigare kontakt"}`;
   }
+  return "Hela ärendet";
+}
+
+function caseHistoryItems(caseRecord) {
+  return projectCaseHistory({ caseId: caseRecord.id, events: caseEvents, notes: caseNotes });
+}
+
+function historyCategoryLabel(category) {
+  return ({ notes: "Anteckning", activities: "Aktivitet", contacts: "Kontakt", documents: "Handling", system: "System" })[category] || "Händelse";
+}
+
+function historyItemHtml(item, { compact = false } = {}) {
+  const correctionButton = item.sourceType === "case_note" && !item.replaced
+    ? `<button type="button" class="btn btn-link btn-sm px-0" data-correct-case-note="${escapeHtml(item.sourceId)}">Rätta</button>`
+    : "";
+  return `
+    <article class="case-history-item ${item.technical ? "is-technical" : ""}">
+      <div class="case-history-marker" aria-hidden="true"></div>
+      <div class="case-history-body">
+        <div class="case-history-heading">
+          <span class="case-history-category">${escapeHtml(historyCategoryLabel(item.category))}</span>
+          <time datetime="${escapeHtml(item.occurredAt || "")}">${escapeHtml(formatDateTime(item.occurredAt))}</time>
+        </div>
+        <strong>${escapeHtml(item.text)}</strong>
+        ${item.detail ? `<p class="mb-1 ${item.replaced ? "text-decoration-line-through text-secondary" : ""}">${escapeHtml(compact && item.detail.length > 180 ? `${item.detail.slice(0, 180)}…` : item.detail)}</p>` : ""}
+        <div class="case-history-meta"><span>${escapeHtml(handlerNameById(item.actorId))}</span>${item.targetType ? `<span>${escapeHtml(historyTargetLabel(item))}</span>` : ""}${item.replaced ? "<span>Ersatt av rättelse</span>" : ""}${correctionButton}</div>
+      </div>
+    </article>`;
+}
+
+function renderCaseHistory(caseRecord) {
+  const items = caseHistoryItems(caseRecord);
+  const filtered = filterCaseHistory(items, caseHistoryFilter);
+  els.caseHistoryFilters.innerHTML = CASE_HISTORY_FILTERS.map((filter) => `
+    <button type="button" class="btn btn-outline-secondary ${filter.id === caseHistoryFilter ? "active" : ""}" data-case-history-filter="${escapeHtml(filter.id)}">${escapeHtml(filter.label)}</button>
+  `).join("");
+  els.caseHistoryList.innerHTML = filtered.length
+    ? filtered.map((item) => historyItemHtml(item)).join("")
+    : '<div class="empty-list border rounded text-secondary">Inga händelser matchar filtret.</div>';
+  const recent = latestRelevantCaseHistory(items, 3);
+  els.caseRecentHistoryList.innerHTML = recent.length
+    ? recent.map((item) => historyItemHtml(item, { compact: true })).join("")
+    : '<p class="text-secondary mb-0">Inga verksamhetshändelser har registrerats ännu.</p>';
+  els.caseEventCount.textContent = items.length;
 }
 
 function renderMentorCases(candidate) {
@@ -9435,8 +9767,12 @@ function activityResultClassificationLabel(classification) {
 function renderActivityTypeConfiguration(definition) {
   const results = definition.results || [];
   const usage = caseTypesUsingActivityTemplate(definition.id);
+  const guided = isGuidedActivityTemplate(definition);
+  const steps = [...(definition.stepTemplate?.steps || [])].sort((left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0));
   els.activityTypeStatusFact.textContent = Object.values(ACTIVITY_STATUS_LABELS).join(", ");
-  els.activityTypeCompletionFact.textContent = definition.id === "decision"
+  els.activityTypeCompletionFact.textContent = guided
+    ? "Alla obligatoriska steg måste vara klara. Därefter registreras aktivitetens slutresultat separat."
+    : definition.id === "decision"
     ? "Resultat krävs. Godkänd avslutar godkännandeärendet; avvikande resultat kräver tjänsteanteckning och ställningstagande."
     : "Resultat krävs när aktiviteten avslutas. Avvikande resultat kräver tjänsteanteckning och ställningstagande.";
   els.activityTypeWorkInputFact.textContent = definition.workInput
@@ -9458,6 +9794,12 @@ function renderActivityTypeConfiguration(definition) {
         </tr>`).join("")}</tbody>
       </table>
     </div>`;
+  els.activityTypeStepsSection.hidden = !guided;
+  els.activityTypeStepsFact.innerHTML = guided ? `
+    <p class="small text-secondary">Stegmall version ${Number(definition.stepTemplate?.version || 1)}. Inaktiva steg skapas inte i nya aktiviteter.</p>
+    <ol class="activity-type-step-list">
+      ${steps.map((step) => `<li class="${step.active === false ? "is-inactive" : ""}"><span><strong>${escapeHtml(step.title)}</strong><small>${escapeHtml(step.nextAction || "Fortsätt arbetet")}</small></span><span class="badge ${step.active === false ? "text-bg-light border text-secondary" : "text-bg-primary"}">${step.active === false ? "Inaktivt" : step.required === false ? "Valfritt" : "Obligatoriskt"}</span></li>`).join("")}
+    </ol>` : "";
 }
 
 function canAdministerDefinitions() {
@@ -9560,6 +9902,59 @@ function renderCaseTypeActivityEditor(definition) {
       <input id="case-type-template-order-${escapeHtml(template.id)}" class="form-control form-control-sm case-type-template-order" type="number" min="1" max="99" value="${selected ? selected.index + 1 : index + 1}" data-case-type-template-order="${escapeHtml(template.id)}" ${selected ? "" : "disabled"}>
     </div>`;
   }).join("") || '<p class="text-secondary mb-0">Det finns inga publicerade aktivitetsmallar att välja.</p>';
+}
+
+function activityStepCheckpointOptions(selected) {
+  return [
+    ["manual", "Manuell bekräftelse"],
+    ["prepared", "Underlag förberett"],
+    ["time_found", "Tid överenskommen"],
+    ["meeting_scheduled", "Möte bokat"],
+    ["meeting_completed", "Möte genomfört"],
+    ["meeting_documented", "Möte dokumenterat"]
+  ].map(([value, label]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`).join("");
+}
+
+function activityTypeStepEditorRow(step, index) {
+  return `<div class="activity-type-step-row" data-activity-type-step data-step-id="${escapeHtml(step.id || customDefinitionId("activity-step"))}">
+    <div class="activity-type-step-order"><label class="form-label">Ordning</label><input class="form-control form-control-sm" type="number" min="1" max="99" value="${index + 1}" data-step-order></div>
+    <div class="activity-type-step-main"><label class="form-label">Namn</label><input class="form-control form-control-sm" maxlength="80" required value="${escapeHtml(step.title || "")}" data-step-title><label class="form-label mt-2">Nästa åtgärd</label><input class="form-control form-control-sm" maxlength="120" required value="${escapeHtml(step.nextAction || "")}" data-step-next-action></div>
+    <div class="activity-type-step-settings"><label class="form-label">Checkpunkt</label><select class="form-select form-select-sm" data-step-checkpoint>${activityStepCheckpointOptions(step.checkpoint || "manual")}</select><div class="form-check mt-2"><input class="form-check-input" type="checkbox" data-step-required ${step.required === false ? "" : "checked"}><label class="form-check-label">Obligatoriskt</label></div><div class="form-check"><input class="form-check-input" type="checkbox" data-step-active ${step.active === false ? "" : "checked"}><label class="form-check-label">Aktivt</label></div></div>
+  </div>`;
+}
+
+function renderActivityTypeStepEditor(definition) {
+  const steps = [...(definition.stepTemplate?.steps || [])].sort((left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0));
+  els.activityTypeAdminSteps.innerHTML = steps.map(activityTypeStepEditorRow).join("");
+}
+
+function activityTypeStepsFromEditor() {
+  return [...els.activityTypeAdminSteps.querySelectorAll("[data-activity-type-step]")]
+    .map((row, index) => ({
+      id: row.dataset.stepId || customDefinitionId("activity-step"),
+      title: row.querySelector("[data-step-title]").value.trim(),
+      nextAction: row.querySelector("[data-step-next-action]").value.trim(),
+      checkpoint: row.querySelector("[data-step-checkpoint]").value,
+      required: row.querySelector("[data-step-required]").checked,
+      active: row.querySelector("[data-step-active]").checked,
+      sortOrder: Number(row.querySelector("[data-step-order]").value || index + 1) - 1
+    }))
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .map((step, sortOrder) => ({ ...step, sortOrder }));
+}
+
+function publishedStepTemplate(definition) {
+  const steps = activityTypeStepsFromEditor();
+  if (!steps.some((step) => step.active)) throw new Error("Minst ett steg måste vara aktivt.");
+  if (steps.some((step) => !step.title || !step.nextAction)) throw new Error("Alla steg behöver namn och nästa åtgärd.");
+  const duplicateTitles = steps.filter((step, index) => steps.findIndex((item) => item.title.localeCompare(step.title, "sv", { sensitivity: "base" }) === 0) !== index);
+  if (duplicateTitles.length) throw new Error("Stegnamnen måste vara unika inom mallen.");
+  const previousSteps = [...(definition.stepTemplate?.steps || [])].sort((left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0));
+  const changed = JSON.stringify(previousSteps) !== JSON.stringify(steps);
+  return {
+    version: Number(definition.stepTemplate?.version || 1) + (changed ? 1 : 0),
+    steps
+  };
 }
 
 function caseTypeActivityRefsFromEditor() {
@@ -9700,6 +10095,7 @@ function renderActivityTypeAdministration() {
     return;
   }
   const customDefinition = creating || !SYSTEM_ACTIVITY_TEMPLATE_IDS.has(selectedDefinition.id);
+  const guidedDefinition = isGuidedActivityTemplate(selectedDefinition);
   els.activityTypeAdminIdInput.value = selectedDefinition.id;
   const parentCaseType = caseTypeById(selectedActivityParentCaseTypeId) || caseTypesUsingActivityTemplate(selectedDefinition.id)[0] || null;
   els.activityTypeBackLink.href = parentCaseType ? `#/case-types/${encodeURIComponent(parentCaseType.id)}` : "#/case-types";
@@ -9717,7 +10113,9 @@ function renderActivityTypeAdministration() {
     els.activityTypeAdminTitleInput.disabled = !customDefinition;
     els.activityTypeAdminTitleInput.value = selectedDefinition.title || "";
     els.activityTypeAdminWorkInstructionInput.value = selectedDefinition.workInstruction || "";
+    if (guidedDefinition) renderActivityTypeStepEditor(selectedDefinition);
   }
+  els.activityTypeAdminStepsSection.hidden = !activityTypeEditMode || !guidedDefinition;
   els.activityTypeReadView.hidden = activityTypeEditMode;
   els.activityTypeAdminForm.hidden = !activityTypeEditMode;
   els.editActivityTypeButton.hidden = activityTypeEditMode || !administrator;
@@ -10367,7 +10765,11 @@ function saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nex
   if (targetStatus === "waiting" && !["mentor", "handler", "external"].includes(nextWaitingForParty)) {
     return Promise.reject(Object.assign(new Error("Ange vem eller vad aktiviteten väntar på."), { code: "WAITING_PARTY_REQUIRED" }));
   }
-  const classification = targetStatus === "completed" ? resultClassification(activity.templateId, nextResult) : null;
+  const guidedBlocker = targetStatus === "completed" ? incompleteGuidedActivityStep(activity) : null;
+  if (guidedBlocker) {
+    return Promise.reject(Object.assign(new Error(`Slutför ${guidedBlocker.label} innan aktiviteten avslutas.`), { code: "GUIDED_STEPS_INCOMPLETE" }));
+  }
+  const classification = targetStatus === "completed" ? activityResultClassification(activity, nextResult) : null;
   if (targetStatus === "completed" && !classification) {
     return Promise.reject(Object.assign(new Error("Välj ett giltigt resultat innan aktiviteten avslutas."), { code: "RESULT_REQUIRED" }));
   }
@@ -10515,6 +10917,38 @@ function saveActivityCommand({ activity, caseRecord, nextStatus, nextResult, nex
       };
       put(CASES_STORE, updatedCase);
       return { caseId: currentCase.id, activityId: activity.id, status: nextCaseStatus, version: updatedCase.version, deviationId: newDeviation?.id || null };
+    }
+  });
+}
+
+function saveGuidedActivityStepCommand({ activity, caseRecord, stepId, status, reason = "" }) {
+  if (caseRecord.status === "closed") {
+    return Promise.reject(Object.assign(new Error("Ärendet måste återöppnas innan aktivitetssteg kan ändras."), { code: "CASE_CLOSED" }));
+  }
+  if (caseRecord.status === "paused") {
+    return Promise.reject(Object.assign(new Error("Ärendet måste återupptas innan aktivitetssteg kan ändras."), { code: "CASE_PAUSED" }));
+  }
+  const definition = activityDefinition(activity);
+  return executeCaseCommand({
+    commandType: "update_activity_step",
+    caseId: caseRecord.id,
+    expectedVersion: caseRecord.version,
+    payload: { activityId: activity.id, stepId, status, reason },
+    additionalStores: [CASE_ACTIVITIES_STORE],
+    mutate: ({ currentCase, now, put, event }) => {
+      const updated = updateGuidedActivityStep(activity, definition, {
+        stepId,
+        status,
+        reason,
+        actorId: CURRENT_USER_ID,
+        at: now
+      });
+      put(CASE_ACTIVITIES_STORE, updated.activity);
+      const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
+      put(CASES_STORE, updatedCase);
+      event("activity_step_updated", "activity", activity.id,
+        `${updated.step.title} sattes till ${GUIDED_STEP_STATUS_LABELS[status] || status}${updated.step.reason ? `: ${updated.step.reason}` : ""}`);
+      return { caseId: currentCase.id, activityId: activity.id, stepId, version: updatedCase.version };
     }
   });
 }
@@ -10766,10 +11200,10 @@ function registerCaseMeetingCommand({
     caseId: caseRecord.id,
     expectedVersion: caseRecord.version,
     payload: { existingId: existing?.id || null, meetingType, meetingStatus, occurredAt, endsAt, mode, activityId, summary, nextStep, rescheduledFromInteractionId },
-    additionalStores: [CASE_MEETINGS_STORE, INTERACTIONS_STORE],
+    additionalStores: [CASE_MEETINGS_STORE, INTERACTIONS_STORE, CASE_ACTIVITIES_STORE],
     mutate: ({ currentCase, put, event }) => {
       if (existing) put(CASE_MEETINGS_STORE, { ...existing, supersededByMeetingId: meetingId, updatedAt: now, updatedBy: CURRENT_USER_ID });
-      put(CASE_MEETINGS_STORE, {
+      const meetingRecord = {
         id: meetingId,
         tenantId: DEFAULT_TENANT_ID,
         caseId: currentCase.id,
@@ -10798,7 +11232,8 @@ function registerCaseMeetingCommand({
         createdBy: CURRENT_USER_ID,
         updatedAt: now,
         updatedBy: CURRENT_USER_ID
-      });
+      };
+      put(CASE_MEETINGS_STORE, meetingRecord);
       put(INTERACTIONS_STORE, normalizeInteraction({
         id: interactionId,
         tenantId: DEFAULT_TENANT_ID,
@@ -10826,6 +11261,20 @@ function registerCaseMeetingCommand({
         updatedAt: now,
         updatedBy: CURRENT_USER_ID
       }));
+      const linkedActivity = caseActivities.find((activity) => activity.id === activityId && activity.caseId === currentCase.id);
+      if (linkedActivity && isGuidedActivityTemplate(activityDefinition(linkedActivity))) {
+        const activeMeetings = caseMeetings.filter((meeting) => meeting.caseId === currentCase.id
+          && meeting.id !== existing?.id
+          && !meeting.supersededByMeetingId);
+        const synchronized = synchronizeFirstMeetingSteps(linkedActivity, activityDefinition(linkedActivity), [...activeMeetings, meetingRecord]);
+        if (synchronized.changedSteps.length) {
+          put(CASE_ACTIVITIES_STORE, synchronized.activity);
+          for (const step of synchronized.changedSteps) {
+            event("activity_step_updated", "activity", linkedActivity.id,
+              `${step.title} markerades som klart genom mötesregistreringen`);
+          }
+        }
+      }
       const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
       put(CASES_STORE, updatedCase);
       event(existing ? "meeting_revised" : "meeting_registered", "meeting", meetingId,
@@ -10972,9 +11421,9 @@ function openCaseLifecycle(action) {
   pendingCaseLifecycleAction = action;
   const content = {
     pause: ["Pausa ärendet", "Öppna aktiviteter ligger kvar men ska inte handläggas under pausen. Ange orsak och bevakningsdatum.", "Pausa ärendet"],
-    resume: ["Återuppta ärendet", "Ärendet blir aktivt igen. Tidigare paus och motivering ligger kvar i loggen.", "Återuppta ärendet"],
+    resume: ["Återuppta ärendet", "Ärendet blir aktivt igen. Tidigare paus och motivering ligger kvar i historiken.", "Återuppta ärendet"],
     close: ["Avsluta ärendet", "Öppna aktiviteter markeras som ej aktuella. Ärendet och all historik bevaras.", "Avsluta ärendet"],
-    reopen: ["Återöppna ärendet", "Ärendet blir aktivt igen. Åtgärden kräver samordnarbehörighet och registreras i loggen.", "Återöppna ärendet"]
+    reopen: ["Återöppna ärendet", "Ärendet blir aktivt igen. Åtgärden kräver samordnarbehörighet och registreras i historiken.", "Återöppna ärendet"]
   }[action];
   els.caseLifecycleForm.reset();
   const reasonOptions = {
@@ -11022,7 +11471,7 @@ async function syncCandidateFromActivity(activity, status, note, now, result = "
   const caseRecord = cases.find((item) => item.id === activity.caseId);
   const candidate = candidates.find((item) => item.id === caseRecord?.mentorId);
   if (!candidate) return true;
-  const completed = status === "completed" && resultClassification(activity.templateId, result) === "acceptable";
+  const completed = status === "completed" && activityResultClassification(activity, result) === "acceptable";
 
   if (activity.templateId === "identityVerified" && completed && (!candidate.personalNumber || !candidate.identityMethod)) {
     showFeedback("Registrera personnummer och verifieringssätt på mentorkortet innan identitetsaktiviteten slutförs.");
@@ -11453,11 +11902,12 @@ function updateInteractionFormState({ applyCaseSuggestions = false } = {}) {
   renderInteractionParticipantStates();
 }
 
-function openInteractionForm(intent = "scheduled", caseId = "", interactionId = "") {
+function openInteractionForm(intent = "scheduled", caseId = "", interactionId = "", preferredActivityId = "") {
   const existing = interactions.find((item) => item.id === interactionId) || allInteractions().find((item) => item.id === interactionId);
   els.interactionForm.reset();
   els.interactionForm.dataset.interactionId = existing?.id || "";
   els.interactionForm.dataset.rescheduledFromInteractionId = "";
+  els.interactionForm.dataset.activityId = existing?.activityId || preferredActivityId || "";
   const resolvedIntent = existing?.status === "scheduled" ? "scheduled" : existing ? "completed" : intent;
   els.interactionScheduledInput.checked = resolvedIntent === "scheduled";
   els.interactionCompletedInput.checked = resolvedIntent === "completed";
@@ -11628,7 +12078,11 @@ els.parentBookMeetingButton.addEventListener("click", () => openInteractionForPa
 els.mentorBookMeetingButton.addEventListener("click", () => openInteractionForParty("mentor", selectedId));
 els.interactionForm.querySelectorAll('input[name="interactionIntent"]').forEach((input) => input.addEventListener("change", () => updateInteractionFormState()));
 els.interactionForm.querySelectorAll('input[name="interactionOutcomeStatus"]').forEach((input) => input.addEventListener("change", () => updateInteractionFormState()));
-els.interactionCaseInput.addEventListener("change", () => updateInteractionFormState({ applyCaseSuggestions: true }));
+els.interactionCaseInput.addEventListener("change", () => {
+  const linkedActivity = caseActivities.find((activity) => activity.id === els.interactionForm.dataset.activityId);
+  if (linkedActivity && linkedActivity.caseId !== els.interactionCaseInput.value) els.interactionForm.dataset.activityId = "";
+  updateInteractionFormState({ applyCaseSuggestions: true });
+});
 els.interactionKindInput.addEventListener("change", () => updateInteractionFormState());
 [els.interactionParentInput, els.interactionMentorInput, els.interactionHandlerInput, els.interactionExternalInput]
   .forEach((input) => input.addEventListener("change", renderInteractionParticipantStates));
@@ -11656,7 +12110,7 @@ els.interactionForm.addEventListener("submit", async (event) => {
     startsAt,
     endsAt,
     caseId: caseRecord?.id || null,
-    activityId: meetingActivityForCase(caseRecord)?.id || null,
+    activityId: existingInteraction?.activityId || els.interactionForm.dataset.activityId || meetingActivityForCase(caseRecord)?.id || null,
     organizerId: els.interactionOrganizerInput.value || CURRENT_USER_ID,
     participants,
     title: els.interactionTitleInput.value.trim(),
@@ -12328,7 +12782,7 @@ els.matchingOutcomeForm.addEventListener("submit", async (event) => {
           ...responseActivity,
           status: completed ? "completed" : outcome === "waiting" ? "waiting" : "in_progress",
           resultCode: completed ? responseResult : null,
-          resultClassification: completed ? resultClassification(responseActivity.templateId, responseResult) : null,
+          resultClassification: completed ? activityResultClassification(responseActivity, responseResult) : null,
           waitingForParty: outcome === "waiting" ? "external" : null,
           version: responseActivity.version + 1,
           updatedAt: now,
@@ -12352,7 +12806,7 @@ els.matchingOutcomeForm.addEventListener("submit", async (event) => {
         const decisionResult = createAssignment ? "match_approved" : "match_rejected";
         put(CASE_ACTIVITIES_STORE, {
           ...decisionActivity, status: "completed", resultCode: decisionResult,
-          resultClassification: resultClassification(decisionActivity.templateId, decisionResult),
+          resultClassification: activityResultClassification(decisionActivity, decisionResult),
           waitingForParty: null, version: decisionActivity.version + 1, updatedAt: now,
           updatedBy: CURRENT_USER_ID, completedAt: now, completedBy: CURRENT_USER_ID
         });
@@ -13247,7 +13701,7 @@ async function submitCaseForm(event) {
       ownerId,
       coHandlerIds
     },
-    additionalStores: [CASE_ASSIGNMENTS_STORE, CASE_ACTIVITIES_STORE],
+    additionalStores: [CASE_ASSIGNMENTS_STORE, CASE_ACTIVITIES_STORE, CASE_DESCRIPTION_VERSIONS_STORE],
     mutate: ({ currentCase, now, put, event: recordEvent }) => {
       const caseRecord = {
         ...(currentCase || {}),
@@ -13282,6 +13736,14 @@ async function submitCaseForm(event) {
         closedBy: currentCase?.closedBy || null
       };
       put(CASES_STORE, caseRecord);
+      if (!currentCase || currentCase.description !== caseRecord.description) {
+        const previousVersions = descriptionVersionsForCase(caseDescriptionVersions, id);
+        put(CASE_DESCRIPTION_VERSIONS_STORE, createCaseDescriptionVersion({
+          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: id,
+          text: caseRecord.description, version: previousVersions.length ? previousVersions[0].version + 1 : 1,
+          createdAt: now, createdBy: CURRENT_USER_ID
+        }));
+      }
 
       if (currentCase) {
         for (const assignment of assignmentsForCase(id)) {
@@ -13299,11 +13761,13 @@ async function submitCaseForm(event) {
         recordEvent("assignment_changed", "assignment", id, `Ansvarig handläggare ändrades från ${previousOwner?.name || "ej tilldelad"} till ${handlerNameById(ownerId)}`);
       }
       for (const template of selectedActivities) {
+        const templateDefinition = activityTemplateDefinitionById(template.templateId, template.version);
         const activity = {
           id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: id, templateId: template.templateId, templateVersion: template.version,
           title: template.title, status: "not_started", resultCode: null, resultClassification: null, handlerIdOverride: null,
           waitingForParty: null, dueDate: null, sortOrder: template.sortOrder, version: 1,
-          createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, completedAt: null, completedBy: null
+          createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID, completedAt: null, completedBy: null,
+          guidedState: initializeGuidedActivityState(templateDefinition, { actorId: CURRENT_USER_ID, at: now })
         };
         put(CASE_ACTIVITIES_STORE, activity);
       }
@@ -13371,6 +13835,169 @@ function handleCaseFormProgress() {
 els.caseCreateForm.addEventListener("input", handleCaseFormProgress);
 els.caseCreateForm.addEventListener("change", handleCaseFormProgress);
 
+function startCaseDescriptionEdit() {
+  const caseRecord = selectedCaseRecord();
+  if (!caseRecord) return;
+  els.caseWorkspaceDescriptionInput.value = caseRecord.description || "";
+  els.caseDescriptionReadView.hidden = true;
+  els.caseDescriptionForm.hidden = false;
+  requestAnimationFrame(() => els.caseWorkspaceDescriptionInput.focus());
+}
+
+els.editCaseDescriptionButton.addEventListener("click", startCaseDescriptionEdit);
+els.cancelCaseDescriptionButton.addEventListener("click", () => {
+  els.caseDescriptionForm.hidden = true;
+  els.caseDescriptionReadView.hidden = false;
+});
+els.toggleCaseDescriptionButton.addEventListener("click", () => {
+  const caseRecord = selectedCaseRecord();
+  if (!caseRecord) return;
+  caseDescriptionExpanded = !caseDescriptionExpanded;
+  renderCaseDescription(caseRecord);
+});
+
+els.caseDescriptionForm.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-description-format]");
+  if (!button) return;
+  const input = els.caseWorkspaceDescriptionInput;
+  const start = input.selectionStart;
+  const end = input.selectionEnd;
+  const selected = input.value.slice(start, end);
+  const replacements = {
+    heading: `## ${selected || "Rubrik"}`,
+    bold: `**${selected || "text"}**`,
+    list: selected ? selected.split("\n").map((line) => `- ${line}`).join("\n") : "- ",
+    checklist: selected ? selected.split("\n").map((line) => `- [ ] ${line}`).join("\n") : "- [ ] ",
+    link: `[${selected || "länktext"}](https://)`
+  };
+  const replacement = replacements[button.dataset.descriptionFormat];
+  if (!replacement) return;
+  input.setRangeText(replacement, start, end, "end");
+  input.focus();
+});
+
+els.caseDescriptionForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const caseRecord = selectedCaseRecord();
+  const text = els.caseWorkspaceDescriptionInput.value.trim();
+  if (!caseRecord || !text || text === caseRecord.description) return;
+  const versions = descriptionVersionsForCase(caseDescriptionVersions, caseRecord.id);
+  await executeCaseCommand({
+    commandType: "update_case_description",
+    caseId: caseRecord.id,
+    expectedVersion: caseRecord.version,
+    payload: { text },
+    additionalStores: [CASE_DESCRIPTION_VERSIONS_STORE],
+    mutate: ({ currentCase, now, put, event: recordEvent }) => {
+      const versionRecord = createCaseDescriptionVersion({
+        id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id,
+        text, version: versions.length ? versions[0].version + 1 : 1,
+        createdAt: now, createdBy: CURRENT_USER_ID
+      });
+      const updatedCase = { ...currentCase, description: text, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
+      put(CASE_DESCRIPTION_VERSIONS_STORE, versionRecord);
+      put(CASES_STORE, updatedCase);
+      recordEvent("case_description_updated", "case", currentCase.id, "Ärendebeskrivningen uppdaterades");
+      return { caseId: currentCase.id, version: updatedCase.version };
+    }
+  });
+  els.caseDescriptionForm.hidden = true;
+  els.caseDescriptionReadView.hidden = false;
+  markSaved();
+  showFeedback("Ärendebeskrivningen har sparats.");
+  await refresh();
+});
+
+function openCaseNoteForm(versionId = "") {
+  const caseRecord = selectedCaseRecord();
+  if (!caseRecord) return;
+  const original = caseNotes.find((note) => note.id === versionId) || null;
+  if (versionId && !original) {
+    showFeedback("Anteckningen har ändrats. Läs in historiken och försök igen.");
+    return;
+  }
+  els.caseNoteForm.reset();
+  els.caseNoteForm.dataset.versionId = original?.id || "";
+  els.caseNoteModalTitle.textContent = original ? "Rätta ärendeanteckning" : "Anteckning om ärendet";
+  const options = [{ value: "case:", label: `Hela ärendet · ${caseRecord.number}` }];
+  for (const activity of activitiesForCase(caseRecord.id)) options.push({ value: `activity:${activity.id}`, label: `Aktivitet · ${activity.title}` });
+  for (const interaction of allInteractions().filter((item) => item.caseId === caseRecord.id)) {
+    options.push({ value: `interaction:${interaction.id}`, label: `Kontakt · ${interaction.title} · ${formatDateTime(interaction.startsAt)}` });
+  }
+  els.caseNoteTargetInput.innerHTML = options.map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join("");
+  if (original) {
+    els.caseNoteTargetInput.value = `${original.targetType}:${original.targetId || ""}`;
+    els.caseNoteTargetInput.disabled = true;
+    els.caseNoteTextInput.value = original.text;
+  } else {
+    els.caseNoteTargetInput.disabled = false;
+  }
+  bootstrap.Modal.getOrCreateInstance(els.caseNoteModal).show();
+  setTimeout(() => els.caseNoteTextInput.focus(), 150);
+}
+
+els.caseNoteForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const caseRecord = selectedCaseRecord();
+  if (!caseRecord) return;
+  const original = caseNotes.find((note) => note.id === els.caseNoteForm.dataset.versionId) || null;
+  const [targetType, targetId = ""] = els.caseNoteTargetInput.value.split(":");
+  const noteId = original?.noteId || original?.id || crypto.randomUUID();
+  const noteVersionId = crypto.randomUUID();
+  const latestVersion = original
+    ? Math.max(...caseNotes.filter((note) => (note.noteId || note.id) === noteId).map((note) => Number(note.version || 1)))
+    : 0;
+  const text = els.caseNoteTextInput.value.trim();
+  await executeCaseCommand({
+    commandType: original ? "correct_case_note" : "add_case_note",
+    caseId: caseRecord.id,
+    expectedVersion: caseRecord.version,
+    payload: { noteId, targetType, targetId, text, supersedesVersionId: original?.id || null },
+    additionalStores: [CASE_NOTES_STORE],
+    mutate: ({ currentCase, now, put, event: recordEvent }) => {
+      const note = createCaseNoteVersion({
+        id: noteVersionId, tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id, noteId,
+        targetType, targetId: targetId || null, text, version: latestVersion + 1,
+        supersedesVersionId: original?.id || null, createdAt: now, createdBy: CURRENT_USER_ID
+      });
+      const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
+      put(CASE_NOTES_STORE, note);
+      put(CASES_STORE, updatedCase);
+      recordEvent(original ? "case_note_corrected" : "case_note_created", "case_note", note.id, original ? "Ärendeanteckning rättades" : "Ärendeanteckning lades till");
+      return { caseId: currentCase.id, noteId: note.id, version: updatedCase.version };
+    }
+  });
+  bootstrap.Modal.getOrCreateInstance(els.caseNoteModal).hide();
+  markSaved();
+  showFeedback(original ? "Rättelsen har sparats." : "Anteckningen har sparats.");
+  await refresh();
+});
+
+els.addCaseContactButton.addEventListener("click", () => openInteractionForm("completed", selectedCaseRecordId));
+els.addCaseMeetingButton.addEventListener("click", () => openInteractionForm("scheduled", selectedCaseRecordId));
+els.addCaseDocumentButton.addEventListener("click", () => {
+  bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-documents-tab")).show();
+  els.caseDocumentForm.dataset.activityId = "";
+  els.documentActivityInput.value = "";
+  requestAnimationFrame(() => els.documentTitleInput.focus());
+});
+els.addCaseNoteButton.addEventListener("click", () => openCaseNoteForm());
+els.historyAddCaseNoteButton.addEventListener("click", () => openCaseNoteForm());
+els.showFullCaseHistoryButton.addEventListener("click", () => bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-events-tab")).show());
+els.caseHistoryFilters.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-case-history-filter]");
+  const caseRecord = selectedCaseRecord();
+  if (!button || !caseRecord) return;
+  caseHistoryFilter = button.dataset.caseHistoryFilter;
+  renderCaseHistory(caseRecord);
+});
+for (const list of [els.caseHistoryList, els.caseRecentHistoryList]) {
+  list.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-correct-case-note]");
+    if (button) openCaseNoteForm(button.dataset.correctCaseNote);
+  });
+}
+
 els.newCaseActivityButton.addEventListener("click", () => {
   els.caseActivityForm.hidden = false;
   bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
@@ -13391,32 +14018,21 @@ els.caseActivityForm.addEventListener("submit", async (event) => {
   if (!caseRecord) return;
   const activityId = crypto.randomUUID();
   const title = els.activityTitleInput.value.trim();
-  const note = els.activityNoteInput.value.trim();
+  const instruction = els.activityInstructionInput.value.trim();
   await executeCaseCommand({
     commandType: "add_activity",
     caseId: caseRecord.id,
     expectedVersion: caseRecord.version,
-    payload: { activityId, title, handlerId: els.activityOwnerInput.value, dueDate: els.activityDueDateInput.value, note },
-    additionalStores: [CASE_ACTIVITIES_STORE, CASE_DOCUMENTS_STORE],
+    payload: { activityId, title, instruction, handlerId: els.activityOwnerInput.value, dueDate: els.activityDueDateInput.value },
+    additionalStores: [CASE_ACTIVITIES_STORE],
     mutate: ({ currentCase, now, put, event: recordEvent }) => {
-      const activity = {
+      const activity = createAdHocActivity({
         id: activityId, tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id,
-        templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1, title, status: "not_started",
-        resultCode: null, resultClassification: null, handlerIdOverride: els.activityOwnerInput.value || null,
-        waitingForParty: null, dueDate: els.activityDueDateInput.value || null,
-        sortOrder: activitiesForCase(currentCase.id).length, version: 1,
-        createdAt: now, createdBy: CURRENT_USER_ID, updatedAt: now, updatedBy: CURRENT_USER_ID,
-        completedAt: null, completedBy: null
-      };
+        title, instruction, templateId: AD_HOC_ACTIVITY_TEMPLATE_ID, templateVersion: 1,
+        handlerIdOverride: els.activityOwnerInput.value || null, dueDate: els.activityDueDateInput.value || null,
+        sortOrder: activitiesForCase(currentCase.id).length, createdAt: now, createdBy: CURRENT_USER_ID
+      });
       put(CASE_ACTIVITIES_STORE, activity);
-      if (note) {
-        put(CASE_DOCUMENTS_STORE, {
-          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: currentCase.id, activityId, meetingId: null,
-          type: "service_note", title: `Tjänsteanteckning: ${title}`, description: note, documentDate: now.slice(0, 10),
-          storageObjectId: null, mimeType: null, sizeBytes: null, checksum: null, informationClass: "normal", supersedesDocumentId: null,
-          createdAt: now, createdBy: CURRENT_USER_ID
-        });
-      }
       const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
       put(CASES_STORE, updatedCase);
       recordEvent("activity_updated", "activity", activityId, `Aktiviteten "${title}" lades till`);
@@ -13524,6 +14140,59 @@ els.activityDetailGuidanceButton.addEventListener("click", () => {
   navigateToCandidate(mentorId);
 });
 
+els.guidedActivitySteps.addEventListener("click", async (event) => {
+  const bookButton = event.target.closest("[data-guided-book-meeting]");
+  if (bookButton) {
+    const activity = caseActivities.find((item) => item.id === bookButton.dataset.guidedBookMeeting);
+    if (activity) openInteractionForm("scheduled", activity.caseId, "", activity.id);
+    return;
+  }
+  const interactionButton = event.target.closest("[data-guided-open-interaction]");
+  if (interactionButton) {
+    const interaction = allInteractions().find((item) => item.id === interactionButton.dataset.guidedOpenInteraction);
+    if (interaction) openInteractionForm(interaction.status === "scheduled" ? "scheduled" : "completed", interaction.caseId || "", interaction.id, interaction.activityId || "");
+    return;
+  }
+  const stepButton = event.target.closest("[data-guided-step-status]");
+  if (!stepButton) return;
+  const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
+  const caseRecord = cases.find((item) => item.id === activity?.caseId);
+  if (!activity || !caseRecord) return;
+  const status = stepButton.dataset.guidedStepStatus;
+  const stepId = stepButton.dataset.guidedStepId;
+  const step = guidedProgressForActivity(activity)?.steps.find((item) => item.id === stepId);
+  if (!step) return;
+  let reason = "";
+  if (["blocked", "not_applicable"].includes(status)) {
+    const confirmation = await confirmAction({
+      eyebrow: status === "blocked" ? "Blockera arbetssteg" : "Hoppa över valfritt steg",
+      title: status === "blocked" ? `Vad hindrar ${step.title}?` : `Varför är ${step.title} inte aktuellt?`,
+      body: status === "blocked"
+        ? "Aktiviteten sätts i vänteläge tills steget återupptas. Orsaken visas i steget och i ärendets historik."
+        : "Steget markeras som ej aktuellt. Orsaken sparas i aktivitetens historik.",
+      mentorName: activity.title,
+      confirmLabel: status === "blocked" ? "Blockera steg" : "Hoppa över steg",
+      noteRequired: true
+    });
+    if (!confirmation.confirmed) return;
+    reason = confirmation.note.trim();
+    if (!reason) {
+      showFeedback("Ange en kort orsak innan stegets status ändras.");
+      return;
+    }
+  }
+  await saveGuidedActivityStepCommand({ activity, caseRecord, stepId, status, reason });
+  markSaved();
+  await refresh();
+  showFeedback(status === "complete"
+    ? "Steget har markerats som klart."
+    : status === "blocked"
+      ? "Steget är blockerat och aktiviteten har satts i vänteläge."
+      : status === "not_applicable"
+        ? "Steget har markerats som ej aktuellt."
+        : "Steget har återupptagits.");
+});
+
 els.activityDetailForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const activity = caseActivities.find((item) => item.id === selectedCaseActivityId);
@@ -13541,7 +14210,7 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   const closesCase = activitySaveRequiresConfirmation(activity, nextStatus, nextResult);
   const nextActivity = nextOpenActivity(activity);
   const hasDeviatingResult = nextStatus === "completed"
-    && resultClassification(activity.templateId, nextResult) === "deviation";
+    && activityResultClassification(activity, nextResult) === "deviation";
   updateActivityValidationState();
   if (!els.activityDetailForm.reportValidity()) return;
 
@@ -14009,6 +14678,19 @@ els.deactivateCaseTypeButton.addEventListener("click", async () => {
   showFeedback("Ärendetypen har inaktiverats. Historiska ärenden är oförändrade.");
 });
 
+els.addActivityTypeStepButton.addEventListener("click", () => {
+  const index = els.activityTypeAdminSteps.querySelectorAll("[data-activity-type-step]").length;
+  els.activityTypeAdminSteps.insertAdjacentHTML("beforeend", activityTypeStepEditorRow({
+    id: customDefinitionId("activity-step"),
+    title: "",
+    nextAction: "",
+    checkpoint: "manual",
+    required: true,
+    active: true
+  }, index));
+  els.activityTypeAdminSteps.querySelectorAll("[data-step-title]")[index]?.focus();
+});
+
 els.activityTypeAdminForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!canAdministerDefinitions()) {
@@ -14034,6 +14716,15 @@ els.activityTypeAdminForm.addEventListener("submit", async (event) => {
   els.activityTypeAdminTitleInput.setCustomValidity("");
   const definitionId = creating ? customDefinitionId("activity-template") : definition.id;
   const now = new Date().toISOString();
+  let stepTemplate = definition.stepTemplate;
+  if (isGuidedActivityTemplate(definition)) {
+    try {
+      stepTemplate = publishedStepTemplate(definition);
+    } catch (error) {
+      showFeedback(error.message);
+      return;
+    }
+  }
   const nextVersion = creating ? 1 : Math.max(0, ...activityTemplateDefinitionVersions
     .filter((item) => item.id === definition.id)
     .map((item) => Number(item.version || 1))) + 1;
@@ -14045,11 +14736,30 @@ els.activityTypeAdminForm.addEventListener("submit", async (event) => {
     status: "published",
     title,
     workInstruction: els.activityTypeAdminWorkInstructionInput.value.trim(),
+    stepTemplate,
     updatedAt: now,
     updatedBy: CURRENT_USER_ID
   };
   const records = creating ? [nextDefinition] : [{ ...definition, status: "retired", updatedAt: now, updatedBy: CURRENT_USER_ID }, nextDefinition];
-  await atomicPut({ [ACTIVITY_TEMPLATE_DEFINITIONS_STORE]: records });
+  const affectedCaseTypeRecords = [];
+  if (!creating) {
+    for (const caseType of caseTypesUsingActivityTemplate(definition.id)) {
+      const nextCaseTypeVersion = Math.max(0, ...caseTypeDefinitionVersions
+        .filter((item) => item.id === caseType.id)
+        .map((item) => Number(item.version || 1))) + 1;
+      const references = caseTypeActivityTemplateRefs(caseType).map((reference) => reference.templateId === definition.id
+        ? { ...reference, version: nextVersion }
+        : reference);
+      affectedCaseTypeRecords.push(
+        { ...caseType, status: "retired", updatedAt: now, updatedBy: CURRENT_USER_ID },
+        { ...caseType, version: nextCaseTypeVersion, status: "published", activityTemplateRefs: references, activityTemplateIds: references.map((reference) => reference.templateId), updatedAt: now, updatedBy: CURRENT_USER_ID }
+      );
+    }
+  }
+  await atomicPut({
+    [ACTIVITY_TEMPLATE_DEFINITIONS_STORE]: records,
+    ...(affectedCaseTypeRecords.length ? { [CASE_TYPE_DEFINITIONS_STORE]: affectedCaseTypeRecords } : {})
+  });
   activityTypeEditMode = false;
   markSaved();
   showFeedback(creating ? "Aktivitetsmallen har skapats." : "En ny version av aktivitetsmallen har publicerats.");
