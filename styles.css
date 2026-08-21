@@ -113,6 +113,84 @@
   padding-bottom: 0.85rem;
 }
 
+.interaction-external-participants,
+.interaction-communication-form {
+  padding: 0.85rem;
+  border: 1px solid var(--app-border);
+  background: var(--bs-tertiary-bg);
+}
+
+.interaction-external-participant-list,
+.interaction-communication-list {
+  display: grid;
+  gap: 0;
+  margin-top: 0.65rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.interaction-external-participant,
+.interaction-communication-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.interaction-external-participant > div,
+.interaction-communication-item > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.interaction-external-participant span,
+.interaction-external-participant small,
+.interaction-communication-item time,
+.interaction-communication-item small {
+  color: var(--app-text-muted);
+  font-size: 0.78rem;
+}
+
+.interaction-communication-details {
+  padding: 0;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.interaction-communication-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 0;
+  color: var(--app-primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.interaction-communication-content {
+  padding-bottom: 0.85rem;
+}
+
+.interaction-communication-item {
+  grid-template-columns: minmax(7rem, 0.7fr) minmax(0, 2fr) auto;
+}
+
+.interaction-communication-item p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.interaction-communication-item.is-pending {
+  padding-inline: 0.65rem;
+  border-left: 3px solid var(--app-primary);
+  background: var(--app-primary-soft);
+}
+
+.interaction-communication-form {
+  margin-top: 0.85rem;
+}
+
 .interaction-response-option {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(8.5rem, 11rem);
@@ -217,7 +295,8 @@
   }
 
   .interaction-outcome-options,
-  .interaction-timeline-item {
+  .interaction-timeline-item,
+  .interaction-communication-item {
     grid-template-columns: 1fr;
   }
 
@@ -3606,6 +3685,15 @@ body.is-system-administration .sidebar-menu-group {
 
 .case-register-table tbody tr {
   cursor: pointer;
+}
+
+.interactive-register-row {
+  cursor: pointer;
+}
+
+.interactive-register-row:focus-visible {
+  outline: 3px solid var(--bs-primary);
+  outline-offset: -3px;
 }
 
 .case-register-table td,

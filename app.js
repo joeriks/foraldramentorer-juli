@@ -171,6 +171,37 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "110",
+    date: "2026-08-21",
+    title: "Spårbar kommunikation kring möten",
+    flow: "Möte -> deltagare -> tidsförfrågan, kallelse och uppföljning",
+    simplified: "Kort kommunikation om tid, kallelser, påminnelser, ombokningar och avbokningar samlas direkt under mötet i stället för i lösa anteckningar.",
+    retained: "Mötets status, kalenderkoppling, ärendekoppling, deltagarsvar och befintliga mötesposter fungerar som tidigare.",
+    changes: [
+      "Mötet har fått en kronologisk kommunikationshistorik med typ, kommentar, tidpunkt och registrerande handläggare.",
+      "Nya kommunikationshändelser kan tas bort innan mötet sparas, medan sparad historik inte skrivs över.",
+      "Övriga deltagare läggs till strukturerat med namn, roll, telefon och e-post.",
+      "Kopplade föräldrar, mentorer och handläggare behåller sin registerkoppling och tillgängliga kontaktuppgifter."
+    ]
+  },
+  {
+    version: "109",
+    date: "2026-08-21",
+    title: "Konsekvent navigering och datumvisning",
+    flow: "Navigation -> planering eller register -> detaljvy",
+    simplified: "Möten har fått en egen ingång och genvägar, registerfilter, ärendeflikar och datum visas nu mer förutsägbart när handläggaren byter vy eller post.",
+    retained: "Ärendedata, testdata, verksamhetsregler och användarens val inom den öppna ärendevyn fungerar som tidigare.",
+    changes: [
+      "Möten finns som en egen huvudpunkt och visar kalenderns gemensamma mötesdata i en ren mötesvy.",
+      "Kontaktmottagning öppnar sitt filtrerade ärenderegister från både desktop- och mobilnavigationen.",
+      "Ett nytt ärende öppnas på fliken Arbete om länken inte uttryckligen pekar på en annan flik.",
+      "Ärenderegistrets statusfilter följer URL:en och återställs när hela registret öppnas.",
+      "Bara den relevanta huvudgenvägen markeras för stödärenden, matchningar, uppdrag och mottagningsärenden.",
+      "Ärende-, mentor- och föräldrarader kan öppnas konsekvent med både mus och tangentbord.",
+      "Register och arbetsköer använder exakta datum i stället för växlande relativa tidsangivelser."
+    ]
+  },
+  {
     version: "108",
     date: "2026-08-21",
     title: "Tydligare möteshantering",
@@ -1271,6 +1302,7 @@ let pendingSourceCaseId = null;
 let selectedCaseRecordId = null;
 let caseRouteIntent = "";
 let caseRouteTargetId = "";
+let caseRouteShouldResetTab = false;
 let mentorRouteIntent = "";
 let mentorRouteCaseId = "";
 let mentorRouteActivityId = "";
@@ -1347,6 +1379,7 @@ const els = {
   testUserTypeSelect: document.querySelector("#testUserTypeSelect"),
   navDashboard: document.querySelector("#navDashboard"),
   navCalendar: document.querySelector("#navCalendar"),
+  navMeetings: document.querySelector("#navMeetings"),
   navIncomingContact: document.querySelector("#navIncomingContact"),
   navPresentation: document.querySelector("#navPresentation"),
   navIntake: document.querySelector("#navIntake"),
@@ -1492,13 +1525,27 @@ const els = {
   interactionParentInput: document.querySelector("#interactionParentInput"),
   interactionMentorInput: document.querySelector("#interactionMentorInput"),
   interactionHandlerInput: document.querySelector("#interactionHandlerInput"),
-  interactionExternalInput: document.querySelector("#interactionExternalInput"),
+  interactionExternalParticipantCount: document.querySelector("#interactionExternalParticipantCount"),
+  interactionExternalParticipantList: document.querySelector("#interactionExternalParticipantList"),
+  interactionExternalNameInput: document.querySelector("#interactionExternalNameInput"),
+  interactionExternalRoleInput: document.querySelector("#interactionExternalRoleInput"),
+  interactionExternalPhoneInput: document.querySelector("#interactionExternalPhoneInput"),
+  interactionExternalEmailInput: document.querySelector("#interactionExternalEmailInput"),
+  interactionAddExternalParticipantButton: document.querySelector("#interactionAddExternalParticipantButton"),
   interactionInvitationDetails: document.querySelector("#interactionInvitationDetails"),
   interactionInvitationFields: document.querySelector("#interactionInvitationFields"),
   interactionInvitationInput: document.querySelector("#interactionInvitationInput"),
   interactionCopyInvitationButton: document.querySelector("#interactionCopyInvitationButton"),
   interactionResponseSection: document.querySelector("#interactionResponseSection"),
   interactionResponseFields: document.querySelector("#interactionResponseFields"),
+  interactionCommunicationDetails: document.querySelector("#interactionCommunicationDetails"),
+  interactionCommunicationCount: document.querySelector("#interactionCommunicationCount"),
+  interactionCommunicationList: document.querySelector("#interactionCommunicationList"),
+  interactionCommunicationTypeInput: document.querySelector("#interactionCommunicationTypeInput"),
+  interactionCommunicationAtInput: document.querySelector("#interactionCommunicationAtInput"),
+  interactionCommunicationCommentInput: document.querySelector("#interactionCommunicationCommentInput"),
+  interactionCommunicationHelp: document.querySelector("#interactionCommunicationHelp"),
+  interactionAddCommunicationButton: document.querySelector("#interactionAddCommunicationButton"),
   interactionOutcomeFields: document.querySelector("#interactionOutcomeFields"),
   interactionMeetingOutcomeSection: document.querySelector("#interactionMeetingOutcomeSection"),
   interactionAttendanceSection: document.querySelector("#interactionAttendanceSection"),
@@ -5628,6 +5675,12 @@ function renderCalendarOwnerFilter() {
 }
 
 function renderCalendar() {
+  const meetingsOnly = currentView === "meetings";
+  els.calendarLogContactButton.hidden = meetingsOnly;
+  document.querySelectorAll("[data-calendar-type-filter]").forEach((input) => {
+    input.checked = calendarTypeFilters.has(input.dataset.calendarTypeFilter);
+    input.closest("label").hidden = meetingsOnly && input.dataset.calendarTypeFilter !== "meeting";
+  });
   renderCalendarOwnerFilter();
   const monthName = new Intl.DateTimeFormat("sv-SE", { month: "long", year: "numeric" }).format(calendarCursor);
   els.calendarMonthTitle.textContent = monthName.charAt(0).toLocaleUpperCase("sv-SE") + monthName.slice(1);
@@ -5702,6 +5755,7 @@ function renderAll() {
   const viewRenderer = {
     dashboard: () => { renderPipeline(); renderDashboard(); },
     calendar: renderCalendar,
+    meetings: renderCalendar,
     versions: renderVersions,
     presentation: renderPresentation,
     cases: renderCases,
@@ -5735,8 +5789,14 @@ function renderAll() {
 }
 
 function applyCurrentRouteIntent() {
-  if (currentView !== "case" || !caseRouteIntent) return;
+  if (currentView !== "case") return;
   requestAnimationFrame(() => {
+    if (!caseRouteIntent) {
+      if (caseRouteShouldResetTab) bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
+      caseRouteShouldResetTab = false;
+      return;
+    }
+    caseRouteShouldResetTab = false;
     if (caseRouteIntent === "activities") {
       bootstrap.Tab.getOrCreateInstance(document.querySelector("#case-overview-tab")).show();
       (selectedCaseActivityId ? els.activityDetailPanel : els.activityListPanel)?.scrollIntoView({ block: "start" });
@@ -6404,6 +6464,8 @@ async function loadRoutinesDocument(sectionKey = "") {
 
 function applyRoute() {
   let route = parseRoute();
+  const previousView = currentView;
+  const previousCaseRouteIntent = caseRouteIntent;
   const mentorRoutes = new Set(["mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "learning"]);
   const publicRoutes = new Set(["public-home", "public-support", "public-learning"]);
   if (isPublicSession() && !publicRoutes.has(route.view)) {
@@ -6426,7 +6488,14 @@ function applyRoute() {
   const routeCaseId = nestedCaseRoute?.[1] || route.id;
   const routeMentorId = nestedMentorRoute?.[1] || route.id;
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "calendar", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "calendar", "meetings", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
+  if (currentView === "meetings" && previousView !== "meetings") {
+    calendarTypeFilters.clear();
+    calendarTypeFilters.add("meeting");
+  } else if (currentView === "calendar" && previousView !== "calendar") {
+    calendarTypeFilters.clear();
+    ["meeting", "contact", "activity", "case"].forEach((type) => calendarTypeFilters.add(type));
+  }
   const systemAdministrationView = SYSTEM_ADMINISTRATION_VIEWS.has(currentView);
   document.body.classList.toggle("is-system-administration", systemAdministrationView);
   els.administrationContext.hidden = !systemAdministrationView;
@@ -6440,6 +6509,9 @@ function applyRoute() {
   selectedCaseRecordId = currentView === "case" ? routeCaseId : selectedCaseRecordId;
   caseRouteIntent = currentView === "case" ? nestedCaseRoute?.[2] || "" : "";
   caseRouteTargetId = currentView === "case" ? nestedCaseRoute?.[3] || "" : "";
+  caseRouteShouldResetTab = currentView === "case"
+    && !caseRouteIntent
+    && (previousView !== "case" || routeCaseId !== previousCaseRecordId || Boolean(previousCaseRouteIntent));
   if (currentView !== "case") {
     selectedCaseActivityId = null;
   } else if (caseRouteIntent === "activities" && caseRouteTargetId) {
@@ -6460,14 +6532,14 @@ function applyRoute() {
   if (selectedActivityTypeId === "new") activityTypeEditMode = true;
   workQueueOnly = currentView === "mentors" && route.id === "action";
   caseTypeFilter = currentView === "cases" && caseTypeById(route.id) ? route.id : "";
-  if (currentView === "cases" && route.params?.has("status")) {
-    const status = route.params.get("status");
+  if (currentView === "cases") {
+    const status = route.params?.get("status") || "";
     caseStatusFilter = ["open", "new", "in_progress", "waiting", "paused", "decision_required", "closed"].includes(status) ? status : "";
     casePage = 1;
   }
 
   els.dashboardView.hidden = currentView !== "dashboard";
-  els.calendarView.hidden = currentView !== "calendar";
+  els.calendarView.hidden = !["calendar", "meetings"].includes(currentView);
   els.versionsView.hidden = currentView !== "versions";
   els.presentationView.hidden = currentView !== "presentation";
   els.casesView.hidden = currentView !== "cases";
@@ -6492,7 +6564,7 @@ function applyRoute() {
 
   const mentorSession = isMentorSession();
   const publicSession = isPublicSession();
-  for (const navigationItem of [els.navDashboard, els.navCalendar, els.navPresentation, els.navIntake, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navParentSupportCases, els.navLearning, els.navAdministration]) {
+  for (const navigationItem of [els.navDashboard, els.navCalendar, els.navMeetings, els.navPresentation, els.navIntake, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navParentSupportCases, els.navLearning, els.navAdministration]) {
     navigationItem.hidden = mentorSession || publicSession;
   }
   document.querySelectorAll(".sidebar-nav > .nav-link.disabled").forEach((navigationItem) => {
@@ -6515,14 +6587,21 @@ function applyRoute() {
 
   els.navDashboard.classList.toggle("active", currentView === "dashboard");
   els.navCalendar.classList.toggle("active", currentView === "calendar");
+  els.navMeetings.classList.toggle("active", currentView === "meetings");
   els.navPresentation.classList.toggle("active", currentView === "presentation");
-  els.navIntake.classList.toggle("active", currentView === "cases" && caseTypeFilter === "incoming-contact");
-  els.navCases.classList.toggle("active", (currentView === "cases" && !caseTypeFilter) || currentView === "case");
-  els.navMatchings.classList.toggle("active", currentView === "cases" && caseTypeFilter === "matching");
-  els.navAssignments.classList.toggle("active", currentView === "cases" && caseTypeFilter === "mentor-assignment");
+  const currentCaseTypeId = currentView === "case"
+    ? cases.find((caseRecord) => caseRecord.id === routeCaseId)?.caseTypeId || ""
+    : currentView === "cases" ? caseTypeFilter : "";
+  const intakeNavigationActive = ["cases", "case"].includes(currentView) && currentCaseTypeId === "incoming-contact";
+  const matchingNavigationActive = ["cases", "case"].includes(currentView) && currentCaseTypeId === "matching";
+  const assignmentNavigationActive = ["cases", "case"].includes(currentView) && currentCaseTypeId === "mentor-assignment";
+  const specializedCaseNavigation = new Set(["incoming-contact", "parent-support", "matching", "mentor-assignment"]);
+  els.navIntake.classList.toggle("active", intakeNavigationActive);
+  els.navCases.classList.toggle("active", ["cases", "case"].includes(currentView) && !specializedCaseNavigation.has(currentCaseTypeId));
+  els.navMatchings.classList.toggle("active", matchingNavigationActive);
+  els.navAssignments.classList.toggle("active", assignmentNavigationActive);
   els.navCandidates.classList.toggle("active", currentView === "mentors" || currentView === "mentor");
-  const parentSupportNavigationActive = (currentView === "cases" && caseTypeFilter === "parent-support")
-    || (currentView === "case" && cases.find((caseRecord) => caseRecord.id === routeCaseId)?.caseTypeId === "parent-support");
+  const parentSupportNavigationActive = ["cases", "case"].includes(currentView) && currentCaseTypeId === "parent-support";
   els.navParents.classList.toggle("active", currentView === "parents" || currentView === "parent" || parentSupportNavigationActive);
   els.navParentSupportCases.classList.toggle("active", parentSupportNavigationActive);
   els.mobileParentSupportCases.classList.toggle("active", parentSupportNavigationActive);
@@ -6551,6 +6630,9 @@ function applyRoute() {
   } else if (currentView === "calendar") {
     els.pageTitle.textContent = "Kalender";
     els.breadcrumb.textContent = "Start / Kalender";
+  } else if (currentView === "meetings") {
+    els.pageTitle.textContent = "Möten";
+    els.breadcrumb.textContent = "Start / Möten";
   } else if (currentView === "versions") {
     els.pageTitle.textContent = "Versioner";
     els.breadcrumb.textContent = "Start / Systemadministration / Versioner";
@@ -6640,6 +6722,21 @@ function applyRoute() {
 
 function navigateToCandidate(id) {
   window.location.hash = `#/mentor/${id}`;
+}
+
+function makeRegisterRowInteractive(row, label, openRecord) {
+  row.classList.add("interactive-register-row");
+  row.tabIndex = 0;
+  row.setAttribute("aria-label", label);
+  row.addEventListener("click", (event) => {
+    if (event.target.closest("a, button, input, select, textarea")) return;
+    openRecord();
+  });
+  row.addEventListener("keydown", (event) => {
+    if (event.target !== row || !["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    openRecord();
+  });
 }
 
 function navigateToCase(id) {
@@ -7156,11 +7253,13 @@ function dashboardQueueOwnerLabel() {
   return handler ? ` i ${handler.name}s ärenden` : "";
 }
 
-function caseDateLabel(caseRecord) {
+function caseDateLabel(caseRecord, { explicitObject = false } = {}) {
   const createdAt = caseRecord.createdAt;
   const updatedAt = caseRecord.updatedAt || createdAt;
-  const hasChanged = createdAt && updatedAt && new Date(updatedAt).getTime() > new Date(createdAt).getTime();
-  return `Skapad ${formatDate(createdAt)}${hasChanged ? ` · Senast ändrad ${formatDate(updatedAt)}` : ""}`;
+  const createdDate = formatDate(createdAt);
+  const updatedDate = formatDate(updatedAt);
+  const hasChanged = createdAt && updatedAt && updatedDate !== createdDate;
+  return `${explicitObject ? "Ärendet skapat" : "Skapad"} ${createdDate}${hasChanged ? ` · Senast ändrad ${updatedDate}` : ""}`;
 }
 
 function renderDashboard() {
@@ -7239,7 +7338,7 @@ function renderDashboard() {
     const parent = caseParent(caseRecord);
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td class="dashboard-queue-case"><span class="case-number-text">${escapeHtml(caseRecord.number)}</span><strong>${escapeHtml(mentor?.name || parent?.name || caseRecord.title)}</strong><small>${escapeHtml(activityHandlerLabel(activity, caseRecord))}</small><small class="dashboard-queue-case-date">${escapeHtml(caseDateLabel(caseRecord))}</small></td>
+      <td class="dashboard-queue-case"><span class="case-number-text">${escapeHtml(caseRecord.number)}</span><strong>${escapeHtml(mentor?.name || parent?.name || caseRecord.title)}</strong><small>${escapeHtml(activityHandlerLabel(activity, caseRecord))}</small><small class="dashboard-queue-case-date">${escapeHtml(caseDateLabel(caseRecord, { explicitObject: true }))}</small></td>
       <td><div class="dashboard-queue-next"><div><strong>${escapeHtml(activity.title)}</strong><small class="${activityDueState(activity) ? `activity-due-${activityDueState(activity)}` : ""}">${escapeHtml(activityHasBlockingResult(activity) ? "Ställningstagande krävs" : `Förfaller: ${activityDueLabel(activity)}`)}</small></div><button type="button" class="btn btn-outline-primary btn-sm" data-open-activity="${activity.id}">Öppna</button></div></td>
     `;
     els.actionTableBody.append(row);
@@ -7363,7 +7462,9 @@ function renderParents() {
     const openSupport = supportCases.filter((item) => item.status !== "closed").length;
     const activeAssignments = supportCases.flatMap((item) => assignmentCasesForSupport(item.id)).filter((item) => item.status !== "closed").length;
     const row = document.createElement("tr");
+    row.dataset.parentId = parent.id;
     row.innerHTML = `<td><a class="fw-semibold" href="#/parent/${escapeHtml(parent.id)}">${escapeHtml(parent.name)}</a></td><td>${escapeHtml(parent.contactDetails || "Ej angivet")}</td><td>${escapeHtml(parent.area || "Ej angivet")}</td><td>${openSupport}</td><td>${activeAssignments}</td><td>${escapeHtml(formatDateTime(parent.updatedAt))}</td>`;
+    makeRegisterRowInteractive(row, `Öppna föräldrakort för ${parent.name}`, () => navigateToParent(parent.id));
     els.parentTableBody.append(row);
   }
 }
@@ -7855,19 +7956,14 @@ function renderCases() {
     const owner = responsibleHandler(caseRecord);
     const nextActivity = nextCaseActivity(caseRecord);
     const row = document.createElement("tr");
-    row.tabIndex = 0;
     row.dataset.caseId = caseRecord.id;
-    row.setAttribute("aria-label", `Öppna ärende ${caseRecord.number}: ${caseRecord.title}`);
     row.innerHTML = `
       <td class="case-register-primary"><span class="case-number-text">${escapeHtml(caseRecord.number)}</span><strong>${escapeHtml(caseRecord.title)}</strong><small>${escapeHtml(caseRecord.type)}</small><small>${escapeHtml(caseDateLabel(caseRecord))}</small></td>
       <td>${mentor ? escapeHtml(mentor.name) : parent ? escapeHtml(parent.name) : '<span class="text-secondary">Ej personanknutet</span>'}</td>
       <td class="case-register-state"><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseStatusLabel(caseRecord.status))}</span><small>${escapeHtml(nextActivity?.title || "Ingen återstående aktivitet")}</small></td>
       <td>${escapeHtml(owner?.name || "Ej tilldelad")}</td>
     `;
-    row.addEventListener("click", () => navigateToCase(caseRecord.id));
-    row.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") navigateToCase(caseRecord.id);
-    });
+    makeRegisterRowInteractive(row, `Öppna ärende ${caseRecord.number}: ${caseRecord.title}`, () => navigateToCase(caseRecord.id));
     els.caseTableBody.append(row);
   }
 }
@@ -9565,15 +9661,16 @@ function renderTable() {
   for (const candidate of rows) {
     const row = document.createElement("tr");
     row.className = [candidate.id === selectedId ? "active" : "", candidate.active === false ? "mentor-register-inactive" : ""].filter(Boolean).join(" ");
+    row.dataset.mentorId = candidate.id;
     row.innerHTML = `
-      <td><span class="case-number-text">${escapeHtml(candidate.caseNumber)}</span><small>${escapeHtml(daysSinceText(candidate.createdAt))}</small></td>
+      <td><span class="case-number-text">${escapeHtml(candidate.caseNumber)}</span><small>Skapad ${escapeHtml(formatDate(candidate.createdAt))}</small></td>
       <td>${escapeHtml(candidate.name)}<small>${escapeHtml(candidate.languages)}</small></td>
       <td><div class="mentor-register-status"><span class="${statusClass(candidate)}">${escapeHtml(candidate.status)}</span>${candidate.active === false ? '<span class="badge rounded-pill text-bg-secondary">Inaktiv</span>' : ""}</div></td>
       <td>${escapeHtml(candidate.area)}</td>
       <td>${escapeHtml(candidate.coordinator || "Ej tilldelad")}</td>
       <td>${escapeHtml(formatDate(candidate.updatedAt || candidate.createdAt))}</td>
     `;
-    row.addEventListener("click", () => navigateToCandidate(candidate.id));
+    makeRegisterRowInteractive(row, `Öppna mentorkort för ${candidate.name}`, () => navigateToCandidate(candidate.id));
     els.candidateTableBody.append(row);
   }
 }
@@ -11223,7 +11320,7 @@ async function registerDocumentCommand({ caseRecord, activityId, type, title, do
 
 function registerCaseMeetingCommand({
   caseRecord, existing = null, meetingType, meetingStatus = "scheduled", occurredAt, endsAt = null,
-  mode, activityId, title = "", location = "", invitationText = "", participants = null,
+  mode, activityId, title = "", location = "", invitationText = "", communicationHistory = [], participants = null,
   organizerId = CURRENT_USER_ID, summary, nextStep = "", rescheduledFromInteractionId = null
 }) {
   if (meetingStatus === "completed" && new Date(occurredAt).getTime() > Date.now()) {
@@ -11258,6 +11355,7 @@ function registerCaseMeetingCommand({
         title: title || ({ certification_interview: "Intervju inför godkännande", follow_up: "Uppföljning", other: "Möte" })[meetingType] || "Möte",
         location,
         invitationText,
+        communicationHistory,
         summary,
         nextStep,
         rescheduledFromInteractionId,
@@ -11291,6 +11389,7 @@ function registerCaseMeetingCommand({
         mode,
         location,
         invitationText,
+        communicationHistory,
         summary,
         nextStep,
         rescheduledFromInteractionId,
@@ -11749,12 +11848,6 @@ function formatFileSize(value) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function daysSinceText(value) {
-  if (!value) return "Skapat datum saknas";
-  const days = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86400000));
-  return days === 0 ? "Skapat idag" : `Skapat för ${days} dagar sedan`;
-}
-
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
@@ -11923,6 +12016,58 @@ function interactionOutcomeActionLabel(status) {
   return "Markera som genomfört";
 }
 
+const INTERACTION_COMMUNICATION_LABELS = {
+  time_request: "Förfrågan om dag och tid",
+  time_response: "Svar på tidsförfrågan",
+  time_confirmed: "Godkänd tid",
+  invitation_sent: "Kallelse skickad",
+  reminder_sent: "Påminnelse skickad",
+  rescheduled: "Ombokning",
+  cancelled: "Avbokning",
+  other: "Övrigt"
+};
+
+function interactionDraftItems(key) {
+  try {
+    const items = JSON.parse(els.interactionForm.dataset[key] || "[]");
+    return Array.isArray(items) ? items : [];
+  } catch {
+    return [];
+  }
+}
+
+function setInteractionDraftItems(key, items) {
+  els.interactionForm.dataset[key] = JSON.stringify(items);
+}
+
+function externalParticipantsFromForm() {
+  return interactionDraftItems("externalParticipants");
+}
+
+function renderExternalParticipants() {
+  const participants = externalParticipantsFromForm();
+  els.interactionExternalParticipantCount.textContent = `${participants.length} ${participants.length === 1 ? "tillagd" : "tillagda"}`;
+  els.interactionExternalParticipantList.innerHTML = participants.length
+    ? participants.map((participant) => {
+      const contact = [participant.phone, participant.email].filter(Boolean).join(" · ") || "Ingen kontaktuppgift";
+      return `<div class="interaction-external-participant"><div><strong>${escapeHtml(participant.displayName)}</strong><span>${escapeHtml(participant.roleLabel || "Roll ej angiven")}</span><small>${escapeHtml(contact)}</small></div><button type="button" class="btn btn-link btn-sm" data-remove-external-participant="${escapeHtml(participant.id)}">Ta bort</button></div>`;
+    }).join("")
+    : '<p class="small text-secondary mb-0">Inga övriga deltagare har lagts till.</p>';
+}
+
+function communicationHistoryFromForm() {
+  return interactionDraftItems("communicationHistory").map(({ pending, ...item }) => item);
+}
+
+function renderInteractionCommunicationHistory() {
+  const history = interactionDraftItems("communicationHistory")
+    .sort((left, right) => new Date(left.occurredAt) - new Date(right.occurredAt));
+  els.interactionCommunicationCount.textContent = history.length;
+  els.interactionCommunicationList.innerHTML = history.length
+    ? history.map((item) => `<article class="interaction-communication-item${item.pending ? " is-pending" : ""}"><time datetime="${escapeHtml(item.occurredAt)}">${escapeHtml(formatDateTime(item.occurredAt))}</time><div><strong>${escapeHtml(INTERACTION_COMMUNICATION_LABELS[item.type] || INTERACTION_COMMUNICATION_LABELS.other)}</strong><p>${escapeHtml(item.comment)}</p><small>${escapeHtml(handlerNameById(item.createdBy) || item.createdBy || "System")}${item.pending ? " · sparas med mötet" : ""}</small></div>${item.pending ? `<button type="button" class="btn btn-link btn-sm" data-remove-communication="${escapeHtml(item.id)}">Ta bort</button>` : ""}</article>`).join("")
+    : '<p class="small text-secondary mb-0">Ingen kommunikation har registrerats ännu.</p>';
+}
+
 function updateInteractionFormState({ applyCaseSuggestions = false } = {}) {
   clearInteractionValidity();
   const scheduled = els.interactionScheduledInput.checked;
@@ -11946,6 +12091,7 @@ function updateInteractionFormState({ applyCaseSuggestions = false } = {}) {
           : "Registrera genomförd kontakt";
   els.interactionPlanningFields.hidden = !scheduled;
   els.interactionInvitationDetails.hidden = !scheduled;
+  els.interactionCommunicationDetails.hidden = interactionKind !== "meeting";
   els.interactionResponseSection.hidden = !scheduled || !editing;
   els.interactionOutcomeFields.hidden = scheduled;
   els.interactionEndInput.required = scheduled;
@@ -11994,6 +12140,8 @@ function openInteractionForm(intent = "scheduled", caseId = "", interactionId = 
   els.interactionForm.dataset.originalStatus = existing?.status || "";
   els.interactionForm.dataset.rescheduledFromInteractionId = "";
   els.interactionForm.dataset.activityId = existing?.activityId || preferredActivityId || "";
+  setInteractionDraftItems("externalParticipants", []);
+  setInteractionDraftItems("communicationHistory", existing?.communicationHistory || []);
   const resolvedIntent = existing?.status === "scheduled" ? "scheduled" : existing ? "completed" : intent;
   els.interactionScheduledInput.checked = resolvedIntent === "scheduled";
   els.interactionCompletedInput.checked = resolvedIntent === "completed";
@@ -12004,11 +12152,11 @@ function openInteractionForm(intent = "scheduled", caseId = "", interactionId = 
     option.textContent = `${caseRecord.number} · ${caseRecord.type} · ${caseRecord.title}`;
     els.interactionCaseInput.append(option);
   }
-  populateInteractionSelect(els.interactionParentInput, [...parents].sort((a, b) => a.name.localeCompare(b.name, "sv")), (parent) => parent.name);
-  populateInteractionSelect(els.interactionMentorInput, [...candidates].filter((candidate) => candidate.active !== false).sort((a, b) => a.name.localeCompare(b.name, "sv")), (mentor) => mentor.name);
+  populateInteractionSelect(els.interactionParentInput, [...parents].sort((a, b) => a.name.localeCompare(b.name, "sv")), (parent) => `${parent.name}${parent.contactDetails ? ` · ${parent.contactDetails}` : ""}`);
+  populateInteractionSelect(els.interactionMentorInput, [...candidates].filter((candidate) => candidate.active !== false).sort((a, b) => a.name.localeCompare(b.name, "sv")), (mentor) => `${mentor.name}${mentor.contactDetails ? ` · ${mentor.contactDetails}` : ""}`);
   const activeHandlers = [...handlers].filter((handler) => handler.active !== false);
-  populateInteractionSelect(els.interactionOrganizerInput, activeHandlers, (handler) => handler.name, CURRENT_USER_ID);
-  populateInteractionSelect(els.interactionHandlerInput, activeHandlers, (handler) => handler.name);
+  populateInteractionSelect(els.interactionOrganizerInput, activeHandlers, (handler) => `${handler.name}${handler.email ? ` · ${handler.email}` : ""}`, CURRENT_USER_ID);
+  populateInteractionSelect(els.interactionHandlerInput, activeHandlers, (handler) => `${handler.name}${handler.email ? ` · ${handler.email}` : ""}`);
   els.interactionCaseInput.value = existing?.caseId || caseId || "";
   const startsAt = new Date();
   if (resolvedIntent === "scheduled") startsAt.setMinutes(Math.ceil(startsAt.getMinutes() / 15) * 15, 0, 0);
@@ -12024,6 +12172,10 @@ function openInteractionForm(intent = "scheduled", caseId = "", interactionId = 
   els.interactionLocationInput.value = existing?.location || "";
   els.interactionInvitationInput.value = existing?.invitationText || "";
   els.interactionInvitationDetails.open = Boolean(existing?.invitationText || existing?.participants?.some((participant) => participant.responseStatus && participant.responseStatus !== "no_response"));
+  els.interactionCommunicationDetails.open = Boolean(existing?.communicationHistory?.length);
+  els.interactionCommunicationAtInput.value = localDateTimeValue();
+  els.interactionCommunicationCommentInput.value = "";
+  els.interactionCommunicationHelp.textContent = "Händelsen sparas tillsammans med mötet.";
   els.interactionSummaryInput.value = existing?.summary || "";
   els.interactionNextStepInput.value = existing?.nextStep || "";
   updateInteractionFormState({ applyCaseSuggestions: !existing });
@@ -12033,7 +12185,7 @@ function openInteractionForm(intent = "scheduled", caseId = "", interactionId = 
     els.interactionMentorInput.value = participant("mentor")?.partyId || "";
     els.interactionOrganizerInput.value = existing.organizerId || CURRENT_USER_ID;
     els.interactionHandlerInput.value = participant("handler")?.partyId || "";
-    els.interactionExternalInput.value = existing.participants.filter((item) => item.partyType === "external").map((item) => item.displayName).join(", ");
+    setInteractionDraftItems("externalParticipants", existing.participants.filter((item) => item.partyType === "external"));
     els.interactionForm.dataset.attendance = JSON.stringify(Object.fromEntries(existing.participants.map((item) => [item.id, item.attendanceStatus])));
     els.interactionForm.dataset.responses = JSON.stringify(Object.fromEntries(existing.participants.map((item) => [item.id, item.responseStatus])));
     renderInteractionParticipantStates();
@@ -12042,6 +12194,8 @@ function openInteractionForm(intent = "scheduled", caseId = "", interactionId = 
     els.interactionForm.dataset.responses = "{}";
     renderInteractionParticipantStates();
   }
+  renderExternalParticipants();
+  renderInteractionCommunicationHistory();
   updateInteractionFormState();
   els.interactionForm.dataset.dirty = "false";
   els.interactionForm.querySelector(".interaction-form-scroll").scrollTop = 0;
@@ -12054,12 +12208,14 @@ function selectedInteractionParticipants() {
   const parent = parents.find((item) => item.id === els.interactionParentInput.value);
   const mentor = candidates.find((item) => item.id === els.interactionMentorInput.value);
   const handler = handlers.find((item) => item.id === els.interactionHandlerInput.value);
-  if (parent) participants.push(interactionParticipant({ partyType: "parent", partyId: parent.id, displayName: parent.name }));
-  if (mentor) participants.push(interactionParticipant({ partyType: "mentor", partyId: mentor.id, displayName: mentor.name }));
-  if (handler) participants.push(interactionParticipant({ partyType: "handler", partyId: handler.id, displayName: handler.name }));
-  for (const displayName of els.interactionExternalInput.value.split(",").map((name) => name.trim()).filter(Boolean)) {
-    participants.push(interactionParticipant({ partyType: "external", displayName }));
-  }
+  const contact = (record) => {
+    const value = String(record?.contactDetails || record?.contact || "").trim();
+    return value.includes("@") ? { email: value } : value ? { phone: value } : {};
+  };
+  if (parent) participants.push(interactionParticipant({ partyType: "parent", partyId: parent.id, displayName: parent.name, roleLabel: "Förälder", ...contact(parent) }));
+  if (mentor) participants.push(interactionParticipant({ partyType: "mentor", partyId: mentor.id, displayName: mentor.name, roleLabel: "Mentor", ...contact(mentor) }));
+  if (handler) participants.push(interactionParticipant({ partyType: "handler", partyId: handler.id, displayName: handler.name, roleLabel: handler.role || "Handläggare", email: handler.email || "" }));
+  participants.push(...externalParticipantsFromForm());
   return participants;
 }
 
@@ -12117,9 +12273,12 @@ function rescheduleInteraction(interactionId) {
   els.interactionParentInput.value = participant("parent")?.partyId || els.interactionParentInput.value;
   els.interactionMentorInput.value = participant("mentor")?.partyId || els.interactionMentorInput.value;
   els.interactionHandlerInput.value = participant("handler")?.partyId || els.interactionHandlerInput.value;
-  els.interactionExternalInput.value = source.participants.filter((item) => item.partyType === "external").map((item) => item.displayName).join(", ");
+  setInteractionDraftItems("externalParticipants", source.participants.filter((item) => item.partyType === "external"));
+  setInteractionDraftItems("communicationHistory", []);
   els.interactionCaseHelp.textContent = `${els.interactionCaseHelp.textContent} En ny bokning skapas och den tidigare posten behålls.`;
   renderInteractionParticipantStates();
+  renderExternalParticipants();
+  renderInteractionCommunicationHistory();
 }
 
 function openInteractionForParty(partyType, partyId) {
@@ -12174,11 +12333,70 @@ els.interactionCaseInput.addEventListener("change", () => {
   updateInteractionFormState({ applyCaseSuggestions: true });
 });
 els.interactionKindInput.addEventListener("change", () => updateInteractionFormState());
-[els.interactionParentInput, els.interactionMentorInput, els.interactionHandlerInput, els.interactionExternalInput]
+[els.interactionParentInput, els.interactionMentorInput, els.interactionHandlerInput]
   .forEach((input) => input.addEventListener("change", () => {
     els.interactionParentInput.setCustomValidity("");
     renderInteractionParticipantStates();
   }));
+els.interactionAddExternalParticipantButton.addEventListener("click", () => {
+  const displayName = els.interactionExternalNameInput.value.trim();
+  const roleLabel = els.interactionExternalRoleInput.value.trim();
+  els.interactionExternalNameInput.setCustomValidity(displayName ? "" : "Ange deltagarens namn.");
+  els.interactionExternalRoleInput.setCustomValidity(roleLabel ? "" : "Ange deltagarens roll.");
+  if (!els.interactionExternalNameInput.reportValidity() || !els.interactionExternalRoleInput.reportValidity() || !els.interactionExternalEmailInput.reportValidity()) return;
+  const participant = interactionParticipant({
+    partyType: "external",
+    partyId: crypto.randomUUID(),
+    displayName,
+    roleLabel,
+    phone: els.interactionExternalPhoneInput.value.trim(),
+    email: els.interactionExternalEmailInput.value.trim()
+  });
+  setInteractionDraftItems("externalParticipants", [...externalParticipantsFromForm(), participant]);
+  [els.interactionExternalNameInput, els.interactionExternalRoleInput, els.interactionExternalPhoneInput, els.interactionExternalEmailInput].forEach((input) => { input.value = ""; });
+  renderExternalParticipants();
+  renderInteractionParticipantStates();
+  els.interactionForm.dataset.dirty = "true";
+});
+els.interactionExternalParticipantList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-remove-external-participant]");
+  if (!button) return;
+  setInteractionDraftItems("externalParticipants", externalParticipantsFromForm().filter((participant) => participant.id !== button.dataset.removeExternalParticipant));
+  renderExternalParticipants();
+  renderInteractionParticipantStates();
+  els.interactionForm.dataset.dirty = "true";
+});
+els.interactionAddCommunicationButton.addEventListener("click", () => {
+  const comment = els.interactionCommunicationCommentInput.value.trim();
+  const occurredAtValue = els.interactionCommunicationAtInput.value;
+  els.interactionCommunicationCommentInput.setCustomValidity(comment ? "" : "Skriv en kort kommentar om kommunikationen.");
+  els.interactionCommunicationAtInput.setCustomValidity(occurredAtValue ? "" : "Ange när kommunikationen skedde.");
+  if (!els.interactionCommunicationCommentInput.reportValidity() || !els.interactionCommunicationAtInput.reportValidity()) return;
+  const now = new Date().toISOString();
+  const item = {
+    id: crypto.randomUUID(),
+    type: els.interactionCommunicationTypeInput.value,
+    comment,
+    occurredAt: new Date(occurredAtValue).toISOString(),
+    createdAt: now,
+    createdBy: currentActorId(),
+    pending: true
+  };
+  setInteractionDraftItems("communicationHistory", [...interactionDraftItems("communicationHistory"), item]);
+  els.interactionCommunicationCommentInput.value = "";
+  els.interactionCommunicationAtInput.value = localDateTimeValue();
+  els.interactionCommunicationHelp.textContent = "Händelsen är tillagd. Spara mötet för att registrera den.";
+  els.interactionCommunicationDetails.open = true;
+  renderInteractionCommunicationHistory();
+  els.interactionForm.dataset.dirty = "true";
+});
+els.interactionCommunicationList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-remove-communication]");
+  if (!button) return;
+  setInteractionDraftItems("communicationHistory", interactionDraftItems("communicationHistory").filter((item) => item.id !== button.dataset.removeCommunication));
+  renderInteractionCommunicationHistory();
+  els.interactionForm.dataset.dirty = "true";
+});
 els.interactionStartInput.addEventListener("input", () => els.interactionStartInput.setCustomValidity(""));
 els.interactionEndInput.addEventListener("input", () => els.interactionEndInput.setCustomValidity(""));
 els.interactionSummaryInput.addEventListener("input", () => els.interactionSummaryInput.setCustomValidity(""));
@@ -12236,6 +12454,7 @@ els.interactionForm.addEventListener("submit", async (event) => {
     mode: interactionKind === "meeting" ? els.interactionModeInput.value : interactionKind,
     location: els.interactionLocationInput.value.trim(),
     invitationText: els.interactionInvitationInput.value.trim(),
+    communicationHistory: communicationHistoryFromForm(),
     summary: els.interactionSummaryInput.value.trim(),
     nextStep: els.interactionNextStepInput.value.trim(),
     rescheduledFromInteractionId: els.interactionForm.dataset.rescheduledFromInteractionId || existingInteraction?.rescheduledFromInteractionId || null
@@ -12257,6 +12476,7 @@ els.interactionForm.addEventListener("submit", async (event) => {
         title: common.title,
         location: common.location,
         invitationText: common.invitationText,
+        communicationHistory: common.communicationHistory,
         participants,
         organizerId: common.organizerId,
         summary: common.summary,
@@ -12356,6 +12576,11 @@ els.navDashboard.addEventListener("click", (event) => {
 els.navCalendar.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("#/calendar");
+});
+
+els.navMeetings.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("#/meetings");
 });
 
 els.navIntake.addEventListener("click", (event) => {
@@ -15084,7 +15309,7 @@ els.caseSummaryBoard?.addEventListener("click", (event) => {
   casePage = 1;
   els.caseStatusFilter.value = caseStatusFilter;
   els.caseSearchInput.value = "";
-  navigateTo("#/cases");
+  navigateTo(caseListRoute());
 });
 
 els.caseFlowBoard?.addEventListener("click", (event) => {

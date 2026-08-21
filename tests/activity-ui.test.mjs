@@ -57,6 +57,24 @@ test("shows activities in the first case work tab", () => {
   assert.match(app, /els\.caseRecentHistorySection\.before\(els\.caseActivitiesPane\)/);
   assert.match(app, /els\.caseActivitiesPane\.hidden = false/);
   assert.doesNotMatch(app, /\["open_activities", "Visa alla kontroller"/);
+  assert.match(app, /caseRouteShouldResetTab = currentView === "case"/);
+  assert.match(app, /if \(caseRouteShouldResetTab\) bootstrap\.Tab\.getOrCreateInstance\(document\.querySelector\("#case-overview-tab"\)\)\.show\(\)/);
+});
+
+test("keeps register navigation and row interaction consistent", () => {
+  assert.match(html, /id="navMeetings"[^>]*href="#\/meetings"/);
+  assert.match(app, /els\.navMeetings\.classList\.toggle\("active", currentView === "meetings"\)/);
+  assert.match(app, /calendarTypeFilters\.add\("meeting"\)/);
+  assert.match(html, /id="navIntake"[^>]*href="#\/cases\/incoming-contact"/);
+  assert.doesNotMatch(html, /href="#\/intake"/);
+  assert.match(app, /const status = route\.params\?\.get\("status"\) \|\| ""/);
+  assert.match(app, /navigateTo\(caseListRoute\(\)\)/);
+  assert.match(app, /const currentCaseTypeId = currentView === "case"/);
+  assert.match(app, /function makeRegisterRowInteractive\(row, label, openRecord\)/);
+  assert.match(app, /makeRegisterRowInteractive\(row, `Öppna föräldrakort/);
+  assert.match(app, /makeRegisterRowInteractive\(row, `Öppna ärende/);
+  assert.match(app, /makeRegisterRowInteractive\(row, `Öppna mentorkort/);
+  assert.match(styles, /\.interactive-register-row:focus-visible/);
 });
 
 test("keeps the activity list compact and finishes activities in their detail view", () => {
@@ -77,8 +95,11 @@ test("keeps overview, registers and case headers focused on actionable informati
   assert.match(app, /<details class="case-flow-more">/);
   assert.match(html, /<th>Ärende<\/th>\s*<th>Nästa aktivitet<\/th>/);
   assert.match(app, /class="dashboard-queue-next"/);
-  assert.match(app, /class="dashboard-queue-case-date">\$\{escapeHtml\(caseDateLabel\(caseRecord\)\)\}/);
-  assert.match(app, /function caseDateLabel\(caseRecord\)/);
+  assert.match(app, /class="dashboard-queue-case-date">\$\{escapeHtml\(caseDateLabel\(caseRecord, \{ explicitObject: true \}\)\)\}/);
+  assert.match(app, /function caseDateLabel\(caseRecord, \{ explicitObject = false \} = \{\}\)/);
+  assert.match(app, /caseDateLabel\(caseRecord, \{ explicitObject: true \}\)/);
+  assert.match(app, /<small>Skapad \$\{escapeHtml\(formatDate\(candidate\.createdAt\)\)\}<\/small>/);
+  assert.doesNotMatch(app, /function daysSinceText/);
   assert.match(html, /<thead class="table-light"><tr><th>Aktivitet<\/th><th>Läge<\/th><\/tr><\/thead>/);
   assert.doesNotMatch(html, /<th>Aktivitet<\/th><th>Status<\/th><th>Ansvarig<\/th><th>Förfallodatum<\/th><th>Underlag<\/th>/);
   assert.match(app, /class="activity-list-meta"/);

@@ -35,12 +35,15 @@ export function validateInteractionForSave({ status, startsAt, endsAt = null, pa
   };
 }
 
-export function interactionParticipant({ partyType, partyId = null, displayName, required = true }) {
+export function interactionParticipant({ partyType, partyId = null, displayName, roleLabel = "", phone = "", email = "", required = true }) {
   return {
     id: `${partyType}:${partyId || String(displayName || "extern").toLocaleLowerCase("sv-SE")}`,
     partyType,
     partyId,
     displayName: String(displayName || "").trim(),
+    roleLabel: String(roleLabel || "").trim(),
+    phone: String(phone || "").trim(),
+    email: String(email || "").trim(),
     required: Boolean(required),
     invitationStatus: "not_prepared",
     responseStatus: "no_response",
@@ -49,10 +52,14 @@ export function interactionParticipant({ partyType, partyId = null, displayName,
 }
 
 export function suggestedInteractionParticipants({ parent = null, mentor = null, handler = null } = {}) {
+  const contact = (record) => {
+    const value = String(record?.contactDetails || record?.contact || "").trim();
+    return value.includes("@") ? { email: value } : value ? { phone: value } : {};
+  };
   return [
-    parent ? interactionParticipant({ partyType: "parent", partyId: parent.id, displayName: parent.name }) : null,
-    mentor ? interactionParticipant({ partyType: "mentor", partyId: mentor.id, displayName: mentor.name }) : null,
-    handler ? interactionParticipant({ partyType: "handler", partyId: handler.id, displayName: handler.name }) : null
+    parent ? interactionParticipant({ partyType: "parent", partyId: parent.id, displayName: parent.name, roleLabel: "Förälder", ...contact(parent) }) : null,
+    mentor ? interactionParticipant({ partyType: "mentor", partyId: mentor.id, displayName: mentor.name, roleLabel: "Mentor", ...contact(mentor) }) : null,
+    handler ? interactionParticipant({ partyType: "handler", partyId: handler.id, displayName: handler.name, roleLabel: handler.role || "Handläggare", email: handler.email || "", ...contact(handler) }) : null
   ].filter(Boolean);
 }
 
@@ -68,10 +75,25 @@ export function normalizeInteraction(record = {}) {
     caseId: record.caseId || null,
     activityId: record.activityId || null,
     organizerId: record.organizerId || record.createdBy || null,
-    participants: Array.isArray(record.participants) ? record.participants : [],
+    participants: Array.isArray(record.participants) ? record.participants.map((participant) => ({
+      ...participant,
+      roleLabel: String(participant.roleLabel || "").trim(),
+      phone: String(participant.phone || "").trim(),
+      email: String(participant.email || "").trim()
+    })) : [],
     title: String(record.title || "").trim(),
     location: String(record.location || "").trim(),
     invitationText: String(record.invitationText || "").trim(),
+    communicationHistory: Array.isArray(record.communicationHistory)
+      ? record.communicationHistory.filter((item) => item?.comment && item?.occurredAt).map((item) => ({
+        id: String(item.id || ""),
+        type: String(item.type || "other"),
+        comment: String(item.comment || "").trim(),
+        occurredAt: item.occurredAt,
+        createdAt: item.createdAt || item.occurredAt,
+        createdBy: item.createdBy || null
+      }))
+      : [],
     summary: String(record.summary || "").trim(),
     nextStep: String(record.nextStep || "").trim()
   };
@@ -94,6 +116,7 @@ export function interactionFromCaseMeeting(meeting, participants = []) {
     mode: meeting.mode,
     location: meeting.location,
     invitationText: meeting.invitationText,
+    communicationHistory: meeting.communicationHistory,
     summary: meeting.summary,
     nextStep: meeting.nextStep,
     rescheduledFromInteractionId: meeting.rescheduledFromInteractionId || null,

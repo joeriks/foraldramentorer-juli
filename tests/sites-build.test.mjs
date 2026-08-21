@@ -19,9 +19,10 @@ test("serves the application shell", async () => {
   assert.match(html, /id="dashboardView"/);
   assert.match(html, /id="calendarView"/);
   assert.match(html, /id="navCalendar"[^>]*href="#\/calendar"/);
+  assert.match(html, /id="navMeetings"[^>]*href="#\/meetings"/);
   assert.match(html, /id="caseFlowBoard"/);
   assert.match(html, /id="navIncomingContact"[^>]*sidebar-subaction-link/);
-  assert.match(html, /id="navIntake"/);
+  assert.match(html, /id="navIntake"[^>]*href="#\/cases\/incoming-contact"/);
   assert.match(html, /id="navVersions"/);
   assert.match(html, /id="mobileIncomingContact"/);
   assert.match(html, /id="navParentSupportCases"[^>]*href="#\/cases\/parent-support"/);
@@ -145,8 +146,9 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /parentSupportNavigationActive/);
   assert.match(scriptText, /mentorActiveFilter === "active"/);
   assert.match(scriptText, /function toggleSelectedCandidateActive/);
-  assert.match(scriptText, /function caseDateLabel\(caseRecord\)/);
-  assert.match(scriptText, /`Skapad \$\{formatDate\(createdAt\)\}/);
+  assert.match(scriptText, /function caseDateLabel\(caseRecord, \{ explicitObject = false \} = \{\}\)/);
+  assert.match(scriptText, /"Ärendet skapat" : "Skapad"/);
+  assert.doesNotMatch(scriptText, /Skapat för \$\{days\} dagar sedan/);
   assert.match(scriptText, /dashboard-queue-case-date/);
   assert.match(scriptText, /version: "107"/);
   assert.match(scriptText, /version: "103"/);

@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import {
   interactionFromCaseMeeting,
   interactionFromIncomingContact,
+  interactionParticipant,
   interactionStatusFromForm,
   meetingSatisfiesRequirement,
+  normalizeInteraction,
   suggestedInteractionParticipants,
   validateInteractionForSave
 } from "../interaction-domain.js";
@@ -88,4 +90,35 @@ test("projects an incoming call as a completed interaction", () => {
   assert.equal(interaction.status, "completed");
   assert.equal(interaction.direction, "incoming");
   assert.equal(interaction.nextStep, "Ring tillbaka");
+});
+
+test("preserves structured participant contacts and meeting communication", () => {
+  const participant = interactionParticipant({
+    partyType: "external",
+    partyId: "school-1",
+    displayName: "Eva Nilsson",
+    roleLabel: "Skolkurator",
+    phone: "070-123 45 67",
+    email: "eva.nilsson@example.se"
+  });
+  const normalized = normalizeInteraction({
+    kind: "meeting",
+    participants: [participant],
+    communicationHistory: [{
+      id: "communication-1",
+      type: "reminder_sent",
+      comment: "Påminnelse skickad via e-post.",
+      occurredAt: "2026-08-21T09:00:00.000Z",
+      createdAt: "2026-08-21T09:01:00.000Z",
+      createdBy: "handler-sara",
+      pending: true
+    }]
+  });
+
+  assert.equal(normalized.participants[0].roleLabel, "Skolkurator");
+  assert.equal(normalized.participants[0].phone, "070-123 45 67");
+  assert.equal(normalized.participants[0].email, "eva.nilsson@example.se");
+  assert.equal(normalized.communicationHistory[0].type, "reminder_sent");
+  assert.equal(normalized.communicationHistory[0].createdBy, "handler-sara");
+  assert.equal("pending" in normalized.communicationHistory[0], false);
 });
