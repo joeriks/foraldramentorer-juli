@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import {
   interactionFromCaseMeeting,
   interactionFromIncomingContact,
+  interactionStatusFromForm,
   meetingSatisfiesRequirement,
-  suggestedInteractionParticipants
+  suggestedInteractionParticipants,
+  validateInteractionForSave
 } from "../interaction-domain.js";
 
 test("suggests known case parties without requiring the handler to attend", () => {
@@ -35,6 +37,46 @@ test("preserves the link from a new booking to the previous meeting", () => {
     occurredAt: "2026-08-24T10:00:00.000Z", rescheduledFromInteractionId: "meeting-1"
   }, suggestedInteractionParticipants({ mentor: { id: "mentor-1", name: "Mikael" } }));
   assert.equal(interaction.rescheduledFromInteractionId, "meeting-1");
+});
+
+test("resolves every meeting outcome without treating cancellation as completion", () => {
+  assert.equal(interactionStatusFromForm({ scheduled: true, kind: "meeting" }), "scheduled");
+  assert.equal(interactionStatusFromForm({ scheduled: false, kind: "meeting", outcomeStatus: "completed" }), "completed");
+  assert.equal(interactionStatusFromForm({ scheduled: false, kind: "meeting", outcomeStatus: "cancelled" }), "cancelled");
+  assert.equal(interactionStatusFromForm({ scheduled: false, kind: "meeting", outcomeStatus: "no_show" }), "no_show");
+  assert.equal(interactionStatusFromForm({ scheduled: false, kind: "phone", outcomeStatus: "cancelled" }), "completed");
+});
+
+test("allows corrected meeting input after reporting exact validation errors", () => {
+  const now = new Date("2026-08-21T12:00:00.000Z").getTime();
+  const invalid = validateInteractionForSave({
+    status: "completed",
+    startsAt: "2026-08-22T10:00:00.000Z",
+    participants: [{ id: "parent:1" }],
+    summary: "",
+    now
+  });
+  assert.match(invalid.startsAt, /framtiden/);
+  assert.match(invalid.summary, /anteckning/);
+
+  const corrected = validateInteractionForSave({
+    status: "completed",
+    startsAt: "2026-08-21T10:00:00.000Z",
+    participants: [{ id: "parent:1" }],
+    summary: "Mötet genomfördes.",
+    now
+  });
+  assert.deepEqual(corrected, { startsAt: "", endsAt: "", participants: "", summary: "" });
+});
+
+test("validates a booking but permits future cancelled and no-show records", () => {
+  const booking = validateInteractionForSave({ status: "scheduled", startsAt: "2026-08-21T11:00:00.000Z", endsAt: "2026-08-21T10:00:00.000Z", participants: [] });
+  assert.match(booking.endsAt, /efter starttiden/);
+  assert.match(booking.participants, /deltagare/);
+  for (const status of ["cancelled", "no_show"]) {
+    const result = validateInteractionForSave({ status, startsAt: "2026-08-25T10:00:00.000Z", participants: [], summary: "Mötet blev inte av." });
+    assert.deepEqual(result, { startsAt: "", endsAt: "", participants: "", summary: "" });
+  }
 });
 
 test("projects an incoming call as a completed interaction", () => {

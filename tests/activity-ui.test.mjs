@@ -77,6 +77,8 @@ test("keeps overview, registers and case headers focused on actionable informati
   assert.match(app, /<details class="case-flow-more">/);
   assert.match(html, /<th>Ärende<\/th>\s*<th>Nästa aktivitet<\/th>/);
   assert.match(app, /class="dashboard-queue-next"/);
+  assert.match(app, /class="dashboard-queue-case-date">\$\{escapeHtml\(caseDateLabel\(caseRecord\)\)\}/);
+  assert.match(app, /function caseDateLabel\(caseRecord\)/);
   assert.match(html, /<thead class="table-light"><tr><th>Aktivitet<\/th><th>Läge<\/th><\/tr><\/thead>/);
   assert.doesNotMatch(html, /<th>Aktivitet<\/th><th>Status<\/th><th>Ansvarig<\/th><th>Förfallodatum<\/th><th>Underlag<\/th>/);
   assert.match(app, /class="activity-list-meta"/);

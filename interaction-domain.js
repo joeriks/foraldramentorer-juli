@@ -13,6 +13,28 @@ export const INTERACTION_STATUS_LABELS = {
   no_show: "Uteblev"
 };
 
+export function interactionStatusFromForm({ scheduled, kind, outcomeStatus = "completed" }) {
+  if (scheduled) return "scheduled";
+  return kind === "meeting" ? outcomeStatus : "completed";
+}
+
+export function validateInteractionForSave({ status, startsAt, endsAt = null, participants = [], summary = "", now = Date.now() }) {
+  return {
+    startsAt: status === "completed" && new Date(startsAt).getTime() > now
+      ? "En genomförd kontakt kan inte ha en tidpunkt i framtiden."
+      : "",
+    endsAt: status === "scheduled" && new Date(endsAt).getTime() <= new Date(startsAt).getTime()
+      ? "Sluttiden måste vara efter starttiden."
+      : "",
+    participants: status === "scheduled" && !participants.length
+      ? "Lägg till minst en deltagare."
+      : "",
+    summary: status !== "scheduled" && !String(summary).trim()
+      ? "En kort anteckning krävs."
+      : ""
+  };
+}
+
 export function interactionParticipant({ partyType, partyId = null, displayName, required = true }) {
   return {
     id: `${partyType}:${partyId || String(displayName || "extern").toLocaleLowerCase("sv-SE")}`,

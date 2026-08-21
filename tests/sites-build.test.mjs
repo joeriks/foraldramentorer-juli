@@ -145,7 +145,10 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /parentSupportNavigationActive/);
   assert.match(scriptText, /mentorActiveFilter === "active"/);
   assert.match(scriptText, /function toggleSelectedCandidateActive/);
+  assert.match(scriptText, /function caseDateLabel\(caseRecord\)/);
   assert.match(scriptText, /`Skapad \$\{formatDate\(createdAt\)\}/);
+  assert.match(scriptText, /dashboard-queue-case-date/);
+  assert.match(scriptText, /version: "107"/);
   assert.match(scriptText, /version: "103"/);
   assert.match(scriptText, /dashboardQueueOwnerFilter === "all"/);
   assert.match(scriptText, /dashboardQueueMode === "unassigned"/);
