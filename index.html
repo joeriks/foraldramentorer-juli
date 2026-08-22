@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260821-reminder-catchup-v115">
+    <link rel="stylesheet" href="styles.css?v=20260822-mentor-application-v116">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -34,6 +34,7 @@
           <a id="navMentorProfile" class="nav-link" href="#/mentor-profile" hidden>Min profil</a>
           <a id="navPublicHome" class="nav-link" href="#/public-home" hidden>Start</a>
           <a id="navPublicSupport" class="nav-link" href="#/public-support" hidden>Sök stöd</a>
+          <a id="navPublicMentorApplication" class="nav-link" href="#/public-mentor" hidden>Bli mentor</a>
           <a id="navPublicLearning" class="nav-link" href="#/public-learning" hidden>Råd och material</a>
           <span class="nav-link disabled" aria-disabled="true"><span>Arvoden</span><small>Kommer senare</small></span>
           <span class="nav-link disabled" aria-disabled="true"><span>Statistik</span><small>Kommer senare</small></span>
@@ -69,6 +70,7 @@
                   <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/mentor-profile">Min profil</a></li>
                   <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-home">Start</a></li>
                   <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-support">Sök stöd</a></li>
+                  <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-mentor">Bli mentor</a></li>
                   <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-learning">Råd och material</a></li>
                   <li><a class="dropdown-item" href="#/dashboard">Översikt</a></li>
                   <li><a class="dropdown-item" href="#/calendar">Kalender</a></li>
@@ -116,7 +118,7 @@
                   <option value="coordinator">Samordnare</option>
                   <option value="handler">Handläggare</option>
                   <option value="mentor">Mentor</option>
-                  <option value="public">Ej inloggad förälder</option>
+                    <option value="public">Ej inloggad besökare</option>
                 </select>
               </div>
             </div>
@@ -1296,6 +1298,16 @@
           </section>
 
           <section id="candidatesView" hidden>
+            <section id="mentorApplicationQueuePanel" class="card mb-3" aria-labelledby="mentorApplicationQueueTitle">
+              <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-start gap-2">
+                <div><h2 id="mentorApplicationQueueTitle" class="h5 mb-1">Intresseanmälningar</h2><p id="mentorApplicationQueueSummary" class="text-secondary mb-0">Inga ansökningar väntar.</p></div>
+                <button id="mentorApplicationQueueToggle" type="button" class="btn btn-outline-primary btn-sm" aria-expanded="true">Dölj</button>
+              </div>
+              <div id="mentorApplicationQueueContent">
+                <div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light"><tr><th>Inkommen</th><th>Sökande</th><th>Område och språk</th><th>Status</th><th></th></tr></thead><tbody id="mentorApplicationTableBody"></tbody></table></div>
+                <div id="mentorApplicationDetailPanel" class="mentor-application-review border-top" hidden></div>
+              </div>
+            </section>
             <div class="card" aria-label="Mentorregister">
               <div class="card-header bg-white">
                 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-start">
@@ -2516,6 +2528,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260821-reminder-catchup-v115"></script>
+    <script type="module" src="app.js?v=20260822-mentor-application-v116"></script>
   </body>
 </html>

@@ -2,7 +2,7 @@
 
 Status: Verksamhetsförslag 2.0
 Produkt: FöräldraMentorer - Kommunportal  
-Senast uppdaterad: 2026-08-19
+Senast uppdaterad: 2026-08-22
 
 Relaterade dokument:
 
@@ -206,6 +206,17 @@ flowchart LR
 ```
 
 Övergången mellan stegen ska ske med ett uttryckligt kommando. Systemet får föreslå nästa ärende eller aktivitet, men får inte fatta verksamhetsbeslut dolt.
+
+### 4.1 Publik intresseanmälan från ny mentor
+
+1. Den intresserade personen öppnar `Bli mentor` utan inloggning och lämnar kontaktuppgifter, område, språk, tillgänglighet, erfarenhetsområden och motivation. Personnummer eller registeruppgifter ska inte efterfrågas här.
+2. Ett utkast kan sparas lokalt och fortsättas i samma webbläsare. Vid inskick skapas en intresseanmälan med referens, status och historik samt en registrerad mottagningsbekräftelse via demo-e-post eller demo-SMS.
+3. Ansökan visas i mentorregistrets granskningskö. Handläggaren kontrollerar fullständighet och möjliga dubbletter innan någon mentorpost skapas.
+4. Om uppgifter saknas används `Begär komplettering`. Ansökan ligger kvar som samma objekt och den sökande kan uppdatera den under `Min ansökan`.
+5. Om personen redan finns kopplas ansökan till den befintliga mentorposten. Annars väljer handläggaren `Ta emot och skapa mentor`.
+6. Överföringen skapar en ordinarie mentorpost och matchningsprofil samt startar ärendet `Godkännande av mentor`. Självuppgivna erfarenheter är märkta som egna uppgifter tills handläggningen verifierar dem.
+
+Intresseanmälan är inte ett godkännande och inte ett mentorärende. Den är ett insamlings- och mottagningsobjekt före kommunens formella prövning. Identitet, belastningsregister, referenser, utbildning, intervju och beslut hanteras fortsatt i godkännandeärendet.
 
 ## 5. Dagligt arbete för handläggare
 

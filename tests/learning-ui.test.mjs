@@ -73,7 +73,7 @@ test("offers an unauthenticated parent portal and explicit public material selec
   for (const id of ["navPublicHome", "navPublicSupport", "navPublicLearning", "publicPortalView"]) {
     assert.match(html, new RegExp(`id=["']${id}["']`), `${id} should exist in the application shell`);
   }
-  assert.match(html, /<option value="public">Ej inloggad förälder<\/option>/);
+  assert.match(html, /<option value="public">Ej inloggad besökare<\/option>/);
   assert.match(app, /PUBLIC_SUPPORT_REQUESTS_STORE = "publicSupportRequests"/);
   assert.match(app, /data-learning-public/);
   assert.match(app, /selectedPublicLearningContent/);

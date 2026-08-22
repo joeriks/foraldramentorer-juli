@@ -2,7 +2,7 @@
 
 Status: Aktuell konceptbeskrivning för prototypen
 
-Senast uppdaterad: 2026-08-19
+Senast uppdaterad: 2026-08-22
 
 Teknisk fördjupning: [Progressiv ärendehantering](teknisk-specifikation-progressiv-arendehantering.md)
 
@@ -137,6 +137,7 @@ Prototypens viktigaste funktioner är:
 - Personanknutna och generella ärenden med ansvarig handläggare, versionshanterad beskrivning, aktiviteter, handlingar, kontakter, arbetsanteckningar och fullständig historik.
 - Enkla och guidade aktiviteter som handläggarens huvudsakliga arbetsyta, med strukturerade resultat och tydligt nästa steg.
 - Godkännandeflöde för mentor med kontroller, utbildning, intervju och beslut.
+- Publik intresseanmälan där en ny mentor kan registrera kontaktuppgifter, förutsättningar, erfarenhetsområden och motivation samt följa ansökans status.
 - Stöd- och matchningsflöde med sökbar mentorlista och synliga matchande respektive saknade kriterier.
 - Kontaktmottagning för inkommande samtal och e-post utan krav på personkoppling.
 - Lokal datalagring i IndexedDB med realistiska exempelärenden och bevarad historik.
@@ -160,6 +161,10 @@ Minnesregel:
 > Aktivitet = att göra. Händelse = gjort. Handling = formellt underlag. Ärendeanteckning = nödvändig fri arbetsinformation som saknar bättre plats.
 
 När en ny mentor registreras är `Skapa ärende om godkännande` förvalt, men användaren kan välja bort det. Godkännandeärendet använder aktiviteter för identitet, belastningsregister, referenser, utbildning, kunskapsavstämning, kallelse, intervju och beslut. Handläggaren kan även lägga till fria uppföljningsaktiviteter, exempelvis att kontakta mentorn när en referens inte går att nå.
+
+En ny mentor kan också börja i den publika portalen. Intresseanmälan är ett separat objekt tills en handläggare har granskat den. Den sökande fyller i namn, kontaktväg, geografiska områden, språk, tillgänglighet, stödområden, erfarenhetsgrund och motivation i fyra steg. Personnummer efterfrågas inte publikt. Den sökande kan spara ett utkast och ser därefter ansökans status, meddelanden och historik under `Min ansökan` i samma webbläsare.
+
+I mentorregistret visas inskickade ansökningar i en egen granskningskö. Handläggaren ser vilka uppgifter som är självregistrerade, kontrollerar möjliga dubbletter och kan begära komplettering. När ansökan tas emot skapas den ordinarie mentorposten, matchningsprofilen och ärendet `Godkännande av mentor`. Identitetskontroll och övriga lämplighetskontroller sker alltså fortsatt i det skyddade godkännandeflödet och inte i den publika ansökan.
 
 ### Översikt, register och ärendekort
 

@@ -4,7 +4,7 @@ Status: Utkast 1.2
 Produkt: FöräldraMentorer – Kommunportal  
 Målmiljö: Webbaserad SaaS  
 Prototyplagring: IndexedDB
-Senast uppdaterad: 2026-08-20
+Senast uppdaterad: 2026-08-22
 
 Verksamhetsmässig tillämpning: [Verksamhetsflöden och handläggningsrutiner](verksamhetsfloden-och-handlaggningsrutiner.md)
 
@@ -86,11 +86,46 @@ En avvikelse ska ha ett separat ställningstagande med något av följande utfal
 
 Om mentorn behöver göra något ska handläggaren skapa en aktivitet som beskriver den egna åtgärden, exempelvis `Begär nytt registerutdrag från mentorn`. Aktiviteten ansvaras fortfarande av en handläggare, medan det kan anges att den inväntar mentorn.
 
+### 3.6 Intresseanmälan från mentor
+
+En publik intresseanmälan är ett separat objekt före mentorposten och godkännandeärendet. Det förhindrar att ofullständiga, återkallade eller duplicerade ansökningar direkt blir personer i mentorregistret. Objektet innehåller strukturerade matchningsuppgifter, samtyckestidpunkt, livscykelstatus, versionsnummer och oföränderlig historik. Det innehåller inte personnummer.
+
+Handläggarens uttryckliga överföringskommando skapar mentorpost och första matchningsprofil samt refererar tillbaka till ansökan. Den befintliga mekanismen skapar därefter `Godkännande av mentor`. En möjlig dubblett ska i stället kunna kopplas till en befintlig mentor utan att registeruppgifter skrivs över.
+
 ## 4. Datamodell
 
 Fältnamnen nedan är logiska kontrakt. Prototypen kan använda JavaScript-objekt, medan SaaS-versionen bör använda motsvarande databastabeller och validerade API-kontrakt.
 
 Alla verksamhetsposter ska bära `tenantId`. Referenser mellan poster får endast skapas inom samma tenant. Alla tidsstämplar lagras som UTC i ISO 8601-format och konverteras till användarens tidszon vid visning.
+
+```ts
+interface MentorApplication {
+  id: string;
+  tenantId: string;
+  reference: string;
+  status: "draft" | "submitted" | "needs_completion" | "converted" | "withdrawn";
+  version: number;
+  name: string;
+  email: string;
+  phone: string;
+  geographicAreaIds: string[];
+  languageIds: string[];
+  availabilitySlotIds: string[];
+  supportAreas: Array<{
+    areaId: string;
+    confidenceLevel: string;
+    experienceLevels: string[];
+  }>;
+  motivation: string;
+  consentGivenAt: string | null;
+  mentorId: string | null;
+  history: Array<{ eventType: string; occurredAt: string; actorId: string; message: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+Kommunikationsposter länkas till ansökan med `entityType = mentor_application`. I prototypen används endast demo-adaptrar som registrerar e-post och SMS utan extern leverans. I målarkitekturen ersätts adaptern, medan ansökans och kommunikationens kontrakt behålls.
 
 ```ts
 type CaseStatus =

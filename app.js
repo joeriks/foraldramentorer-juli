@@ -79,6 +79,14 @@ import {
   normalizeMeetingReminder,
   normalizeCommunicationRecord
 } from "./communication-domain.js?v=20260821-reminder-catchup-v115";
+import {
+  MENTOR_APPLICATION_STATUS_LABELS,
+  convertMentorApplication,
+  mentorApplicationDuplicateCandidates,
+  mentorApplicationMissingFields,
+  normalizeMentorApplication,
+  submitMentorApplication
+} from "./mentor-application-domain.js?v=20260822-mentor-application-v1";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260820-calendar-v4";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
@@ -130,7 +138,7 @@ import {
 } from "./matching-catalog-domain.js?v=20260821-structured-matching-v1";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
-const DB_VERSION = 12;
+const DB_VERSION = 13;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
 const INCOMING_CONTACTS_STORE = "incomingContacts";
@@ -160,6 +168,7 @@ const LEARNING_CONTENT_STORE = "learningContent";
 const TENANT_LEARNING_SELECTION_STORE = "tenantLearningSelection";
 const LEARNING_PROGRESS_STORE = "learningProgress";
 const PUBLIC_SUPPORT_REQUESTS_STORE = "publicSupportRequests";
+const MENTOR_APPLICATIONS_STORE = "mentorApplications";
 const SUPPORT_TICKETS_STORE = "supportTickets";
 const TENANT_SUPPORT_AREA_SELECTION_STORE = "tenantSupportAreaSelection";
 const TENANT_GEOGRAPHIC_AREAS_STORE = "tenantGeographicAreas";
@@ -181,6 +190,21 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "116",
+    date: "2026-08-22",
+    title: "Nya mentorer kan anmäla intresse själva",
+    flow: "Publik intresseanmälan -> handläggarens granskningskö -> mentorpost -> godkännandeärende",
+    simplified: "Den intresserade mentorn lämnar själv kontaktuppgifter, tillgänglighet och erfarenhetsområden i fyra korta steg. Handläggaren slipper skriva om samma uppgifter och behöver bara granska, kontrollera dubbletter och ta emot ansökan.",
+    retained: "Det ordinarie mentorregistret, matchningsprofilen och ärendet Godkännande av mentor används oförändrat efter överföringen. Identitet och personnummer hanteras först i den skyddade handläggningen.",
+    changes: [
+      "Den publika portalen har fått Bli mentor och Min ansökan med utkast, granskningssteg, status och historik.",
+      "Intresseanmälan samlar strukturerade geografiska områden, språk, tillgänglighet, stödområden, erfarenhetsgrund och motivation utan personnummer.",
+      "Mentorregistret har fått en separat kö där självregistrerade uppgifter, möjliga dubbletter och saknade uppgifter framgår före överföring.",
+      "Mottagningsbekräftelse och kompletteringsbegäran registreras via den globala kommunikationen med demo-e-post eller demo-SMS.",
+      "En mottagen ansökan skapar en vanlig mentorpost, en versionsmärkt matchningsprofil och ett ordinarie godkännandeärende."
+    ]
+  },
   {
     version: "115",
     date: "2026-08-21",
@@ -1448,6 +1472,11 @@ let learningAdminFilter = "all";
 let learningMutationQueue = Promise.resolve();
 let publicSupportRequests = [];
 let lastPublicSupportRequestId = "";
+let mentorApplications = [];
+let selectedMentorApplicationId = "";
+let publicMentorApplicationStep = 1;
+let publicMentorApplicationEditing = false;
+const PUBLIC_MENTOR_APPLICATION_KEY = "foraldramentorer.publicMentorApplicationId";
 let supportTickets = [];
 let tenantSupportAreaSelection = [];
 let tenantGeographicAreas = [];
@@ -1492,6 +1521,7 @@ const els = {
   navMentorProfile: document.querySelector("#navMentorProfile"),
   navPublicHome: document.querySelector("#navPublicHome"),
   navPublicSupport: document.querySelector("#navPublicSupport"),
+  navPublicMentorApplication: document.querySelector("#navPublicMentorApplication"),
   navPublicLearning: document.querySelector("#navPublicLearning"),
   navAdministration: document.querySelector("#navAdministration"),
   navHandlers: document.querySelector("#navHandlers"),
@@ -1538,6 +1568,12 @@ const els = {
   casesView: document.querySelector("#casesView"),
   caseDetailView: document.querySelector("#caseDetailView"),
   candidatesView: document.querySelector("#candidatesView"),
+  mentorApplicationQueuePanel: document.querySelector("#mentorApplicationQueuePanel"),
+  mentorApplicationQueueSummary: document.querySelector("#mentorApplicationQueueSummary"),
+  mentorApplicationQueueToggle: document.querySelector("#mentorApplicationQueueToggle"),
+  mentorApplicationQueueContent: document.querySelector("#mentorApplicationQueueContent"),
+  mentorApplicationTableBody: document.querySelector("#mentorApplicationTableBody"),
+  mentorApplicationDetailPanel: document.querySelector("#mentorApplicationDetailPanel"),
   detailView: document.querySelector("#detailView"),
   parentsView: document.querySelector("#parentsView"),
   parentDetailView: document.querySelector("#parentDetailView"),
@@ -2541,6 +2577,10 @@ function openDatabase() {
       const publicSupportRequestStore = ensureStore(PUBLIC_SUPPORT_REQUESTS_STORE);
       ensureIndex(publicSupportRequestStore, "tenantCreatedAt", ["tenantId", "createdAt"]);
       ensureIndex(publicSupportRequestStore, "tenantStatus", ["tenantId", "status"]);
+      const mentorApplicationStore = ensureStore(MENTOR_APPLICATIONS_STORE);
+      ensureIndex(mentorApplicationStore, "tenantCreatedAt", ["tenantId", "createdAt"]);
+      ensureIndex(mentorApplicationStore, "tenantStatus", ["tenantId", "status"]);
+      ensureIndex(mentorApplicationStore, "tenantEmail", ["tenantId", "email"]);
       const supportTicketStore = ensureStore(SUPPORT_TICKETS_STORE);
       ensureIndex(supportTicketStore, "tenantCreatedAt", ["tenantId", "createdAt"]);
       ensureIndex(supportTicketStore, "tenantStatus", ["tenantId", "status"]);
@@ -2694,6 +2734,10 @@ function publicSupportRequestTx(mode = "readonly") {
   return db.transaction(PUBLIC_SUPPORT_REQUESTS_STORE, mode).objectStore(PUBLIC_SUPPORT_REQUESTS_STORE);
 }
 
+function mentorApplicationTx(mode = "readonly") {
+  return db.transaction(MENTOR_APPLICATIONS_STORE, mode).objectStore(MENTOR_APPLICATIONS_STORE);
+}
+
 function supportTicketTx(mode = "readonly") {
   return db.transaction(SUPPORT_TICKETS_STORE, mode).objectStore(SUPPORT_TICKETS_STORE);
 }
@@ -2795,6 +2839,9 @@ const saveLearningProgress = (value) => putInto(learningProgressTx, value);
 const getAllPublicSupportRequests = () => getAllFrom(publicSupportRequestTx);
 const savePublicSupportRequest = (value) => putInto(publicSupportRequestTx, value);
 const clearPublicSupportRequests = () => clearStore(publicSupportRequestTx);
+const getAllMentorApplications = () => getAllFrom(mentorApplicationTx);
+const saveMentorApplication = (value) => putInto(mentorApplicationTx, value);
+const clearMentorApplications = () => clearStore(mentorApplicationTx);
 const getAllSupportTickets = () => getAllFrom(supportTicketTx);
 const saveSupportTicket = (value) => putInto(supportTicketTx, value);
 const clearSupportTickets = () => clearStore(supportTicketTx);
@@ -4973,6 +5020,10 @@ async function refresh() {
   publicSupportRequests = (await getAllPublicSupportRequests())
     .filter((request) => request.tenantId === DEFAULT_TENANT_ID)
     .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
+  mentorApplications = (await getAllMentorApplications())
+    .map(normalizeMentorApplication)
+    .filter((application) => application.tenantId === DEFAULT_TENANT_ID)
+    .sort((left, right) => new Date(right.updatedAt || right.createdAt) - new Date(left.updatedAt || left.createdAt));
   supportTickets = (await getAllSupportTickets())
     .filter((ticket) => ticket.tenantId === DEFAULT_TENANT_ID)
     .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
@@ -5408,7 +5459,7 @@ function renderPublicHome() {
   const materials = selectedPublicLearningContent();
   els.publicPortalView.innerHTML = `
     <section class="public-intro">
-      <div><div class="record-type">Föräldramentorer</div><h2>Du kan söka stöd i din vardag som förälder</h2><p>Kommunen kan hjälpa dig att beskriva ditt behov och bedöma om stöd av en föräldramentor passar. Du behöver inte veta exakt vilket stöd du ska söka.</p><div class="d-flex flex-wrap gap-2 mt-4"><a class="btn btn-primary" href="#/public-support">Sök stöd</a><a class="btn btn-outline-primary" href="#/public-learning">Läs råd och material</a></div></div>
+      <div><div class="record-type">Föräldramentorer</div><h2>Du kan söka stöd i din vardag som förälder</h2><p>Kommunen kan hjälpa dig att beskriva ditt behov och bedöma om stöd av en föräldramentor passar. Du behöver inte veta exakt vilket stöd du ska söka.</p><div class="d-flex flex-wrap gap-2 mt-4"><a class="btn btn-primary" href="#/public-support">Sök stöd</a><a class="btn btn-outline-primary" href="#/public-mentor">Bli mentor</a><a class="btn btn-outline-primary" href="#/public-learning">Läs råd och material</a></div></div>
       <aside><strong>Är situationen akut?</strong><p>Vid omedelbar fara, ring 112. Föräldramentorstöd är inte en akutinsats.</p></aside>
     </section>
     <section class="public-process" aria-labelledby="publicProcessTitle"><div><h3 id="publicProcessTitle" class="h5 mb-1">Så går det till</h3><p class="text-secondary mb-0">En förfrågan leder inte automatiskt till ett beslut eller ett mentoruppdrag.</p></div><ol><li><span>1</span><div><strong>Skicka en förfrågan</strong><p>Beskriv kort vad du vill ha hjälp med och hur kommunen kan kontakta dig.</p></div></li><li><span>2</span><div><strong>Kommunen kontaktar dig</strong><p>En handläggare går igenom behovet tillsammans med dig.</p></div></li><li><span>3</span><div><strong>Ni tar ställning</strong><p>Om stödet passar får både du och en föreslagen mentor tacka ja innan ett uppdrag startar.</p></div></li></ol></section>
@@ -5423,6 +5474,166 @@ function renderPublicSupport() {
   }
   els.publicPortalView.innerHTML = `<section class="card public-support-card"><div class="card-header bg-white"><div class="record-type">Förfrågan om stöd</div><h2 class="h5 mb-1">Berätta kort hur kommunen kan hjälpa dig</h2><p class="text-secondary mb-0">Fyll bara i det som behövs för att kommunen ska kunna kontakta dig. Du får beskriva behovet närmare tillsammans med en handläggare.</p></div><form id="publicSupportForm" class="card-body public-support-form"><div><label class="form-label" for="publicSupportName">Namn</label><input id="publicSupportName" name="name" class="form-control" autocomplete="name" required></div><div><label class="form-label" for="publicSupportContactMethod">Jag vill bli kontaktad via</label><select id="publicSupportContactMethod" name="contactMethod" class="form-select"><option value="phone">Telefon</option><option value="email">E-post</option></select></div><div><label class="form-label" for="publicSupportContact">Telefonnummer eller e-post</label><input id="publicSupportContact" name="contact" class="form-control" autocomplete="tel" required></div><div><label class="form-label" for="publicSupportArea">Område eller stadsdel <span class="text-secondary">(valfritt)</span></label><input id="publicSupportArea" name="area" class="form-control"></div><div class="public-support-description"><label class="form-label mb-1">Vad vill du ha stöd med?</label><p class="form-text mt-0">Välj gärna flera områden. Du behöver inte ha en diagnos eller veta exakt vilket stöd som passar.</p><div id="publicSupportAreaChoices" class="support-area-choices public-support-area-choices"></div><label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="supportAreaUncertain" value="yes"><span class="form-check-label">Jag vet inte ännu och vill prata med kommunen</span></label></div><div class="public-support-description"><label class="form-label" for="publicSupportDescription">Beskriv kort vad du vill ha hjälp med</label><textarea id="publicSupportDescription" name="description" class="form-control" rows="4" maxlength="1000" required></textarea><div class="form-text">Ange inte personnummer, journaluppgifter eller andra känsliga uppgifter.</div></div><div class="public-support-description"><label class="form-label" for="publicSupportAvailability">När passar det att kommunen kontaktar dig? <span class="text-secondary">(valfritt)</span></label><input id="publicSupportAvailability" name="availability" class="form-control" placeholder="Till exempel vardagar efter klockan 15"></div><div class="form-check public-support-consent"><input id="publicSupportConsent" name="consent" class="form-check-input" type="checkbox" required><label class="form-check-label" for="publicSupportConsent">Jag förstår att detta är en förfrågan och att kommunen kontaktar mig innan något stöd eller uppdrag startar.</label></div><div class="public-support-actions"><a class="btn btn-outline-secondary" href="#/public-home">Avbryt</a><button type="submit" class="btn btn-primary">Skicka förfrågan</button></div></form></section>`;
   renderSupportAreaChoices(els.publicPortalView.querySelector("#publicSupportAreaChoices"), [], { name: "publicSupportArea", publicOnly: true });
+}
+
+function currentPublicMentorApplication() {
+  const applicationId = localStorage.getItem(PUBLIC_MENTOR_APPLICATION_KEY) || "";
+  return mentorApplications.find((application) => application.id === applicationId) || null;
+}
+
+function mentorApplicationOptionLabels(ids, options) {
+  return selectedOptionLabels(ids, options).join(", ") || "Ej angivet";
+}
+
+function mentorApplicationCommunications(applicationId) {
+  return communications
+    .filter((record) => record.links?.some((link) => link.entityType === "mentor_application" && link.entityId === applicationId))
+    .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
+}
+
+function mentorApplicationSupportRows(application) {
+  const selected = new Map(normalizeMentorSupportAreas(application?.supportAreas).map((entry) => [entry.areaId, entry]));
+  const confidenceLabels = Object.fromEntries(MENTOR_SUPPORT_CONFIDENCE_LEVELS);
+  const experienceLabels = Object.fromEntries(MENTOR_EXPERIENCE_LEVELS);
+  return enabledSupportAreas().map((area) => {
+    const entry = selected.get(area.id);
+    return `<div class="public-mentor-support-row" data-public-mentor-support-row="${escapeHtml(area.id)}">
+      <label class="form-check mb-0"><input class="form-check-input" type="checkbox" name="mentorSupportArea" value="${escapeHtml(area.id)}" ${entry ? "checked" : ""}><span class="form-check-label"><strong>${escapeHtml(area.title)}</strong><small>${escapeHtml(area.publicDescription || "")}</small></span></label>
+      <div class="public-mentor-support-details" ${entry ? "" : "hidden"}>
+        <label><span class="form-label">Hur trygg känner du dig inom området?</span><select class="form-select" data-public-mentor-confidence="${escapeHtml(area.id)}">${MENTOR_SUPPORT_CONFIDENCE_LEVELS.map(([id, label]) => `<option value="${id}" ${(entry?.confidenceLevel || "good") === id ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select></label>
+        <fieldset><legend class="form-label">Vad bygger erfarenheten på?</legend><div class="public-mentor-check-list">${MENTOR_EXPERIENCE_LEVELS.map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" value="${id}" data-public-mentor-experience="${escapeHtml(area.id)}" ${entry?.experienceLevels.includes(id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}</div></fieldset>
+        ${entry ? `<p class="small text-secondary mb-0">Valt: ${escapeHtml(confidenceLabels[entry.confidenceLevel] || "")} · ${escapeHtml(entry.experienceLevels.map((id) => experienceLabels[id]).filter(Boolean).join(", "))}</p>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function publicMentorApplicationForm(application = null) {
+  const areaIds = new Set(application?.geographicAreaIds || []);
+  const languageIds = new Set(application?.languageIds || []);
+  const availabilityIds = new Set(application?.availabilitySlotIds || []);
+  const stepLabels = ["Kontakt", "Förutsättningar", "Erfarenhet", "Granska"];
+  return `<section class="card public-mentor-application-card">
+    <div class="card-header bg-white"><div class="record-type">Intresseanmälan</div><h2 class="h5 mb-1">${application ? "Fortsätt din intresseanmälan" : "Jag vill bli föräldramentor"}</h2><p class="text-secondary mb-0">Du kan spara ett utkast och fortsätta i den här webbläsaren. Ange inte personnummer eller känsliga uppgifter.</p></div>
+    <ol class="public-mentor-stepper" aria-label="Steg i intresseanmälan">${stepLabels.map((label, index) => `<li data-public-mentor-step-indicator="${index + 1}"><span>${index + 1}</span><strong>${label}</strong></li>`).join("")}</ol>
+    <form id="publicMentorApplicationForm" class="card-body public-mentor-application-form" data-application-id="${escapeHtml(application?.id || "")}" novalidate>
+      <section class="public-mentor-step" data-public-mentor-step="1">
+        <div><h3 class="h6 mb-1">Hur kan kommunen nå dig?</h3><p class="text-secondary mb-0">Namn och minst en kontaktväg behövs. Identitet kontrolleras senare av kommunen.</p></div>
+        <div class="public-mentor-form-grid"><label><span class="form-label">Namn <span aria-hidden="true">*</span></span><input class="form-control" name="name" autocomplete="name" value="${escapeHtml(application?.name || "")}"></label><label><span class="form-label">E-post</span><input class="form-control" name="email" type="email" autocomplete="email" value="${escapeHtml(application?.email || "")}"></label><label><span class="form-label">Telefon</span><input class="form-control" name="phone" type="tel" autocomplete="tel" value="${escapeHtml(application?.phone || "")}"></label></div>
+      </section>
+      <section class="public-mentor-step" data-public-mentor-step="2" hidden>
+        <div><h3 class="h6 mb-1">Var och när kan du hjälpa till?</h3><p class="text-secondary mb-0">Välj minst ett alternativ i varje grupp. Uppgifterna används senare vid matchning.</p></div>
+        <fieldset><legend class="form-label">Geografiskt område <span aria-hidden="true">*</span></legend><div class="public-mentor-check-grid">${activeGeographicAreas().map((area) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="geographicAreaId" value="${escapeHtml(area.id)}" ${areaIds.has(area.id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(area.label)}</span></label>`).join("")}</div></fieldset>
+        <fieldset><legend class="form-label">Språk <span aria-hidden="true">*</span></legend><div class="public-mentor-check-grid">${LANGUAGE_OPTIONS.map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="languageId" value="${escapeHtml(id)}" ${languageIds.has(id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}</div></fieldset>
+        <fieldset><legend class="form-label">Tillgänglighet <span aria-hidden="true">*</span></legend><div class="public-mentor-check-grid">${AVAILABILITY_OPTIONS.map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="availabilitySlotId" value="${escapeHtml(id)}" ${availabilityIds.has(id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}</div></fieldset>
+      </section>
+      <section class="public-mentor-step" data-public-mentor-step="3" hidden>
+        <div><h3 class="h6 mb-1">Vad vill du bidra med?</h3><p class="text-secondary mb-0">Välj minst ett stödområde och berätta vad din erfarenhet grundar sig på.</p></div>
+        <div class="public-mentor-support-list">${mentorApplicationSupportRows(application)}</div>
+        <label><span class="form-label">Varför vill du bli föräldramentor? <span aria-hidden="true">*</span></span><textarea class="form-control" name="motivation" rows="5" maxlength="2000">${escapeHtml(application?.motivation || "")}</textarea><span class="form-text">Beskriv kort din motivation och relevanta erfarenheter. Undvik känsliga personuppgifter.</span></label>
+      </section>
+      <section class="public-mentor-step" data-public-mentor-step="4" hidden>
+        <div><h3 class="h6 mb-1">Granska och skicka</h3><p class="text-secondary mb-0">Kontrollera att uppgifterna stämmer. Du kan ändra ansökan tills kommunen har fört över den till mentorregistret.</p></div>
+        <div id="publicMentorApplicationReview" class="public-mentor-review"></div>
+        <label class="form-check public-mentor-consent"><input class="form-check-input" type="checkbox" name="consent" ${application?.consentGivenAt ? "checked" : ""}><span class="form-check-label">Jag godkänner att kommunen kontaktar mig om intresseanmälan och behandlar uppgifterna för att bedöma om jag kan bli föräldramentor.</span></label>
+        <div class="alert alert-warning mb-0">Detta är en prototyp. Uppgifterna sparas bara lokalt i den här webbläsaren och skickas inte till kommunen.</div>
+      </section>
+      <div id="publicMentorApplicationError" class="alert alert-danger mb-0" role="alert" hidden></div>
+      <div class="public-mentor-actions"><button type="button" class="btn btn-outline-secondary" data-public-mentor-back hidden>Tillbaka</button><button type="button" class="btn btn-outline-primary" data-public-mentor-save>Spara utkast</button><button type="button" class="btn btn-primary" data-public-mentor-next>Nästa</button><button type="submit" class="btn btn-primary" data-public-mentor-submit hidden>Skicka intresseanmälan</button></div>
+    </form>
+  </section>`;
+}
+
+function renderPublicMentorApplicationStatus(application) {
+  const statusLabel = MENTOR_APPLICATION_STATUS_LABELS[application.status] || application.status;
+  const messages = mentorApplicationCommunications(application.id);
+  const supportLabels = application.supportAreas.map((entry) => supportAreaById(entry.areaId)?.title).filter(Boolean);
+  els.publicPortalView.innerHTML = `<section class="card public-mentor-application-card public-mentor-status">
+    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-start gap-3"><div><div class="record-type">Min intresseanmälan · ${escapeHtml(application.reference)}</div><h2 class="h5 mb-1">${escapeHtml(application.name)}</h2><p class="text-secondary mb-0">Skickad ${escapeHtml(formatDateTime(application.submittedAt || application.createdAt))}</p></div><span class="badge text-bg-${application.status === "converted" ? "success" : application.status === "needs_completion" ? "warning" : "primary"}">${escapeHtml(statusLabel)}</span></div>
+    <div class="card-body public-mentor-status-body"><section><h3 class="h6">Vad händer nu?</h3><p>${application.status === "converted" ? "Kommunen har tagit emot uppgifterna och startat prövningen inför ett eventuellt mentoruppdrag." : application.status === "needs_completion" ? "Kommunen behöver fler uppgifter. Läs meddelandet nedan och uppdatera intresseanmälan." : "Kommunen går igenom uppgifterna och kontaktar dig via e-post eller telefon."}</p>${application.status !== "converted" ? '<button type="button" class="btn btn-outline-primary btn-sm" data-edit-public-mentor-application>Ändra uppgifter</button>' : `<a class="btn btn-outline-primary btn-sm" href="#/public-learning">Läs råd och material</a>`}</section>
+      <section><h3 class="h6">Sammanfattning</h3><dl class="public-mentor-summary"><div><dt>Kontakt</dt><dd>${escapeHtml([application.email, application.phone].filter(Boolean).join(" · "))}</dd></div><div><dt>Område</dt><dd>${escapeHtml(geographicAreaLabels(application.geographicAreaIds, tenantGeographicAreas).join(", "))}</dd></div><div><dt>Språk</dt><dd>${escapeHtml(mentorApplicationOptionLabels(application.languageIds, LANGUAGE_OPTIONS))}</dd></div><div><dt>Stödområden</dt><dd>${escapeHtml(supportLabels.join(", "))}</dd></div></dl></section>
+      <section><h3 class="h6">Meddelanden</h3>${messages.length ? `<div class="public-mentor-message-list">${messages.map((message) => `<article><div><strong>${escapeHtml(message.subject || COMMUNICATION_CHANNEL_LABELS[message.channel] || "Meddelande")}</strong><small>${escapeHtml(formatDateTime(message.createdAt))} · ${escapeHtml(COMMUNICATION_CHANNEL_LABELS[message.channel] || message.channel)}</small></div><p>${escapeHtml(message.body)}</p></article>`).join("")}</div>` : '<p class="text-secondary mb-0">Inga meddelanden utöver mottagningsbekräftelsen har registrerats.</p>'}</section>
+      <section><h3 class="h6">Historik</h3><ol class="public-mentor-history">${[...application.history].reverse().map((item) => `<li><span>${escapeHtml(formatDateTime(item.occurredAt))}</span><p>${escapeHtml(item.message)}</p></li>`).join("")}</ol></section>
+    </div>
+  </section>`;
+}
+
+function renderPublicMentorApplication() {
+  const application = currentPublicMentorApplication();
+  if (application && application.status !== "draft" && !publicMentorApplicationEditing) {
+    renderPublicMentorApplicationStatus(application);
+    return;
+  }
+  els.publicPortalView.innerHTML = publicMentorApplicationForm(application);
+  updatePublicMentorApplicationStep();
+}
+
+function publicMentorApplicationFromForm(form, previous = null) {
+  const formData = new FormData(form);
+  const now = new Date().toISOString();
+  const supportAreas = [...form.querySelectorAll('input[name="mentorSupportArea"]:checked')].map((input) => ({
+    areaId: input.value,
+    confidenceLevel: form.querySelector(`[data-public-mentor-confidence="${CSS.escape(input.value)}"]`)?.value || "good",
+    experienceLevels: [...form.querySelectorAll(`[data-public-mentor-experience="${CSS.escape(input.value)}"]:checked`)].map((entry) => entry.value),
+    verified: false
+  }));
+  return normalizeMentorApplication({
+    ...previous,
+    id: previous?.id || crypto.randomUUID(),
+    tenantId: DEFAULT_TENANT_ID,
+    reference: previous?.reference || `FMI-${now.slice(2, 4)}-${randomDigits(5)}`,
+    status: previous?.status === "submitted" || previous?.status === "needs_completion" ? previous.status : "draft",
+    name: formData.get("name"), email: formData.get("email"), phone: formData.get("phone"),
+    geographicAreaIds: formData.getAll("geographicAreaId"), languageIds: formData.getAll("languageId"), availabilitySlotIds: formData.getAll("availabilitySlotId"),
+    supportAreas, motivation: formData.get("motivation"),
+    consentGivenAt: formData.get("consent") === "on" ? previous?.consentGivenAt || now : null,
+    createdAt: previous?.createdAt || now, createdBy: previous?.createdBy || "public-applicant",
+    updatedAt: now, updatedBy: "public-applicant", version: Number(previous?.version || 0) + 1,
+    history: previous?.history?.length ? previous.history : [{ eventType: "application_started", occurredAt: now, actorId: "public-applicant", message: "Intresseanmälan påbörjades." }]
+  });
+}
+
+function validatePublicMentorApplicationStep(form, step) {
+  const application = publicMentorApplicationFromForm(form, currentPublicMentorApplication());
+  const emailInput = form.querySelector('input[name="email"]');
+  let message = "";
+  if (step === 1 && !application.name) message = "Ange ditt namn.";
+  else if (step === 1 && !application.email && !application.phone) message = "Ange e-post eller telefon.";
+  else if (step === 1 && application.email && !emailInput.checkValidity()) message = "Ange en giltig e-postadress.";
+  else if (step === 2 && !application.geographicAreaIds.length) message = "Välj minst ett geografiskt område.";
+  else if (step === 2 && !application.languageIds.length) message = "Välj minst ett språk.";
+  else if (step === 2 && !application.availabilitySlotIds.length) message = "Välj när du vanligen är tillgänglig.";
+  else if (step === 3 && !application.supportAreas.length) message = "Välj minst ett stödområde.";
+  else if (step === 3 && application.supportAreas.some((entry) => !entry.experienceLevels.length)) message = "Ange vad erfarenheten bygger på för varje valt stödområde.";
+  else if (step === 3 && !application.motivation) message = "Beskriv kort varför du vill bli föräldramentor.";
+  const error = form.querySelector("#publicMentorApplicationError");
+  error.textContent = message;
+  error.hidden = !message;
+  return !message;
+}
+
+function updatePublicMentorApplicationReview(form) {
+  const review = form.querySelector("#publicMentorApplicationReview");
+  if (!review) return;
+  const application = publicMentorApplicationFromForm(form, currentPublicMentorApplication());
+  review.innerHTML = `<dl><div><dt>Namn</dt><dd>${escapeHtml(application.name || "Ej angivet")}</dd></div><div><dt>Kontakt</dt><dd>${escapeHtml([application.email, application.phone].filter(Boolean).join(" · ") || "Ej angivet")}</dd></div><div><dt>Område</dt><dd>${escapeHtml(geographicAreaLabels(application.geographicAreaIds, tenantGeographicAreas).join(", ") || "Ej angivet")}</dd></div><div><dt>Språk</dt><dd>${escapeHtml(mentorApplicationOptionLabels(application.languageIds, LANGUAGE_OPTIONS))}</dd></div><div><dt>Tillgänglighet</dt><dd>${escapeHtml(mentorApplicationOptionLabels(application.availabilitySlotIds, AVAILABILITY_OPTIONS))}</dd></div><div><dt>Stödområden</dt><dd>${escapeHtml(application.supportAreas.map((entry) => supportAreaById(entry.areaId)?.title).filter(Boolean).join(", ") || "Ej angivet")}</dd></div></dl><div><strong>Motivation</strong><p>${escapeHtml(application.motivation || "Ej angivet")}</p></div>`;
+}
+
+function updatePublicMentorApplicationStep() {
+  const form = els.publicPortalView.querySelector("#publicMentorApplicationForm");
+  if (!form) return;
+  publicMentorApplicationStep = Math.min(4, Math.max(1, publicMentorApplicationStep));
+  form.querySelectorAll("[data-public-mentor-step]").forEach((section) => { section.hidden = Number(section.dataset.publicMentorStep) !== publicMentorApplicationStep; });
+  els.publicPortalView.querySelectorAll("[data-public-mentor-step-indicator]").forEach((item) => {
+    const itemStep = Number(item.dataset.publicMentorStepIndicator);
+    item.classList.toggle("active", itemStep === publicMentorApplicationStep);
+    item.classList.toggle("complete", itemStep < publicMentorApplicationStep);
+  });
+  form.querySelector("[data-public-mentor-back]").hidden = publicMentorApplicationStep === 1;
+  form.querySelector("[data-public-mentor-next]").hidden = publicMentorApplicationStep === 4;
+  form.querySelector("[data-public-mentor-submit]").hidden = publicMentorApplicationStep !== 4;
+  form.querySelector("#publicMentorApplicationError").hidden = true;
+  if (publicMentorApplicationStep === 4) updatePublicMentorApplicationReview(form);
 }
 
 function renderPublicLearning() {
@@ -5441,6 +5652,7 @@ function renderPublicLearning() {
 function renderPublicPortal() {
   if (currentView === "public-home") renderPublicHome();
   else if (currentView === "public-support") renderPublicSupport();
+  else if (currentView === "public-mentor") renderPublicMentorApplication();
   else renderPublicLearning();
 }
 
@@ -6343,6 +6555,7 @@ function renderAll() {
     "mentor-profile": renderMentorPortal,
     "public-home": renderPublicPortal,
     "public-support": renderPublicPortal,
+    "public-mentor": renderPublicPortal,
     "public-learning": renderPublicPortal,
     handler: renderHandlerDetail
   }[currentView];
@@ -6408,7 +6621,7 @@ function currentMentorUser() {
 
 function currentUser() {
   if (activeTestUserType === "public") {
-    return { id: "public-visitor", name: "Ej inloggad", role: "Förälder", active: true };
+    return { id: "public-visitor", name: "Ej inloggad", role: "Besökare", active: true };
   }
   if (activeTestUserType === "mentor") {
     const mentor = currentMentorUser();
@@ -7031,7 +7244,7 @@ function applyRoute() {
   const previousView = currentView;
   const previousCaseRouteIntent = caseRouteIntent;
   const mentorRoutes = new Set(["mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "learning"]);
-  const publicRoutes = new Set(["public-home", "public-support", "public-learning"]);
+  const publicRoutes = new Set(["public-home", "public-support", "public-mentor", "public-learning"]);
   if (isPublicSession() && !publicRoutes.has(route.view)) {
     window.history.replaceState(null, "", "#/public-home");
     route = { view: "public-home", id: null };
@@ -7052,7 +7265,7 @@ function applyRoute() {
   const routeCaseId = nestedCaseRoute?.[1] || route.id;
   const routeMentorId = nestedMentorRoute?.[1] || route.id;
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "calendar", "meetings", "communications", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-learning"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "calendar", "meetings", "communications", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-mentor", "public-learning"].includes(route.view) ? route.view : "dashboard";
   if (currentView === "calendar" && previousView !== "calendar") {
     calendarTypeFilters.clear();
     ["meeting", "contact", "activity", "case"].forEach((type) => calendarTypeFilters.add(type));
@@ -7113,7 +7326,7 @@ function applyRoute() {
   els.parentDetailView.hidden = currentView !== "parent";
   els.learningView.hidden = currentView !== "learning";
   els.mentorPortalView.hidden = !["mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile"].includes(currentView);
-  els.publicPortalView.hidden = !["public-home", "public-support", "public-learning"].includes(currentView);
+  els.publicPortalView.hidden = !["public-home", "public-support", "public-mentor", "public-learning"].includes(currentView);
   els.administrationView.hidden = currentView !== "administration";
   els.caseNumberingAdministrationView.hidden = currentView !== "case-numbering";
   els.caseTypesAdministrationView.hidden = currentView !== "case-types" || Boolean(nestedActivityRoute);
@@ -7127,7 +7340,7 @@ function applyRoute() {
 
   const mentorSession = isMentorSession();
   const publicSession = isPublicSession();
-  for (const navigationItem of [els.navDashboard, els.navCalendar, els.navMeetings, els.navCommunications, els.navPresentation, els.navIntake, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navParentSupportCases, els.navLearning, els.navAdministration]) {
+  for (const navigationItem of [els.navDashboard, els.navCalendar, els.navMeetings, els.navCommunications, els.navPresentation, els.navIntake, els.navIncomingContact, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navParentSupportCases, els.navLearning, els.navAdministration]) {
     navigationItem.hidden = mentorSession || publicSession;
   }
   document.querySelectorAll(".sidebar-nav > .nav-link.disabled").forEach((navigationItem) => {
@@ -7137,9 +7350,12 @@ function applyRoute() {
   for (const navigationItem of [els.navMentorHome, els.navMentorAssignments, els.navMentorLearning, els.navMentorProfile]) {
     navigationItem.hidden = !mentorSession;
   }
-  for (const navigationItem of [els.navPublicHome, els.navPublicSupport, els.navPublicLearning]) {
+  for (const navigationItem of [els.navPublicHome, els.navPublicSupport, els.navPublicMentorApplication, els.navPublicLearning]) {
     navigationItem.hidden = !publicSession;
   }
+  const publicMentorNavigationLabel = currentPublicMentorApplication() ? "Min ansökan" : "Bli mentor";
+  els.navPublicMentorApplication.textContent = publicMentorNavigationLabel;
+  document.querySelectorAll('.public-mobile-nav a[href="#/public-mentor"]').forEach((link) => { link.textContent = publicMentorNavigationLabel; });
   document.querySelectorAll(".mobile-navigation .dropdown-menu > li").forEach((item) => {
     item.hidden = mentorSession
       ? !item.classList.contains("mentor-mobile-nav")
@@ -7186,6 +7402,7 @@ function applyRoute() {
   els.navMentorProfile.classList.toggle("active", currentView === "mentor-profile");
   els.navPublicHome.classList.toggle("active", currentView === "public-home");
   els.navPublicSupport.classList.toggle("active", currentView === "public-support");
+  els.navPublicMentorApplication.classList.toggle("active", currentView === "public-mentor");
   els.navPublicLearning.classList.toggle("active", currentView === "public-learning");
 
   if (currentView === "dashboard") {
@@ -7253,6 +7470,9 @@ function applyRoute() {
   } else if (currentView === "public-support") {
     els.pageTitle.textContent = "Sök stöd";
     els.breadcrumb.textContent = "Start / Sök stöd";
+  } else if (currentView === "public-mentor") {
+    els.pageTitle.textContent = currentPublicMentorApplication() ? "Min ansökan" : "Bli mentor";
+    els.breadcrumb.textContent = `Start / ${currentPublicMentorApplication() ? "Min ansökan" : "Bli mentor"}`;
   } else if (currentView === "public-learning") {
     els.pageTitle.textContent = route.id ? "Råd och material" : "Råd och material";
     els.breadcrumb.textContent = route.id ? "Start / Råd och material / Läs" : "Start / Råd och material";
@@ -10213,7 +10433,126 @@ function renderMentorCases(candidate) {
   }
 }
 
+function mentorApplicationStatusClass(status) {
+  if (status === "converted") return "badge text-bg-success";
+  if (status === "needs_completion") return "badge text-bg-warning";
+  if (status === "submitted") return "badge text-bg-primary";
+  return "badge text-bg-secondary";
+}
+
+function activeMentorApplications() {
+  return mentorApplications.filter((application) => ["submitted", "needs_completion"].includes(application.status));
+}
+
+function renderMentorApplicationDetail(application) {
+  if (!application) {
+    els.mentorApplicationDetailPanel.hidden = true;
+    els.mentorApplicationDetailPanel.innerHTML = "";
+    return;
+  }
+  const duplicates = mentorApplicationDuplicateCandidates(application, candidates);
+  const missing = mentorApplicationMissingFields(application);
+  const confidenceLabels = Object.fromEntries(MENTOR_SUPPORT_CONFIDENCE_LEVELS);
+  const experienceLabels = Object.fromEntries(MENTOR_EXPERIENCE_LEVELS);
+  const messages = mentorApplicationCommunications(application.id);
+  els.mentorApplicationDetailPanel.hidden = false;
+  els.mentorApplicationDetailPanel.innerHTML = `<div class="mentor-application-detail-header"><div><div class="record-type">${escapeHtml(application.reference)} · Självregistrerad uppgift</div><h3 class="h5 mb-1">${escapeHtml(application.name)}</h3><p class="text-secondary mb-0">Inkommen ${escapeHtml(formatDateTime(application.submittedAt || application.createdAt))}</p></div><button type="button" class="btn-close" aria-label="Stäng ansökan" data-close-mentor-application></button></div>
+    ${duplicates.length ? `<div class="alert alert-warning"><strong>Möjlig dubblett</strong><p class="mb-2">En mentor med samma namn eller kontaktuppgift finns redan. Skapa inte en ny post innan detta har kontrollerats.</p>${duplicates.map((candidate) => `<div class="d-flex flex-wrap justify-content-between align-items-center gap-2"><a href="#/mentor/${escapeHtml(candidate.id)}">${escapeHtml(candidate.caseNumber)} · ${escapeHtml(candidate.name)}</a><button type="button" class="btn btn-outline-primary btn-sm" data-link-mentor-application="${escapeHtml(candidate.id)}">Koppla till befintlig mentor</button></div>`).join("")}</div>` : ""}
+    ${missing.length ? `<div class="alert alert-danger"><strong>Ansökan är inte fullständig</strong><p class="mb-0">Saknas: ${escapeHtml(missing.join(", "))}.</p></div>` : ""}
+    <div class="mentor-application-detail-grid"><section><h4>Kontakt och tillgänglighet</h4><dl><div><dt>E-post</dt><dd>${escapeHtml(application.email || "Ej angivet")}</dd></div><div><dt>Telefon</dt><dd>${escapeHtml(application.phone || "Ej angivet")}</dd></div><div><dt>Område</dt><dd>${escapeHtml(geographicAreaLabels(application.geographicAreaIds, tenantGeographicAreas).join(", ") || "Ej angivet")}</dd></div><div><dt>Språk</dt><dd>${escapeHtml(mentorApplicationOptionLabels(application.languageIds, LANGUAGE_OPTIONS))}</dd></div><div><dt>Tillgänglighet</dt><dd>${escapeHtml(mentorApplicationOptionLabels(application.availabilitySlotIds, AVAILABILITY_OPTIONS))}</dd></div></dl></section>
+      <section><h4>Stödområden och erfarenhet</h4><div class="mentor-application-area-list">${application.supportAreas.map((entry) => `<article><strong>${escapeHtml(supportAreaById(entry.areaId)?.title || entry.areaId)}</strong><span>${escapeHtml(confidenceLabels[entry.confidenceLevel] || "")}</span><small>${escapeHtml(entry.experienceLevels.map((id) => experienceLabels[id]).filter(Boolean).join(" · "))} · Egen uppgift</small></article>`).join("") || '<p class="text-secondary mb-0">Inga stödområden angivna.</p>'}</div></section>
+      <section class="mentor-application-detail-wide"><h4>Motivation</h4><p>${escapeHtml(application.motivation || "Ej angivet")}</p></section>
+      <section class="mentor-application-detail-wide"><h4>Kommunikation</h4>${messages.length ? `<ul class="mentor-application-message-list">${messages.map((message) => `<li><strong>${escapeHtml(message.subject || COMMUNICATION_CHANNEL_LABELS[message.channel] || "Meddelande")}</strong><span>${escapeHtml(formatDateTime(message.createdAt))} · ${escapeHtml(message.body)}</span></li>`).join("")}</ul>` : '<p class="text-secondary mb-0">Ingen kommunikation registrerad.</p>'}</section></div>
+    <div class="mentor-application-detail-actions"><button type="button" class="btn btn-outline-primary" data-request-mentor-completion>${application.status === "needs_completion" ? "Skicka ny begäran om komplettering" : "Begär komplettering"}</button><button type="button" class="btn btn-primary" data-convert-mentor-application ${duplicates.length || missing.length ? "disabled" : ""}>Ta emot och skapa mentor</button></div>`;
+}
+
+function renderMentorApplicationQueue() {
+  const rows = activeMentorApplications();
+  els.mentorApplicationQueueSummary.textContent = rows.length
+    ? `${rows.length} ${rows.length === 1 ? "intresseanmälan väntar" : "intresseanmälningar väntar"} på handläggning.`
+    : "Inga intresseanmälningar väntar.";
+  els.mentorApplicationTableBody.innerHTML = rows.map((application) => `<tr class="${application.id === selectedMentorApplicationId ? "table-active" : ""}"><td>${escapeHtml(formatDate(application.submittedAt || application.createdAt))}</td><td><strong>${escapeHtml(application.name)}</strong><small class="d-block text-secondary">${escapeHtml(application.email || application.phone || "Kontaktuppgift saknas")}</small></td><td>${escapeHtml(geographicAreaLabels(application.geographicAreaIds, tenantGeographicAreas).join(", ") || "Ej angivet")}<small class="d-block text-secondary">${escapeHtml(mentorApplicationOptionLabels(application.languageIds, LANGUAGE_OPTIONS))}</small></td><td><span class="${mentorApplicationStatusClass(application.status)}">${escapeHtml(MENTOR_APPLICATION_STATUS_LABELS[application.status] || application.status)}</span></td><td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-application="${escapeHtml(application.id)}">Granska</button></td></tr>`).join("") || '<tr><td colspan="5" class="text-center text-secondary py-3">Inga väntande intresseanmälningar.</td></tr>';
+  renderMentorApplicationDetail(rows.find((application) => application.id === selectedMentorApplicationId));
+}
+
+async function sendMentorApplicationMessage(application, { subject, body, actorId = "system" }) {
+  const channel = application.email ? "email" : "sms";
+  const record = await dispatchOutboundCommunication({
+    draft: {
+      tenantId: DEFAULT_TENANT_ID,
+      recipientName: application.name,
+      recipientAddress: application.email || application.phone,
+      recipientPartyType: "mentor_applicant",
+      recipientPartyId: application.id,
+      sender: { name: "FöräldraMentorer", address: channel === "email" ? "kommun@demo.local" : "SMS demo" },
+      subject,
+      body,
+      links: [{ entityType: "mentor_application", entityId: application.id, label: application.reference }],
+      createdBy: actorId
+    },
+    provider: createDemoCommunicationProvider(channel)
+  });
+  await saveCommunication(record);
+  return record;
+}
+
+async function linkMentorApplicationToCandidate(application, candidate) {
+  const now = new Date().toISOString();
+  const linked = convertMentorApplication(application, { mentorId: candidate.id, now, actorId: currentActorId() });
+  linked.history[linked.history.length - 1].message = `Ansökan kopplades till den befintliga mentorposten ${candidate.caseNumber}.`;
+  await saveMentorApplication(linked);
+}
+
+async function convertMentorApplicationToCandidate(application) {
+  const now = new Date().toISOString();
+  const mentorId = crypto.randomUUID();
+  const matching = structuredMatchingValues({
+    geographicAreaIds: application.geographicAreaIds,
+    languageIds: application.languageIds,
+    availabilitySlotIds: application.availabilitySlotIds
+  });
+  const candidate = {
+    id: mentorId,
+    tenantId: DEFAULT_TENANT_ID,
+    caseNumber: await reserveCaseNumber(),
+    name: application.name,
+    personalNumber: "",
+    contactDetails: [application.email, application.phone].filter(Boolean).join(" · "),
+    informationStatus: "provided",
+    interestNote: application.motivation,
+    ...matching,
+    supportAreas: normalizeMentorSupportAreas(application.supportAreas),
+    coordinatorId: "",
+    coordinator: "",
+    status: "Anmäld",
+    active: true,
+    checks: Object.fromEntries(CHECKS.map(([key]) => [key, false])),
+    checkMeta: buildCheckMeta(),
+    interviewDate: "",
+    interviewMode: "",
+    notes: "",
+    identityMethod: "",
+    identityVerifiedAt: "",
+    identityVerifiedBy: "",
+    mentorApplicationId: application.id,
+    history: [{ at: now, text: `Självregistrerad intresseanmälan ${application.reference} mottagen`, actor: currentUserName() }],
+    createdAt: now,
+    createdBy: currentActorId(),
+    updatedAt: now,
+    updatedBy: currentActorId()
+  };
+  const converted = convertMentorApplication(application, { mentorId, now, actorId: currentActorId() });
+  const built = buildMentorMatchingProfile({ tenantId: DEFAULT_TENANT_ID, mentor: candidate, profileId: crypto.randomUUID(), actorId: currentActorId(), now });
+  await atomicPut({
+    [STORE]: [candidate],
+    [MENTOR_APPLICATIONS_STORE]: [converted],
+    ...profileWrites(built, MENTOR_MATCHING_PROFILES_STORE, MENTOR_MATCHING_AREAS_STORE, MENTOR_MATCHING_LANGUAGES_STORE)
+  });
+  return candidate;
+}
+
 function renderTable() {
+  renderMentorApplicationQueue();
   els.candidateTableBody.innerHTML = "";
   const rows = filteredCandidates();
   const mentorLabel = candidates.length === 1 ? "mentor" : "mentorer";
@@ -12517,12 +12856,98 @@ els.mentorPortalView.addEventListener("submit", async (event) => {
 });
 
 els.publicPortalView.addEventListener("click", (event) => {
-  if (!event.target.closest("[data-new-public-support]")) return;
-  lastPublicSupportRequestId = "";
-  renderPublicSupport();
+  if (event.target.closest("[data-new-public-support]")) {
+    lastPublicSupportRequestId = "";
+    renderPublicSupport();
+    return;
+  }
+  if (event.target.closest("[data-edit-public-mentor-application]")) {
+    publicMentorApplicationEditing = true;
+    publicMentorApplicationStep = 1;
+    renderPublicMentorApplication();
+    return;
+  }
+  const form = event.target.closest("#publicMentorApplicationForm");
+  if (!form) return;
+  const previous = currentPublicMentorApplication();
+  const persistDraft = async () => {
+    const application = publicMentorApplicationFromForm(form, previous);
+    await saveMentorApplication(application);
+    localStorage.setItem(PUBLIC_MENTOR_APPLICATION_KEY, application.id);
+    mentorApplications = [application, ...mentorApplications.filter((item) => item.id !== application.id)];
+    return application;
+  };
+  if (event.target.closest("[data-public-mentor-back]")) {
+    publicMentorApplicationStep -= 1;
+    updatePublicMentorApplicationStep();
+    return;
+  }
+  if (event.target.closest("[data-public-mentor-next]")) {
+    if (!validatePublicMentorApplicationStep(form, publicMentorApplicationStep)) return;
+    persistDraft().then(() => {
+      publicMentorApplicationStep += 1;
+      updatePublicMentorApplicationStep();
+    }).catch((error) => showFeedback(error.message));
+    return;
+  }
+  if (event.target.closest("[data-public-mentor-save]")) {
+    persistDraft().then(() => {
+      markSaved();
+      showFeedback("Utkastet har sparats i den här webbläsaren.");
+    }).catch((error) => showFeedback(error.message));
+  }
+});
+
+els.publicPortalView.addEventListener("change", (event) => {
+  const supportAreaInput = event.target.closest('input[name="mentorSupportArea"]');
+  if (!supportAreaInput) return;
+  const row = supportAreaInput.closest("[data-public-mentor-support-row]");
+  const details = row?.querySelector(".public-mentor-support-details");
+  if (details) details.hidden = !supportAreaInput.checked;
 });
 
 els.publicPortalView.addEventListener("submit", async (event) => {
+  const mentorForm = event.target.closest("#publicMentorApplicationForm");
+  if (mentorForm) {
+    event.preventDefault();
+    for (const step of [1, 2, 3]) {
+      if (!validatePublicMentorApplicationStep(mentorForm, step)) {
+        publicMentorApplicationStep = step;
+        updatePublicMentorApplicationStep();
+        return;
+      }
+    }
+    const consent = mentorForm.querySelector('input[name="consent"]');
+    if (!consent.checked) {
+      const error = mentorForm.querySelector("#publicMentorApplicationError");
+      error.textContent = "Godkänn att kommunen får kontakta dig innan du skickar intresseanmälan.";
+      error.hidden = false;
+      consent.focus();
+      return;
+    }
+    const previous = currentPublicMentorApplication();
+    const draft = publicMentorApplicationFromForm(mentorForm, previous);
+    try {
+      const submitted = submitMentorApplication(draft, { now: new Date().toISOString(), actorId: "public-applicant" });
+      await saveMentorApplication(submitted);
+      localStorage.setItem(PUBLIC_MENTOR_APPLICATION_KEY, submitted.id);
+      await sendMentorApplicationMessage(submitted, {
+        subject: "Vi har tagit emot din intresseanmälan",
+        body: `Hej ${submitted.name}! Vi har registrerat din intresseanmälan med referens ${submitted.reference}. Kommunen går igenom uppgifterna och kontaktar dig. Detta meddelande har registrerats i prototypens demoleverantör och har inte skickats externt.`,
+        actorId: "system"
+      });
+      publicMentorApplicationEditing = false;
+      publicMentorApplicationStep = 1;
+      markSaved();
+      await refresh();
+      showFeedback("Intresseanmälan har registrerats i prototypen.");
+    } catch (error) {
+      const feedback = mentorForm.querySelector("#publicMentorApplicationError");
+      feedback.textContent = error.message;
+      feedback.hidden = false;
+    }
+    return;
+  }
   const form = event.target.closest("#publicSupportForm");
   if (!form) return;
   event.preventDefault();
@@ -12550,6 +12975,76 @@ els.publicPortalView.addEventListener("submit", async (event) => {
   lastPublicSupportRequestId = id;
   markSaved();
   await refresh();
+});
+
+els.mentorApplicationQueueToggle.addEventListener("click", () => {
+  const hidden = !els.mentorApplicationQueueContent.hidden;
+  els.mentorApplicationQueueContent.hidden = hidden;
+  els.mentorApplicationQueueToggle.textContent = hidden ? "Visa" : "Dölj";
+  els.mentorApplicationQueueToggle.setAttribute("aria-expanded", String(!hidden));
+});
+
+els.mentorApplicationQueuePanel.addEventListener("click", async (event) => {
+  const openButton = event.target.closest("[data-open-mentor-application]");
+  if (openButton) {
+    selectedMentorApplicationId = openButton.dataset.openMentorApplication;
+    renderMentorApplicationQueue();
+    els.mentorApplicationDetailPanel.scrollIntoView({ block: "nearest" });
+    return;
+  }
+  if (event.target.closest("[data-close-mentor-application]")) {
+    selectedMentorApplicationId = "";
+    renderMentorApplicationQueue();
+    return;
+  }
+  const application = mentorApplications.find((item) => item.id === selectedMentorApplicationId);
+  if (!application) return;
+  const linkButton = event.target.closest("[data-link-mentor-application]");
+  if (linkButton) {
+    const candidate = candidates.find((item) => item.id === linkButton.dataset.linkMentorApplication);
+    if (!candidate) return;
+    await linkMentorApplicationToCandidate(application, candidate);
+    selectedMentorApplicationId = "";
+    markSaved();
+    await refresh();
+    window.location.hash = `#/mentor/${candidate.id}`;
+    showFeedback("Intresseanmälan har kopplats till den befintliga mentorn.");
+    return;
+  }
+  if (event.target.closest("[data-request-mentor-completion]")) {
+    const now = new Date().toISOString();
+    const updated = normalizeMentorApplication({
+      ...application,
+      status: "needs_completion",
+      updatedAt: now,
+      updatedBy: currentActorId(),
+      version: application.version + 1,
+      history: [...application.history, { eventType: "completion_requested", occurredAt: now, actorId: currentActorId(), message: "Kommunen begärde en komplettering av intresseanmälan." }]
+    });
+    await saveMentorApplication(updated);
+    await sendMentorApplicationMessage(updated, {
+      subject: "Komplettera din intresseanmälan",
+      body: `Hej ${updated.name}! Kommunen behöver att du ser över och kompletterar din intresseanmälan ${updated.reference}. Öppna Min ansökan i samma webbläsare för att ändra uppgifterna. Detta är ett registrerat demomeddelande och har inte skickats externt.`,
+      actorId: currentActorId()
+    });
+    markSaved();
+    await refresh();
+    showFeedback("Begäran om komplettering har registrerats via demoleverantören.");
+    return;
+  }
+  if (event.target.closest("[data-convert-mentor-application]")) {
+    try {
+      const candidate = await convertMentorApplicationToCandidate(application);
+      selectedMentorApplicationId = "";
+      markSaved();
+      await refresh();
+      window.location.hash = `#/mentor/${candidate.id}`;
+      showFeedback("Mentorn har skapats och godkännandeflödet har startats.");
+    } catch (error) {
+      console.error("Kunde inte ta emot mentoransökan", error);
+      showFeedback(error.message || "Intresseanmälan kunde inte tas emot.");
+    }
+  }
 });
 
 function populateInteractionSelect(select, records, label, selectedId = "") {
@@ -16442,7 +16937,8 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
 els.resetButton.addEventListener("click", async () => {
   const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata? Mentorärenden tas bort och grundhandläggarna återställs. Åtgärden kan inte ångras.");
   if (!confirmed) return;
-  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStores(MATCHING_PROFILE_STORES), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests(), clearSupportTickets(), clearTenantSupportAreaSelections(), clearTenantGeographicAreas()]);
+  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStores(MATCHING_PROFILE_STORES), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests(), clearMentorApplications(), clearSupportTickets(), clearTenantSupportAreaSelections(), clearTenantGeographicAreas()]);
+  localStorage.removeItem(PUBLIC_MENTOR_APPLICATION_KEY);
   await ensureDefaultHandlers();
   selectedId = null;
   markSaved();
