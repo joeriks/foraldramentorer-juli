@@ -869,6 +869,65 @@ body.is-system-administration .sidebar-menu-group {
   font-size: 1.5rem;
 }
 
+.mentor-next-contact {
+  margin-top: var(--app-space-2) !important;
+  color: var(--app-text) !important;
+}
+
+.mentor-next-contact strong {
+  margin-right: 0.35rem;
+}
+
+.mentor-assignment-mobile-list {
+  display: none;
+}
+
+.mentor-assignment-mobile-item {
+  display: grid;
+  gap: var(--app-space-3);
+  padding: var(--app-space-3);
+  color: inherit;
+  text-decoration: none;
+}
+
+.mentor-assignment-mobile-item + .mentor-assignment-mobile-item {
+  border-top: 1px solid var(--app-border);
+}
+
+.mentor-assignment-mobile-heading,
+.mentor-assignment-mobile-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--app-space-2);
+}
+
+.mentor-assignment-mobile-heading small,
+.mentor-assignment-mobile-meta span,
+.mentor-assignment-mobile-meta strong {
+  display: block;
+}
+
+.mentor-assignment-mobile-heading small,
+.mentor-assignment-mobile-meta span {
+  color: var(--app-text-muted);
+}
+
+.mentor-assignment-mobile-meta {
+  font-size: 0.8125rem;
+}
+
+.mentor-assignment-mobile-meta strong {
+  color: var(--app-text);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.mentor-assignment-mobile-action {
+  color: var(--app-primary);
+  font-weight: 600;
+}
+
 .mentor-plan-facts,
 .mentor-profile-facts {
   display: grid;
@@ -1672,6 +1731,119 @@ body.is-system-administration .sidebar-menu-group {
   .mentor-welcome {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  body.is-mentor-portal .app-header {
+    padding: 0.75rem;
+  }
+
+  body.is-mentor-portal #breadcrumb,
+  body.is-mentor-portal .session-user-initials,
+  body.is-mentor-portal .session-user-label,
+  body.is-mentor-portal #currentUserRole,
+  body.is-mentor-portal .test-user-switcher-label {
+    display: none;
+  }
+
+  body.is-mentor-portal .session-user {
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: var(--app-space-2);
+    padding-top: var(--app-space-2);
+    border-top: 1px solid var(--app-border-soft);
+  }
+
+  body.is-mentor-portal .session-user > div:nth-child(2) {
+    min-width: 0;
+    flex: 1;
+  }
+
+  body.is-mentor-portal .session-user-identity strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.is-mentor-portal .test-user-switcher {
+    width: auto;
+    min-width: 8.75rem;
+    margin-left: auto;
+  }
+
+  body.is-mentor-portal .system-status {
+    gap: 0.35rem;
+    min-height: 0;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  body.is-mentor-portal .system-status > :not(.status-dot):not(.system-status-environment):not(.system-status-data),
+  body.is-mentor-portal .system-status-product {
+    display: none !important;
+  }
+
+  body.is-mentor-portal .system-status-data::before {
+    content: "· ";
+    font-weight: 400;
+  }
+
+  body.is-mentor-portal .app-main {
+    padding: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .view-stack {
+    gap: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-welcome {
+    gap: var(--app-space-3);
+    padding: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-welcome .record-type,
+  body.is-mentor-portal .mentor-welcome-copy,
+  body.is-mentor-portal .mentor-summary-grid,
+  body.is-mentor-portal .mentor-home-help,
+  body.is-mentor-portal .mentor-assignments-help {
+    display: none;
+  }
+
+  body.is-mentor-portal .mentor-welcome h2 {
+    margin: 0;
+    font-size: 1.2rem;
+  }
+
+  body.is-mentor-portal .mentor-welcome .btn {
+    width: 100%;
+  }
+
+  body.is-mentor-portal .mentor-home-grid {
+    gap: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-home-grid .card-header,
+  body.is-mentor-portal .mentor-assignments-card .card-header {
+    padding: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-task-link {
+    padding: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-progress-value {
+    margin-bottom: var(--app-space-2);
+  }
+
+  body.is-mentor-portal .mentor-progress-value strong {
+    font-size: 1.2rem;
+  }
+
+  body.is-mentor-portal .mentor-assignments-table {
+    display: none;
+  }
+
+  body.is-mentor-portal .mentor-assignment-mobile-list {
+    display: block;
   }
 
   .mentor-summary-grid,
@@ -4177,6 +4349,16 @@ body.is-system-administration .sidebar-menu-group {
 .learning-course-outline li.is-complete > span:first-child {
   border-color: var(--bs-success);
   color: var(--bs-success);
+}
+
+.learning-course-start {
+  margin: 0;
+  padding-top: var(--app-space-4);
+  border-top: 1px solid var(--app-border);
+}
+
+.learning-course-start > div {
+  min-width: 0;
 }
 
 body.is-learning-focus {

@@ -37,3 +37,15 @@ test("keeps the profile editor within the mobile document width", () => {
   assert.match(styles, /@media \(max-width: 600px\)[\s\S]*\.mentor-self-service-grid,[\s\S]*\.mentor-self-service-choice-grid,[\s\S]*\.mentor-self-service-support-fields,[\s\S]*grid-template-columns: 1fr/);
   assert.match(styles, /\.mentor-self-service-actions[\s\S]*flex-direction: column-reverse/);
 });
+
+test("gives the mentor portal a direct and compact mobile flow", () => {
+  assert.match(app, /classList\.toggle\("is-mentor-portal", isMentorSession\(\)\)/);
+  assert.match(app, /Fortsätt uppdraget/);
+  assert.match(app, /mentor-next-contact/);
+  assert.match(app, /mentor-assignment-mobile-list/);
+  assert.match(app, /mentor-assignments-table/);
+  assert.match(styles, /body\.is-mentor-portal \.mentor-summary-grid[\s\S]*display: none/);
+  assert.match(styles, /body\.is-mentor-portal \.mentor-assignments-table[\s\S]*display: none/);
+  assert.match(styles, /body\.is-mentor-portal \.mentor-assignment-mobile-list[\s\S]*display: block/);
+  assert.match(styles, /body\.is-mentor-portal \.system-status/);
+});

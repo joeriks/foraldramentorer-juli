@@ -105,7 +105,7 @@ import {
   prepareLearningMarkdown,
   requiredLearningContentIds,
   scoreKnowledgeTest
-} from "./learning-domain.js?v=20260823-learning-collaboration-v122";
+} from "./learning-domain.js?v=20260823-mentor-mobile-v123";
 import {
   containsSensitivePersonalData,
   findSupportKnowledge,
@@ -210,6 +210,24 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "123",
+    date: "2026-08-23",
+    title: "Rakare mentorportal och tydligare kursstart",
+    flow: "Mentorportal -> nästa uppgift -> läs kursöversikt -> påbörja utbildning",
+    simplified: "Mobilvyn leder nu direkt till nästa relevanta uppgift. Förklarande texter och prototypverktyg tar mindre plats, och en ny kurs startas först efter att mentorn har gått igenom kursens introduktion.",
+    retained: "Samma uppdrag, utbildningar, profiluppgifter, rapportering och rollväxling finns kvar. Skrivbordsvyn behåller sin mer utförliga sammanfattning och tabell.",
+    changes: [
+      "Mentorns startsida visar en direkt fortsättningsknapp och datum för nästa planerade kontakt.",
+      "Sammanfattningsrutorna och upprepade hjälptexter döljs på små skärmar.",
+      "Uppdragsregistret får en mobil lista med status, period och senaste rapport.",
+      "Inloggningsrad och prototypstatus har komprimerats i mentorlägets mobilvy.",
+      "Knappen Påbörja utbildningen ligger sist på kursöversikten efter mål och kursdelar.",
+      "En redan påbörjad utbildning behåller sin snabba fortsättningsknapp nära progressionen.",
+      "Reflektionsfältet ger en kort vänlig ledtråd och visar utförligare hjälp först efter ett misslyckat sparförsök.",
+      "Alla befintliga länkar, formulär och registerdata används oförändrat."
+    ]
+  },
   {
     version: "122",
     date: "2026-08-23",
@@ -5454,12 +5472,32 @@ function learningCourseActionLabel({ completeCount, percent }) {
   return "Gå igenom utbildningen igen";
 }
 
+function learningReflectionFeedback(assessment, value, attempted = false) {
+  if (assessment.valid) return {
+    message: "Det ser bra ut. Du kan spara och fortsätta.",
+    status: "Redo att sparas"
+  };
+  if (!attempted) return {
+    message: "Skriv några meningar med egna ord.",
+    status: ""
+  };
+  if (!String(value || "").trim()) return {
+    message: "Skriv ett kort svar om hur du skulle hantera situationen innan du fortsätter.",
+    status: ""
+  };
+  return {
+    message: "Utveckla svaret lite mer. Beskriv med egna ord vad du skulle säga eller göra.",
+    status: ""
+  };
+}
+
 function renderLearningReflectionForm(course, module, progress, isComplete) {
   const value = progress.reflections?.[module.id] || "";
   const assessment = assessLearningReflection(value);
   const helpId = `reflection-${module.id}-help`;
-  const validationClass = value ? assessment.valid ? "is-valid" : "is-invalid" : "";
-  return `<form data-learning-reflection="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}" novalidate><label class="form-label" for="reflection-${escapeHtml(module.id)}">${escapeHtml(module.prompt)}</label><textarea id="reflection-${escapeHtml(module.id)}" class="form-control" rows="4" aria-describedby="${escapeHtml(helpId)}" required>${escapeHtml(value)}</textarea><div id="${escapeHtml(helpId)}" class="form-text learning-reflection-help ${validationClass}" data-learning-reflection-help><span>Skriv minst fem begripliga ord och använd minst tre olika ord. Enstaka tecken och upprepningar räknas inte.</span><strong data-learning-reflection-count>${assessment.valid ? "Kravet uppfyllt" : `${assessment.meaningfulWordCount} av ${assessment.requiredWordCount} ord räknas`}</strong></div><button type="submit" class="btn btn-primary btn-sm mt-3" ${selectedLearnerId ? "" : "disabled"}>${isComplete ? "Spara ändring" : "Spara och fortsätt"}</button></form>`;
+  const feedback = learningReflectionFeedback(assessment, value);
+  const validationClass = value && assessment.valid ? "is-valid" : "";
+  return `<form data-learning-reflection="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}" novalidate><label class="form-label" for="reflection-${escapeHtml(module.id)}">${escapeHtml(module.prompt)}</label><textarea id="reflection-${escapeHtml(module.id)}" class="form-control" rows="4" aria-describedby="${escapeHtml(helpId)}" required>${escapeHtml(value)}</textarea><div id="${escapeHtml(helpId)}" class="form-text learning-reflection-help ${validationClass}" data-learning-reflection-help><span data-learning-reflection-message>${escapeHtml(feedback.message)}</span><strong data-learning-reflection-status ${feedback.status ? "" : "hidden"}>${escapeHtml(feedback.status)}</strong></div><button type="submit" class="btn btn-primary btn-sm mt-3" ${selectedLearnerId ? "" : "disabled"}>${isComplete ? "Spara ändring" : "Spara och fortsätt"}</button></form>`;
 }
 
 function renderLearningModuleList(course, state) {
@@ -5487,6 +5525,8 @@ function renderCourseOverview(course) {
   const estimatedMinutes = Number(course.estimatedMinutes) || course.modules.reduce((sum, module) => sum + Number(module.estimatedMinutes || 0), 0);
   const actionLabel = learningCourseActionLabel(state);
   const currentModule = nextModule || course.modules[0];
+  const courseEntry = `<section class="learning-course-entry" aria-label="${completeCount ? "Fortsätt utbildningen" : "Påbörja utbildningen"}"><div><span class="record-type">${nextModule ? completeCount ? "Fortsätt där du slutade" : "Redo att börja" : "Utbildningen är genomförd"}</span><h3>${escapeHtml(currentModule?.title || "Alla delar är genomförda")}</h3>${currentModule?.estimatedMinutes ? `<p>Cirka ${Number(currentModule.estimatedMinutes)} minuter för nästa del</p>` : ""}</div><a class="btn btn-primary btn-lg" href="#/learning/${encodeURIComponent(course.id)}?mode=focus">${actionLabel}</a></section>`;
+  const courseStart = `<section class="learning-course-entry learning-course-start" aria-label="Påbörja utbildningen"><div><span class="record-type">Redo att börja</span><h3>Påbörja utbildningen</h3><p>Första delen är ${escapeHtml(currentModule?.title || "kursintroduktionen")}${currentModule?.estimatedMinutes ? ` och tar cirka ${Number(currentModule.estimatedMinutes)} minuter` : ""}. Dina framsteg sparas efter varje del.</p></div><a class="btn btn-primary btn-lg" href="#/learning/${encodeURIComponent(course.id)}?mode=focus">Påbörja utbildningen</a></section>`;
   return `<div class="card-header record-header bg-white learning-course-overview-header">
     <a class="small" href="#/learning">Tillbaka till utbildning</a>
     <div class="record-type mt-3">Utbildning · version ${course.version}</div><h2 class="h5 mb-1">${escapeHtml(course.title)}</h2><p class="text-secondary mb-0">${escapeHtml(course.summary)}</p>
@@ -5494,9 +5534,10 @@ function renderCourseOverview(course) {
     <div class="learning-course-progress mt-3"><div class="progress" role="progressbar" aria-label="Utbildningsförlopp" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${percent}%"></div></div><strong>${completeCount} av ${total} delar klara</strong></div>
   </div>
   <div class="card-body learning-course-overview-body">
-    <section class="learning-course-entry" aria-label="Starta eller fortsätt utbildningen"><div><span class="record-type">${nextModule ? completeCount ? "Fortsätt där du slutade" : "Redo att börja" : "Utbildningen är genomförd"}</span><h3>${escapeHtml(currentModule?.title || "Alla delar är genomförda")}</h3>${currentModule?.estimatedMinutes ? `<p>Cirka ${Number(currentModule.estimatedMinutes)} minuter för nästa del</p>` : ""}</div><a class="btn btn-primary btn-lg" href="#/learning/${encodeURIComponent(course.id)}?mode=focus">${actionLabel}</a></section>
+    ${completeCount ? courseEntry : ""}
     <section class="learning-course-intro" aria-labelledby="learningCourseGoals"><div class="learning-markdown">${renderLearningMarkdown(course.bodyMarkdown)}</div>${course.learningObjectives?.length ? `<div class="learning-course-objectives"><h3 id="learningCourseGoals" class="h6">Efter utbildningen kan du</h3><ul>${course.learningObjectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></div>` : ""}</section>
     <section class="learning-course-outline" aria-labelledby="learningCourseOutline"><h3 id="learningCourseOutline" class="h6">Utbildningens delar</h3><ol>${course.modules.map((module, index) => `<li class="${state.completed.has(module.id) ? "is-complete" : module.id === nextModule?.id ? "is-current" : ""}"><span>${index + 1}</span><div><strong>${escapeHtml(module.title)}</strong><small>${learningTypeLabel(module.type)}${module.estimatedMinutes ? ` · cirka ${Number(module.estimatedMinutes)} min` : ""}</small></div><span>${state.completed.has(module.id) ? "Klar" : module.id === nextModule?.id ? "Nästa" : ""}</span></li>`).join("")}</ol></section>
+    ${completeCount ? "" : courseStart}
   </div>`;
 }
 
@@ -5617,10 +5658,16 @@ function renderMentorHome() {
   const learning = mentorCourseSummary(mentor.id);
   const nextContact = reports.map((report) => report.nextContactOn).filter((date) => date && date >= new Date().toISOString().slice(0, 10)).sort()[0] || null;
   const latestAssignment = activeAssignments[0] || assignments[0] || null;
+  const nextCourse = learning.courses.find((course) => courseProgressPercent(course, learningProgressRecord(mentor.id, course.id).completedModuleIds) < 100) || null;
+  const primaryAction = latestAssignment
+    ? { href: `#/mentor-assignment/${escapeHtml(latestAssignment.id)}`, label: "Fortsätt uppdraget" }
+    : nextCourse
+      ? { href: `#/learning/${encodeURIComponent(nextCourse.id)}`, label: "Fortsätt utbildningen" }
+      : { href: "#/mentor-profile", label: "Visa min profil" };
   els.mentorPortalView.innerHTML = `
     <section class="mentor-welcome">
-      <div><div class="record-type">Mentorportal</div><h2>Välkommen, ${escapeHtml(mentor.name)}</h2><p>Här ser du dina uppdrag, rapporterar genomförda kontakter och fortsätter din utbildning.</p></div>
-      ${latestAssignment ? `<a class="btn btn-primary" href="#/mentor-assignment/${escapeHtml(latestAssignment.id)}">Öppna aktuellt uppdrag</a>` : ""}
+      <div><div class="record-type">Mentorportal</div><h2>Hej, ${escapeHtml(mentor.name)}</h2><p class="mentor-welcome-copy">Här ser du dina uppdrag, rapporterar genomförda kontakter och fortsätter din utbildning.</p>${nextContact ? `<p class="mentor-next-contact"><strong>Nästa kontakt</strong> ${escapeHtml(formatDate(nextContact))}</p>` : ""}</div>
+      <a class="btn btn-primary" href="${primaryAction.href}">${primaryAction.label}</a>
     </section>
     <section class="mentor-summary-grid" aria-label="Din sammanfattning">
       <article><strong>${activeAssignments.length}</strong><span>aktiva uppdrag</span></article>
@@ -5629,21 +5676,34 @@ function renderMentorHome() {
       <article><strong>${nextContact ? escapeHtml(formatDate(nextContact)) : "Ej planerad"}</strong><span>nästa kontakt</span></article>
     </section>
     <div class="mentor-home-grid">
-      <section class="card"><div class="card-header bg-white"><h3 class="h5 mb-1">Mina uppdrag</h3><p class="text-secondary mb-0">Aktuella överenskommelser och återrapportering.</p></div><div class="list-group list-group-flush">${activeAssignments.slice(0, 3).map((caseRecord) => {
+      <section class="card mentor-home-assignments"><div class="card-header bg-white"><h3 class="h5 mb-1">Mina uppdrag</h3><p class="text-secondary mb-0 mentor-home-help">Aktuella överenskommelser och återrapportering.</p></div><div class="list-group list-group-flush">${activeAssignments.slice(0, 3).map((caseRecord) => {
         const parent = caseParent(caseRecord);
         return `<a class="list-group-item list-group-item-action mentor-task-link" href="#/mentor-assignment/${escapeHtml(caseRecord.id)}"><span><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><small>${escapeHtml(parent?.name || "Förälder")} · ${escapeHtml(caseStatusLabel(caseRecord.status))}</small></span><span>Öppna</span></a>`;
-      }).join("") || '<div class="card-body text-secondary">Du har inga aktiva uppdrag.</div>'}</div><div class="card-footer bg-white"><a href="#/mentor-assignments">Visa alla uppdrag</a></div></section>
-      <section class="card"><div class="card-header bg-white"><h3 class="h5 mb-1">Utbildning</h3><p class="text-secondary mb-0">Kommunens kurser och material för mentorer.</p></div><div class="card-body"><p class="mentor-progress-value"><strong>${learning.completed}</strong> av ${learning.courses.length} kurser slutförda</p><div class="progress mb-3" role="progressbar" aria-label="Genomförda kurser" aria-valuenow="${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}%"></div></div><a class="btn btn-outline-primary btn-sm" href="#/learning">Fortsätt utbildningen</a></div></section>
+      }).join("") || '<div class="card-body text-secondary">Du har inga aktiva uppdrag.</div>'}</div><div class="card-footer bg-white"><a href="#/mentor-assignments">Alla uppdrag</a></div></section>
+      <section class="card mentor-home-learning"><div class="card-header bg-white"><h3 class="h5 mb-1">Utbildning</h3><p class="text-secondary mb-0 mentor-home-help">Kommunens kurser och material för mentorer.</p></div><div class="card-body"><p class="mentor-progress-value"><strong>${learning.completed}</strong> av ${learning.courses.length} kurser slutförda</p><div class="progress mb-3" role="progressbar" aria-label="Genomförda kurser" aria-valuenow="${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}%"></div></div><a class="btn btn-outline-primary btn-sm" href="#/learning">${nextCourse ? "Fortsätt utbildningen" : "Visa utbildningar"}</a></div></section>
     </div>`;
 }
 
 function renderMentorAssignments() {
   const assignments = mentorAssignments();
-  els.mentorPortalView.innerHTML = `<section class="card"><div class="card-header bg-white"><h2 class="h5 mb-1">Mina uppdrag</h2><p class="text-secondary mb-0">Varje uppdrag gäller ett avgränsat stödbehov och har en egen plan och rapportering.</p></div><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Uppdrag</th><th>Förälder</th><th>Period</th><th>Status</th><th>Senast rapporterat</th><th></th></tr></thead><tbody>${assignments.map((caseRecord) => {
+  const assignmentRows = assignments.map((caseRecord) => {
     const plan = caseRecord.details?.assignmentPlan || {};
     const reports = assignmentRecords(caseRecord.id).reports;
-    return `<tr><td><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><small class="d-block text-secondary">${escapeHtml(caseRecord.number)}</small></td><td>${escapeHtml(caseParent(caseRecord)?.name || "Ej angivet")}</td><td>${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}</td><td><span class="${caseStatusBadge(caseRecord.status)}">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></td><td>${reports[0] ? escapeHtml(formatDate(reports[0].occurredOn)) : "Ingen rapport"}</td><td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/mentor-assignment/${escapeHtml(caseRecord.id)}">Öppna</a></td></tr>`;
-  }).join("") || '<tr><td colspan="6" class="text-center text-secondary py-4">Inga uppdrag är registrerade.</td></tr>'}</tbody></table></div></section>`;
+    const values = {
+      title: escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title),
+      number: escapeHtml(caseRecord.number),
+      parent: escapeHtml(caseParent(caseRecord)?.name || "Ej angivet"),
+      period: `${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}`,
+      status: escapeHtml(caseStatusLabel(caseRecord.status)),
+      latestReport: reports[0] ? escapeHtml(formatDate(reports[0].occurredOn)) : "Ingen rapport",
+      href: `#/mentor-assignment/${escapeHtml(caseRecord.id)}`
+    };
+    return {
+      desktop: `<tr><td><strong>${values.title}</strong><small class="d-block text-secondary">${values.number}</small></td><td>${values.parent}</td><td>${values.period}</td><td><span class="${caseStatusBadge(caseRecord.status)}">${values.status}</span></td><td>${values.latestReport}</td><td class="text-end"><a class="btn btn-outline-primary btn-sm" href="${values.href}">Öppna</a></td></tr>`,
+      mobile: `<a class="mentor-assignment-mobile-item" href="${values.href}"><span class="mentor-assignment-mobile-heading"><span><strong>${values.title}</strong><small>${values.number} · ${values.parent}</small></span><span class="${caseStatusBadge(caseRecord.status)}">${values.status}</span></span><span class="mentor-assignment-mobile-meta"><span><strong>Period</strong>${values.period}</span><span><strong>Senast rapporterat</strong>${values.latestReport}</span></span><span class="mentor-assignment-mobile-action">Öppna uppdraget</span></a>`
+    };
+  });
+  els.mentorPortalView.innerHTML = `<section class="card mentor-assignments-card"><div class="card-header bg-white"><h2 class="h5 mb-1">Mina uppdrag</h2><p class="text-secondary mb-0 mentor-assignments-help">Varje uppdrag gäller ett avgränsat stödbehov och har en egen plan och rapportering.</p></div><div class="table-responsive mentor-assignments-table"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Uppdrag</th><th>Förälder</th><th>Period</th><th>Status</th><th>Senast rapporterat</th><th></th></tr></thead><tbody>${assignmentRows.map((row) => row.desktop).join("") || '<tr><td colspan="6" class="text-center text-secondary py-4">Inga uppdrag är registrerade.</td></tr>'}</tbody></table></div><div class="mentor-assignment-mobile-list">${assignmentRows.map((row) => row.mobile).join("") || '<p class="text-secondary mb-0">Inga uppdrag är registrerade.</p>'}</div></section>`;
 }
 
 function renderMentorAssignment() {
@@ -7696,6 +7756,7 @@ function applyRoute() {
   const enteringFocusedLearningView = focusedLearningView && !document.body.classList.contains("is-learning-focus");
   document.body.classList.toggle("is-system-administration", systemAdministrationView);
   document.body.classList.toggle("is-learning-focus", focusedLearningView);
+  document.body.classList.toggle("is-mentor-portal", isMentorSession());
   if (enteringFocusedLearningView) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, 0)));
   els.administrationContext.hidden = !systemAdministrationView;
   selectedId = currentView === "mentor" ? routeMentorId : selectedId;
@@ -17463,13 +17524,19 @@ function updateLearningReflectionValidation(textarea, { report = false } = {}) {
   const assessment = assessLearningReflection(textarea.value);
   const form = textarea.closest("[data-learning-reflection]");
   const help = form?.querySelector("[data-learning-reflection-help]");
-  const count = form?.querySelector("[data-learning-reflection-count]");
-  textarea.setCustomValidity(assessment.valid ? "" : assessment.message);
+  const message = form?.querySelector("[data-learning-reflection-message]");
+  const status = form?.querySelector("[data-learning-reflection-status]");
+  if (report && !assessment.valid && form) form.dataset.validationAttempted = "true";
+  const attempted = form?.dataset.validationAttempted === "true";
+  const feedback = learningReflectionFeedback(assessment, textarea.value, attempted);
+  textarea.setCustomValidity(assessment.valid ? "" : feedback.message);
   help?.classList.toggle("is-valid", assessment.valid);
-  help?.classList.toggle("is-invalid", !assessment.valid && Boolean(textarea.value.trim()));
-  if (count) count.textContent = assessment.valid
-    ? "Kravet uppfyllt"
-    : `${assessment.meaningfulWordCount} av ${assessment.requiredWordCount} ord räknas`;
+  help?.classList.toggle("is-invalid", !assessment.valid && attempted);
+  if (message) message.textContent = feedback.message;
+  if (status) {
+    status.textContent = feedback.status;
+    status.hidden = !feedback.status;
+  }
   if (report && !assessment.valid) {
     textarea.reportValidity();
     textarea.focus();

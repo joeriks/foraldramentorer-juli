@@ -44,8 +44,11 @@ test("puts the next learning step first without locking later parts", () => {
   assert.match(app, /Klar, gå vidare/);
   assert.match(app, /aria-current="step"/);
   assert.match(app, /assessLearningReflection/);
-  assert.match(app, /Skriv minst fem begripliga ord/);
-  assert.match(app, /data-learning-reflection-count/);
+  assert.match(app, /Skriv några meningar med egna ord/);
+  assert.match(app, /Utveckla svaret lite mer/);
+  assert.match(app, /data-learning-reflection-status/);
+  assert.match(app, /dataset\.validationAttempted/);
+  assert.doesNotMatch(app, /av \$\{assessment\.requiredWordCount} ord räknas/);
   assert.match(app, /updateLearningReflectionValidation/);
   assert.doesNotMatch(app, /is-upcoming[^\n]+disabled/);
   assert.match(styles, /\.learning-module > summary/);
@@ -77,6 +80,15 @@ test("enters a focused course mode from a clear course overview", () => {
   assert.match(styles, /\.learning-course-entry/);
   assert.match(styles, /\.learning-course-completion/);
   assert.match(styles, /\.learning-course-review > summary/);
+});
+
+test("places the first course start after the introduction and outline", () => {
+  const overview = app.match(/function renderCourseOverview[\s\S]*?\n}\n\nfunction renderFocusedCourse/)?.[0] || "";
+  assert.match(overview, /completeCount \? courseEntry : ""/);
+  assert.match(overview, /learning-course-entry learning-course-start/);
+  assert.match(overview, /completeCount \? "" : courseStart/);
+  assert.ok(overview.indexOf("learning-course-outline") < overview.indexOf('completeCount ? "" : courseStart'));
+  assert.match(styles, /\.learning-course-start/);
 });
 
 test("supports joint learning and gives staff read-only access to mentor progress and answers", () => {
