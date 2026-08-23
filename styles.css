@@ -1858,9 +1858,22 @@ body.is-system-administration .sidebar-menu-group {
 }
 
 .mentor-report-summary,
+.mentor-report-next-meeting,
 .mentor-report-support,
 .mentor-report-actions {
   grid-column: 1 / -1;
+}
+
+.mentor-report-next-meeting {
+  display: grid;
+  gap: 0.2rem;
+  padding: var(--app-space-3);
+  border-left: 3px solid var(--bs-success);
+  background: var(--bs-success-bg-subtle);
+}
+
+.mentor-report-next-meeting strong {
+  font-size: 1.05rem;
 }
 
 .mentor-report-actions {

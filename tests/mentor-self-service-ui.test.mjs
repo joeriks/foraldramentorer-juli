@@ -94,11 +94,16 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(app, /mentorMeetingReportQueueMarkup\(caseRecord\)/);
   assert.match(app, /mentorReportForMeeting/);
   assert.match(app, /meetingResult\.meetingId/);
+  assert.match(app, /mentorMeetingReportNextContactField\.hidden = Boolean\(nextMeeting\)/);
+  assert.match(app, /mentorMeetingReportNextMeetingTime\.textContent = nextMeeting \? formatDateTime/);
   assert.doesNotMatch(app.match(/function renderMentorAssignment[\s\S]*?\n}\n/)?.[0] || "", /mentorPortalReportForm|Återrapportera kontakt/);
   assert.match(html, /id="mentorMeetingReportModal"/);
   assert.match(html, /id="mentorMeetingReportForm"/);
   assert.match(html, /Faktisk tid i minuter/);
   assert.match(html, /Spara återrapportering/);
+  assert.match(html, /id="mentorMeetingReportNextMeeting"/);
+  assert.match(html, /Nästa möte är inbokat/);
+  assert.match(html, /Planera nästa kontakt/);
   assert.match(html, /id="mentorReportDetailModal"/);
   assert.match(app, /Det här gör du härnäst/);
   assert.match(app, /Inget möte inbokat/);

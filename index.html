@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260823-mentor-report-v138">
+    <link rel="stylesheet" href="styles.css?v=20260823-next-meeting-v139">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -2592,7 +2592,8 @@
                 <div><label class="form-label" for="mentorMeetingReportOutcomeInput">Resultat</label><select id="mentorMeetingReportOutcomeInput" name="outcome" class="form-select"><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div>
                 <div><label class="form-label" for="mentorMeetingReportDurationInput">Faktisk tid i minuter</label><input id="mentorMeetingReportDurationInput" name="durationMinutes" class="form-control" type="number" min="1" required></div>
                 <div class="mentor-report-summary"><label class="form-label" for="mentorMeetingReportSummaryInput">Kort sammanfattning</label><textarea id="mentorMeetingReportSummaryInput" name="summary" class="form-control" rows="4" required></textarea><p class="form-text">Beskriv kort vad som hände och vad ni kom överens om.</p></div>
-                <div><label class="form-label" for="mentorMeetingReportNextContactInput">Nästa kontakt <span class="text-secondary fw-normal">(valfritt)</span></label><input id="mentorMeetingReportNextContactInput" name="nextContactOn" class="form-control" type="date"></div>
+                <div id="mentorMeetingReportNextMeeting" class="mentor-report-next-meeting" hidden><span class="record-type">Nästa möte är inbokat</span><strong id="mentorMeetingReportNextMeetingTime"></strong><span id="mentorMeetingReportNextMeetingDetails" class="text-secondary"></span></div>
+                <div id="mentorMeetingReportNextContactField"><label class="form-label" for="mentorMeetingReportNextContactInput">Planera nästa kontakt <span class="text-secondary fw-normal">(valfritt)</span></label><input id="mentorMeetingReportNextContactInput" name="nextContactOn" class="form-control" type="date"><p class="form-text">Ange ett datum bara om nästa möte ännu inte är bokat.</p></div>
                 <div class="form-check mentor-report-support"><input id="mentorMeetingReportNeedsSupportInput" name="needsHandlerSupport" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorMeetingReportNeedsSupportInput">Jag behöver stöd från handläggaren</label></div>
               </div>
             </div>
@@ -2637,6 +2638,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260823-mentor-report-v138"></script>
+    <script type="module" src="app.js?v=20260823-next-meeting-v139"></script>
   </body>
 </html>

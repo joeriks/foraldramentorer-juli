@@ -219,6 +219,16 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "139",
+    date: "2026-08-23",
+    title: "Nästa möte visas i återrapporteringen",
+    description: "När ett nytt möte redan är bokat visar återrapporteringen dess datum, tid och plats i stället för ett överflödigt datumfält.",
+    simplified: [
+      "Bokad mötestid visas direkt i rapportdialogen.",
+      "Planera nästa kontakt visas bara när inget framtida möte finns."
+    ]
+  },
+  {
     version: "138",
     date: "2026-08-23",
     title: "Återrapportering fungerar på mobil",
@@ -1881,6 +1891,10 @@ const els = {
   mentorMeetingReportDurationInput: document.querySelector("#mentorMeetingReportDurationInput"),
   mentorMeetingReportOutcomeInput: document.querySelector("#mentorMeetingReportOutcomeInput"),
   mentorMeetingReportSummaryInput: document.querySelector("#mentorMeetingReportSummaryInput"),
+  mentorMeetingReportNextMeeting: document.querySelector("#mentorMeetingReportNextMeeting"),
+  mentorMeetingReportNextMeetingTime: document.querySelector("#mentorMeetingReportNextMeetingTime"),
+  mentorMeetingReportNextMeetingDetails: document.querySelector("#mentorMeetingReportNextMeetingDetails"),
+  mentorMeetingReportNextContactField: document.querySelector("#mentorMeetingReportNextContactField"),
   mentorMeetingReportNextContactInput: document.querySelector("#mentorMeetingReportNextContactInput"),
   mentorMeetingReportNeedsSupportInput: document.querySelector("#mentorMeetingReportNeedsSupportInput"),
   mentorMeetingReportSubmitButton: document.querySelector("#mentorMeetingReportSubmitButton"),
@@ -6374,6 +6388,10 @@ function openMentorMeetingReport(interactionId) {
     ? Math.max(1, Math.round((new Date(meeting.endsAt) - new Date(meeting.startsAt)) / 60000))
     : 60;
   const outcome = ["completed", "cancelled", "no_show"].includes(meeting.status) ? meeting.status : "completed";
+  const nextMeeting = nextScheduledMeetingForCase(allInteractions(), caseRecord.id);
+  const nextMeetingDetails = nextMeeting
+    ? [contactModeLabels[nextMeeting.mode] || nextMeeting.mode, nextMeeting.location].filter(Boolean).join(" · ")
+    : "";
   els.mentorMeetingReportForm.reset();
   els.mentorMeetingReportForm.dataset.caseId = caseRecord.id;
   els.mentorMeetingReportForm.dataset.interactionId = meeting.id;
@@ -6383,6 +6401,11 @@ function openMentorMeetingReport(interactionId) {
   els.mentorMeetingReportOutcomeInput.value = outcome;
   els.mentorMeetingReportSummaryInput.value = meeting.summary || "";
   els.mentorMeetingReportNextContactInput.value = "";
+  els.mentorMeetingReportNextContactInput.disabled = Boolean(nextMeeting);
+  els.mentorMeetingReportNextContactField.hidden = Boolean(nextMeeting);
+  els.mentorMeetingReportNextMeeting.hidden = !nextMeeting;
+  els.mentorMeetingReportNextMeetingTime.textContent = nextMeeting ? formatDateTime(nextMeeting.startsAt) : "";
+  els.mentorMeetingReportNextMeetingDetails.textContent = nextMeetingDetails;
   els.mentorMeetingReportNeedsSupportInput.checked = false;
   mentorMeetingReportModal ||= bootstrap.Modal.getOrCreateInstance(els.mentorMeetingReportModal);
   mentorMeetingReportModal.show();
