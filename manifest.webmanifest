@@ -1,0 +1,44 @@
+{
+  "name": "FöräldraMentorer - Mentorportal",
+  "short_name": "Mentorportal",
+  "description": "Mentorns uppdrag, utbildning och profil hos FöräldraMentorer.",
+  "lang": "sv-SE",
+  "start_url": "/#/mentor-home",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f3f6f7",
+  "theme_color": "#008180",
+  "icons": [
+    {
+      "src": "/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mina uppdrag",
+      "short_name": "Uppdrag",
+      "url": "/#/mentor-assignments",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Utbildning",
+      "url": "/#/learning",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Min profil",
+      "url": "/#/mentor-profile",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

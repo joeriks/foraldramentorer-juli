@@ -600,6 +600,70 @@ body {
   padding: var(--app-space-3) var(--app-space-4);
 }
 
+.mentor-sidebar-brand,
+.mentor-mobile-brand {
+  display: none;
+}
+
+body.is-mentor-portal {
+  --app-primary: #007f7d;
+  --app-primary-hover: #006765;
+  --app-primary-soft: #e1f2f1;
+}
+
+body.is-mentor-portal .sidebar {
+  background: #18383a;
+  border-right-color: #102b2d;
+}
+
+body.is-mentor-portal .sidebar-brand {
+  padding: 0.8rem 1rem;
+  background: #fff;
+}
+
+body.is-mentor-portal .sidebar-brand-default {
+  display: none;
+}
+
+body.is-mentor-portal .mentor-sidebar-brand {
+  display: grid;
+  gap: 0.3rem;
+  color: #31505a;
+  text-decoration: none;
+}
+
+.mentor-sidebar-brand img {
+  display: block;
+  width: 100%;
+  max-width: 11.5rem;
+  height: auto;
+}
+
+.mentor-sidebar-brand span {
+  color: #51656b;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.mentor-install-action {
+  width: calc(100% - var(--app-space-4));
+  margin: var(--app-space-3) var(--app-space-2) 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.mentor-install-action:hover,
+.mentor-install-action:focus-visible {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .sidebar-nav {
   padding: var(--app-space-2);
 }
@@ -743,6 +807,29 @@ body.is-system-administration .sidebar-menu-group {
   max-height: min(29rem, 55dvh);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.mentor-install-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--app-space-2);
+}
+
+.mentor-install-heading img {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 2.75rem;
+}
+
+.mentor-install-instructions {
+  display: grid;
+  gap: var(--app-space-2);
+  padding-left: 1.25rem;
+}
+
+.mentor-install-modal .modal-footer {
+  border-top: 0;
 }
 
 .session-user {
@@ -1734,7 +1821,37 @@ body.is-system-administration .sidebar-menu-group {
   }
 
   body.is-mentor-portal .app-header {
-    padding: 0.75rem;
+    padding: max(0.75rem, env(safe-area-inset-top)) 0.75rem 0.75rem;
+    border-bottom-color: #bfd8d7 !important;
+    box-shadow: 0 0.15rem 0.5rem rgb(24 56 58 / 10%);
+  }
+
+  body.is-mentor-portal .mentor-mobile-brand {
+    display: block;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex: 0 0 2.25rem;
+  }
+
+  body.is-mentor-portal .mentor-mobile-brand img {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  body.is-mentor-portal .mobile-navigation {
+    order: 3;
+  }
+
+  body.is-mentor-portal .mobile-navigation .dropdown-toggle {
+    min-height: 2.25rem;
+    border-color: #91b4b3;
+    color: #244f50;
+  }
+
+  body.is-mentor-portal #pageTitle {
+    font-size: 1.15rem;
+    line-height: 2.25rem;
   }
 
   body.is-mentor-portal #breadcrumb,
@@ -1751,6 +1868,10 @@ body.is-system-administration .sidebar-menu-group {
     gap: var(--app-space-2);
     padding-top: var(--app-space-2);
     border-top: 1px solid var(--app-border-soft);
+  }
+
+  body.is-mentor-portal .dropdown-menu {
+    --bs-dropdown-link-active-bg: #007f7d;
   }
 
   body.is-mentor-portal .session-user > div:nth-child(2) {
@@ -1920,6 +2041,19 @@ body.is-system-administration .sidebar-menu-group {
   .mentor-plan-facts > div:last-child,
   .mentor-profile-facts > div:last-child {
     border-bottom: 0;
+  }
+}
+
+@media (display-mode: standalone) {
+  body.is-mentor-portal .test-user-switcher,
+  body.is-mentor-portal .system-status,
+  body.is-mentor-portal .mentor-install-action,
+  body.is-mentor-portal #mobileMentorInstall {
+    display: none !important;
+  }
+
+  body.is-mentor-portal .app-shell {
+    min-height: 100dvh;
   }
 }
 

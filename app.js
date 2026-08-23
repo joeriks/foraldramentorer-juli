@@ -105,7 +105,7 @@ import {
   prepareLearningMarkdown,
   requiredLearningContentIds,
   scoreKnowledgeTest
-} from "./learning-domain.js?v=20260823-mentor-mobile-v123";
+} from "./learning-domain.js?v=20260823-mentor-pwa-v124";
 import {
   containsSensitivePersonalData,
   findSupportKnowledge,
@@ -210,6 +210,22 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "124",
+    date: "2026-08-23",
+    title: "Installerbar mentorportal",
+    flow: "Mentorportal -> Lägg till på hemskärmen -> öppna som fristående app",
+    simplified: "Mentorportalen har fått en tydligare egen identitet och kan installeras från mobilens hemskärm. När den öppnas därifrån visas den i ett lugnare, fristående appläge.",
+    retained: "Mentorns uppdrag, utbildning, profil, lokalt sparad data och ordinarie webbläsarläge fungerar som tidigare. Kommunportalens vyer och flöden påverkas inte.",
+    changes: [
+      "FöräldraMentorers officiella fyrikon används som appikon och i mentorportalens mobila sidhuvud.",
+      "Mentorportalens navigering visar FöräldraMentorers logotyp och har fått en egen turkos profilfärg.",
+      "Lägg till på hemskärmen finns i mentorportalens navigering.",
+      "Webbläsarens installationsdialog används när den finns; annars visas anpassade instruktioner för aktuell enhet.",
+      "Manifest, appgenvägar och fristående visning har lagts till.",
+      "En service worker gör appskalet tillgängligt även vid ett tillfälligt nätverksavbrott."
+    ]
+  },
   {
     version: "123",
     date: "2026-08-23",
@@ -1621,6 +1637,8 @@ let activeTestUserType = TEST_USER_TYPES.has(localStorage.getItem(TEST_USER_TYPE
   : "coordinator";
 let caseHistoryFilter = "all";
 let caseDescriptionExpanded = false;
+let deferredMentorInstallPrompt = null;
+let mentorInstallModal = null;
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
@@ -1630,7 +1648,13 @@ const els = {
   currentUserLabel: document.querySelector("#currentUserLabel"),
   currentUserName: document.querySelector("#currentUserName"),
   currentUserRole: document.querySelector("#currentUserRole"),
+  systemStatusProduct: document.querySelector(".system-status-product"),
   testUserTypeSelect: document.querySelector("#testUserTypeSelect"),
+  navMentorInstall: document.querySelector("#navMentorInstall"),
+  mobileMentorInstall: document.querySelector("#mobileMentorInstall"),
+  mentorInstallModal: document.querySelector("#mentorInstallModal"),
+  mentorInstallIntro: document.querySelector("#mentorInstallIntro"),
+  mentorInstallInstructions: document.querySelector("#mentorInstallInstructions"),
   navDashboard: document.querySelector("#navDashboard"),
   navCalendar: document.querySelector("#navCalendar"),
   navMeetings: document.querySelector("#navMeetings"),
@@ -2521,6 +2545,67 @@ function markSaved() {
 function showFeedback(message) {
   els.feedbackToastBody.textContent = message;
   bootstrap.Toast.getOrCreateInstance(els.feedbackToast, { delay: 3200 }).show();
+}
+
+function isMentorAppInstalled() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function updateMentorInstallActions() {
+  const visible = isMentorSession() && !isMentorAppInstalled();
+  els.navMentorInstall.hidden = !visible;
+  const mobileItem = els.mobileMentorInstall.closest("li");
+  if (mobileItem) mobileItem.hidden = !visible;
+}
+
+function mentorInstallSteps() {
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (ios) return [
+    "Tryck på Dela i webbläsarens verktygsrad.",
+    "Välj Lägg till på hemskärmen.",
+    "Bekräfta med Lägg till."
+  ];
+  if (/android/i.test(navigator.userAgent)) return [
+    "Öppna webbläsarens meny.",
+    "Välj Installera app eller Lägg till på startskärmen.",
+    "Bekräfta installationen."
+  ];
+  return [
+    "Öppna webbläsarens meny eller installationsikon i adressfältet.",
+    "Välj Installera Mentorportal.",
+    "Bekräfta installationen."
+  ];
+}
+
+function showMentorInstallInstructions() {
+  els.mentorInstallIntro.textContent = "Öppna mentorportalen som en app och nå den direkt från hemskärmen.";
+  els.mentorInstallInstructions.replaceChildren(...mentorInstallSteps().map((step) => {
+    const item = document.createElement("li");
+    item.textContent = step;
+    return item;
+  }));
+  mentorInstallModal ||= bootstrap.Modal.getOrCreateInstance(els.mentorInstallModal);
+  mentorInstallModal.show();
+}
+
+async function installMentorApp() {
+  if (isMentorAppInstalled()) {
+    showFeedback("Mentorportalen är redan öppnad som app.");
+    updateMentorInstallActions();
+    return;
+  }
+  if (!deferredMentorInstallPrompt) {
+    showMentorInstallInstructions();
+    return;
+  }
+  deferredMentorInstallPrompt.prompt();
+  const choice = await deferredMentorInstallPrompt.userChoice;
+  deferredMentorInstallPrompt = null;
+  if (choice.outcome === "accepted") {
+    showFeedback("Mentorportalen läggs till på hemskärmen.");
+    updateMentorInstallActions();
+  }
 }
 
 function clearCaseFormError() {
@@ -7182,6 +7267,7 @@ function renderCurrentUser() {
   els.currentUserRole.textContent = user.active === false ? `${user.role} · Inaktiv` : user.role;
   els.currentUserInitials.textContent = userInitials(user.name);
   els.currentUserLabel.textContent = isPublicSession() ? "Besökarläge" : "Inloggad som";
+  els.systemStatusProduct.textContent = isMentorSession() ? "Mentorportal" : isPublicSession() ? "Publik portal" : "Kommunportal";
   els.testUserTypeSelect.value = activeTestUserType;
 }
 
@@ -7852,6 +7938,7 @@ function applyRoute() {
           || item.classList.contains("public-mobile-nav")
           || (handlerSession && item.classList.contains("admin-mobile-nav"));
   });
+  updateMentorInstallActions();
 
   els.navDashboard.classList.toggle("active", currentView === "dashboard");
   els.navCalendar.classList.toggle("active", currentView === "calendar");
@@ -13300,6 +13387,21 @@ function openHandlerModal(handler = null) {
   handlerModal.show();
 }
 
+els.navMentorInstall.addEventListener("click", installMentorApp);
+els.mobileMentorInstall.addEventListener("click", installMentorApp);
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredMentorInstallPrompt = event;
+  updateMentorInstallActions();
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredMentorInstallPrompt = null;
+  updateMentorInstallActions();
+  showFeedback("Mentorportalen har lagts till på hemskärmen.");
+});
+
 els.testUserTypeSelect.addEventListener("change", () => {
   const nextType = els.testUserTypeSelect.value;
   if (!TEST_USER_TYPES.has(nextType)) return;
@@ -17792,6 +17894,14 @@ window.addEventListener("hashchange", () => {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") runMeetingReminderScheduler();
 });
+
+if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch((error) => {
+      console.warn("Mentorportalen kunde inte aktivera offlinestöd.", error);
+    });
+  });
+}
 
 openDatabase()
   .then(async (database) => {

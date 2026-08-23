@@ -24,6 +24,12 @@ const sourceFiles = [
   ["/feature-links.js", "feature-links.js", "text/javascript; charset=utf-8"],
   ["/routine-illustrations.js", "routine-illustrations.js", "text/javascript; charset=utf-8"],
   ["/styles.css", "styles.css", "text/css; charset=utf-8"],
+  ["/manifest.webmanifest", "manifest.webmanifest", "application/manifest+json; charset=utf-8"],
+  ["/service-worker.js", "service-worker.js", "text/javascript; charset=utf-8"],
+  ["/assets/foraldramentorer-logo.svg", "assets/foraldramentorer-logo.svg", "image/svg+xml; charset=utf-8"],
+  ["/assets/icon-192.png", "assets/icon-192.png", "image/png", true],
+  ["/assets/icon-512.png", "assets/icon-512.png", "image/png", true],
+  ["/assets/apple-touch-icon.png", "assets/apple-touch-icon.png", "image/png", true],
   ["/prototypes/matchningsunderlag.html", "prototypes/matchningsunderlag.html", "text/html; charset=utf-8"],
   ["/prototypes/matchningsunderlag.css", "prototypes/matchningsunderlag.css", "text/css; charset=utf-8"],
   ["/prototypes/matchningsunderlag.js", "prototypes/matchningsunderlag.js", "text/javascript; charset=utf-8"],
@@ -34,10 +40,12 @@ const sourceFiles = [
 ];
 
 const assets = {};
-for (const [pathname, filename, contentType] of sourceFiles) {
+for (const [pathname, filename, contentType, binary = false] of sourceFiles) {
+  const content = await readFile(resolve(root, filename));
   assets[pathname] = {
-    body: await readFile(resolve(root, filename), "utf8"),
-    contentType
+    body: binary ? content.toString("base64") : content.toString("utf8"),
+    contentType,
+    binary
   };
 }
 
@@ -50,6 +58,14 @@ function jsonResponse(value, status = 200) {
     status,
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" }
   });
+}
+
+function responseBody(asset) {
+  if (!asset.binary) return asset.body;
+  const decoded = atob(asset.body);
+  const bytes = new Uint8Array(decoded.length);
+  for (let index = 0; index < decoded.length; index += 1) bytes[index] = decoded.charCodeAt(index);
+  return bytes;
 }
 
 async function handleSupport(request, env) {
@@ -107,7 +123,7 @@ export default {
     const asset = assets[url.pathname] || (request.headers.get("accept")?.includes("text/html") ? assets["/"] : null);
     if (!asset) return new Response("Not found", { status: 404 });
     const cacheControl = url.pathname.startsWith("/vendor/") ? "public, max-age=3600" : "no-cache";
-    return new Response(request.method === "HEAD" ? null : asset.body, {
+    return new Response(request.method === "HEAD" ? null : responseBody(asset), {
       status: 200,
       headers: { "content-type": asset.contentType, "cache-control": cacheControl, "x-content-type-options": "nosniff" }
     });

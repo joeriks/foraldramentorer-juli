@@ -4,16 +4,28 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
-    <link rel="icon" href="data:,">
+    <meta name="theme-color" content="#008180">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Mentorportal">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260823-mentor-mobile-v123">
+    <link rel="stylesheet" href="styles.css?v=20260823-mentor-pwa-v124">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
       <aside class="sidebar" aria-label="Huvudnavigation">
         <div class="sidebar-brand border-bottom border-secondary-subtle">
-          <div class="fw-semibold text-white">FöräldraMentorer</div>
-          <div class="small text-white-50">Kommunportal</div>
+          <div class="sidebar-brand-default">
+            <div class="fw-semibold text-white">FöräldraMentorer</div>
+            <div class="small text-white-50">Kommunportal</div>
+          </div>
+          <a class="mentor-sidebar-brand" href="#/mentor-home" aria-label="FöräldraMentorer mentorportal">
+            <img src="assets/foraldramentorer-logo.svg" alt="FöräldraMentorer">
+            <span>Mentorportal</span>
+          </a>
         </div>
         <nav class="sidebar-nav nav nav-pills flex-column gap-1">
           <a id="navDashboard" class="nav-link" href="#/dashboard">Översikt</a>
@@ -32,6 +44,7 @@
           <a id="navMentorAssignments" class="nav-link" href="#/mentor-assignments" hidden>Mina uppdrag</a>
           <a id="navMentorLearning" class="nav-link" href="#/learning" hidden>Utbildning</a>
           <a id="navMentorProfile" class="nav-link" href="#/mentor-profile" hidden>Min profil</a>
+          <button id="navMentorInstall" class="mentor-install-action" type="button" hidden>Lägg till på hemskärmen</button>
           <a id="navPublicHome" class="nav-link" href="#/public-home" hidden>Start</a>
           <a id="navPublicSupport" class="nav-link" href="#/public-support" hidden>Sök stöd</a>
           <a id="navPublicMentorApplication" class="nav-link" href="#/public-mentor" hidden>Bli mentor</a>
@@ -61,6 +74,9 @@
         <header class="app-header bg-white border-bottom">
           <div class="d-flex flex-wrap gap-3 justify-content-between align-items-start">
             <div class="d-flex align-items-start gap-3">
+              <a class="mentor-mobile-brand" href="#/mentor-home" aria-label="Till mentorportalens översikt">
+                <img src="assets/icon-192.png" alt="">
+              </a>
               <div class="mobile-navigation dropdown">
                 <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Meny</button>
                 <ul class="dropdown-menu">
@@ -68,6 +84,8 @@
                   <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/mentor-assignments">Mina uppdrag</a></li>
                   <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/learning">Utbildning</a></li>
                   <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/mentor-profile">Min profil</a></li>
+                  <li class="mentor-mobile-nav" hidden><hr class="dropdown-divider"></li>
+                  <li class="mentor-mobile-nav" hidden><button id="mobileMentorInstall" class="dropdown-item" type="button">Lägg till på hemskärmen</button></li>
                   <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-home">Start</a></li>
                   <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-support">Sök stöd</a></li>
                   <li class="public-mobile-nav" hidden><a class="dropdown-item" href="#/public-mentor">Bli mentor</a></li>
@@ -2531,7 +2549,28 @@
       </div>
     </div>
 
+    <div class="modal fade" id="mentorInstallModal" tabindex="-1" aria-labelledby="mentorInstallModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content mentor-install-modal">
+          <div class="modal-header">
+            <div class="mentor-install-heading">
+              <img src="assets/icon-192.png" alt="">
+              <div><p class="modal-eyebrow mb-1">Mentorportal</p><h2 id="mentorInstallModalTitle" class="modal-title h5">Lägg till på hemskärmen</h2></div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button>
+          </div>
+          <div class="modal-body">
+            <p id="mentorInstallIntro">Öppna mentorportalen som en app och nå den direkt från hemskärmen.</p>
+            <ol id="mentorInstallInstructions" class="mentor-install-instructions mb-0"></ol>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary w-100" data-bs-dismiss="modal">Jag förstår</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260823-mentor-mobile-v123"></script>
+    <script type="module" src="app.js?v=20260823-mentor-pwa-v124"></script>
   </body>
 </html>
