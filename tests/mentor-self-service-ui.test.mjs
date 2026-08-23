@@ -73,6 +73,11 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(app, /mentorReportSubmittedMarkup\(report\)/);
   assert.match(app, /data-open-mentor-report/);
   assert.match(app, /Kompletteringen tidsstämplas\. Den ursprungliga rapporten ändras inte\./);
+  assert.match(app, /function mentorParentContactMarkup/);
+  assert.match(app, /Kontakt med föräldern/);
+  assert.match(app, /href="tel:/);
+  assert.match(app, /href="mailto:/);
+  assert.match(app, /Kontaktuppgifter saknas/);
   assert.match(html, /id="mentorReportDetailModal"/);
   assert.match(app, /Det här gör du härnäst/);
   assert.match(app, /Inget möte inbokat/);
@@ -83,5 +88,6 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(styles, /body\.is-mentor-portal \.mentor-home-assignment-actions[\s\S]*flex-direction: column/);
   assert.match(styles, /body\.is-mentor-portal \.mentor-assignments-table[\s\S]*display: none/);
   assert.match(styles, /body\.is-mentor-portal \.mentor-assignment-mobile-list[\s\S]*display: block/);
+  assert.match(styles, /body\.is-mentor-portal \.mentor-parent-contact[\s\S]*grid-template-columns: 1fr/);
   assert.match(styles, /body\.is-mentor-portal \.system-status/);
 });

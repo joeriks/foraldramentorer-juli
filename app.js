@@ -218,6 +218,20 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "132",
+    date: "2026-08-23",
+    title: "Förälderns kontaktuppgifter i mentoruppdraget",
+    flow: "Öppna mentoruppdrag -> hitta förälderns kontaktvägar -> ring eller skicka e-post",
+    simplified: "Mentorn ser nu förälderns tillgängliga telefonnummer och e-post direkt i uppdraget och behöver inte leta i andra delar av systemet.",
+    retained: "Endast kontaktuppgifter som redan hör till föräldraposten visas. Kommunens interna personuppgifter och anteckningar är fortsatt skyddade.",
+    changes: [
+      "Kontakt med föräldern visas nära uppdragets viktigaste information.",
+      "Telefonnummer och e-post är klickbara när de finns registrerade.",
+      "Om kontaktuppgifter saknas hänvisas mentorn tydligt till ansvarig handläggare.",
+      "Kontaktsektionen staplas utan sidledsskroll på mobil."
+    ]
+  },
+  {
     version: "131",
     date: "2026-08-23",
     title: "Spårbara mentorrapporter",
@@ -5996,10 +6010,26 @@ function mentorCommunicationRecords(mentorId) {
 
 function communicationContactsForParty(record) {
   const rawContact = String(record?.contactDetails || record?.contact || "").trim();
+  const rawEmail = rawContact.match(/[^\s·,;]+@[^\s·,;]+/)?.[0] || "";
+  const rawPhone = rawContact
+    .replace(rawEmail, "")
+    .split(/[·|;,]/)
+    .map((value) => value.trim())
+    .find((value) => /\d{5}/.test(value.replace(/\D/g, ""))) || "";
   return {
-    email: String(record?.email || (rawContact.includes("@") ? rawContact : "")).trim(),
-    phone: String(record?.phone || (rawContact && !rawContact.includes("@") ? rawContact : "")).trim()
+    email: String(record?.email || rawEmail).trim(),
+    phone: String(record?.phone || rawPhone).trim()
   };
+}
+
+function mentorParentContactMarkup(parent, owner) {
+  const contacts = communicationContactsForParty(parent);
+  const phoneTarget = contacts.phone.replace(/[^\d+]/g, "");
+  const methods = [
+    phoneTarget ? `<a class="mentor-parent-contact-method" href="tel:${escapeHtml(phoneTarget)}"><span>Telefon</span><strong>${escapeHtml(contacts.phone)}</strong></a>` : "",
+    contacts.email ? `<a class="mentor-parent-contact-method" href="mailto:${escapeHtml(contacts.email)}"><span>E-post</span><strong>${escapeHtml(contacts.email)}</strong></a>` : ""
+  ].filter(Boolean);
+  return `<section class="mentor-parent-contact" aria-labelledby="mentorParentContactTitle"><div class="mentor-parent-contact-heading"><span class="record-type">Kontakt med föräldern</span><strong id="mentorParentContactTitle">${escapeHtml(parent?.name || "Förälder")}</strong></div>${methods.length ? `<div class="mentor-parent-contact-methods">${methods.join("")}</div>` : `<p>Kontaktuppgifter saknas. Be ${escapeHtml(owner?.name || "ansvarig handläggare")} att komplettera dem.</p>`}</section>`;
 }
 
 function updateMentorPlanningFormState() {
@@ -6275,6 +6305,7 @@ function renderMentorAssignment() {
   const closed = caseRecord.status === "closed";
   els.mentorPortalView.innerHTML = `<section class="card mentor-assignment-card"><div class="card-header record-header bg-white"><a class="small" href="#/mentor-assignments">Tillbaka till mina uppdrag</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">Mentoruppdrag · ${escapeHtml(caseRecord.number)}</div><h2 class="h5 mb-1">${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</h2><p class="text-secondary mb-0">${escapeHtml(caseRecord.details?.desiredOutcome || caseRecord.description || "")}</p></div><span class="${caseStatusBadge(caseRecord.status)} align-self-start">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></div><dl class="record-meta mt-3 mb-0"><div><dt>Förälder</dt><dd>${escapeHtml(parent?.name || "Ej angivet")}</dd></div><div><dt>Ansvarig handläggare</dt><dd>${escapeHtml(owner?.name || "Ej tilldelad")}</dd></div><div><dt>Period</dt><dd>${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}</dd></div></dl></div>
     <div class="mentor-assignment-next-panel">${mentorAssignmentNextMarkup(caseRecord)}</div>
+    ${mentorParentContactMarkup(parent, owner)}
     ${mentorMeetingScheduleMarkup(caseRecord)}
     ${mentorMeetingHistoryMarkup(caseRecord)}
     <div class="mentor-assignment-contact"><div><strong>Behöver du fråga något?</strong><span>Skriv till ${escapeHtml(owner?.name || "ansvarig handläggare")} om uppdraget.</span></div><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></div>
