@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   ACTIVITY_TEMPLATES,
+  appendMentorReportSupplement,
   activityWorkInputDefinition,
   activitySaveRequiresConfirmation,
   assessCompensationApproval,
@@ -38,6 +39,25 @@ test("derives the next parent follow-up from the plan and completed check-ins", 
   assert.deepEqual(nextAssignmentFollowUp(plan, [{ occurredOn: "2026-07-14" }], now), { state: "overdue", date: "2026-08-13" });
   assert.deepEqual(nextAssignmentFollowUp(plan, [{ occurredOn: "2026-07-14" }, { occurredOn: "2026-08-14" }], now), { state: "upcoming", date: "2026-09-13" });
   assert.deepEqual(nextAssignmentFollowUp({ ...plan, followUpFrequency: "custom" }, [{ occurredOn: "2026-07-14" }], now), { state: "unscheduled", date: null });
+});
+
+test("adds traceable report supplements without rewriting the submitted report", () => {
+  const original = { id: "report-1", summary: "Ursprunglig rapport", supplements: [] };
+  const updated = appendMentorReportSupplement(original, {
+    id: "supplement-1",
+    text: "  Förtydligande om nästa kontakt.  ",
+    createdAt: "2026-08-23T14:30:00.000Z",
+    createdBy: "mentor-1"
+  });
+
+  assert.equal(updated.summary, "Ursprunglig rapport");
+  assert.deepEqual(original.supplements, []);
+  assert.deepEqual(updated.supplements, [{
+    id: "supplement-1",
+    text: "Förtydligande om nästa kontakt.",
+    createdAt: "2026-08-23T14:30:00.000Z",
+    createdBy: "mentor-1"
+  }]);
 });
 
 test("groups a parent's linked cases by workflow stage", () => {

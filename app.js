@@ -2,6 +2,7 @@ import {
   ACTIVITY_STATUS_LABELS,
   ACTIVITY_TEMPLATES,
   AD_HOC_ACTIVITY_TEMPLATE_ID,
+  appendMentorReportSupplement,
   CASE_DETAIL_FIELD_DEFINITIONS,
   CASE_STATUS_LABELS,
   CASE_TYPE_DEFINITIONS,
@@ -36,7 +37,7 @@ import {
   resultOptions,
   stableHash,
   supportProfileRequirements
-} from "./case-domain.js?v=20260823-follow-up-v130";
+} from "./case-domain.js?v=20260823-mentor-report-v131";
 import {
   GUIDED_STEP_STATUS_LABELS,
   guidedActivityProgress,
@@ -216,6 +217,20 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "131",
+    date: "2026-08-23",
+    title: "Spårbara mentorrapporter",
+    flow: "Inskickad rapport -> detaljvy -> tidsstämplad komplettering",
+    simplified: "Tidigare rapporter visar nu när de skickades in och kan öppnas utan att den ursprungliga rapporten skrivs över.",
+    retained: "Kontaktens datum, resultat och ursprungliga sammanfattning förblir låsta efter inskickning.",
+    changes: [
+      "Mentor- och handläggarvyer visar inskickad tid och avsändare.",
+      "Rapporter kan öppnas i en gemensam detaljvy.",
+      "Kompletteringar sparas separat med författare och tidpunkt.",
+      "Prototypdata innehåller en exempelkomplettering med full historik."
+    ]
+  },
   {
     version: "130",
     date: "2026-08-23",
@@ -1737,6 +1752,8 @@ let caseHistoryFilter = "all";
 let caseDescriptionExpanded = false;
 let deferredMentorInstallPrompt = null;
 let mentorInstallModal = null;
+let mentorReportDetailModal = null;
+let selectedMentorReportId = "";
 let communicationComposerRecipient = null;
 
 const els = {
@@ -1754,6 +1771,9 @@ const els = {
   mentorInstallModal: document.querySelector("#mentorInstallModal"),
   mentorInstallIntro: document.querySelector("#mentorInstallIntro"),
   mentorInstallInstructions: document.querySelector("#mentorInstallInstructions"),
+  mentorReportDetailModal: document.querySelector("#mentorReportDetailModal"),
+  mentorReportDetailTitle: document.querySelector("#mentorReportDetailTitle"),
+  mentorReportDetailBody: document.querySelector("#mentorReportDetailBody"),
   navDashboard: document.querySelector("#navDashboard"),
   navCalendar: document.querySelector("#navCalendar"),
   navMeetings: document.querySelector("#navMeetings"),
@@ -3912,7 +3932,7 @@ function exampleTemplates(count) {
   });
 }
 
-const EXAMPLE_DATA_VERSION = 11;
+const EXAMPLE_DATA_VERSION = 12;
 
 function exampleTime(base, hours) {
   return new Date(new Date(base).getTime() + (hours * 60 * 60 * 1000)).toISOString();
@@ -4147,9 +4167,22 @@ function completeExampleHistory(records, exampleCandidates, now) {
 
     for (const report of records[MENTOR_REPORTS_STORE].filter((item) => item.caseId === assignmentCase.id)) {
       const reportAt = exampleTime(assignmentStartedAt, 24 * 10);
-      Object.assign(report, { occurredOn: reportAt.slice(0, 10), createdAt: reportAt, createdBy: assignmentOwnerId });
-      addHistoryEvent(assignmentCase.id, "mentor_report_registered", "Mentorns kontakt- och tidsrapport registrerades", reportAt, assignmentOwnerId, "mentor_report", report.id);
-      assignmentLatestAt = reportAt > assignmentLatestAt ? reportAt : assignmentLatestAt;
+      const supplementAt = exampleTime(reportAt, 2);
+      const reportActorId = report.recordedBy || report.reportedByMentorId || assignmentOwnerId;
+      Object.assign(report, {
+        occurredOn: reportAt.slice(0, 10), createdAt: reportAt, createdBy: reportActorId,
+        supplements: [{
+          id: crypto.randomUUID(),
+          text: "Komplettering: nästa kontakt planeras tillsammans med föräldern vid kommande möte.",
+          createdAt: supplementAt,
+          createdBy: reportActorId
+        }],
+        updatedAt: supplementAt,
+        updatedBy: reportActorId
+      });
+      addHistoryEvent(assignmentCase.id, "mentor_report_registered", "Mentorns kontakt- och tidsrapport registrerades", reportAt, reportActorId, "mentor_report", report.id);
+      addHistoryEvent(assignmentCase.id, "mentor_report_supplement_added", "Mentorn kompletterade den inskickade rapporten", supplementAt, reportActorId, "mentor_report", report.id);
+      assignmentLatestAt = supplementAt > assignmentLatestAt ? supplementAt : assignmentLatestAt;
     }
     for (const checkIn of records[PARENT_CHECK_INS_STORE].filter((item) => item.caseId === assignmentCase.id)) {
       const checkInAt = exampleTime(assignmentStartedAt, 24 * 14);
@@ -4647,8 +4680,8 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
         summary: concern
           ? "Kontakten genomfördes men mentorn önskar stöd från handläggaren."
           : "Planerad kontakt genomfördes enligt uppdragsplanen.",
-        needsHandlerSupport: concern, reportedByMentorId: mentor.id, recordedBy: ownerId,
-        createdAt: now, createdBy: ownerId
+        needsHandlerSupport: concern, reportedByMentorId: mentor.id, recordedBy: mentor.id,
+        createdAt: now, createdBy: mentor.id
       });
       records[PARENT_CHECK_INS_STORE].push({
         id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId,
@@ -6169,6 +6202,55 @@ function renderMentorAssignments() {
   els.mentorPortalView.innerHTML = `<section class="card mentor-assignments-card"><div class="card-header bg-white"><h2 class="h5 mb-1">Mina uppdrag</h2><p class="text-secondary mb-0 mentor-assignments-help">Varje uppdrag gäller ett avgränsat stödbehov och har en egen plan och rapportering.</p></div><div class="table-responsive mentor-assignments-table"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Uppdrag</th><th>Förälder</th><th>Period</th><th>Status</th><th>Senast rapporterat</th><th></th></tr></thead><tbody>${assignmentRows.map((row) => row.desktop).join("") || '<tr><td colspan="6" class="text-center text-secondary py-4">Inga uppdrag är registrerade.</td></tr>'}</tbody></table></div><div class="mentor-assignment-mobile-list">${assignmentRows.map((row) => row.mobile).join("") || '<p class="text-secondary mb-0">Inga uppdrag är registrerade.</p>'}</div></section>`;
 }
 
+function mentorReportSubmittedBy(report) {
+  return actorNameById(report.recordedBy || report.createdBy || report.reportedByMentorId);
+}
+
+function mentorReportSubmittedMarkup(report) {
+  return report.createdAt
+    ? `<time datetime="${escapeHtml(report.createdAt)}">${escapeHtml(formatDateTime(report.createdAt))}</time><small class="d-block text-secondary">av ${escapeHtml(mentorReportSubmittedBy(report))}</small>`
+    : '<span class="text-secondary">Tidpunkt saknas</span>';
+}
+
+function canSupplementMentorReport(report, caseRecord) {
+  if (!report || !caseRecord || caseRecord.status === "closed" || isPublicSession()) return false;
+  if (!isMentorSession()) return true;
+  return report.reportedByMentorId === currentMentorUser()?.id
+    && mentorAssignments().some((assignment) => assignment.id === caseRecord.id);
+}
+
+function renderMentorReportDetail(report) {
+  if (!report) {
+    els.mentorReportDetailTitle.textContent = "Rapporten finns inte";
+    els.mentorReportDetailBody.innerHTML = '<p class="text-secondary mb-0">Rapporten kan ha tagits bort eller så är länken felaktig.</p>';
+    return;
+  }
+  const caseRecord = cases.find((item) => item.id === report.caseId);
+  const supplements = [...(report.supplements || [])].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
+  const canSupplement = canSupplementMentorReport(report, caseRecord);
+  els.mentorReportDetailTitle.textContent = `Rapport ${formatDate(report.occurredOn)}`;
+  els.mentorReportDetailBody.innerHTML = `
+    <dl class="mentor-report-detail-facts">
+      <div><dt>Kontakt genomförd</dt><dd>${escapeHtml(formatDate(report.occurredOn))}</dd></div>
+      <div><dt>Inskickad</dt><dd>${mentorReportSubmittedMarkup(report)}</dd></div>
+      <div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</dd></div>
+      <div><dt>Tidsåtgång</dt><dd>${escapeHtml(formatMinutes(report.durationMinutes))}</dd></div>
+      <div><dt>Resultat</dt><dd>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}</dd></div>
+      <div><dt>Nästa kontakt</dt><dd>${report.nextContactOn ? escapeHtml(formatDate(report.nextContactOn)) : "Inte angiven"}</dd></div>
+    </dl>
+    <section class="mentor-report-original"><h3>Ursprunglig sammanfattning</h3><p>${escapeHtml(report.summary)}</p>${report.needsHandlerSupport ? '<strong class="text-danger">Stöd från handläggaren efterfrågades.</strong>' : ""}</section>
+    <section class="mentor-report-supplements"><h3>Kompletteringar <span>${supplements.length}</span></h3>${supplements.length ? `<ol>${supplements.map((supplement) => `<li><div><strong>${escapeHtml(actorNameById(supplement.createdBy))}</strong><time datetime="${escapeHtml(supplement.createdAt)}">${escapeHtml(formatDateTime(supplement.createdAt))}</time></div><p>${escapeHtml(supplement.text)}</p></li>`).join("")}</ol>` : '<p class="text-secondary">Inga kompletteringar har lagts till.</p>'}
+      ${canSupplement ? `<form id="mentorReportSupplementForm" data-report-id="${escapeHtml(report.id)}"><label class="form-label" for="mentorReportSupplementText">Kompletterande anteckning</label><textarea id="mentorReportSupplementText" name="text" class="form-control" rows="3" maxlength="2000" required></textarea><p class="form-text">Kompletteringen tidsstämplas. Den ursprungliga rapporten ändras inte.</p><button type="submit" class="btn btn-primary">Lägg till komplettering</button></form>` : `<p class="alert alert-secondary mb-0">${caseRecord?.status === "closed" ? "Uppdraget är avslutat och rapporten är låst." : "Du kan läsa rapporten men inte komplettera den."}</p>`}
+    </section>`;
+}
+
+function openMentorReportDetail(reportId) {
+  selectedMentorReportId = reportId;
+  renderMentorReportDetail(mentorReports.find((report) => report.id === reportId));
+  mentorReportDetailModal ||= bootstrap.Modal.getOrCreateInstance(els.mentorReportDetailModal);
+  mentorReportDetailModal.show();
+}
+
 function renderMentorAssignment() {
   const route = parseRoute();
   const caseRecord = mentorAssignments().find((assignment) => assignment.id === route.id);
@@ -6198,7 +6280,7 @@ function renderMentorAssignment() {
     <div class="mentor-assignment-contact"><div><strong>Behöver du fråga något?</strong><span>Skriv till ${escapeHtml(owner?.name || "ansvarig handläggare")} om uppdraget.</span></div><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></div>
     <div class="card-body record-grid"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div class="${followUpFact.className}"><dt>${escapeHtml(followUpFact.label)}</dt><dd>${escapeHtml(followUpFact.value)}</dd>${followUpFact.help ? `<small>${escapeHtml(followUpFact.help)}</small>` : ""}</div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section>
     <section class="record-section"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h3 class="record-section-title mb-1">Återrapportera kontakt</h3><p class="small text-secondary mb-0">Registrera en kort saklig rapport efter varje planerad kontakt.</p></div></div>${closed ? '<div class="alert alert-secondary mt-3 mb-0">Uppdraget är avslutat och tar inte emot nya rapporter.</div>' : `<form id="mentorPortalReportForm" class="mentor-report-form mt-3" data-case-id="${escapeHtml(caseRecord.id)}"><div><label class="form-label" for="mentorPortalReportDate">Datum</label><input id="mentorPortalReportDate" name="occurredOn" class="form-control" type="date" value="${new Date().toISOString().slice(0, 10)}" required></div><div><label class="form-label" for="mentorPortalReportDuration">Tid i minuter</label><input id="mentorPortalReportDuration" name="durationMinutes" class="form-control" type="number" min="1" value="60" required></div><div><label class="form-label" for="mentorPortalReportMode">Kontaktform</label><select id="mentorPortalReportMode" name="mode" class="form-select"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option><option value="message">Meddelande</option></select></div><div><label class="form-label" for="mentorPortalReportOutcome">Resultat</label><select id="mentorPortalReportOutcome" name="outcome" class="form-select"><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div><div class="mentor-report-summary"><label class="form-label" for="mentorPortalReportSummary">Kort sammanfattning</label><textarea id="mentorPortalReportSummary" name="summary" class="form-control" rows="3" required></textarea></div><div><label class="form-label" for="mentorPortalNextContact">Nästa kontakt (valfritt)</label><input id="mentorPortalNextContact" name="nextContactOn" class="form-control" type="date"></div><div class="form-check mentor-report-support"><input id="mentorPortalNeedsSupport" name="needsHandlerSupport" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorPortalNeedsSupport">Jag behöver stöd från handläggaren</label></div><div class="mentor-report-actions"><button class="btn btn-primary" type="submit">Skicka rapport</button></div></form>`}</section>
-    <section class="record-section record-section-wide"><h3 class="record-section-title">Tidigare rapporter</h3><div class="table-responsive border rounded"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Datum</th><th>Kontaktform</th><th>Tid</th><th>Resultat</th><th>Sammanfattning</th></tr></thead><tbody>${reports.map((report) => `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<small class="d-block text-danger">Stöd begärt</small>' : ""}</td><td>${escapeHtml(report.summary)}</td></tr>`).join("") || '<tr><td colspan="5" class="text-center text-secondary py-3">Ingen rapport har registrerats ännu.</td></tr>'}</tbody></table></div></section></div></section>`;
+    <section class="record-section record-section-wide"><h3 class="record-section-title">Tidigare rapporter</h3><div class="table-responsive border rounded"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Kontaktdatum</th><th>Kontaktform</th><th>Tid</th><th>Resultat</th><th>Sammanfattning</th><th>Inskickad</th><th></th></tr></thead><tbody>${reports.map((report) => `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<small class="d-block text-danger">Stöd begärt</small>' : ""}</td><td>${escapeHtml(report.summary)}</td><td>${mentorReportSubmittedMarkup(report)}</td><td><button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button></td></tr>`).join("") || '<tr><td colspan="7" class="text-center text-secondary py-3">Ingen rapport har registrerats ännu.</td></tr>'}</tbody></table></div></section></div></section>`;
 }
 
 const mentorMeetingModeLabels = { physical: "Fysiskt", digital: "Digitalt", phone: "Telefon" };
@@ -10681,8 +10763,7 @@ function renderAssignmentFollowup(caseRecord) {
   els.mentorReportsEmpty.hidden = reports.length > 0;
   els.mentorReportsTableWrap.hidden = reports.length === 0;
   els.mentorReportsTableBody.innerHTML = reports.map((report) => {
-    const mentor = candidates.find((candidate) => candidate.id === report.reportedByMentorId);
-    return `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<span class="d-block text-danger small">Kontakt med handläggare behövs</span>' : ""}</td><td>${escapeHtml(report.summary)}</td><td>${escapeHtml(mentor?.name || "Mentorn")}<span class="d-block text-secondary small">Registrerad av ${escapeHtml(actorNameById(report.recordedBy || report.createdBy))}</span></td></tr>`;
+    return `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<span class="d-block text-danger small">Kontakt med handläggare behövs</span>' : ""}</td><td>${escapeHtml(report.summary)}</td><td>${mentorReportSubmittedMarkup(report)}</td><td><button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button></td></tr>`;
   }).join("");
 
   els.parentCheckInsEmpty.hidden = checkIns.length > 0;
@@ -14305,6 +14386,52 @@ els.mentorPortalView.addEventListener("submit", async (event) => {
   markSaved();
   showFeedback("Rapporten har skickats till handläggaren.");
   await refresh();
+});
+
+els.mentorReportDetailModal.addEventListener("submit", async (event) => {
+  const form = event.target.closest("#mentorReportSupplementForm");
+  if (!form) return;
+  event.preventDefault();
+  const report = mentorReports.find((item) => item.id === form.dataset.reportId);
+  const caseRecord = cases.find((item) => item.id === report?.caseId);
+  if (!canSupplementMentorReport(report, caseRecord)) {
+    showFeedback("Rapporten kan inte kompletteras i det här läget.");
+    return;
+  }
+  const textarea = form.querySelector('[name="text"]');
+  textarea.setCustomValidity("");
+  const actor = currentActorId();
+  const supplementId = crypto.randomUUID();
+  try {
+    await executeCaseCommand({
+      commandType: "add_mentor_report_supplement",
+      caseId: caseRecord.id,
+      expectedVersion: caseRecord.version,
+      payload: { reportId: report.id, supplementId },
+      additionalStores: [MENTOR_REPORTS_STORE],
+      mutate: ({ currentCase, now, put, event: recordEvent }) => {
+        const updatedReport = appendMentorReportSupplement(report, {
+          id: supplementId,
+          text: textarea.value,
+          createdAt: now,
+          createdBy: actor
+        });
+        put(MENTOR_REPORTS_STORE, updatedReport);
+        const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: actor };
+        put(CASES_STORE, updatedCase);
+        recordEvent("mentor_report_supplement_added", "mentor_report", report.id, "En komplettering lades till i mentorrapporten");
+        return { caseId: currentCase.id, version: updatedCase.version };
+      }
+    });
+  } catch (error) {
+    textarea.setCustomValidity(error.message);
+    textarea.reportValidity();
+    return;
+  }
+  markSaved();
+  await refresh();
+  renderMentorReportDetail(mentorReports.find((item) => item.id === selectedMentorReportId));
+  showFeedback("Kompletteringen har lagts till utan att originalrapporten ändrades.");
 });
 
 els.publicPortalView.addEventListener("click", (event) => {
@@ -18691,6 +18818,11 @@ document.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+  const reportButton = event.target.closest("[data-open-mentor-report]");
+  if (reportButton) {
+    openMentorReportDetail(reportButton.dataset.openMentorReport);
+    return;
+  }
   const link = event.target.closest("a[href^='#/']");
   if (!link || event.defaultPrevented || event.button !== 0) return;
   if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;

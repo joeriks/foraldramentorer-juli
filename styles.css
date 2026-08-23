@@ -1667,6 +1667,91 @@ body.is-system-administration .sidebar-menu-group {
   border-top: 1px solid var(--app-border-soft);
 }
 
+.mentor-report-detail-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--app-border);
+}
+
+.mentor-report-detail-facts > div {
+  min-width: 0;
+  padding: var(--app-space-3);
+  border-bottom: 1px solid var(--app-border-soft);
+}
+
+.mentor-report-detail-facts > div:nth-child(odd) {
+  border-right: 1px solid var(--app-border-soft);
+}
+
+.mentor-report-detail-facts dt {
+  color: var(--app-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.mentor-report-detail-facts dd {
+  margin: 0.2rem 0 0;
+}
+
+.mentor-report-original,
+.mentor-report-supplements {
+  padding-top: var(--app-space-4);
+}
+
+.mentor-report-original h3,
+.mentor-report-supplements h3 {
+  margin: 0 0 var(--app-space-2);
+  font-size: 1rem;
+}
+
+.mentor-report-supplements h3 span {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 1.5rem;
+  margin-left: 0.25rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--app-border-soft);
+  font-size: 0.75rem;
+}
+
+.mentor-report-supplements ol {
+  display: grid;
+  gap: var(--app-space-2);
+  padding: 0;
+  margin: 0 0 var(--app-space-4);
+  list-style: none;
+}
+
+.mentor-report-supplements li {
+  padding: var(--app-space-3);
+  border-left: 0.2rem solid var(--app-primary);
+  background: var(--app-primary-soft);
+}
+
+.mentor-report-supplements li > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--app-space-2);
+}
+
+.mentor-report-supplements li time {
+  color: var(--app-text-muted);
+  font-size: 0.8125rem;
+}
+
+.mentor-report-supplements li p {
+  margin: 0.4rem 0 0;
+}
+
+#mentorReportSupplementForm {
+  padding-top: var(--app-space-3);
+  border-top: 1px solid var(--app-border);
+}
+
 .learning-current-mentor {
   display: grid;
   text-align: right;
@@ -2454,6 +2539,7 @@ body.is-system-administration .sidebar-menu-group {
   .mentor-self-service-support-fields,
   .mentor-profile-history li,
   .mentor-report-form,
+  .mentor-report-detail-facts,
   .public-support-form,
   .public-support-confirmation dl {
     grid-template-columns: 1fr;

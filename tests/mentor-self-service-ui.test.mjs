@@ -70,6 +70,10 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(app, /saknar registrerat utfall/);
   assert.match(app, /Föräldraavstämning försenad/);
   assert.match(app, /nextAssignmentFollowUp\(plan, assignmentRecords\(caseRecord\.id\)\.checkIns\)/);
+  assert.match(app, /mentorReportSubmittedMarkup\(report\)/);
+  assert.match(app, /data-open-mentor-report/);
+  assert.match(app, /Kompletteringen tidsstämplas\. Den ursprungliga rapporten ändras inte\./);
+  assert.match(html, /id="mentorReportDetailModal"/);
   assert.match(app, /Det här gör du härnäst/);
   assert.match(app, /Inget möte inbokat/);
   assert.doesNotMatch(homeRenderer, /mentor-summary-grid|Fortsätt uppdraget/);

@@ -67,6 +67,24 @@ export function nextAssignmentFollowUp(plan = {}, checkIns = [], now = new Date(
   };
 }
 
+export function appendMentorReportSupplement(report, { id, text, createdAt, createdBy }) {
+  const normalizedText = String(text || "").trim();
+  if (!normalizedText) throw new Error("Skriv en kompletterande anteckning.");
+  if (normalizedText.length > 2000) throw new Error("Anteckningen får innehålla högst 2 000 tecken.");
+  const timestamp = String(createdAt || "");
+  const actorId = String(createdBy || "");
+  if (!id || !timestamp || !actorId) throw new Error("Kompletteringen saknar spårbar information.");
+  return {
+    ...report,
+    supplements: [
+      ...(Array.isArray(report?.supplements) ? report.supplements : []),
+      { id, text: normalizedText, createdAt: timestamp, createdBy: actorId }
+    ],
+    updatedAt: timestamp,
+    updatedBy: actorId
+  };
+}
+
 const LEGACY_CASE_STATUS = {
   Nytt: "new",
   Pågår: "in_progress",

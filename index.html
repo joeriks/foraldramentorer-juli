@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260823-follow-up-v130">
+    <link rel="stylesheet" href="styles.css?v=20260823-mentor-report-v131">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -1231,7 +1231,7 @@
                         <div class="d-flex justify-content-end gap-2 mt-3"><button id="cancelMentorReportButton" type="button" class="btn btn-outline-secondary btn-sm">Avbryt</button><button type="submit" class="btn btn-primary btn-sm">Spara mentorrapport</button></div>
                       </form>
                       <div id="mentorReportsEmpty" class="empty-list border rounded text-secondary">Inga mentorrapporter har registrerats.</div>
-                      <div id="mentorReportsTableWrap" class="table-responsive border rounded" hidden><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Datum</th><th>Kontakt</th><th>Tid</th><th>Utfall</th><th>Sammanfattning</th><th>Rapporterad / registrerad</th></tr></thead><tbody id="mentorReportsTableBody"></tbody></table></div>
+                      <div id="mentorReportsTableWrap" class="table-responsive border rounded" hidden><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Datum</th><th>Kontakt</th><th>Tid</th><th>Utfall</th><th>Sammanfattning</th><th>Inskickad</th><th></th></tr></thead><tbody id="mentorReportsTableBody"></tbody></table></div>
                     </section>
 
                     <section class="record-section mb-4">
@@ -2578,6 +2578,19 @@
       </div>
     </div>
 
+    <div class="modal fade" id="mentorReportDetailModal" tabindex="-1" aria-labelledby="mentorReportDetailTitle" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content mentor-report-detail-modal">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow mb-1">Mentorrapport</p><h2 id="mentorReportDetailTitle" class="modal-title h5">Rapportdetaljer</h2></div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button>
+          </div>
+          <div id="mentorReportDetailBody" class="modal-body"></div>
+          <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Stäng</button></div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="mentorInstallModal" tabindex="-1" aria-labelledby="mentorInstallModalTitle" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content mentor-install-modal">
@@ -2600,6 +2613,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260823-follow-up-v130"></script>
+    <script type="module" src="app.js?v=20260823-mentor-report-v131"></script>
   </body>
 </html>

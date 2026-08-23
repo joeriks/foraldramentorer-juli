@@ -140,7 +140,7 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.ok((await iconResponse.arrayBuffer()).byteLength > 1000);
   const serviceWorker = await worker.fetch(new Request("https://example.test/service-worker.js"), {}, context);
   assert.equal(serviceWorker.status, 200);
-  assert.match(await serviceWorker.text(), /foraldramentorer-mentor-v130-follow-up/);
+  assert.match(await serviceWorker.text(), /foraldramentorer-mentor-v131-report-detail/);
   const interactionDomain = await worker.fetch(new Request("https://example.test/interaction-domain.js"), {}, context);
   assert.equal(interactionDomain.status, 200);
   assert.match(await interactionDomain.text(), /meetingSatisfiesRequirement/);
