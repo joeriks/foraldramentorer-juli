@@ -104,6 +104,16 @@ export function normalizeInteraction(record = {}) {
   };
 }
 
+export function nextScheduledMeetingForCase(records = [], caseId, now = Date.now()) {
+  return records
+    .filter((record) => record.caseId === caseId
+      && record.kind === "meeting"
+      && record.status === "scheduled"
+      && record.startsAt
+      && new Date(record.startsAt).getTime() >= now)
+    .sort((left, right) => new Date(left.startsAt) - new Date(right.startsAt))[0] || null;
+}
+
 export function interactionFromCaseMeeting(meeting, participants = []) {
   return normalizeInteraction({
     id: meeting.interactionId || `meeting:${meeting.id}`,

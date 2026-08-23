@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
 test("prototype data uses the current scenario version and real handler ids", () => {
-  assert.match(source, /const EXAMPLE_DATA_VERSION = 6;/);
+  assert.match(source, /const EXAMPLE_DATA_VERSION = 7;/);
   assert.match(source, /function exampleTime\(base, hours\)/);
   assert.match(source, /coordinatorId: assignedHandler\?\.id \|\| ""/);
   assert.match(source, /exampleDataVersion: EXAMPLE_DATA_VERSION/);
@@ -15,6 +15,7 @@ test("prototype data uses the current scenario version and real handler ids", ()
 test("prototype workflows contain auditable activity evidence", () => {
   assert.match(source, /\[CASE_DOCUMENTS_STORE\]: \[\]/);
   assert.match(source, /\[CASE_MEETINGS_STORE\]: \[\]/);
+  assert.match(source, /\[INTERACTIONS_STORE\]: \[\]/);
   assert.match(source, /\[ACTIVITY_DEVIATIONS_STORE\]: \[\]/);
   assert.match(source, /\[DEVIATION_DECISIONS_STORE\]: \[\]/);
   assert.match(source, /Tjänsteanteckning: \$\{activity\.title\}/);
@@ -22,6 +23,7 @@ test("prototype workflows contain auditable activity evidence", () => {
   assert.match(source, /activityId: reportActivity\?\.id \|\| null/);
   assert.match(source, /document_registered/);
   assert.match(source, /meeting_registered/);
+  assert.match(source, /title: "Nästa möte med föräldern"/);
   assert.match(source, /mentor_report_registered/);
   assert.match(source, /parent_checkin_registered/);
   assert.match(source, /compensation_period_created/);

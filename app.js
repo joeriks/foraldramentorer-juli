@@ -65,10 +65,11 @@ import {
   interactionParticipant,
   interactionStatusFromForm,
   meetingSatisfiesRequirement,
+  nextScheduledMeetingForCase,
   normalizeInteraction,
   suggestedInteractionParticipants,
   validateInteractionForSave
-} from "./interaction-domain.js?v=20260821-interactions-v2";
+} from "./interaction-domain.js?v=20260823-mentor-next-meeting-v126";
 import {
   COMMUNICATION_CHANNEL_LABELS,
   COMMUNICATION_DIRECTION_LABELS,
@@ -210,6 +211,21 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "126",
+    date: "2026-08-23",
+    title: "Nästa möte och nästa steg i mentorportalen",
+    flow: "Mentorportal -> aktivt uppdrag -> nästa möte och nästa steg",
+    simplified: "Mentorn ser nu direkt när nästa möte med föräldern är bokat och vad som behöver göras härnäst. En planerad kontaktdag skiljs tydligt från ett faktiskt bokat möte.",
+    retained: "Uppdragsdetaljer, rapportering, utbildning och meddelanden fungerar vidare som tidigare.",
+    changes: [
+      "Bokade möten hämtas från det gemensamma mötesregistret och visas på mentorstartsidan.",
+      "Varje aktivt uppdrag visar en konkret nästa åtgärd.",
+      "Om inget möte är bokat framgår det uttryckligen.",
+      "Nästa möte och nästa steg visas även inne i uppdraget.",
+      "Normal prototypdata innehåller ett framtida möte för ett aktivt mentoruppdrag."
+    ]
+  },
   {
     version: "125",
     date: "2026-08-23",
@@ -3817,7 +3833,7 @@ function exampleTemplates(count) {
   });
 }
 
-const EXAMPLE_DATA_VERSION = 6;
+const EXAMPLE_DATA_VERSION = 7;
 
 function exampleTime(base, hours) {
   return new Date(new Date(base).getTime() + (hours * 60 * 60 * 1000)).toISOString();
@@ -4141,7 +4157,7 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
   const parentNames = ["Nora Mahmoud", "Emil Svensson", "Leila Hassan", "Johan Berg", "Mariam Ali", "Sofia Nilsson", "Ahmed Rahimi", "Elin Karlsson"];
   const records = {
     [PARENTS_STORE]: [], [INCOMING_CONTACTS_STORE]: [], [CASES_STORE]: [], [CASE_ASSIGNMENTS_STORE]: [], [CASE_ACTIVITIES_STORE]: [],
-    [CASE_DOCUMENTS_STORE]: [], [CASE_EVENTS_STORE]: [], [ACTIVITY_DEVIATIONS_STORE]: [], [CASE_MEETINGS_STORE]: [],
+    [CASE_DOCUMENTS_STORE]: [], [CASE_EVENTS_STORE]: [], [ACTIVITY_DEVIATIONS_STORE]: [], [CASE_MEETINGS_STORE]: [], [INTERACTIONS_STORE]: [],
     [DEVIATION_DECISIONS_STORE]: [], [MENTOR_REPORTS_STORE]: [], [PARENT_CHECK_INS_STORE]: [], [COMPENSATION_PERIODS_STORE]: []
   };
   let nextExampleSequence = count + 1;
@@ -4413,6 +4429,27 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       };
       records[CASES_STORE].push(assignmentCase);
       addAssignment(assignmentCaseId, ownerId);
+      if (!concern) {
+        const meetingStartsAt = exampleTime(now, 24 * (3 + (parentIndex % 4)));
+        const meetingEndsAt = exampleTime(meetingStartsAt, 1);
+        const meetingMode = parentIndex % 2 ? "digital" : "physical";
+        records[INTERACTIONS_STORE].push({
+          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, kind: "meeting", status: "scheduled",
+          direction: "not_applicable", caseId: assignmentCaseId, activityId: null, organizerId: ownerId,
+          participants: suggestedInteractionParticipants({
+            parent,
+            mentor,
+            handler: seedHandlers.find((handler) => handler.id === ownerId)
+          }),
+          title: "Nästa möte med föräldern", startsAt: meetingStartsAt, endsAt: meetingEndsAt,
+          mode: meetingMode, location: meetingMode === "digital" ? "Digitalt möte" : "Kommunhuset",
+          invitationText: "Gemensam avstämning om hur uppdraget fungerar och vad nästa steg ska vara.",
+          reminder: { enabled: true, offsetMinutes: 1440 }, communicationHistory: [],
+          summary: "", nextStep: "Genomför mötet och återrapportera kontakten efteråt.",
+          version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId,
+          exampleData: true, exampleDataVersion: EXAMPLE_DATA_VERSION
+        });
+      }
       const assignmentActivities = addActivities(assignmentCaseId, assignmentType, {
         completed: concern
           ? assignmentType.suggestedActivities.slice(0, 3)
@@ -5757,6 +5794,38 @@ function mentorCommunicationRecords(mentorId) {
     .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
 }
 
+function mentorAssignmentNextOverview(caseRecord) {
+  const reports = assignmentRecords(caseRecord.id).reports;
+  const latestReport = reports[0] || null;
+  const nextMeeting = nextScheduledMeetingForCase(allInteractions(), caseRecord.id);
+  const today = new Date().toISOString().slice(0, 10);
+  const nextContact = reports
+    .map((report) => report.nextContactOn)
+    .filter((date) => date && date >= today)
+    .sort()[0] || null;
+  const parentName = caseParent(caseRecord)?.name || "föräldern";
+  const waitingForHandler = caseRecord.status === "decision_required" || latestReport?.needsHandlerSupport;
+  const nextAction = waitingForHandler
+    ? "Invänta handläggarens besked innan nästa kontakt."
+    : nextMeeting
+      ? `Förbered mötet med ${parentName} och gå igenom uppdragsplanen.`
+      : nextContact
+        ? `Kontakta ${parentName} ${formatDate(nextContact)} och kom överens om tid och mötesform.`
+        : `Kom överens med ${parentName} om nästa kontakt.`;
+  return { nextMeeting, nextContact, nextAction };
+}
+
+function mentorAssignmentNextMarkup(caseRecord) {
+  const { nextMeeting, nextContact, nextAction } = mentorAssignmentNextOverview(caseRecord);
+  const meetingDetails = nextMeeting
+    ? [mentorMeetingModeLabels[nextMeeting.mode] || nextMeeting.mode, nextMeeting.location].filter(Boolean).join(" · ")
+    : "";
+  return `<dl class="mentor-assignment-next">
+    <div><dt>Nästa möte med föräldern</dt><dd>${nextMeeting ? escapeHtml(formatDateTime(nextMeeting.startsAt)) : "Inget möte inbokat"}</dd>${meetingDetails ? `<small>${escapeHtml(meetingDetails)}</small>` : !nextMeeting && nextContact ? `<small>Kontakt planerad ${escapeHtml(formatDate(nextContact))}, men ingen mötestid är bokad.</small>` : ""}</div>
+    <div><dt>Det här gör du härnäst</dt><dd>${escapeHtml(nextAction)}</dd></div>
+  </dl>`;
+}
+
 function renderMentorHome() {
   const mentor = currentMentorUser();
   if (!mentor) {
@@ -5783,9 +5852,7 @@ function renderMentorHome() {
     <div class="mentor-home-grid">
       <section class="card mentor-home-assignments"><div class="card-header bg-white"><h3 class="h5 mb-1">${assignmentHeading}</h3><p class="text-secondary mb-0 mentor-home-help">Öppna ett uppdrag för att se planen eller rapportera en genomförd kontakt.</p></div><div class="mentor-home-assignment-list">${activeAssignments.slice(0, 3).map((caseRecord) => {
         const parent = caseParent(caseRecord);
-        const assignmentReports = assignmentRecords(caseRecord.id).reports;
-        const nextContact = assignmentReports.map((report) => report.nextContactOn).filter((date) => date && date >= new Date().toISOString().slice(0, 10)).sort()[0] || null;
-        return `<article class="mentor-home-assignment-item"><div><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><p>${escapeHtml(parent?.name || "Förälder")} · ${escapeHtml(caseStatusLabel(caseRecord.status))}</p>${nextContact ? `<small>Nästa kontakt ${escapeHtml(formatDate(nextContact))}</small>` : '<small>Ingen nästa kontakt planerad</small>'}</div><div class="mentor-home-assignment-actions"><a class="btn btn-primary btn-sm" href="#/mentor-assignment/${escapeHtml(caseRecord.id)}">Öppna uppdraget</a><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}">Skriv till handläggaren</button></div></article>`;
+        return `<article class="mentor-home-assignment-item"><div class="mentor-home-assignment-copy"><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><p>${escapeHtml(parent?.name || "Förälder")} · ${escapeHtml(caseStatusLabel(caseRecord.status))}</p>${mentorAssignmentNextMarkup(caseRecord)}</div><div class="mentor-home-assignment-actions"><a class="btn btn-primary btn-sm" href="#/mentor-assignment/${escapeHtml(caseRecord.id)}">Öppna uppdraget</a><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}">Skriv till handläggaren</button></div></article>`;
       }).join("") || '<div class="card-body"><p class="text-secondary mb-2">När ett uppdrag startar visas det här.</p><a href="#/learning">Fortsätt med utbildningen under tiden</a></div>'}</div>${assignments.length > activeAssignments.slice(0, 3).length ? '<div class="card-footer bg-white"><a href="#/mentor-assignments">Visa alla uppdrag</a></div>' : ""}</section>
       <div class="mentor-home-side">
         <section class="card mentor-home-learning"><div class="card-header bg-white"><h3 class="h5 mb-1">Din utbildning</h3></div><div class="card-body"><p class="mentor-progress-value"><strong>${learning.completed}</strong> av ${learning.courses.length} kurser slutförda</p><div class="progress mb-3" role="progressbar" aria-label="Genomförda kurser" aria-valuenow="${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}%"></div></div><a class="btn btn-outline-primary btn-sm" href="#/learning">${nextCourse ? "Fortsätt utbildningen" : "Visa utbildningarna"}</a></div></section>
@@ -5846,6 +5913,7 @@ function renderMentorAssignment() {
   const owner = responsibleHandler(caseRecord);
   const closed = caseRecord.status === "closed";
   els.mentorPortalView.innerHTML = `<section class="card mentor-assignment-card"><div class="card-header record-header bg-white"><a class="small" href="#/mentor-assignments">Tillbaka till mina uppdrag</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">Mentoruppdrag · ${escapeHtml(caseRecord.number)}</div><h2 class="h5 mb-1">${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</h2><p class="text-secondary mb-0">${escapeHtml(caseRecord.details?.desiredOutcome || caseRecord.description || "")}</p></div><span class="${caseStatusBadge(caseRecord.status)} align-self-start">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></div><dl class="record-meta mt-3 mb-0"><div><dt>Förälder</dt><dd>${escapeHtml(parent?.name || "Ej angivet")}</dd></div><div><dt>Ansvarig handläggare</dt><dd>${escapeHtml(owner?.name || "Ej tilldelad")}</dd></div><div><dt>Period</dt><dd>${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}</dd></div></dl></div>
+    <div class="mentor-assignment-next-panel">${mentorAssignmentNextMarkup(caseRecord)}</div>
     <div class="mentor-assignment-contact"><div><strong>Behöver du fråga något?</strong><span>Skriv till ${escapeHtml(owner?.name || "ansvarig handläggare")} om uppdraget.</span></div><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></div>
     <div class="card-body record-grid"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div><dt>Nästa uppföljning</dt><dd>${plan.firstFollowUpDate ? escapeHtml(formatDate(plan.firstFollowUpDate)) : "Ej angivet"}</dd></div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section>
     <section class="record-section"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h3 class="record-section-title mb-1">Återrapportera kontakt</h3><p class="small text-secondary mb-0">Registrera en kort saklig rapport efter varje planerad kontakt.</p></div></div>${closed ? '<div class="alert alert-secondary mt-3 mb-0">Uppdraget är avslutat och tar inte emot nya rapporter.</div>' : `<form id="mentorPortalReportForm" class="mentor-report-form mt-3" data-case-id="${escapeHtml(caseRecord.id)}"><div><label class="form-label" for="mentorPortalReportDate">Datum</label><input id="mentorPortalReportDate" name="occurredOn" class="form-control" type="date" value="${new Date().toISOString().slice(0, 10)}" required></div><div><label class="form-label" for="mentorPortalReportDuration">Tid i minuter</label><input id="mentorPortalReportDuration" name="durationMinutes" class="form-control" type="number" min="1" value="60" required></div><div><label class="form-label" for="mentorPortalReportMode">Kontaktform</label><select id="mentorPortalReportMode" name="mode" class="form-select"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option><option value="message">Meddelande</option></select></div><div><label class="form-label" for="mentorPortalReportOutcome">Resultat</label><select id="mentorPortalReportOutcome" name="outcome" class="form-select"><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div><div class="mentor-report-summary"><label class="form-label" for="mentorPortalReportSummary">Kort sammanfattning</label><textarea id="mentorPortalReportSummary" name="summary" class="form-control" rows="3" required></textarea></div><div><label class="form-label" for="mentorPortalNextContact">Nästa kontakt (valfritt)</label><input id="mentorPortalNextContact" name="nextContactOn" class="form-control" type="date"></div><div class="form-check mentor-report-support"><input id="mentorPortalNeedsSupport" name="needsHandlerSupport" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorPortalNeedsSupport">Jag behöver stöd från handläggaren</label></div><div class="mentor-report-actions"><button class="btn btn-primary" type="submit">Skicka rapport</button></div></form>`}</section>

@@ -6,10 +6,23 @@ import {
   interactionParticipant,
   interactionStatusFromForm,
   meetingSatisfiesRequirement,
+  nextScheduledMeetingForCase,
   normalizeInteraction,
   suggestedInteractionParticipants,
   validateInteractionForSave
 } from "../interaction-domain.js";
+
+test("finds the next scheduled meeting for a case", () => {
+  const records = [
+    { id: "past", caseId: "case-1", kind: "meeting", status: "scheduled", startsAt: "2026-08-20T10:00:00.000Z" },
+    { id: "later", caseId: "case-1", kind: "meeting", status: "scheduled", startsAt: "2026-08-25T10:00:00.000Z" },
+    { id: "next", caseId: "case-1", kind: "meeting", status: "scheduled", startsAt: "2026-08-24T10:00:00.000Z" },
+    { id: "cancelled", caseId: "case-1", kind: "meeting", status: "cancelled", startsAt: "2026-08-23T10:00:00.000Z" },
+    { id: "other-case", caseId: "case-2", kind: "meeting", status: "scheduled", startsAt: "2026-08-23T10:00:00.000Z" }
+  ];
+  assert.equal(nextScheduledMeetingForCase(records, "case-1", new Date("2026-08-21T12:00:00.000Z").getTime())?.id, "next");
+  assert.equal(nextScheduledMeetingForCase(records, "missing", new Date("2026-08-21T12:00:00.000Z").getTime()), null);
+});
 
 test("suggests known case parties without requiring the handler to attend", () => {
   const participants = suggestedInteractionParticipants({

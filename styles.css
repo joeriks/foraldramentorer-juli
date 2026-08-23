@@ -981,6 +981,51 @@ body.is-system-administration .sidebar-menu-group {
   color: var(--app-text-muted);
 }
 
+.mentor-home-assignment-copy {
+  min-width: 0;
+}
+
+.mentor-assignment-next {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--app-space-3);
+  margin: var(--app-space-3) 0 0;
+}
+
+.mentor-assignment-next > div {
+  min-width: 0;
+  padding-left: var(--app-space-3);
+  border-left: 0.2rem solid #6aa5a2;
+}
+
+.mentor-assignment-next dt {
+  color: var(--app-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.mentor-assignment-next dd {
+  margin: 0.2rem 0 0;
+  font-weight: 600;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.mentor-assignment-next small {
+  margin-top: 0.25rem;
+}
+
+.mentor-assignment-next-panel {
+  padding: var(--app-space-3) var(--app-space-4);
+  border-bottom: 1px solid var(--app-border);
+  background: #f7faf9;
+}
+
+.mentor-assignment-next-panel .mentor-assignment-next {
+  margin: 0;
+}
+
 .mentor-home-assignment-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2080,6 +2125,10 @@ body.is-system-administration .sidebar-menu-group {
   body.is-mentor-portal .mentor-home-assignment-item {
     grid-template-columns: 1fr;
     padding: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-assignment-next {
+    grid-template-columns: 1fr;
   }
 
   body.is-mentor-portal .mentor-home-assignment-actions {
