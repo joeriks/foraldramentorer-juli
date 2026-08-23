@@ -5,13 +5,17 @@ import { readFile } from "node:fs/promises";
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
 test("prototype data uses the current scenario version and real handler ids", () => {
-  assert.match(source, /const EXAMPLE_DATA_VERSION = 13;/);
+  assert.match(source, /const EXAMPLE_DATA_VERSION = 14;/);
   assert.match(source, /function exampleTime\(base, hours\)/);
   assert.match(source, /coordinatorId: assignedHandler\?\.id \|\| ""/);
   assert.match(source, /exampleDataVersion: EXAMPLE_DATA_VERSION/);
   assert.match(source, /Mentorn kompletterade den inskickade rapporten/);
   assert.match(source, /reportedByMentorId: mentor\.id, recordedBy: mentor\.id/);
   assert.match(source, /interactionId: reportedMeetingInteractionId/);
+  assert.match(source, /linkedMeeting \? calendarDateKey\(new Date\(linkedMeeting\.startsAt\)\)/);
+  assert.match(source, /assignmentCase\.details\.assignmentPlan\.endDate = exampleTime\(now, 24 \* 180\)/);
+  assert.match(source, /while \(followUp\.state === "overdue" && completedFollowUps < 6\)/);
+  assert.match(source, /new Date\(now\)/);
   assert.match(source, /version: "82"/);
 });
 

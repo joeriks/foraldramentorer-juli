@@ -1102,6 +1102,77 @@ body.is-system-administration .sidebar-menu-group {
   margin: 0;
 }
 
+.mentor-assignment-next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-2);
+  margin-top: var(--app-space-3);
+}
+
+.mentor-assignment-next-actions:empty {
+  display: none;
+}
+
+.mentor-meeting-report-queue {
+  padding: var(--app-space-4);
+  border-bottom: 1px solid var(--app-border);
+  background: #eef7f6;
+}
+
+.mentor-meeting-report-queue > div > h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  margin: 0;
+  font-size: 1rem;
+}
+
+.mentor-meeting-report-queue > div > p {
+  margin: 0.2rem 0 var(--app-space-3);
+  color: var(--app-text-muted);
+  font-size: 0.875rem;
+}
+
+.mentor-meeting-report-queue ol {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border: 1px solid #9bc4c0;
+  background: #fff;
+}
+
+.mentor-meeting-report-queue li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--app-space-3);
+  min-width: 0;
+  padding: var(--app-space-3);
+  border-left: 0.25rem solid var(--app-primary);
+}
+
+.mentor-meeting-report-queue li + li {
+  border-top: 1px solid var(--app-border);
+}
+
+.mentor-meeting-report-queue time,
+.mentor-meeting-report-queue strong,
+.mentor-meeting-report-queue li span {
+  display: block;
+  min-width: 0;
+}
+
+.mentor-meeting-report-queue time {
+  color: var(--app-text-muted);
+  font-size: 0.8125rem;
+}
+
+.mentor-meeting-report-queue li span {
+  margin-top: 0.15rem;
+  color: var(--app-text-muted);
+  font-size: 0.8125rem;
+}
+
 .mentor-meeting-schedule {
   padding: var(--app-space-4);
   border-bottom: 1px solid var(--app-border);
@@ -2525,6 +2596,10 @@ body.is-system-administration .sidebar-menu-group {
     grid-template-columns: 1fr;
   }
 
+  body.is-mentor-portal .mentor-assignment-next-actions .btn {
+    width: 100%;
+  }
+
   body.is-mentor-portal .mentor-home-assignment-actions {
     align-items: stretch;
     flex-direction: column;
@@ -2553,6 +2628,18 @@ body.is-system-administration .sidebar-menu-group {
 
   body.is-mentor-portal .mentor-meeting-schedule {
     padding: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-meeting-report-queue {
+    padding: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-meeting-report-queue li {
+    grid-template-columns: 1fr;
+  }
+
+  body.is-mentor-portal .mentor-meeting-report-queue .btn {
+    width: 100%;
   }
 
   body.is-mentor-portal .mentor-meeting-history {

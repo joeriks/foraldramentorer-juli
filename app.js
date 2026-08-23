@@ -218,6 +218,21 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "134",
+    date: "2026-08-23",
+    title: "Möten som väntar på återrapportering",
+    flow: "Öppna mentoruppdrag -> se möten att återrapportera -> öppna valt möte",
+    simplified: "Passerade möten utan rapport ligger nu i en egen tydlig kö nära uppdragets början. Prototypens datum räknas från dagens datum så att kommande möten och avstämningar fortsätter vara aktuella.",
+    retained: "Mötesregistret, rapportdetaljerna, kompletteringar och uppdragsplanens styrning fungerar vidare med samma poster.",
+    changes: [
+      "Möten utan rapport visas under Möten att återrapportera och blandas inte med färdiga historikposter.",
+      "Nästa åtgärd högst upp länkar direkt till det möte som behöver återrapporteras.",
+      "Tidigare möten visar rapporterade och avslutade möten med anteckningar och historik.",
+      "Exempeldata skapar kommande möten relativt dagens datum.",
+      "Historiska föräldraavstämningar fylls fram till ett aktuellt nästa datum; avvikelseexempel kan fortfarande visas som försenade."
+    ]
+  },
+  {
     version: "133",
     date: "2026-08-23",
     title: "Återrapportering från mötet",
@@ -3972,7 +3987,7 @@ function exampleTemplates(count) {
   });
 }
 
-const EXAMPLE_DATA_VERSION = 13;
+const EXAMPLE_DATA_VERSION = 14;
 
 function exampleTime(base, hours) {
   return new Date(new Date(base).getTime() + (hours * 60 * 60 * 1000)).toISOString();
@@ -4202,15 +4217,18 @@ function completeExampleHistory(records, exampleCandidates, now) {
     assignmentCase.details.assignmentPlan.updatedBy = assignmentOwnerId;
     assignmentCase.details.assignmentPlan.startDate = exampleTime(assignmentStartedAt, 24).slice(0, 10);
     assignmentCase.details.assignmentPlan.firstFollowUpDate = exampleTime(assignmentStartedAt, 24 * 14).slice(0, 10);
+    assignmentCase.details.assignmentPlan.endDate = exampleTime(now, 24 * 180).slice(0, 10);
     addHistoryEvent(assignmentCase.id, "assignment_plan_updated", "Uppdragsplan och första uppföljning registrerades", planAt, assignmentOwnerId);
     let assignmentLatestAt = timeActivities(assignmentCase, exampleTime(assignmentStartedAt, 4), assignmentOwnerId, 24 * 7);
 
     for (const report of records[MENTOR_REPORTS_STORE].filter((item) => item.caseId === assignmentCase.id)) {
-      const reportAt = exampleTime(assignmentStartedAt, 24 * 10);
+      const linkedMeeting = records[INTERACTIONS_STORE].find((item) => item.id === report.interactionId);
+      const reportAt = linkedMeeting ? exampleTime(linkedMeeting.endsAt || linkedMeeting.startsAt, 2) : exampleTime(assignmentStartedAt, 24 * 10);
       const supplementAt = exampleTime(reportAt, 2);
       const reportActorId = report.recordedBy || report.reportedByMentorId || assignmentOwnerId;
       Object.assign(report, {
-        occurredOn: reportAt.slice(0, 10), createdAt: reportAt, createdBy: reportActorId,
+        occurredOn: linkedMeeting ? calendarDateKey(new Date(linkedMeeting.startsAt)) : reportAt.slice(0, 10),
+        createdAt: reportAt, createdBy: reportActorId,
         supplements: [{
           id: crypto.randomUUID(),
           text: "Komplettering: nästa kontakt planeras tillsammans med föräldern vid kommande möte.",
@@ -4229,6 +4247,33 @@ function completeExampleHistory(records, exampleCandidates, now) {
       Object.assign(checkIn, { occurredOn: checkInAt.slice(0, 10), createdAt: checkInAt, createdBy: assignmentOwnerId });
       addHistoryEvent(assignmentCase.id, "parent_checkin_registered", "Förälderns avstämning registrerades", checkInAt, assignmentOwnerId, "parent_check_in", checkIn.id);
       assignmentLatestAt = checkInAt > assignmentLatestAt ? checkInAt : assignmentLatestAt;
+    }
+    if (assignmentCase.status === "in_progress") {
+      let followUp = nextAssignmentFollowUp(
+        assignmentCase.details.assignmentPlan,
+        records[PARENT_CHECK_INS_STORE].filter((item) => item.caseId === assignmentCase.id),
+        new Date(now)
+      );
+      let completedFollowUps = 0;
+      while (followUp.state === "overdue" && completedFollowUps < 6) {
+        const checkInAt = new Date(`${followUp.date}T10:00:00`).toISOString();
+        const checkIn = {
+          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCase.id,
+          activityId: null, parentId: assignmentCase.parentId, occurredOn: followUp.date, mode: "phone",
+          contactConfirmed: "yes", collaboration: "well", relevance: "yes", safety: "safe",
+          continueStatus: "continue", note: "Avstämningen visar att kontakten fortsätter enligt plan.",
+          createdAt: checkInAt, createdBy: assignmentOwnerId
+        };
+        records[PARENT_CHECK_INS_STORE].push(checkIn);
+        addHistoryEvent(assignmentCase.id, "parent_checkin_registered", "Planerad föräldraavstämning registrerades", checkInAt, assignmentOwnerId, "parent_check_in", checkIn.id);
+        assignmentLatestAt = checkInAt > assignmentLatestAt ? checkInAt : assignmentLatestAt;
+        completedFollowUps += 1;
+        followUp = nextAssignmentFollowUp(
+          assignmentCase.details.assignmentPlan,
+          records[PARENT_CHECK_INS_STORE].filter((item) => item.caseId === assignmentCase.id),
+          new Date(now)
+        );
+      }
     }
     for (const period of records[COMPENSATION_PERIODS_STORE].filter((item) => item.caseId === assignmentCase.id)) {
       const periodAt = exampleTime(assignmentStartedAt, (24 * (period.status === "needs_completion" ? 15 : 22)) + 2);
@@ -4567,7 +4612,7 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
         details: {
           supportPurpose, desiredOutcome, supportAreaIds: [...supportAreaIds],
           assignmentPlan: {
-            startDate: monthStart, endDate: `${today.slice(0, 4)}-12-31`, contactFrequency: "weekly",
+            startDate: monthStart, endDate: exampleTime(now, 24 * 180).slice(0, 10), contactFrequency: "weekly",
             contactMode: parentIndex % 2 ? "digital" : "physical", firstFollowUpDate: today,
             firstMeetingAt: exampleTime(now, 24 * (3 + (parentIndex % 4))), plannedMeetingCount: 4,
             mentorMeetingPlanningAllowed: !concern,
@@ -6147,6 +6192,9 @@ function mentorAssignmentNextOverview(caseRecord) {
   const latestReport = reports[0] || null;
   const interactionRecords = allInteractions();
   const nextMeeting = nextScheduledMeetingForCase(interactionRecords, caseRecord.id);
+  const reportDueMeeting = caseRecord.status === "closed"
+    ? null
+    : mentorPastMeetings(caseRecord).find((meeting) => !mentorReportForMeeting(caseRecord, meeting)) || null;
   const pastDueMeeting = interactionRecords
     .filter((item) => item.caseId === caseRecord.id && item.kind === "meeting" && interactionTimingState(item) === "past_due")
     .sort((left, right) => new Date(right.startsAt) - new Date(left.startsAt))[0] || null;
@@ -6157,16 +6205,18 @@ function mentorAssignmentNextOverview(caseRecord) {
     .sort()[0] || null;
   const parentName = caseParent(caseRecord)?.name || "föräldern";
   const waitingForHandler = caseRecord.status === "decision_required" || latestReport?.needsHandlerSupport;
-  const nextAction = pastDueMeeting
-    ? `Registrera vad som hände vid mötet med ${parentName} ${formatDateTime(pastDueMeeting.startsAt)}.`
-    : waitingForHandler
-      ? "Invänta handläggarens besked innan nästa kontakt."
-      : nextMeeting
-        ? `Förbered mötet med ${parentName} och gå igenom uppdragsplanen.`
-        : nextContact
-          ? `Kontakta ${parentName} ${formatDate(nextContact)} och kom överens om tid och mötesform.`
-          : `Kom överens med ${parentName} om nästa kontakt.`;
-  return { nextMeeting, pastDueMeeting, nextContact, nextAction };
+  const nextAction = reportDueMeeting
+    ? `Återrapportera mötet med ${parentName} ${formatDateTime(reportDueMeeting.startsAt)}.`
+    : pastDueMeeting
+      ? `Registrera vad som hände vid mötet med ${parentName} ${formatDateTime(pastDueMeeting.startsAt)}.`
+      : waitingForHandler
+        ? "Invänta handläggarens besked innan nästa kontakt."
+        : nextMeeting
+          ? `Förbered mötet med ${parentName} och gå igenom uppdragsplanen.`
+          : nextContact
+            ? `Kontakta ${parentName} ${formatDate(nextContact)} och kom överens om tid och mötesform.`
+            : `Kom överens med ${parentName} om nästa kontakt.`;
+  return { nextMeeting, reportDueMeeting, pastDueMeeting, nextContact, nextAction };
 }
 
 function mentorCanPlanContacts(caseRecord) {
@@ -6174,15 +6224,15 @@ function mentorCanPlanContacts(caseRecord) {
 }
 
 function mentorAssignmentNextMarkup(caseRecord) {
-  const { nextMeeting, pastDueMeeting, nextContact, nextAction } = mentorAssignmentNextOverview(caseRecord);
+  const { nextMeeting, reportDueMeeting, pastDueMeeting, nextContact, nextAction } = mentorAssignmentNextOverview(caseRecord);
   const meetingDetails = nextMeeting
     ? [mentorMeetingModeLabels[nextMeeting.mode] || nextMeeting.mode, nextMeeting.location].filter(Boolean).join(" · ")
     : "";
   return `<dl class="mentor-assignment-next">
-    ${pastDueMeeting ? `<div class="is-past-due"><dt>Behöver följas upp</dt><dd>Mötet ${escapeHtml(formatDateTime(pastDueMeeting.startsAt))} saknar registrerat utfall</dd><small>Öppna uppdraget och registrera om mötet genomfördes, ställdes in eller om någon uteblev.</small></div>` : ""}
+    ${reportDueMeeting ? `<div class="is-past-due"><dt>Möte att återrapportera</dt><dd>${escapeHtml(formatDateTime(reportDueMeeting.startsAt))}</dd><small>Registrera vad som hände och om något behöver följas upp.</small></div>` : pastDueMeeting ? `<div class="is-past-due"><dt>Behöver följas upp</dt><dd>Mötet ${escapeHtml(formatDateTime(pastDueMeeting.startsAt))} saknar registrerat utfall</dd><small>Öppna uppdraget och registrera om mötet genomfördes, ställdes in eller om någon uteblev.</small></div>` : ""}
     <div><dt>Nästa möte med föräldern</dt><dd>${nextMeeting ? escapeHtml(formatDateTime(nextMeeting.startsAt)) : "Inget möte inbokat"}</dd>${meetingDetails ? `<small>${escapeHtml(meetingDetails)}</small>` : !nextMeeting && nextContact ? `<small>Kontakt planerad ${escapeHtml(formatDate(nextContact))}, men ingen mötestid är bokad.</small>` : ""}</div>
     <div><dt>Det här gör du härnäst</dt><dd>${escapeHtml(nextAction)}</dd></div>
-  </dl>${nextMeeting && mentorCanPlanContacts(caseRecord) ? `<button type="button" class="btn btn-outline-primary btn-sm mentor-plan-contact-button" data-mentor-edit-meeting="${escapeHtml(nextMeeting.id)}">Ändra mötet</button>` : ""}`;
+  </dl><div class="mentor-assignment-next-actions">${reportDueMeeting ? `<button type="button" class="btn btn-primary btn-sm" data-mentor-report-meeting="${escapeHtml(reportDueMeeting.id)}">Återrapportera mötet</button>` : ""}${nextMeeting && mentorCanPlanContacts(caseRecord) ? `<button type="button" class="btn btn-outline-primary btn-sm mentor-plan-contact-button" data-mentor-edit-meeting="${escapeHtml(nextMeeting.id)}">Ändra mötet</button>` : ""}</div>`;
 }
 
 function mentorMeetingScheduleMarkup(caseRecord) {
@@ -6201,6 +6251,26 @@ function mentorReportForMeeting(caseRecord, meeting) {
   const meetingDate = calendarDateKey(new Date(meeting.startsAt));
   return assignmentRecords(caseRecord.id).reports.find((report) => report.interactionId === meeting.id
     || (!report.interactionId && report.occurredOn === meetingDate && report.mode === meeting.mode)) || null;
+}
+
+function mentorPastMeetings(caseRecord) {
+  const now = Date.now();
+  return allInteractions()
+    .filter((item) => item.caseId === caseRecord.id
+      && item.kind === "meeting"
+      && item.startsAt
+      && (new Date(item.startsAt).getTime() < now || ["completed", "no_show"].includes(item.status)))
+    .sort((left, right) => new Date(right.startsAt) - new Date(left.startsAt));
+}
+
+function mentorMeetingReportQueueMarkup(caseRecord) {
+  if (caseRecord.status === "closed") return "";
+  const records = mentorPastMeetings(caseRecord).filter((meeting) => !mentorReportForMeeting(caseRecord, meeting));
+  if (!records.length) return "";
+  return `<section class="mentor-meeting-report-queue"><div><h3>Möten att återrapportera <span class="badge text-bg-secondary">${records.length}</span></h3><p>Välj ett möte och registrera vad som hände.</p></div><ol>${records.map((meeting) => {
+    const details = [mentorMeetingModeLabels[meeting.mode] || meeting.mode, meeting.location].filter(Boolean).join(" · ");
+    return `<li><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><strong>${escapeHtml(meeting.title || "Möte med föräldern")}</strong>${details ? `<span>${escapeHtml(details)}</span>` : ""}</div><button type="button" class="btn btn-primary btn-sm" data-mentor-report-meeting="${escapeHtml(meeting.id)}">Återrapportera mötet</button></li>`;
+  }).join("")}</ol></section>`;
 }
 
 function openMentorMeetingReport(interactionId) {
@@ -6239,15 +6309,10 @@ function openMentorMeetingReport(interactionId) {
 }
 
 function mentorMeetingHistoryMarkup(caseRecord) {
-  const now = Date.now();
-  const records = allInteractions()
-    .filter((item) => item.caseId === caseRecord.id
-      && item.kind === "meeting"
-      && item.startsAt
-      && (new Date(item.startsAt).getTime() < now || ["completed", "no_show"].includes(item.status)))
-    .sort((left, right) => new Date(right.startsAt) - new Date(left.startsAt));
-  if (!records.length) return `<section class="mentor-meeting-history"><div><h3>Tidigare möten</h3><p>Genomförda, inställda och passerade möten visas här.</p></div><p class="text-secondary mb-0">Inga tidigare möten är registrerade.</p></section>`;
-  return `<section class="mentor-meeting-history"><div><h3>Tidigare möten</h3><p>Anteckningar och överenskomna nästa steg finns kvar med mötet.</p></div><ol>${records.map((meeting) => {
+  const records = mentorPastMeetings(caseRecord)
+    .filter((meeting) => caseRecord.status === "closed" || mentorReportForMeeting(caseRecord, meeting));
+  if (!records.length) return "";
+  return `<section class="mentor-meeting-history"><div><h3>Tidigare möten</h3><p>Återrapporterade och avslutade möten med anteckningar och nästa steg.</p></div><ol>${records.map((meeting) => {
     const participants = meeting.participants.map((participant) => participant.displayName).filter(Boolean).join(", ");
     const durationMinutes = meeting.startsAt && meeting.endsAt ? Math.max(0, Math.round((new Date(meeting.endsAt) - new Date(meeting.startsAt)) / 60000)) : 0;
     const facts = [mentorMeetingModeLabels[meeting.mode] || meeting.mode, meeting.location, durationMinutes ? formatMinutes(durationMinutes) : ""].filter(Boolean).join(" · ");
@@ -6256,9 +6321,7 @@ function mentorMeetingHistoryMarkup(caseRecord) {
     const report = mentorReportForMeeting(caseRecord, meeting);
     const reportAction = report
       ? `<button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna rapport${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button>`
-      : caseRecord.status !== "closed"
-        ? `<button type="button" class="btn ${pastDue ? "btn-primary" : "btn-outline-primary"} btn-sm" data-mentor-report-meeting="${escapeHtml(meeting.id)}">Återrapportera mötet</button>`
-        : "";
+      : "";
     return `<li class="${pastDue ? "is-past-due" : ""}"><header><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><strong>${escapeHtml(meeting.title || "Möte med föräldern")}</strong></div><span class="badge ${interactionStatusBadge(meeting)}">${escapeHtml(interactionStatusLabel(meeting))}</span></header>${pastDue ? '<p class="mentor-meeting-past-due">Registrera om mötet genomfördes, ställdes in eller om någon uteblev.</p>' : ""}${facts ? `<p class="mentor-meeting-history-facts">${escapeHtml(facts)}</p>` : ""}${participants ? `<p class="mentor-meeting-history-facts">Deltagare: ${escapeHtml(participants)}</p>` : ""}<div class="mentor-meeting-history-note"><strong>Anteckning</strong><p>${escapeHtml(meeting.summary || "Ingen anteckning registrerad.")}</p></div>${meeting.nextStep ? `<div class="mentor-meeting-history-next"><strong>Nästa steg</strong><p>${escapeHtml(meeting.nextStep)}</p></div>` : ""}${communicationHistory.length ? `<details><summary>Kommunikation och ändringar (${communicationHistory.length})</summary><ol>${communicationHistory.map((item) => `<li><time datetime="${escapeHtml(item.occurredAt)}">${escapeHtml(formatDateTime(item.occurredAt))}</time><span>${escapeHtml(item.comment)}</span></li>`).join("")}</ol></details>` : ""}<footer><small>Senast registrerad ${escapeHtml(formatDateTime(meeting.updatedAt || meeting.createdAt))} av ${escapeHtml(actorNameById(meeting.updatedBy || meeting.createdBy))}</small>${reportAction}</footer></li>`;
   }).join("")}</ol></section>`;
 }
@@ -6410,11 +6473,12 @@ function renderMentorAssignment() {
   els.mentorPortalView.innerHTML = `<section class="card mentor-assignment-card"><div class="card-header record-header bg-white"><a class="small" href="#/mentor-assignments">Tillbaka till mina uppdrag</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">Mentoruppdrag · ${escapeHtml(caseRecord.number)}</div><h2 class="h5 mb-1">${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</h2><p class="text-secondary mb-0">${escapeHtml(caseRecord.details?.desiredOutcome || caseRecord.description || "")}</p></div><span class="${caseStatusBadge(caseRecord.status)} align-self-start">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></div><dl class="record-meta mt-3 mb-0"><div><dt>Förälder</dt><dd>${escapeHtml(parent?.name || "Ej angivet")}</dd></div><div><dt>Ansvarig handläggare</dt><dd>${escapeHtml(owner?.name || "Ej tilldelad")}</dd></div><div><dt>Period</dt><dd>${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}</dd></div></dl></div>
     <div class="mentor-assignment-next-panel">${mentorAssignmentNextMarkup(caseRecord)}</div>
     ${mentorParentContactMarkup(parent, owner)}
+    ${mentorMeetingReportQueueMarkup(caseRecord)}
     ${mentorMeetingScheduleMarkup(caseRecord)}
     ${mentorMeetingHistoryMarkup(caseRecord)}
     <div class="mentor-assignment-contact"><div><strong>Behöver du fråga något?</strong><span>Skriv till ${escapeHtml(owner?.name || "ansvarig handläggare")} om uppdraget.</span></div><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></div>
     <div class="card-body record-grid"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div class="${followUpFact.className}"><dt>${escapeHtml(followUpFact.label)}</dt><dd>${escapeHtml(followUpFact.value)}</dd>${followUpFact.help ? `<small>${escapeHtml(followUpFact.help)}</small>` : ""}</div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section>
-    <section class="record-section record-section-wide"><h3 class="record-section-title mb-1">Rapporterade möten</h3><p class="small text-secondary">En ny rapport skapas från mötet under Tidigare möten ovan.</p><div class="table-responsive border rounded"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Mötesdatum</th><th>Kontaktform</th><th>Tid</th><th>Resultat</th><th>Sammanfattning</th><th>Inskickad</th><th></th></tr></thead><tbody>${reports.map((report) => `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<small class="d-block text-danger">Stöd begärt</small>' : ""}</td><td>${escapeHtml(report.summary)}</td><td>${mentorReportSubmittedMarkup(report)}</td><td><button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button></td></tr>`).join("") || '<tr><td colspan="7" class="text-center text-secondary py-3">Inget möte har återrapporterats ännu.</td></tr>'}</tbody></table></div></section></div></section>`;
+    <section class="record-section record-section-wide"><h3 class="record-section-title mb-1">Rapporterade möten</h3><p class="small text-secondary">En ny rapport skapas från valt möte under Möten att återrapportera ovan.</p><div class="table-responsive border rounded"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Mötesdatum</th><th>Kontaktform</th><th>Tid</th><th>Resultat</th><th>Sammanfattning</th><th>Inskickad</th><th></th></tr></thead><tbody>${reports.map((report) => `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<small class="d-block text-danger">Stöd begärt</small>' : ""}</td><td>${escapeHtml(report.summary)}</td><td>${mentorReportSubmittedMarkup(report)}</td><td><button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button></td></tr>`).join("") || '<tr><td colspan="7" class="text-center text-secondary py-3">Inget möte har återrapporterats ännu.</td></tr>'}</tbody></table></div></section></div></section>`;
 }
 
 const mentorMeetingModeLabels = { physical: "Fysiskt", digital: "Digitalt", phone: "Telefon" };

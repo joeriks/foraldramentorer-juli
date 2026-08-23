@@ -32,6 +32,9 @@ test("shows the assignment meeting series and limits mentor actions by the assig
   assert.match(app, /data-mentor-cancel-meeting/);
   assert.match(app, /Mötet har ställts in och finns kvar i historiken/);
   assert.match(app, /function mentorMeetingHistoryMarkup/);
+  assert.match(app, /function mentorMeetingReportQueueMarkup/);
+  assert.match(app, /Möten att återrapportera/);
+  assert.match(app, /mentorPastMeetings\(caseRecord\)\.filter\(\(meeting\) => !mentorReportForMeeting/);
   assert.match(app, /Tidigare möten/);
   assert.match(app, /Kommunikation och ändringar/);
   assert.match(app, /Ingen anteckning registrerad/);
@@ -80,6 +83,8 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(app, /Kontaktuppgifter saknas/);
   assert.match(app, /function openMentorMeetingReport/);
   assert.match(app, /data-mentor-report-meeting/);
+  assert.match(app, /Möte att återrapportera/);
+  assert.match(app, /mentorMeetingReportQueueMarkup\(caseRecord\)/);
   assert.match(app, /mentorReportForMeeting/);
   assert.match(app, /meetingResult\.meetingId/);
   assert.doesNotMatch(app.match(/function renderMentorAssignment[\s\S]*?\n}\n/)?.[0] || "", /mentorPortalReportForm|Återrapportera kontakt/);
@@ -97,5 +102,7 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(styles, /body\.is-mentor-portal \.mentor-assignments-table[\s\S]*display: none/);
   assert.match(styles, /body\.is-mentor-portal \.mentor-assignment-mobile-list[\s\S]*display: block/);
   assert.match(styles, /body\.is-mentor-portal \.mentor-parent-contact[\s\S]*grid-template-columns: 1fr/);
+  assert.match(styles, /\.mentor-meeting-report-queue/);
+  assert.match(styles, /body\.is-mentor-portal \.mentor-meeting-report-queue li[\s\S]*grid-template-columns: 1fr/);
   assert.match(styles, /body\.is-mentor-portal \.system-status/);
 });
