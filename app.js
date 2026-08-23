@@ -86,7 +86,7 @@ import {
   mentorApplicationMissingFields,
   normalizeMentorApplication,
   submitMentorApplication
-} from "./mentor-application-domain.js?v=20260822-mentor-application-v1";
+} from "./mentor-application-domain.js?v=20260823-mentor-application-v2";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260820-calendar-v4";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
@@ -190,6 +190,19 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "118",
+    date: "2026-08-23",
+    title: "Klick fungerar efter publicering",
+    flow: "Öppna publicerad portal -> alla programmoduler laddas -> navigation och rollbyte fungerar",
+    simplified: "Publiceringsbygget kontrollerar nu automatiskt att varje modul som portalen använder verkligen följer med.",
+    retained: "Rollväljaren, navigeringen, testdata och samtliga verksamhetsflöden är oförändrade.",
+    changes: [
+      "Den saknade modulen för mentorintresseanmälningar ingår nu i den publicerade versionen.",
+      "Appen kan åter starta fullt ut så att länkar, knappar och rollväxling reagerar på klick.",
+      "Ett nytt byggtest stoppar framtida publicering om någon importerad programmodul saknas."
+    ]
+  },
   {
     version: "117",
     date: "2026-08-22",

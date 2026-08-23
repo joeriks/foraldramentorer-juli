@@ -286,6 +286,21 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.equal(missing.status, 404);
 });
 
+test("serves every local module imported by the application", async () => {
+  const applicationResponse = await worker.fetch(new Request("https://example.test/app.js"), {}, context);
+  assert.equal(applicationResponse.status, 200);
+  const applicationSource = await applicationResponse.text();
+  const modulePaths = [...applicationSource.matchAll(/from\s+["'](\.\/[^"']+)["']/g)]
+    .map((match) => new URL(match[1], "https://example.test/app.js").pathname);
+
+  assert.ok(modulePaths.includes("/mentor-application-domain.js"));
+  for (const modulePath of new Set(modulePaths)) {
+    const response = await worker.fetch(new Request(`https://example.test${modulePath}`), {}, context);
+    assert.equal(response.status, 200, `${modulePath} must be included in the published build`);
+    assert.match(response.headers.get("content-type"), /^text\/javascript/, `${modulePath} must be served as JavaScript`);
+  }
+});
+
 test("serves the standalone matching prototype without changing the application shell", async () => {
   const page = await worker.fetch(new Request("https://example.test/prototypes/matchningsunderlag.html"), {}, context);
   assert.equal(page.status, 200);
