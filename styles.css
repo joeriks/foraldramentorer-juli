@@ -1838,6 +1838,25 @@ body.is-system-administration .sidebar-menu-group {
   gap: var(--app-space-3);
 }
 
+.mentor-meeting-report-modal > form {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mentor-meeting-report-modal > form > .modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.mentor-meeting-report-modal > form > .modal-footer {
+  flex: 0 0 auto;
+  background: #fff;
+}
+
 .mentor-report-summary,
 .mentor-report-support,
 .mentor-report-actions {

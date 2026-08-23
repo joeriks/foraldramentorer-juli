@@ -98,6 +98,7 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(html, /id="mentorMeetingReportModal"/);
   assert.match(html, /id="mentorMeetingReportForm"/);
   assert.match(html, /Faktisk tid i minuter/);
+  assert.match(html, /Spara återrapportering/);
   assert.match(html, /id="mentorReportDetailModal"/);
   assert.match(app, /Det här gör du härnäst/);
   assert.match(app, /Inget möte inbokat/);
@@ -114,4 +115,6 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(styles, /body\.is-mentor-portal \.system-status/);
   assert.match(styles, /body\.is-mentor-portal \.btn,[\s\S]*min-height: 2\.75rem/);
   assert.match(styles, /body\.is-mentor-portal \.mentor-planning-context[\s\S]*display: grid/);
+  assert.match(styles, /\.mentor-meeting-report-modal > form[\s\S]*overflow: hidden/);
+  assert.match(styles, /\.mentor-meeting-report-modal > form > \.modal-body[\s\S]*overflow-y: auto/);
 });

@@ -219,6 +219,16 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "138",
+    date: "2026-08-23",
+    title: "Återrapportering fungerar på mobil",
+    description: "Sparknappen i återrapporteringsdialogen ligger nu alltid synlig och formulärets innehåll kan scrollas separat på små skärmar.",
+    simplified: [
+      "Knappen heter Spara återrapportering och ligger kvar längst ned i dialogen.",
+      "Långa mötesuppgifter och anteckningar kan scrollas utan att åtgärderna försvinner."
+    ]
+  },
+  {
     version: "137",
     date: "2026-08-23",
     title: "Tydligare mentorflöden på mobil",
@@ -14760,7 +14770,7 @@ els.mentorMeetingReportForm.addEventListener("submit", async (event) => {
     ? meeting.nextStep
     : "Fortsätt enligt uppdragsplanen.";
   els.mentorMeetingReportSubmitButton.disabled = true;
-  els.mentorMeetingReportSubmitButton.textContent = "Skickar...";
+  els.mentorMeetingReportSubmitButton.textContent = "Sparar...";
   try {
     const meetingResult = await registerCaseMeetingCommand({
       caseRecord,
@@ -14824,7 +14834,7 @@ els.mentorMeetingReportForm.addEventListener("submit", async (event) => {
     showFeedback(error?.message || "Mötet kunde inte återrapporteras.");
   } finally {
     els.mentorMeetingReportSubmitButton.disabled = false;
-    els.mentorMeetingReportSubmitButton.textContent = "Skicka rapport";
+    els.mentorMeetingReportSubmitButton.textContent = "Spara återrapportering";
   }
 });
 
