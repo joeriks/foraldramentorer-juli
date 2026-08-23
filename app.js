@@ -191,6 +191,21 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "117",
+    date: "2026-08-22",
+    title: "Tydligare rollväxling i prototypen",
+    flow: "Välj prototypvy -> rätt startsida -> rollanpassad navigation och behörighet",
+    simplified: "Rollväljaren skiljer nu kommunpersonal från mentor- och besökarportaler och bekräftar direkt vilken vy som visas.",
+    retained: "Samma testpersoner, arbetsköer, mentorportal och publika portal används. Ingen verksamhetsdata eller ärendefunktion har ändrats.",
+    changes: [
+      "Rollväljaren heter Visa prototypen som och grupperar kommunpersonal respektive andra portaler.",
+      "Handläggare ser verksamhetsvyerna men inte systemadministrationen på desktop eller mobil.",
+      "Direktadresser till systemadministration skickar en handläggare tillbaka till Översikt.",
+      "Mentor och Ej inloggad besökare öppnar sina egna startsidor och menyer direkt.",
+      "Efter varje byte visas en kort bekräftelse av den aktiva prototypvyn."
+    ]
+  },
+  {
     version: "116",
     date: "2026-08-22",
     title: "Nya mentorer kan anmäla intresse själva",
@@ -7251,6 +7266,9 @@ function applyRoute() {
   } else if (isMentorSession() && !mentorRoutes.has(route.view)) {
     window.history.replaceState(null, "", "#/mentor-home");
     route = { view: "mentor-home", id: null };
+  } else if (activeTestUserType === "handler" && SYSTEM_ADMINISTRATION_VIEWS.has(route.view)) {
+    window.history.replaceState(null, "", "#/dashboard");
+    route = { view: "dashboard", id: null };
   } else if (!isMentorSession() && !isPublicSession() && (mentorRoutes.has(route.view) && route.view !== "learning" || publicRoutes.has(route.view))) {
     window.history.replaceState(null, "", "#/dashboard");
     route = { view: "dashboard", id: null };
@@ -7340,13 +7358,14 @@ function applyRoute() {
 
   const mentorSession = isMentorSession();
   const publicSession = isPublicSession();
+  const handlerSession = activeTestUserType === "handler";
   for (const navigationItem of [els.navDashboard, els.navCalendar, els.navMeetings, els.navCommunications, els.navPresentation, els.navIntake, els.navIncomingContact, els.navCases, els.navMatchings, els.navAssignments, els.navCandidates, els.navParents, els.navParentSupportCases, els.navLearning, els.navAdministration]) {
     navigationItem.hidden = mentorSession || publicSession;
   }
   document.querySelectorAll(".sidebar-nav > .nav-link.disabled").forEach((navigationItem) => {
     navigationItem.hidden = mentorSession || publicSession;
   });
-  document.querySelector(".sidebar-menu-group").hidden = mentorSession || publicSession;
+  document.querySelector(".sidebar-menu-group").hidden = mentorSession || publicSession || handlerSession;
   for (const navigationItem of [els.navMentorHome, els.navMentorAssignments, els.navMentorLearning, els.navMentorProfile]) {
     navigationItem.hidden = !mentorSession;
   }
@@ -7361,7 +7380,9 @@ function applyRoute() {
       ? !item.classList.contains("mentor-mobile-nav")
       : publicSession
         ? !item.classList.contains("public-mobile-nav")
-        : item.classList.contains("mentor-mobile-nav") || item.classList.contains("public-mobile-nav");
+        : item.classList.contains("mentor-mobile-nav")
+          || item.classList.contains("public-mobile-nav")
+          || (handlerSession && item.classList.contains("admin-mobile-nav"));
   });
 
   els.navDashboard.classList.toggle("active", currentView === "dashboard");
@@ -12808,6 +12829,12 @@ els.testUserTypeSelect.addEventListener("change", () => {
     navigateTo("#/dashboard");
   }
   renderAll();
+  const contextMessage = nextType === "mentor"
+    ? "Du visar nu mentorportalen."
+    : nextType === "public"
+      ? "Du visar nu den publika portalen som ej inloggad besökare."
+      : `Du visar nu kommunportalen som ${currentUser().role}.`;
+  showFeedback(contextMessage);
 });
 
 els.mentorPortalView.addEventListener("submit", async (event) => {

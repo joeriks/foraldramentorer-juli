@@ -69,6 +69,18 @@ test("offers a role-switched mentor portal with protected mentor routes", () => 
   assert.match(app, /if \(isMentorSession\(\)\) \{\s*selectedLearnerId = currentUser\(\)\.mentorId;/);
 });
 
+test("makes prototype roles explicit and keeps system administration coordinator-only", () => {
+  assert.match(html, /<label class="test-user-switcher-label" for="testUserTypeSelect">Visa prototypen som<\/label>/);
+  assert.match(html, /<optgroup label="Kommunpersonal">[\s\S]*value="coordinator">Samordnare[\s\S]*value="handler">Handläggare[\s\S]*<\/optgroup>/);
+  assert.match(html, /<optgroup label="Andra portaler">[\s\S]*value="mentor">Mentor[\s\S]*value="public">Ej inloggad besökare[\s\S]*<\/optgroup>/);
+  assert.match(html, /class="admin-mobile-nav"/);
+  assert.match(app, /activeTestUserType === "handler" && SYSTEM_ADMINISTRATION_VIEWS\.has\(route\.view\)/);
+  assert.match(app, /document\.querySelector\("\.sidebar-menu-group"\)\.hidden = mentorSession \|\| publicSession \|\| handlerSession/);
+  assert.match(app, /handlerSession && item\.classList\.contains\("admin-mobile-nav"\)/);
+  assert.match(app, /Du visar nu kommunportalen som \$\{currentUser\(\)\.role\}/);
+  assert.match(styles, /\.test-user-switcher-label/);
+});
+
 test("offers an unauthenticated parent portal and explicit public material selection", () => {
   for (const id of ["navPublicHome", "navPublicSupport", "navPublicLearning", "publicPortalView"]) {
     assert.match(html, new RegExp(`id=["']${id}["']`), `${id} should exist in the application shell`);

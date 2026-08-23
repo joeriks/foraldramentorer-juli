@@ -781,8 +781,17 @@ body.is-system-administration .sidebar-menu-group {
 }
 
 .test-user-switcher {
-  min-width: 8.75rem;
+  display: grid;
+  min-width: 11.5rem;
   margin-left: var(--app-space-1);
+}
+
+.test-user-switcher-label {
+  margin-bottom: 0.2rem;
+  color: var(--app-text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .mentor-welcome {

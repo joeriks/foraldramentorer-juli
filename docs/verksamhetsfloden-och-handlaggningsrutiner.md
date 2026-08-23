@@ -984,7 +984,7 @@ Genomförande, innehållsversion, testförsök och resultat lagras separat från
 
 En oinloggad förälder kan läsa det referensmaterial som kommunen uttryckligen har markerat som publikt och skicka en förfrågan om stöd. En förfrågan är inte ett beslut och startar inte ett mentoruppdrag. Kommunen kontaktar föräldern och tar ställning till fortsatt registrering och stödärende enligt avsnitt 10.
 
-Valet av testanvändartyp i prototypen simulerar olika behörigheter. Det är inte en produktionsmässig inloggnings- eller behörighetslösning.
+Valet **Visa prototypen som** simulerar fyra skilda användarkontexter. **Samordnare** använder kommunportalen med systemadministration, medan **Handläggare** använder samma verksamhetsvyer utan systemadministration. **Mentor** och **Ej inloggad besökare** öppnar var sin separat portal med egen startsida och navigation. Ett byte leder direkt till rätt startsida och bekräftas i gränssnittet. Rollvalet är en prototypfunktion och inte en produktionsmässig inloggnings- eller behörighetslösning.
 
 **I systemet:** [Öppna utbildningsbiblioteket](feature:learning.library) · [Administrera kommunens urval](feature:admin.learning) · [Öppna den publika sidan](feature:public.home)
 

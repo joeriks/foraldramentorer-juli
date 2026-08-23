@@ -6,7 +6,7 @@
     <title>FöräldraMentorer - Kommunens kontrollpanel</title>
     <link rel="icon" href="data:,">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260822-mentor-application-v116">
+    <link rel="stylesheet" href="styles.css?v=20260822-role-switch-v117">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -84,18 +84,18 @@
                   <li><a class="dropdown-item" href="#/cases/matching">Matchningar</a></li>
                   <li><a class="dropdown-item" href="#/cases/mentor-assignment">Uppdrag</a></li>
                   <li><a class="dropdown-item" href="#/learning">Utbildning</a></li>
-                  <li><hr class="dropdown-divider"></li>
-                  <li><h2 class="dropdown-header">Systemadministration</h2></li>
-                  <li><a class="dropdown-item" href="#/administration">Handläggare</a></li>
-                  <li><a class="dropdown-item" href="#/case-numbering">Ärendenummer</a></li>
-                  <li><a class="dropdown-item" href="#/case-types">Ärendetyper</a></li>
-                  <li><a class="dropdown-item" href="#/support-areas">Stödområden</a></li>
-                  <li><a class="dropdown-item" href="#/geographic-areas">Geografiska områden</a></li>
-                  <li><a class="dropdown-item" href="#/learning-admin">Administrera utbildning</a></li>
-                  <li><a class="dropdown-item" href="#/support-admin">Supportärenden</a></li>
-                  <li><a class="dropdown-item" href="#/presentation">Demoläge</a></li>
-                  <li><a class="dropdown-item" href="#/routines">Rutiner</a></li>
-                  <li><a class="dropdown-item" href="#/versions">Versioner</a></li>
+                  <li class="admin-mobile-nav"><hr class="dropdown-divider"></li>
+                  <li class="admin-mobile-nav"><h2 class="dropdown-header">Systemadministration</h2></li>
+                  <li class="admin-mobile-nav"><a class="dropdown-item" href="#/administration">Handläggare</a></li>
+                  <li class="admin-mobile-nav"><a class="dropdown-item" href="#/case-numbering">Ärendenummer</a></li>
+                  <li class="admin-mobile-nav"><a class="dropdown-item" href="#/case-types">Ärendetyper</a></li>
+                  <li class="admin-mobile-nav"><a class="dropdown-item" href="#/support-areas">Stödområden</a></li>
+                  <li class="admin-mobile-nav"><a class="dropdown-item" href="#/geographic-areas">Geografiska områden</a></li>
+                  <li class="admin-mobile-nav"><a class="dropdown-item" href="#/learning-admin">Administrera utbildning</a></li>
+                  <li class="admin-mobile-nav"><a class="dropdown-item" href="#/support-admin">Supportärenden</a></li>
+                  <li class="admin-mobile-nav"><a class="dropdown-item" href="#/presentation">Demoläge</a></li>
+                  <li class="admin-mobile-nav"><a class="dropdown-item" href="#/routines">Rutiner</a></li>
+                  <li class="admin-mobile-nav"><a class="dropdown-item" href="#/versions">Versioner</a></li>
                   <li><hr class="dropdown-divider"></li>
                   <li><a class="dropdown-item" href="#/communications">Kommunikation</a></li>
                 </ul>
@@ -113,12 +113,16 @@
                 <div class="session-user-identity"><strong id="currentUserName">Sara Lind</strong><span id="currentUserRole">Samordnare</span></div>
               </div>
               <div class="test-user-switcher">
-                <label class="visually-hidden" for="testUserTypeSelect">Byt typ av testanvändare</label>
-                <select id="testUserTypeSelect" class="form-select form-select-sm" aria-label="Byt typ av testanvändare">
-                  <option value="coordinator">Samordnare</option>
-                  <option value="handler">Handläggare</option>
-                  <option value="mentor">Mentor</option>
+                <label class="test-user-switcher-label" for="testUserTypeSelect">Visa prototypen som</label>
+                <select id="testUserTypeSelect" class="form-select form-select-sm">
+                  <optgroup label="Kommunpersonal">
+                    <option value="coordinator">Samordnare</option>
+                    <option value="handler">Handläggare</option>
+                  </optgroup>
+                  <optgroup label="Andra portaler">
+                    <option value="mentor">Mentor</option>
                     <option value="public">Ej inloggad besökare</option>
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -2528,6 +2532,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260822-mentor-application-v116"></script>
+    <script type="module" src="app.js?v=20260822-role-switch-v117"></script>
   </body>
 </html>
