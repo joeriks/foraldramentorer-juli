@@ -19,6 +19,54 @@ export const ACTIVITY_STATUS_LABELS = {
   not_applicable: "Ej aktuell"
 };
 
+function assignmentDateKey(value) {
+  const date = value instanceof Date ? value : new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join("-");
+}
+
+function advanceAssignmentFollowUp(dateKey, frequency) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(year, month - 1, day, 12, 0, 0, 0);
+  if (frequency === "six_weeks") {
+    date.setDate(date.getDate() + 42);
+    return assignmentDateKey(date);
+  }
+  const months = frequency === "quarterly" ? 3 : 1;
+  const targetMonth = month - 1 + months;
+  const lastDay = new Date(year, targetMonth + 1, 0, 12, 0, 0, 0).getDate();
+  return assignmentDateKey(new Date(year, targetMonth, Math.min(day, lastDay), 12, 0, 0, 0));
+}
+
+export function nextAssignmentFollowUp(plan = {}, checkIns = [], now = new Date()) {
+  const firstDate = assignmentDateKey(plan.firstFollowUpDate);
+  if (!firstDate) return { state: "missing", date: null };
+
+  const completedDates = checkIns
+    .map((record) => assignmentDateKey(record.occurredOn))
+    .filter(Boolean)
+    .sort();
+  let dueDate = firstDate;
+
+  for (const completedDate of completedDates) {
+    if (completedDate < dueDate) continue;
+    if (plan.followUpFrequency === "custom") return { state: "unscheduled", date: null };
+    dueDate = advanceAssignmentFollowUp(dueDate, plan.followUpFrequency);
+  }
+
+  const endDate = assignmentDateKey(plan.endDate);
+  if (endDate && dueDate > endDate) return { state: "none", date: null };
+  const today = assignmentDateKey(now);
+  return {
+    state: dueDate < today ? "overdue" : dueDate === today ? "today" : "upcoming",
+    date: dueDate
+  };
+}
+
 const LEGACY_CASE_STATUS = {
   Nytt: "new",
   Pågår: "in_progress",

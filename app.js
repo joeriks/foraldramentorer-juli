@@ -25,6 +25,7 @@ import {
   findMentorDuplicates,
   groupParentCases,
   matchingOutcome,
+  nextAssignmentFollowUp,
   compensationReadiness,
   normalizeActivityStatus,
   normalizeApprovalCaseDescription,
@@ -35,7 +36,7 @@ import {
   resultOptions,
   stableHash,
   supportProfileRequirements
-} from "./case-domain.js?v=20260821-guided-activities-v1";
+} from "./case-domain.js?v=20260823-follow-up-v130";
 import {
   GUIDED_STEP_STATUS_LABELS,
   guidedActivityProgress,
@@ -215,6 +216,19 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "130",
+    date: "2026-08-23",
+    title: "Rätt nästa föräldraavstämning",
+    flow: "Uppdragsplan -> registrerade avstämningar -> nästa eller försenad avstämning",
+    simplified: "Mentor- och handläggarvyer visar inte längre ett passerat datum som nästa uppföljning. Missade avstämningar markeras som försenade och nästa datum räknas fram först när föregående avstämning har registrerats.",
+    retained: "Planens första avstämningsdatum och valda frekvens finns kvar oförändrade och används som grund för beräkningen.",
+    changes: [
+      "Försenade föräldraavstämningar får en tydlig varning i mentorportalen.",
+      "Nästa avstämningsdatum räknas från planen och registrerade avstämningar.",
+      "Handläggarens nästa åtgärd blir att registrera avstämningen när ett datum har passerat."
+    ]
+  },
   {
     version: "129",
     date: "2026-08-23",
@@ -6164,6 +6178,16 @@ function renderMentorAssignment() {
   }
   const plan = caseRecord.details?.assignmentPlan || {};
   const reports = assignmentRecords(caseRecord.id).reports;
+  const followUp = nextAssignmentFollowUp(plan, assignmentRecords(caseRecord.id).checkIns);
+  const followUpFact = followUp.state === "overdue"
+    ? { className: "is-past-due", label: "Föräldraavstämning försenad", value: formatDate(followUp.date), help: "Handläggaren behöver registrera avstämningen eller planera om den." }
+    : followUp.state === "today"
+      ? { className: "is-today", label: "Föräldraavstämning idag", value: formatDate(followUp.date), help: "" }
+      : followUp.state === "upcoming"
+        ? { className: "", label: "Nästa föräldraavstämning", value: formatDate(followUp.date), help: "" }
+        : followUp.state === "none"
+          ? { className: "", label: "Fler föräldraavstämningar", value: "Inga inom uppdragsperioden", help: "" }
+          : { className: "", label: "Nästa föräldraavstämning", value: "Inte planerad", help: "" };
   const parent = caseParent(caseRecord);
   const owner = responsibleHandler(caseRecord);
   const closed = caseRecord.status === "closed";
@@ -6172,7 +6196,7 @@ function renderMentorAssignment() {
     ${mentorMeetingScheduleMarkup(caseRecord)}
     ${mentorMeetingHistoryMarkup(caseRecord)}
     <div class="mentor-assignment-contact"><div><strong>Behöver du fråga något?</strong><span>Skriv till ${escapeHtml(owner?.name || "ansvarig handläggare")} om uppdraget.</span></div><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></div>
-    <div class="card-body record-grid"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div><dt>Nästa uppföljning</dt><dd>${plan.firstFollowUpDate ? escapeHtml(formatDate(plan.firstFollowUpDate)) : "Ej angivet"}</dd></div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section>
+    <div class="card-body record-grid"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div class="${followUpFact.className}"><dt>${escapeHtml(followUpFact.label)}</dt><dd>${escapeHtml(followUpFact.value)}</dd>${followUpFact.help ? `<small>${escapeHtml(followUpFact.help)}</small>` : ""}</div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section>
     <section class="record-section"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h3 class="record-section-title mb-1">Återrapportera kontakt</h3><p class="small text-secondary mb-0">Registrera en kort saklig rapport efter varje planerad kontakt.</p></div></div>${closed ? '<div class="alert alert-secondary mt-3 mb-0">Uppdraget är avslutat och tar inte emot nya rapporter.</div>' : `<form id="mentorPortalReportForm" class="mentor-report-form mt-3" data-case-id="${escapeHtml(caseRecord.id)}"><div><label class="form-label" for="mentorPortalReportDate">Datum</label><input id="mentorPortalReportDate" name="occurredOn" class="form-control" type="date" value="${new Date().toISOString().slice(0, 10)}" required></div><div><label class="form-label" for="mentorPortalReportDuration">Tid i minuter</label><input id="mentorPortalReportDuration" name="durationMinutes" class="form-control" type="number" min="1" value="60" required></div><div><label class="form-label" for="mentorPortalReportMode">Kontaktform</label><select id="mentorPortalReportMode" name="mode" class="form-select"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option><option value="message">Meddelande</option></select></div><div><label class="form-label" for="mentorPortalReportOutcome">Resultat</label><select id="mentorPortalReportOutcome" name="outcome" class="form-select"><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div><div class="mentor-report-summary"><label class="form-label" for="mentorPortalReportSummary">Kort sammanfattning</label><textarea id="mentorPortalReportSummary" name="summary" class="form-control" rows="3" required></textarea></div><div><label class="form-label" for="mentorPortalNextContact">Nästa kontakt (valfritt)</label><input id="mentorPortalNextContact" name="nextContactOn" class="form-control" type="date"></div><div class="form-check mentor-report-support"><input id="mentorPortalNeedsSupport" name="needsHandlerSupport" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorPortalNeedsSupport">Jag behöver stöd från handläggaren</label></div><div class="mentor-report-actions"><button class="btn btn-primary" type="submit">Skicka rapport</button></div></form>`}</section>
     <section class="record-section record-section-wide"><h3 class="record-section-title">Tidigare rapporter</h3><div class="table-responsive border rounded"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Datum</th><th>Kontaktform</th><th>Tid</th><th>Resultat</th><th>Sammanfattning</th></tr></thead><tbody>${reports.map((report) => `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<small class="d-block text-danger">Stöd begärt</small>' : ""}</td><td>${escapeHtml(report.summary)}</td></tr>`).join("") || '<tr><td colspan="5" class="text-center text-secondary py-3">Ingen rapport har registrerats ännu.</td></tr>'}</tbody></table></div></section></div></section>`;
 }
@@ -10584,6 +10608,8 @@ function formatMinutes(minutes) {
 function renderAssignmentNextSteps(caseRecord, records) {
   const plan = caseRecord.details?.assignmentPlan || {};
   const planReady = Boolean(plan.startDate && plan.endDate && plan.firstFollowUpDate);
+  const followUp = nextAssignmentFollowUp(plan, records.checkIns);
+  const followUpOverdue = followUp.state === "overdue";
   const latestReport = records.reports[0];
   const followUpCase = successorCases(caseRecord).find((item) => item.caseTypeId === "mentor-follow-up");
   if (els.assignmentFollowupDetails.dataset.caseId !== caseRecord.id) {
@@ -10594,14 +10620,20 @@ function renderAssignmentNextSteps(caseRecord, records) {
     ? "Uppdraget är avslutat. Underlagen är låsta men finns kvar för granskning."
     : latestReport?.needsHandlerSupport
       ? "Mentorn har efterfrågat stöd. Registrera handläggarens fortsatta uppföljning."
+      : followUpOverdue
+        ? `Föräldraavstämningen ${formatDate(followUp.date)} är försenad. Registrera avstämningen eller uppdatera planen.`
       : !planReady
         ? "Börja med att komplettera uppdragsplanen."
         : "Registrera nästa mentorrapport och föräldraavstämning när kontakterna har genomförts.";
   const actions = caseRecord.status === "closed"
     ? [["expand_history", "Visa uppföljningshistoriken", "btn-primary"]]
     : [
-        [planReady ? "new_report" : "open_plan", planReady ? "Registrera mentorrapport" : "Komplettera uppdragsplanen", "btn-primary"],
-        ["new_checkin", "Registrera föräldraavstämning", "btn-outline-primary"],
+        followUpOverdue
+          ? ["new_checkin", "Registrera föräldraavstämning", "btn-primary"]
+          : [planReady ? "new_report" : "open_plan", planReady ? "Registrera mentorrapport" : "Komplettera uppdragsplanen", "btn-primary"],
+        followUpOverdue
+          ? ["new_report", "Registrera mentorrapport", "btn-outline-primary"]
+          : ["new_checkin", "Registrera föräldraavstämning", "btn-outline-primary"],
         followUpCase
           ? ["open_case", `Öppna ${followUpCase.number}`, "btn-outline-secondary", followUpCase.id]
           : ["create_followup", "Skapa uppföljningsärende", "btn-outline-secondary", "mentor-follow-up"]

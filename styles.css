@@ -1071,6 +1071,27 @@ body.is-system-administration .sidebar-menu-group {
   margin-top: 0.25rem;
 }
 
+.mentor-plan-facts > .is-past-due {
+  border-left: 0.2rem solid #a63d40;
+  background: #fff4f2;
+}
+
+.mentor-plan-facts > .is-past-due dt,
+.mentor-plan-facts > .is-past-due dd {
+  color: #7d2c30;
+}
+
+.mentor-plan-facts > .is-past-due small {
+  display: block;
+  margin-top: 0.25rem;
+  color: #7d2c30;
+}
+
+.mentor-plan-facts > .is-today {
+  border-left: 0.2rem solid #b7791f;
+  background: #fff9e8;
+}
+
 .mentor-assignment-next-panel {
   padding: var(--app-space-3) var(--app-space-4);
   border-bottom: 1px solid var(--app-border);

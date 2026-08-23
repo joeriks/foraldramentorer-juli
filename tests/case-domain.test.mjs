@@ -23,11 +23,22 @@ import {
   normalizeCaseStatus,
   normalizeMentorStatus,
   matchingOutcome,
+  nextAssignmentFollowUp,
   compensationReadiness,
   resultClassification,
   stableHash,
   supportProfileRequirements
 } from "../case-domain.js";
+
+test("derives the next parent follow-up from the plan and completed check-ins", () => {
+  const plan = { firstFollowUpDate: "2026-07-13", followUpFrequency: "monthly", endDate: "2026-12-31" };
+  const now = new Date(2026, 7, 23, 12, 0, 0);
+
+  assert.deepEqual(nextAssignmentFollowUp(plan, [], now), { state: "overdue", date: "2026-07-13" });
+  assert.deepEqual(nextAssignmentFollowUp(plan, [{ occurredOn: "2026-07-14" }], now), { state: "overdue", date: "2026-08-13" });
+  assert.deepEqual(nextAssignmentFollowUp(plan, [{ occurredOn: "2026-07-14" }, { occurredOn: "2026-08-14" }], now), { state: "upcoming", date: "2026-09-13" });
+  assert.deepEqual(nextAssignmentFollowUp({ ...plan, followUpFrequency: "custom" }, [{ occurredOn: "2026-07-14" }], now), { state: "unscheduled", date: null });
+});
 
 test("groups a parent's linked cases by workflow stage", () => {
   const records = [
