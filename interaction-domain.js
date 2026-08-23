@@ -76,6 +76,7 @@ export function normalizeInteraction(record = {}) {
     caseId: record.caseId || null,
     activityId: record.activityId || null,
     organizerId: record.organizerId || record.createdBy || null,
+    confirmationStatus: record.confirmationStatus === "proposed" ? "proposed" : "confirmed",
     participants: Array.isArray(record.participants) ? record.participants.map((participant) => ({
       ...participant,
       roleLabel: String(participant.roleLabel || "").trim(),
@@ -109,9 +110,33 @@ export function nextScheduledMeetingForCase(records = [], caseId, now = Date.now
     .filter((record) => record.caseId === caseId
       && record.kind === "meeting"
       && record.status === "scheduled"
+      && record.confirmationStatus !== "proposed"
       && record.startsAt
       && new Date(record.startsAt).getTime() >= now)
     .sort((left, right) => new Date(left.startsAt) - new Date(right.startsAt))[0] || null;
+}
+
+export function nextProposedMeetingForCase(records = [], caseId, now = Date.now()) {
+  return records
+    .filter((record) => record.caseId === caseId
+      && record.kind === "meeting"
+      && record.status === "scheduled"
+      && record.confirmationStatus === "proposed"
+      && record.startsAt
+      && new Date(record.startsAt).getTime() >= now)
+    .sort((left, right) => new Date(left.startsAt) - new Date(right.startsAt))[0] || null;
+}
+
+export function plannedMeetingStarts({ firstStartsAt, frequency = "weekly", count = 4 } = {}) {
+  const first = new Date(firstStartsAt);
+  if (Number.isNaN(first.getTime())) return [];
+  const total = Math.max(1, Math.min(24, Number(count) || 1));
+  return Array.from({ length: total }, (_, index) => {
+    const date = new Date(first);
+    if (frequency === "monthly") date.setMonth(date.getMonth() + index);
+    else date.setDate(date.getDate() + index * (frequency === "biweekly" ? 14 : 7));
+    return date.toISOString();
+  });
 }
 
 export function interactionFromCaseMeeting(meeting, participants = []) {
@@ -126,6 +151,7 @@ export function interactionFromCaseMeeting(meeting, participants = []) {
     caseId: meeting.caseId,
     activityId: meeting.activityId,
     organizerId: meeting.organizerId || meeting.createdBy,
+    confirmationStatus: meeting.confirmationStatus,
     participants: meeting.participants?.length ? meeting.participants : participants,
     title: meeting.title || "Möte",
     mode: meeting.mode,
@@ -136,6 +162,8 @@ export function interactionFromCaseMeeting(meeting, participants = []) {
     summary: meeting.summary,
     nextStep: meeting.nextStep,
     rescheduledFromInteractionId: meeting.rescheduledFromInteractionId || null,
+    scheduleSource: meeting.scheduleSource || null,
+    scheduleIndex: Number.isInteger(meeting.scheduleIndex) ? meeting.scheduleIndex : null,
     sourceType: "case_meeting",
     sourceId: meeting.id,
     createdAt: meeting.createdAt,
@@ -174,6 +202,7 @@ export function meetingSatisfiesRequirement(interaction, requirement = "complete
   if (!interaction || interaction.kind !== "meeting") return false;
   if (requirement === "scheduled") {
     return ["scheduled", "completed"].includes(interaction.status)
+      && interaction.confirmationStatus !== "proposed"
       && Boolean(interaction.startsAt)
       && interaction.participants.length > 0;
   }

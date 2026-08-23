@@ -65,11 +65,13 @@ import {
   interactionParticipant,
   interactionStatusFromForm,
   meetingSatisfiesRequirement,
+  nextProposedMeetingForCase,
   nextScheduledMeetingForCase,
   normalizeInteraction,
+  plannedMeetingStarts,
   suggestedInteractionParticipants,
   validateInteractionForSave
-} from "./interaction-domain.js?v=20260823-mentor-next-meeting-v126";
+} from "./interaction-domain.js?v=20260823-assignment-meetings-v127";
 import {
   COMMUNICATION_CHANNEL_LABELS,
   COMMUNICATION_DIRECTION_LABELS,
@@ -211,6 +213,22 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "127",
+    date: "2026-08-23",
+    title: "Planerade möten i mentoruppdraget",
+    flow: "Handläggare -> uppdragsplan -> daterad mötesserie -> mentor kan ändra tillåtna möten",
+    simplified: "Aktiva mentoruppdrag får en färdig serie datumbestämda möten. Mentorn behöver inte skapa möten från början utan ser kommande tider samlat och kan, när handläggaren tillåter, ändra tid, plats eller ställa in ett möte.",
+    retained: "Mötesregistret, kommunikationshistoriken, automatiska påminnelser och handläggarens övriga mötesflöden fungerar vidare med samma data.",
+    changes: [
+      "Uppdragsplanen anger första mötestid och antal planerade möten.",
+      "Kontaktfrekvensen används för att skapa en daterad mötesserie.",
+      "Handläggaren styr per uppdrag om mentorn får ändra eller ställa in möten.",
+      "Mentorportalen visar nästa möte och hela den kommande mötesserien.",
+      "Ändringar och inställda möten behålls i historiken och kan följas upp.",
+      "Prototypdatat innehåller fyra möten per aktivt uppdrag samt exempel på ombokning och spärrade mentorändringar."
+    ]
+  },
   {
     version: "126",
     date: "2026-08-23",
@@ -1614,6 +1632,7 @@ let communicationChannelFilter = "";
 let communicationDirectionFilter = "";
 let candidateModal;
 let communicationComposerModal;
+let mentorPlanningModal;
 let meetingReminderSchedulerRunning = false;
 let meetingReminderTimerId = null;
 let currentView = "dashboard";
@@ -1895,6 +1914,17 @@ const els = {
   interactionSendMessageButton: document.querySelector("#interactionSendMessageButton"),
   interactionSystemCommunicationList: document.querySelector("#interactionSystemCommunicationList"),
   interactionSystemCommunicationHelp: document.querySelector("#interactionSystemCommunicationHelp"),
+  mentorPlanningModal: document.querySelector("#mentorPlanningModal"),
+  mentorPlanningForm: document.querySelector("#mentorPlanningForm"),
+  mentorPlanningContext: document.querySelector("#mentorPlanningContext"),
+  mentorPlanningModeInput: document.querySelector("#mentorPlanningModeInput"),
+  mentorPlanningStartInput: document.querySelector("#mentorPlanningStartInput"),
+  mentorPlanningDurationInput: document.querySelector("#mentorPlanningDurationInput"),
+  mentorPlanningLocationLabel: document.querySelector("#mentorPlanningLocationLabel"),
+  mentorPlanningLocationInput: document.querySelector("#mentorPlanningLocationInput"),
+  mentorPlanningMessageInput: document.querySelector("#mentorPlanningMessageInput"),
+  mentorPlanningMessageHelp: document.querySelector("#mentorPlanningMessageHelp"),
+  mentorPlanningSubmitButton: document.querySelector("#mentorPlanningSubmitButton"),
   communicationComposerModal: document.querySelector("#communicationComposerModal"),
   communicationComposerForm: document.querySelector("#communicationComposerForm"),
   communicationComposerTitle: document.querySelector("#communicationComposerTitle"),
@@ -2225,6 +2255,9 @@ const els = {
   assignmentEndDateInput: document.querySelector("#assignmentEndDateInput"),
   assignmentContactFrequencyInput: document.querySelector("#assignmentContactFrequencyInput"),
   assignmentContactModeInput: document.querySelector("#assignmentContactModeInput"),
+  assignmentFirstMeetingInput: document.querySelector("#assignmentFirstMeetingInput"),
+  assignmentPlannedMeetingCountInput: document.querySelector("#assignmentPlannedMeetingCountInput"),
+  assignmentMentorPlanningAllowedInput: document.querySelector("#assignmentMentorPlanningAllowedInput"),
   assignmentFirstFollowUpInput: document.querySelector("#assignmentFirstFollowUpInput"),
   assignmentFollowUpFrequencyInput: document.querySelector("#assignmentFollowUpFrequencyInput"),
   assignmentReportDeadlineInput: document.querySelector("#assignmentReportDeadlineInput"),
@@ -3833,7 +3866,7 @@ function exampleTemplates(count) {
   });
 }
 
-const EXAMPLE_DATA_VERSION = 7;
+const EXAMPLE_DATA_VERSION = 9;
 
 function exampleTime(base, hours) {
   return new Date(new Date(base).getTime() + (hours * 60 * 60 * 1000)).toISOString();
@@ -4417,6 +4450,8 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
           assignmentPlan: {
             startDate: monthStart, endDate: `${today.slice(0, 4)}-12-31`, contactFrequency: "weekly",
             contactMode: parentIndex % 2 ? "digital" : "physical", firstFollowUpDate: today,
+            firstMeetingAt: exampleTime(now, 24 * (3 + (parentIndex % 4))), plannedMeetingCount: 4,
+            mentorMeetingPlanningAllowed: !concern,
             followUpFrequency: "monthly", reportDeadlineDays: 3,
             note: "Mentorn kontaktar handläggaren vid avvikelse, oro eller tydligt förändrat stödbehov.",
             updatedAt: now, updatedBy: ownerId
@@ -4429,26 +4464,44 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       };
       records[CASES_STORE].push(assignmentCase);
       addAssignment(assignmentCaseId, ownerId);
-      if (!concern) {
-        const meetingStartsAt = exampleTime(now, 24 * (3 + (parentIndex % 4)));
-        const meetingEndsAt = exampleTime(meetingStartsAt, 1);
+      {
         const meetingMode = parentIndex % 2 ? "digital" : "physical";
-        records[INTERACTIONS_STORE].push({
-          id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, kind: "meeting", status: "scheduled",
-          direction: "not_applicable", caseId: assignmentCaseId, activityId: null, organizerId: ownerId,
-          participants: suggestedInteractionParticipants({
-            parent,
-            mentor,
-            handler: seedHandlers.find((handler) => handler.id === ownerId)
-          }),
-          title: "Nästa möte med föräldern", startsAt: meetingStartsAt, endsAt: meetingEndsAt,
-          mode: meetingMode, location: meetingMode === "digital" ? "Digitalt möte" : "Kommunhuset",
-          invitationText: "Gemensam avstämning om hur uppdraget fungerar och vad nästa steg ska vara.",
-          reminder: { enabled: true, offsetMinutes: 1440 }, communicationHistory: [],
-          summary: "", nextStep: "Genomför mötet och återrapportera kontakten efteråt.",
-          version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId,
-          exampleData: true, exampleDataVersion: EXAMPLE_DATA_VERSION
+        plannedMeetingStarts({ firstStartsAt: assignmentCase.details.assignmentPlan.firstMeetingAt, frequency: "weekly", count: 4 }).forEach((meetingStartsAt, scheduleIndex) => {
+          const meetingEndsAt = exampleTime(meetingStartsAt, 1);
+          const meetingId = crypto.randomUUID();
+          const interactionId = crypto.randomUUID();
+          const participants = suggestedInteractionParticipants({ parent, mentor, handler: seedHandlers.find((handler) => handler.id === ownerId) });
+          const communicationHistory = scheduleIndex === 0
+            ? [{
+                id: crypto.randomUUID(), type: "time_confirmed",
+                comment: "Dag och tid bekräftades när uppdragsplanen fastställdes.",
+                occurredAt: exampleTime(now, -24), createdAt: exampleTime(now, -24), createdBy: ownerId
+              }]
+            : scheduleIndex === 1 && parentIndex % 3 === 0
+              ? [{
+                  id: crypto.randomUUID(), type: "rescheduled",
+                  comment: "Tiden flyttades efter överenskommelse med föräldern.",
+                  occurredAt: exampleTime(now, -12), createdAt: exampleTime(now, -12), createdBy: mentor.id
+                }]
+              : [];
+          const shared = {
+            tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, activityId: null, organizerId: ownerId,
+            confirmationStatus: "confirmed", participants, title: `Planerat möte med ${parent.name}`,
+            startsAt: meetingStartsAt, endsAt: meetingEndsAt, mode: meetingMode,
+            location: meetingMode === "digital" ? "Digitalt möte" : "Kommunhuset",
+            invitationText: "Gemensam avstämning om hur uppdraget fungerar och vad nästa steg ska vara.",
+            reminder: { enabled: true, offsetMinutes: 1440 }, communicationHistory, summary: "",
+            nextStep: "Genomför mötet och återrapportera kontakten efteråt.", scheduleSource: "assignment_plan", scheduleIndex,
+            version: 1, createdAt: now, createdBy: ownerId, updatedAt: now, updatedBy: ownerId,
+            exampleData: true, exampleDataVersion: EXAMPLE_DATA_VERSION
+          };
+          records[CASE_MEETINGS_STORE].push({
+            ...shared, id: meetingId, interactionId, meetingType: "follow_up", meetingStatus: "scheduled", occurredAt: meetingStartsAt,
+            participantHandlerIds: [ownerId], externalParticipantNames: [], supersedesMeetingId: null, supersededByMeetingId: null
+          });
+          records[INTERACTIONS_STORE].push({ ...shared, id: interactionId, kind: "meeting", status: "scheduled", direction: "not_applicable", sourceType: "case_meeting", sourceId: meetingId });
         });
+        addEvent(assignmentCaseId, "assignment_meetings_planned", `Fyra möten planerades ${assignmentCase.details.assignmentPlan.mentorMeetingPlanningAllowed ? "med möjlighet för mentorn att ändra tider" : "med ändringar hanterade av handläggaren"}`);
       }
       const assignmentActivities = addActivities(assignmentCaseId, assignmentType, {
         completed: concern
@@ -5318,6 +5371,7 @@ async function refresh() {
   await loadCaseData();
   await migrateCaseDomainV6();
   await loadCaseData();
+  if (await ensureAssignmentMeetingSchedules()) await loadCaseData();
   await ensureCaseDescriptionHistory();
   await loadMatchingProfileData();
   await ensureMatchingProfileRecords();
@@ -5773,7 +5827,7 @@ function renderLearningAdministration() {
   els.learningAdminDetailPanel.innerHTML = `<div class="card-header record-header bg-white"><a class="small" href="#/learning-admin">Tillbaka till administrera utbildning</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">${learningTypeLabel(item.type)}</div><p class="record-id mb-1">Tekniskt ID ${escapeHtml(item.id)}</p><h2 class="h5 mb-0">${escapeHtml(item.title)}</h2></div><div class="d-flex gap-2 align-items-start">${selection && Number(selection.selectedVersion) < Number(item.version) ? `<button type="button" class="btn btn-outline-primary btn-sm" data-use-latest-learning="${escapeHtml(item.id)}">Använd version ${item.version}</button>` : ""}<button type="submit" form="learningAdminForm" class="btn btn-primary btn-sm">Spara ny version</button></div></div><dl class="record-meta mb-0 mt-3"><div><dt>Senaste version</dt><dd>${item.version}</dd></div><div><dt>Kommunens version</dt><dd>${selection ? selection.selectedVersion : "Ingår inte"}</dd></div><div><dt>Omfång</dt><dd>${item.scope === "shared" ? "Gemensamt bibliotek" : "Kommunens eget"}</dd></div></dl></div><form id="learningAdminForm" class="card-body record-grid" data-content-id="${escapeHtml(item.id)}"><section class="record-section"><h3 class="record-section-title">Innehåll</h3><label class="form-label" for="learningAdminTitle">Rubrik</label><input id="learningAdminTitle" class="form-control mb-3" value="${escapeHtml(item.title)}" required><label class="form-label" for="learningAdminSummary">Sammanfattning</label><textarea id="learningAdminSummary" class="form-control mb-3" rows="2" required>${escapeHtml(item.summary)}</textarea><label class="form-label" for="learningAdminMarkdown">Text i Markdown</label><textarea id="learningAdminMarkdown" class="form-control font-monospace" rows="10" required>${escapeHtml(item.bodyMarkdown)}</textarea><div class="form-text">Rubriker, listor, länkar och citat skrivs med vanlig Markdown.</div>${item.type === "test" ? `<label class="form-label mt-3" for="learningAdminPassingScore">Godkändgräns i procent</label><input id="learningAdminPassingScore" class="form-control" type="number" min="1" max="100" value="${Number(item.passingScore)}" required>` : ""}</section>${structure}</form>`;
 }
 
-const assignmentFrequencyLabels = { weekly: "Varje vecka", biweekly: "Varannan vecka", monthly: "Varje månad", as_needed: "Vid behov" };
+const assignmentFrequencyLabels = { weekly: "Varje vecka", biweekly: "Varannan vecka", monthly: "Varje månad", custom: "Enligt individuell plan", as_needed: "Vid behov" };
 
 function mentorAssignments() {
   const mentorId = currentUser().mentorId;
@@ -5794,10 +5848,71 @@ function mentorCommunicationRecords(mentorId) {
     .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
 }
 
+function communicationContactsForParty(record) {
+  const rawContact = String(record?.contactDetails || record?.contact || "").trim();
+  return {
+    email: String(record?.email || (rawContact.includes("@") ? rawContact : "")).trim(),
+    phone: String(record?.phone || (rawContact && !rawContact.includes("@") ? rawContact : "")).trim()
+  };
+}
+
+function updateMentorPlanningFormState() {
+  const mode = els.mentorPlanningModeInput.value;
+  els.mentorPlanningLocationLabel.firstChild.textContent = mode === "digital" ? "Möteslänk " : mode === "phone" ? "Telefonnotering " : "Plats ";
+  els.mentorPlanningLocationInput.hidden = mode === "phone";
+  els.mentorPlanningLocationLabel.hidden = mode === "phone";
+  els.mentorPlanningSubmitButton.textContent = "Spara ändringar";
+  const selectedChannel = els.mentorPlanningMessageInput.value;
+  els.mentorPlanningMessageHelp.textContent = selectedChannel === "none"
+    ? "Ändringen sparas utan att något meddelande förbereds."
+    : `Efter att ändringen sparats öppnas ett färdigt ${selectedChannel === "email" ? "e-postmeddelande" : "SMS"}. I prototypen registreras det i demo och skickas inte externt.`;
+}
+
+function openMentorPlanning(interactionId) {
+  const existing = allInteractions().find((item) => item.id === interactionId && item.kind === "meeting" && item.status === "scheduled");
+  const caseRecord = mentorAssignments().find((assignment) => assignment.id === existing?.caseId);
+  if (!caseRecord || !mentorCanPlanContacts(caseRecord)) {
+    showFeedback("Handläggaren hanterar ändringar av mötestider för det här uppdraget.");
+    return;
+  }
+  const parent = caseParent(caseRecord);
+  const mentor = currentMentorUser();
+  if (!parent || !mentor) {
+    showFeedback("Uppdraget saknar en förälder eller mentor att planera kontakten för.");
+    return;
+  }
+  const contacts = communicationContactsForParty(parent);
+  els.mentorPlanningForm.reset();
+  els.mentorPlanningForm.dataset.caseId = caseRecord.id;
+  els.mentorPlanningForm.dataset.interactionId = existing.id;
+  els.mentorPlanningContext.innerHTML = `<strong>${escapeHtml(parent.name)}</strong><span>${escapeHtml(formatDateTime(existing.startsAt))} · ${escapeHtml(caseRecord.number)}</span>`;
+  els.mentorPlanningModeInput.value = existing.mode || "physical";
+  els.mentorPlanningStartInput.value = localDateTimeValue(existing.startsAt);
+  const durationMinutes = existing?.startsAt && existing?.endsAt
+    ? Math.max(30, Math.round((new Date(existing.endsAt) - new Date(existing.startsAt)) / 60000))
+    : 60;
+  els.mentorPlanningDurationInput.value = [30, 45, 60, 90, 120].includes(durationMinutes) ? String(durationMinutes) : "60";
+  els.mentorPlanningLocationInput.value = existing?.location || "";
+  const emailOption = els.mentorPlanningMessageInput.querySelector('option[value="email"]');
+  const smsOption = els.mentorPlanningMessageInput.querySelector('option[value="sms"]');
+  emailOption.disabled = !contacts.email;
+  smsOption.disabled = !contacts.phone;
+  els.mentorPlanningMessageInput.value = "none";
+  if (!contacts.email && !contacts.phone) {
+    els.mentorPlanningMessageHelp.textContent = "Föräldern saknar en kontaktuppgift. Tiden kan sparas, men inget meddelande kan förberedas.";
+  }
+  els.mentorPlanningStartInput.setCustomValidity("");
+  updateMentorPlanningFormState();
+  mentorPlanningModal ||= bootstrap.Modal.getOrCreateInstance(els.mentorPlanningModal);
+  mentorPlanningModal.show();
+  setTimeout(() => els.mentorPlanningStartInput.focus(), 150);
+}
+
 function mentorAssignmentNextOverview(caseRecord) {
   const reports = assignmentRecords(caseRecord.id).reports;
   const latestReport = reports[0] || null;
-  const nextMeeting = nextScheduledMeetingForCase(allInteractions(), caseRecord.id);
+  const interactionRecords = allInteractions();
+  const nextMeeting = nextScheduledMeetingForCase(interactionRecords, caseRecord.id);
   const today = new Date().toISOString().slice(0, 10);
   const nextContact = reports
     .map((report) => report.nextContactOn)
@@ -5815,6 +5930,10 @@ function mentorAssignmentNextOverview(caseRecord) {
   return { nextMeeting, nextContact, nextAction };
 }
 
+function mentorCanPlanContacts(caseRecord) {
+  return Boolean(caseRecord && caseRecord.status !== "closed" && caseRecord.details?.assignmentPlan?.mentorMeetingPlanningAllowed !== false);
+}
+
 function mentorAssignmentNextMarkup(caseRecord) {
   const { nextMeeting, nextContact, nextAction } = mentorAssignmentNextOverview(caseRecord);
   const meetingDetails = nextMeeting
@@ -5823,7 +5942,19 @@ function mentorAssignmentNextMarkup(caseRecord) {
   return `<dl class="mentor-assignment-next">
     <div><dt>Nästa möte med föräldern</dt><dd>${nextMeeting ? escapeHtml(formatDateTime(nextMeeting.startsAt)) : "Inget möte inbokat"}</dd>${meetingDetails ? `<small>${escapeHtml(meetingDetails)}</small>` : !nextMeeting && nextContact ? `<small>Kontakt planerad ${escapeHtml(formatDate(nextContact))}, men ingen mötestid är bokad.</small>` : ""}</div>
     <div><dt>Det här gör du härnäst</dt><dd>${escapeHtml(nextAction)}</dd></div>
-  </dl>`;
+  </dl>${nextMeeting && mentorCanPlanContacts(caseRecord) ? `<button type="button" class="btn btn-outline-primary btn-sm mentor-plan-contact-button" data-mentor-edit-meeting="${escapeHtml(nextMeeting.id)}">Ändra mötet</button>` : ""}`;
+}
+
+function mentorMeetingScheduleMarkup(caseRecord) {
+  const now = Date.now();
+  const meetingsForCase = allInteractions()
+    .filter((item) => item.caseId === caseRecord.id && item.kind === "meeting" && ["scheduled", "cancelled"].includes(item.status) && item.startsAt && new Date(item.startsAt).getTime() >= now)
+    .sort((left, right) => new Date(left.startsAt) - new Date(right.startsAt));
+  const canEdit = mentorCanPlanContacts(caseRecord);
+  return `<section class="mentor-meeting-schedule"><div><h3>Planerade möten</h3><p>${canEdit ? "Du kan ändra eller ställa in en tid. Alla ändringar sparas i historiken." : "Kontakta handläggaren om en tid behöver ändras."}</p></div>${meetingsForCase.length ? `<ol>${meetingsForCase.map((meeting) => {
+    const details = [mentorMeetingModeLabels[meeting.mode] || meeting.mode, meeting.location].filter(Boolean).join(" · ");
+    return `<li class="${meeting.status === "cancelled" ? "is-cancelled" : ""}"><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><span>${escapeHtml(details || "Plats anges senare")}</span></div><span class="badge ${meeting.status === "cancelled" ? "text-bg-secondary" : "text-bg-warning"}">${meeting.status === "cancelled" ? "Inställt" : "Inplanerat"}</span>${canEdit && meeting.status === "scheduled" ? `<div class="mentor-meeting-actions"><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-edit-meeting="${escapeHtml(meeting.id)}">Ändra</button><button type="button" class="btn btn-outline-danger btn-sm" data-mentor-cancel-meeting="${escapeHtml(meeting.id)}">Ställ in</button></div>` : ""}</li>`;
+  }).join("")}</ol>` : '<p class="text-secondary mb-0">Inga kommande möten finns i uppdragsplanen.</p>'}</section>`;
 }
 
 function renderMentorHome() {
@@ -5914,6 +6045,7 @@ function renderMentorAssignment() {
   const closed = caseRecord.status === "closed";
   els.mentorPortalView.innerHTML = `<section class="card mentor-assignment-card"><div class="card-header record-header bg-white"><a class="small" href="#/mentor-assignments">Tillbaka till mina uppdrag</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">Mentoruppdrag · ${escapeHtml(caseRecord.number)}</div><h2 class="h5 mb-1">${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</h2><p class="text-secondary mb-0">${escapeHtml(caseRecord.details?.desiredOutcome || caseRecord.description || "")}</p></div><span class="${caseStatusBadge(caseRecord.status)} align-self-start">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></div><dl class="record-meta mt-3 mb-0"><div><dt>Förälder</dt><dd>${escapeHtml(parent?.name || "Ej angivet")}</dd></div><div><dt>Ansvarig handläggare</dt><dd>${escapeHtml(owner?.name || "Ej tilldelad")}</dd></div><div><dt>Period</dt><dd>${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}</dd></div></dl></div>
     <div class="mentor-assignment-next-panel">${mentorAssignmentNextMarkup(caseRecord)}</div>
+    ${mentorMeetingScheduleMarkup(caseRecord)}
     <div class="mentor-assignment-contact"><div><strong>Behöver du fråga något?</strong><span>Skriv till ${escapeHtml(owner?.name || "ansvarig handläggare")} om uppdraget.</span></div><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></div>
     <div class="card-body record-grid"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div><dt>Nästa uppföljning</dt><dd>${plan.firstFollowUpDate ? escapeHtml(formatDate(plan.firstFollowUpDate)) : "Ej angivet"}</dd></div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section>
     <section class="record-section"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h3 class="record-section-title mb-1">Återrapportera kontakt</h3><p class="small text-secondary mb-0">Registrera en kort saklig rapport efter varje planerad kontakt.</p></div></div>${closed ? '<div class="alert alert-secondary mt-3 mb-0">Uppdraget är avslutat och tar inte emot nya rapporter.</div>' : `<form id="mentorPortalReportForm" class="mentor-report-form mt-3" data-case-id="${escapeHtml(caseRecord.id)}"><div><label class="form-label" for="mentorPortalReportDate">Datum</label><input id="mentorPortalReportDate" name="occurredOn" class="form-control" type="date" value="${new Date().toISOString().slice(0, 10)}" required></div><div><label class="form-label" for="mentorPortalReportDuration">Tid i minuter</label><input id="mentorPortalReportDuration" name="durationMinutes" class="form-control" type="number" min="1" value="60" required></div><div><label class="form-label" for="mentorPortalReportMode">Kontaktform</label><select id="mentorPortalReportMode" name="mode" class="form-select"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option><option value="message">Meddelande</option></select></div><div><label class="form-label" for="mentorPortalReportOutcome">Resultat</label><select id="mentorPortalReportOutcome" name="outcome" class="form-select"><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div><div class="mentor-report-summary"><label class="form-label" for="mentorPortalReportSummary">Kort sammanfattning</label><textarea id="mentorPortalReportSummary" name="summary" class="form-control" rows="3" required></textarea></div><div><label class="form-label" for="mentorPortalNextContact">Nästa kontakt (valfritt)</label><input id="mentorPortalNextContact" name="nextContactOn" class="form-control" type="date"></div><div class="form-check mentor-report-support"><input id="mentorPortalNeedsSupport" name="needsHandlerSupport" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorPortalNeedsSupport">Jag behöver stöd från handläggaren</label></div><div class="mentor-report-actions"><button class="btn btn-primary" type="submit">Skicka rapport</button></div></form>`}</section>
@@ -6549,6 +6681,155 @@ function allInteractions() {
     .map(interactionFromIncomingContact);
   return [...stored, ...meetingProjections, ...contactProjections]
     .sort((left, right) => new Date(right.startsAt || 0) - new Date(left.startsAt || 0));
+}
+
+function assignmentMeetingPair({ caseRecord, startsAt, scheduleIndex, now, actorId = "system", meetingId = crypto.randomUUID(), interactionId = crypto.randomUUID() }) {
+  const plan = caseRecord.details?.assignmentPlan || {};
+  const mode = ["physical", "digital", "phone"].includes(plan.contactMode) ? plan.contactMode : "physical";
+  const endsAt = new Date(new Date(startsAt).getTime() + 60 * 60 * 1000).toISOString();
+  const participants = participantsForCase(caseRecord);
+  const title = `Planerat möte med ${caseParent(caseRecord)?.name || "föräldern"}`;
+  const common = {
+    tenantId: DEFAULT_TENANT_ID,
+    caseId: caseRecord.id,
+    activityId: null,
+    organizerId: caseRecord.updatedBy || actorId,
+    confirmationStatus: "confirmed",
+    participants,
+    title,
+    startsAt,
+    endsAt,
+    mode,
+    location: "",
+    invitationText: "Planerad kontakt enligt uppdragsplanen.",
+    reminder: { enabled: true, offsetMinutes: 1440 },
+    communicationHistory: [],
+    summary: "",
+    nextStep: "Förbered och genomför kontakten enligt uppdragsplanen.",
+    scheduleSource: "assignment_plan",
+    scheduleIndex,
+    version: 1,
+    createdAt: now,
+    createdBy: actorId,
+    updatedAt: now,
+    updatedBy: actorId
+  };
+  return {
+    meeting: {
+      ...common,
+      id: meetingId,
+      interactionId,
+      meetingType: "follow_up",
+      meetingStatus: "scheduled",
+      occurredAt: startsAt,
+      participantHandlerIds: participants.filter((participant) => participant.partyType === "handler").map((participant) => participant.partyId),
+      externalParticipantNames: [],
+      supersedesMeetingId: null,
+      supersededByMeetingId: null
+    },
+    interaction: normalizeInteraction({
+      ...common,
+      id: interactionId,
+      kind: "meeting",
+      status: "scheduled",
+      direction: "not_applicable",
+      sourceType: "case_meeting",
+      sourceId: meetingId
+    })
+  };
+}
+
+async function ensureAssignmentMeetingSchedules() {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const caseWrites = [];
+  const meetingWrites = [];
+  const interactionWrites = [];
+  const eventWrites = [];
+
+  for (const caseRecord of cases.filter((item) => item.caseTypeId === "mentor-assignment" && !["new", "closed"].includes(item.status))) {
+    const currentPlan = caseRecord.details?.assignmentPlan || {};
+    const desiredCount = Math.max(1, Math.min(24, Number(currentPlan.plannedMeetingCount) || 4));
+    const plannedSlots = interactions
+      .filter((item) => item.caseId === caseRecord.id && item.kind === "meeting" && item.confirmationStatus !== "proposed"
+        && (item.scheduleSource === "assignment_plan" || (item.status === "scheduled" && new Date(item.startsAt).getTime() >= now.getTime())))
+      .sort((left, right) => new Date(left.startsAt) - new Date(right.startsAt));
+    const defaultFirst = new Date(now);
+    defaultFirst.setDate(defaultFirst.getDate() + 1);
+    defaultFirst.setHours(17, 0, 0, 0);
+    const firstMeetingAt = currentPlan.firstMeetingAt || plannedSlots[0]?.startsAt || defaultFirst.toISOString();
+    const starts = plannedMeetingStarts({ firstStartsAt: firstMeetingAt, frequency: currentPlan.contactFrequency, count: desiredCount });
+    const nextPlan = {
+      ...currentPlan,
+      firstMeetingAt,
+      plannedMeetingCount: desiredCount,
+      mentorMeetingPlanningAllowed: currentPlan.mentorMeetingPlanningAllowed !== false
+    };
+    const planChanged = JSON.stringify(nextPlan) !== JSON.stringify(currentPlan);
+    let createdCount = 0;
+
+    for (let index = 0; index < desiredCount; index += 1) {
+      const existingInteraction = plannedSlots[index];
+      if (existingInteraction) {
+        const existingMeeting = caseMeetings.find((item) => item.interactionId === existingInteraction.id && !item.supersededByMeetingId);
+        if (existingMeeting) {
+          if (existingMeeting.scheduleSource !== "assignment_plan" || existingMeeting.scheduleIndex !== index) {
+            meetingWrites.push({ ...existingMeeting, scheduleSource: "assignment_plan", scheduleIndex: index });
+          }
+          if (existingInteraction.scheduleSource !== "assignment_plan" || existingInteraction.scheduleIndex !== index || existingInteraction.sourceId !== existingMeeting.id) {
+            interactionWrites.push(normalizeInteraction({ ...existingInteraction, scheduleSource: "assignment_plan", scheduleIndex: index, sourceType: "case_meeting", sourceId: existingMeeting.id }));
+          }
+          continue;
+        }
+        const pair = assignmentMeetingPair({ caseRecord: { ...caseRecord, details: { ...(caseRecord.details || {}), assignmentPlan: nextPlan } }, startsAt: existingInteraction.startsAt, scheduleIndex: index, now: existingInteraction.createdAt || nowIso, actorId: existingInteraction.createdBy || "system", interactionId: existingInteraction.id });
+        meetingWrites.push({
+          ...pair.meeting,
+          meetingStatus: existingInteraction.status,
+          confirmationStatus: existingInteraction.confirmationStatus || "confirmed",
+          title: existingInteraction.title || pair.meeting.title,
+          endsAt: existingInteraction.endsAt || pair.meeting.endsAt,
+          mode: existingInteraction.mode || pair.meeting.mode,
+          location: existingInteraction.location || "",
+          invitationText: existingInteraction.invitationText || pair.meeting.invitationText,
+          reminder: existingInteraction.reminder || pair.meeting.reminder,
+          communicationHistory: existingInteraction.communicationHistory || [],
+          summary: existingInteraction.summary || "",
+          nextStep: existingInteraction.nextStep || pair.meeting.nextStep
+        });
+        interactionWrites.push(normalizeInteraction({ ...pair.interaction, ...existingInteraction, scheduleSource: "assignment_plan", scheduleIndex: index, sourceType: "case_meeting", sourceId: pair.meeting.id, createdAt: existingInteraction.createdAt || pair.interaction.createdAt, createdBy: existingInteraction.createdBy || pair.interaction.createdBy }));
+        continue;
+      }
+      const pair = assignmentMeetingPair({ caseRecord: { ...caseRecord, details: { ...(caseRecord.details || {}), assignmentPlan: nextPlan } }, startsAt: starts[index], scheduleIndex: index, now: nowIso });
+      meetingWrites.push(pair.meeting);
+      interactionWrites.push(pair.interaction);
+      createdCount += 1;
+    }
+
+    if (planChanged || createdCount) {
+      caseWrites.push({
+        ...caseRecord,
+        details: { ...(caseRecord.details || {}), assignmentPlan: nextPlan },
+        version: Number(caseRecord.version || 1) + 1,
+        updatedAt: nowIso,
+        updatedBy: planChanged ? "system" : caseRecord.updatedBy
+      });
+      eventWrites.push({
+        id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: caseRecord.id,
+        eventType: "assignment_meetings_planned", schemaVersion: 1, entityType: "case", entityId: caseRecord.id,
+        actorId: "system", occurredAt: nowIso, correlationId: crypto.randomUUID(), idempotencyKey: crypto.randomUUID(),
+        payload: { message: `Mötesplanen fastställdes med ${desiredCount} planerade möten` }
+      });
+    }
+  }
+
+  if (!caseWrites.length && !meetingWrites.length && !interactionWrites.length) return false;
+  await atomicPut({
+    [CASES_STORE]: caseWrites,
+    [CASE_MEETINGS_STORE]: meetingWrites,
+    [INTERACTIONS_STORE]: interactionWrites,
+    [CASE_EVENTS_STORE]: eventWrites
+  });
+  return true;
 }
 
 function interactionsForParty(partyType, partyId) {
@@ -10151,6 +10432,9 @@ function renderAssignmentFollowup(caseRecord) {
     els.assignmentEndDateInput.value = plan.endDate || "";
     els.assignmentContactFrequencyInput.value = plan.contactFrequency || "weekly";
     els.assignmentContactModeInput.value = plan.contactMode || "physical";
+    els.assignmentFirstMeetingInput.value = plan.firstMeetingAt ? localDateTimeValue(plan.firstMeetingAt) : "";
+    els.assignmentPlannedMeetingCountInput.value = plan.plannedMeetingCount || 4;
+    els.assignmentMentorPlanningAllowedInput.checked = plan.mentorMeetingPlanningAllowed !== false;
     els.assignmentFirstFollowUpInput.value = plan.firstFollowUpDate || "";
     els.assignmentFollowUpFrequencyInput.value = plan.followUpFrequency || "monthly";
     els.assignmentReportDeadlineInput.value = plan.reportDeadlineDays ?? 3;
@@ -12437,7 +12721,7 @@ function caseEventRecord({ caseId, eventType, entityType = "case", entityId = ca
     schemaVersion: 1,
     entityType,
     entityId,
-    actorId: CURRENT_USER_ID,
+    actorId: currentActorId(),
     occurredAt: now,
     correlationId,
     idempotencyKey,
@@ -12975,7 +13259,8 @@ async function registerDocumentCommand({ caseRecord, activityId, type, title, do
 function registerCaseMeetingCommand({
   caseRecord, existing = null, meetingType, meetingStatus = "scheduled", occurredAt, endsAt = null,
   mode, activityId, title = "", location = "", invitationText = "", communicationHistory = [], participants = null,
-  reminder = { enabled: false, offsetMinutes: 1440 }, organizerId = CURRENT_USER_ID, summary, nextStep = "", rescheduledFromInteractionId = null
+  reminder = { enabled: false, offsetMinutes: 1440 }, organizerId = CURRENT_USER_ID, confirmationStatus = "confirmed", summary, nextStep = "", rescheduledFromInteractionId = null,
+  scheduleSource = existing?.scheduleSource || null, scheduleIndex = Number.isInteger(existing?.scheduleIndex) ? existing.scheduleIndex : null
 }) {
   if (meetingStatus === "completed" && new Date(occurredAt).getTime() > Date.now()) {
     return Promise.reject(Object.assign(new Error("Ett genomfört möte kan inte ha en tidpunkt i framtiden."), { code: "MEETING_DATE_IN_FUTURE" }));
@@ -12984,6 +13269,7 @@ function registerCaseMeetingCommand({
     return Promise.reject(Object.assign(new Error("En sammanfattning krävs för ett genomfört möte."), { code: "MEETING_SUMMARY_REQUIRED" }));
   }
   const now = new Date().toISOString();
+  const actorId = currentActorId();
   const meetingId = crypto.randomUUID();
   const interactionId = existing?.interactionId || meetingId;
   const resolvedParticipants = participants?.length ? participants : participantsForCase(caseRecord);
@@ -12991,10 +13277,10 @@ function registerCaseMeetingCommand({
     commandType: existing ? "revise_meeting" : "register_meeting",
     caseId: caseRecord.id,
     expectedVersion: null,
-    payload: { existingId: existing?.id || null, meetingType, meetingStatus, occurredAt, endsAt, mode, activityId, summary, nextStep, rescheduledFromInteractionId },
+    payload: { existingId: existing?.id || null, meetingType, meetingStatus, confirmationStatus, occurredAt, endsAt, mode, activityId, summary, nextStep, rescheduledFromInteractionId },
     additionalStores: [CASE_MEETINGS_STORE, INTERACTIONS_STORE, CASE_ACTIVITIES_STORE],
     mutate: ({ currentCase, put, event }) => {
-      if (existing) put(CASE_MEETINGS_STORE, { ...existing, supersededByMeetingId: meetingId, updatedAt: now, updatedBy: CURRENT_USER_ID });
+      if (existing) put(CASE_MEETINGS_STORE, { ...existing, supersededByMeetingId: meetingId, updatedAt: now, updatedBy: actorId });
       const meetingRecord = {
         id: meetingId,
         tenantId: DEFAULT_TENANT_ID,
@@ -13002,6 +13288,7 @@ function registerCaseMeetingCommand({
         activityId: activityId || null,
         meetingType,
         meetingStatus,
+        confirmationStatus,
         occurredAt,
         startsAt: occurredAt,
         endsAt,
@@ -13014,6 +13301,8 @@ function registerCaseMeetingCommand({
         summary,
         nextStep,
         rescheduledFromInteractionId,
+        scheduleSource,
+        scheduleIndex,
         organizerId,
         participants: resolvedParticipants,
         participantHandlerIds: resolvedParticipants.filter((participant) => participant.partyType === "handler").map((participant) => participant.partyId),
@@ -13023,9 +13312,9 @@ function registerCaseMeetingCommand({
         supersededByMeetingId: null,
         version: Number(existing?.version || 0) + 1,
         createdAt: now,
-        createdBy: CURRENT_USER_ID,
+        createdBy: actorId,
         updatedAt: now,
-        updatedBy: CURRENT_USER_ID
+        updatedBy: actorId
       };
       put(CASE_MEETINGS_STORE, meetingRecord);
       put(INTERACTIONS_STORE, normalizeInteraction({
@@ -13033,6 +13322,7 @@ function registerCaseMeetingCommand({
         tenantId: DEFAULT_TENANT_ID,
         kind: "meeting",
         status: meetingStatus,
+        confirmationStatus,
         direction: "not_applicable",
         startsAt: occurredAt,
         endsAt,
@@ -13049,13 +13339,15 @@ function registerCaseMeetingCommand({
         summary,
         nextStep,
         rescheduledFromInteractionId,
+        scheduleSource,
+        scheduleIndex,
         sourceType: "case_meeting",
         sourceId: meetingId,
         version: Number(existing?.version || 0) + 1,
         createdAt: existing?.createdAt || now,
-        createdBy: existing?.createdBy || CURRENT_USER_ID,
+        createdBy: existing?.createdBy || actorId,
         updatedAt: now,
-        updatedBy: CURRENT_USER_ID
+        updatedBy: actorId
       }));
       const linkedActivity = caseActivities.find((activity) => activity.id === activityId && activity.caseId === currentCase.id);
       if (linkedActivity && isGuidedActivityTemplate(activityDefinition(linkedActivity))) {
@@ -13071,11 +13363,11 @@ function registerCaseMeetingCommand({
           }
         }
       }
-      const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: CURRENT_USER_ID };
+      const updatedCase = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: actorId };
       put(CASES_STORE, updatedCase);
       event(existing ? "meeting_revised" : "meeting_registered", "meeting", meetingId,
-        `${existing ? "Mötesregistreringen uppdaterades" : meetingStatus === "scheduled" ? "Mötet bokades" : `Mötet registrerades som ${String(INTERACTION_STATUS_LABELS[meetingStatus] || meetingStatus).toLocaleLowerCase("sv-SE")}`}${summary ? `: ${summary}` : ""}`);
-      return { caseId: currentCase.id, meetingId, version: updatedCase.version };
+        `${existing ? "Mötesregistreringen uppdaterades" : meetingStatus === "scheduled" && confirmationStatus === "proposed" ? "Tidsförslag registrerades" : meetingStatus === "scheduled" ? "Mötet bokades" : `Mötet registrerades som ${String(INTERACTION_STATUS_LABELS[meetingStatus] || meetingStatus).toLocaleLowerCase("sv-SE")}`}${summary ? `: ${summary}` : ""}`);
+      return { caseId: currentCase.id, meetingId, interactionId, version: updatedCase.version };
     }
   });
 }
@@ -13577,7 +13869,37 @@ els.testUserTypeSelect.addEventListener("change", () => {
   showFeedback(contextMessage);
 });
 
-els.mentorPortalView.addEventListener("click", (event) => {
+els.mentorPortalView.addEventListener("click", async (event) => {
+  const editMeetingButton = event.target.closest("[data-mentor-edit-meeting]");
+  if (editMeetingButton) {
+    openMentorPlanning(editMeetingButton.dataset.mentorEditMeeting);
+    return;
+  }
+  const cancelMeetingButton = event.target.closest("[data-mentor-cancel-meeting]");
+  if (cancelMeetingButton) {
+    const interaction = allInteractions().find((item) => item.id === cancelMeetingButton.dataset.mentorCancelMeeting);
+    const caseRecord = mentorAssignments().find((assignment) => assignment.id === interaction?.caseId);
+    const existingMeeting = interaction?.sourceType === "case_meeting" ? caseMeetings.find((meeting) => meeting.id === interaction.sourceId) : null;
+    if (!caseRecord || !existingMeeting || !mentorCanPlanContacts(caseRecord)) {
+      showFeedback("Handläggaren hanterar ändringar av mötestider för det här uppdraget.");
+      return;
+    }
+    if (!window.confirm(`Ställ in mötet ${formatDateTime(interaction.startsAt)}? Mötet finns kvar i historiken.`)) return;
+    const actionAt = new Date().toISOString();
+    await registerCaseMeetingCommand({
+      caseRecord, existing: existingMeeting, meetingType: "follow_up", meetingStatus: "cancelled",
+      occurredAt: interaction.startsAt, endsAt: interaction.endsAt, mode: interaction.mode,
+      activityId: interaction.activityId, title: interaction.title, location: interaction.location,
+      invitationText: interaction.invitationText, participants: interaction.participants,
+      reminder: { enabled: false, offsetMinutes: 1440 }, organizerId: currentActorId(),
+      communicationHistory: [...interaction.communicationHistory, { id: crypto.randomUUID(), type: "cancelled", comment: "Mentorn ställde in mötet.", occurredAt: actionAt, createdAt: actionAt, createdBy: currentActorId() }],
+      summary: interaction.summary || "Mötet ställdes in av mentorn.", nextStep: "Kontakta handläggaren om ett ersättningsmöte behöver planeras."
+    });
+    markSaved();
+    await refresh();
+    showFeedback("Mötet har ställts in och finns kvar i historiken.");
+    return;
+  }
   const messageButton = event.target.closest("[data-mentor-message-case]");
   if (messageButton) {
     openMentorMessageComposer(messageButton.dataset.mentorMessageCase);
@@ -13592,6 +13914,91 @@ els.mentorPortalView.addEventListener("click", (event) => {
   if (event.target.closest("[data-cancel-mentor-profile]")) {
     mentorProfileEditMode = false;
     renderMentorProfile();
+  }
+});
+
+els.mentorPlanningForm.addEventListener("change", updateMentorPlanningFormState);
+
+els.mentorPlanningForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const caseRecord = mentorAssignments().find((assignment) => assignment.id === els.mentorPlanningForm.dataset.caseId);
+  if (!caseRecord || !mentorCanPlanContacts(caseRecord)) {
+    showFeedback("Kontakta ansvarig handläggare för att planera nästa möte.");
+    return;
+  }
+  const startsAt = els.mentorPlanningStartInput.value;
+  els.mentorPlanningStartInput.setCustomValidity(new Date(startsAt).getTime() <= Date.now() ? "Välj en tid som ligger framåt." : "");
+  if (!els.mentorPlanningForm.reportValidity()) return;
+  const parent = caseParent(caseRecord);
+  const mentor = currentMentorUser();
+  const existingInteraction = allInteractions().find((item) => item.id === els.mentorPlanningForm.dataset.interactionId);
+  const existingMeeting = existingInteraction?.sourceType === "case_meeting"
+    ? caseMeetings.find((meeting) => meeting.id === existingInteraction.sourceId)
+    : null;
+  if (!existingMeeting) {
+    showFeedback("Mötet kunde inte öppnas. Läs in sidan igen.");
+    return;
+  }
+  const durationMinutes = Number(els.mentorPlanningDurationInput.value || 60);
+  const endsAt = new Date(new Date(startsAt).getTime() + durationMinutes * 60 * 1000).toISOString();
+  const mode = els.mentorPlanningModeInput.value;
+  const participants = suggestedInteractionParticipants({ parent, mentor });
+  const actionAt = new Date().toISOString();
+  const communicationHistory = [...(existingInteraction?.communicationHistory || []), {
+    id: crypto.randomUUID(),
+    type: "rescheduled",
+    comment: `Mentorn ändrade mötet från ${formatDateTime(existingInteraction.startsAt)}.`,
+    occurredAt: actionAt,
+    createdAt: actionAt,
+    createdBy: currentActorId()
+  }];
+  const contactLabel = mode === "phone" ? "telefonsamtal" : mode === "digital" ? "digitala möte" : "möte";
+  const invitationText = `Hej ${parent.name}! Tiden för vårt ${contactLabel} har ändrats till ${formatDateTime(new Date(startsAt).toISOString())}.`;
+  els.mentorPlanningSubmitButton.disabled = true;
+  els.mentorPlanningSubmitButton.textContent = "Sparar...";
+  try {
+    const result = await registerCaseMeetingCommand({
+      caseRecord,
+      existing: existingMeeting,
+      meetingType: "follow_up",
+      meetingStatus: "scheduled",
+      confirmationStatus: "confirmed",
+      occurredAt: startsAt,
+      endsAt,
+      mode,
+      activityId: existingInteraction?.activityId || meetingActivityForCase(caseRecord)?.id || null,
+      title: `Nästa kontakt med ${parent.name}`,
+      location: mode === "phone" ? "" : els.mentorPlanningLocationInput.value.trim(),
+      invitationText,
+      communicationHistory,
+      participants,
+      reminder: { enabled: true, offsetMinutes: 1440 },
+      organizerId: currentActorId(),
+      summary: "",
+      nextStep: "Förbered och genomför kontakten enligt uppdragsplanen."
+    });
+    const channel = els.mentorPlanningMessageInput.value;
+    mentorPlanningModal.hide();
+    markSaved();
+    await refresh();
+    const savedInteraction = allInteractions().find((item) => item.id === result.interactionId);
+    const contacts = communicationContactsForParty(parent);
+    if (["email", "sms"].includes(channel) && savedInteraction && contacts[channel === "email" ? "email" : "phone"]) {
+      setTimeout(() => openCommunicationComposer({
+        channel,
+        interaction: savedInteraction,
+        caseRecord: cases.find((item) => item.id === caseRecord.id),
+        recipient: { displayName: parent.name, ...contacts, partyType: "parent", partyId: parent.id }
+      }), 250);
+    } else {
+      showFeedback("Mötet har ändrats.");
+    }
+  } catch (error) {
+    console.error("Kunde inte planera nästa kontakt", error);
+    showFeedback(error?.message || "Kontakten kunde inte planeras.");
+  } finally {
+    els.mentorPlanningSubmitButton.disabled = false;
+    updateMentorPlanningFormState();
   }
 });
 
@@ -14365,6 +14772,7 @@ els.interactionForm.addEventListener("submit", async (event) => {
     caseId: caseRecord?.id || null,
     activityId: existingInteraction?.activityId || els.interactionForm.dataset.activityId || meetingActivityForCase(caseRecord)?.id || null,
     organizerId: els.interactionOrganizerInput.value || CURRENT_USER_ID,
+    confirmationStatus: existingInteraction?.confirmationStatus || "confirmed",
     participants,
     title: els.interactionTitleInput.value.trim(),
     mode: interactionKind === "meeting" ? els.interactionModeInput.value : interactionKind,
@@ -14400,6 +14808,7 @@ els.interactionForm.addEventListener("submit", async (event) => {
         communicationHistory: common.communicationHistory,
         participants,
         organizerId: common.organizerId,
+        confirmationStatus: common.confirmationStatus,
         summary: common.summary,
         nextStep: common.nextStep,
         rescheduledFromInteractionId: common.rescheduledFromInteractionId
@@ -15274,6 +15683,14 @@ els.assignmentPlanForm.addEventListener("submit", async (event) => {
     return;
   }
   els.assignmentFirstFollowUpInput.setCustomValidity("");
+  const firstMeetingAt = els.assignmentFirstMeetingInput.value;
+  const firstMeetingDate = firstMeetingAt.slice(0, 10);
+  if (firstMeetingDate < els.assignmentStartDateInput.value || firstMeetingDate > els.assignmentEndDateInput.value) {
+    els.assignmentFirstMeetingInput.setCustomValidity("Det första mötet ska ligga inom uppdragstiden.");
+    els.assignmentFirstMeetingInput.reportValidity();
+    return;
+  }
+  els.assignmentFirstMeetingInput.setCustomValidity("");
   await executeCaseCommand({
     commandType: "save_assignment_plan",
     caseId: caseRecord.id,
@@ -15285,6 +15702,9 @@ els.assignmentPlanForm.addEventListener("submit", async (event) => {
         endDate: els.assignmentEndDateInput.value,
         contactFrequency: els.assignmentContactFrequencyInput.value,
         contactMode: els.assignmentContactModeInput.value,
+        firstMeetingAt: new Date(firstMeetingAt).toISOString(),
+        plannedMeetingCount: Number(els.assignmentPlannedMeetingCountInput.value),
+        mentorMeetingPlanningAllowed: els.assignmentMentorPlanningAllowedInput.checked,
         firstFollowUpDate: els.assignmentFirstFollowUpInput.value,
         followUpFrequency: els.assignmentFollowUpFrequencyInput.value,
         reportDeadlineDays: Number(els.assignmentReportDeadlineInput.value),

@@ -1026,6 +1026,67 @@ body.is-system-administration .sidebar-menu-group {
   margin: 0;
 }
 
+.mentor-meeting-schedule {
+  padding: var(--app-space-4);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.mentor-meeting-schedule > div > h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.mentor-meeting-schedule > div > p {
+  margin: 0.2rem 0 var(--app-space-3);
+  color: var(--app-text-muted);
+  font-size: 0.875rem;
+}
+
+.mentor-meeting-schedule ol {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border: 1px solid var(--app-border);
+}
+
+.mentor-meeting-schedule li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--app-space-3);
+  padding: var(--app-space-3);
+}
+
+.mentor-meeting-schedule li + li {
+  border-top: 1px solid var(--app-border);
+}
+
+.mentor-meeting-schedule li > div:first-child,
+.mentor-meeting-schedule time,
+.mentor-meeting-schedule li > div:first-child span {
+  display: block;
+  min-width: 0;
+}
+
+.mentor-meeting-schedule time {
+  font-weight: 700;
+}
+
+.mentor-meeting-schedule li > div:first-child span {
+  color: var(--app-text-muted);
+  font-size: 0.875rem;
+}
+
+.mentor-meeting-schedule .is-cancelled time,
+.mentor-meeting-schedule .is-cancelled > div:first-child span {
+  text-decoration: line-through;
+}
+
+.mentor-meeting-actions {
+  display: flex;
+  gap: var(--app-space-2);
+}
+
 .mentor-home-assignment-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2144,6 +2205,22 @@ body.is-system-administration .sidebar-menu-group {
   body.is-mentor-portal .mentor-message-actions article {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  body.is-mentor-portal .mentor-meeting-schedule {
+    padding: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-meeting-schedule li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  body.is-mentor-portal .mentor-meeting-actions {
+    grid-column: 1 / -1;
+  }
+
+  body.is-mentor-portal .mentor-meeting-actions .btn {
+    flex: 1;
   }
 
   body.is-mentor-portal .mentor-assignment-contact .btn,

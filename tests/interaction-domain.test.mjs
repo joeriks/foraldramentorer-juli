@@ -6,7 +6,9 @@ import {
   interactionParticipant,
   interactionStatusFromForm,
   meetingSatisfiesRequirement,
+  nextProposedMeetingForCase,
   nextScheduledMeetingForCase,
+  plannedMeetingStarts,
   normalizeInteraction,
   suggestedInteractionParticipants,
   validateInteractionForSave
@@ -17,11 +19,26 @@ test("finds the next scheduled meeting for a case", () => {
     { id: "past", caseId: "case-1", kind: "meeting", status: "scheduled", startsAt: "2026-08-20T10:00:00.000Z" },
     { id: "later", caseId: "case-1", kind: "meeting", status: "scheduled", startsAt: "2026-08-25T10:00:00.000Z" },
     { id: "next", caseId: "case-1", kind: "meeting", status: "scheduled", startsAt: "2026-08-24T10:00:00.000Z" },
+    { id: "proposal", caseId: "case-1", kind: "meeting", status: "scheduled", confirmationStatus: "proposed", startsAt: "2026-08-22T10:00:00.000Z" },
     { id: "cancelled", caseId: "case-1", kind: "meeting", status: "cancelled", startsAt: "2026-08-23T10:00:00.000Z" },
     { id: "other-case", caseId: "case-2", kind: "meeting", status: "scheduled", startsAt: "2026-08-23T10:00:00.000Z" }
   ];
   assert.equal(nextScheduledMeetingForCase(records, "case-1", new Date("2026-08-21T12:00:00.000Z").getTime())?.id, "next");
+  assert.equal(nextProposedMeetingForCase(records, "case-1", new Date("2026-08-21T12:00:00.000Z").getTime())?.id, "proposal");
   assert.equal(nextScheduledMeetingForCase(records, "missing", new Date("2026-08-21T12:00:00.000Z").getTime()), null);
+});
+
+test("builds a dated meeting series from the assignment plan", () => {
+  assert.deepEqual(plannedMeetingStarts({
+    firstStartsAt: "2026-09-01T15:00:00.000Z",
+    frequency: "biweekly",
+    count: 3
+  }), [
+    "2026-09-01T15:00:00.000Z",
+    "2026-09-15T15:00:00.000Z",
+    "2026-09-29T15:00:00.000Z"
+  ]);
+  assert.equal(plannedMeetingStarts({ firstStartsAt: "", count: 4 }).length, 0);
 });
 
 test("suggests known case parties without requiring the handler to attend", () => {
@@ -40,6 +57,7 @@ test("keeps booking and completion requirements separate", () => {
     occurredAt: "2026-08-21T10:00:00.000Z", summary: ""
   }, suggestedInteractionParticipants({ parent: { id: "parent-1", name: "Anna" } }));
   assert.equal(meetingSatisfiesRequirement(booked, "scheduled"), true);
+  assert.equal(meetingSatisfiesRequirement({ ...booked, confirmationStatus: "proposed" }, "scheduled"), false);
   assert.equal(meetingSatisfiesRequirement(booked, "completed"), false);
   assert.equal(meetingSatisfiesRequirement({ ...booked, status: "cancelled" }, "scheduled"), false);
   assert.equal(meetingSatisfiesRequirement({ ...booked, status: "no_show", summary: "Mentorn uteblev." }, "completed"), false);

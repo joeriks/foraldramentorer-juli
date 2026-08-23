@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260823-mentor-next-meeting-v126">
+    <link rel="stylesheet" href="styles.css?v=20260823-assignment-meetings-v127">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -1203,6 +1203,9 @@
                           <div class="col-md-3"><label class="form-label" for="assignmentEndDateInput">Planerat slutdatum</label><input id="assignmentEndDateInput" class="form-control form-control-sm" type="date" required></div>
                           <div class="col-md-3"><label class="form-label" for="assignmentContactFrequencyInput">Kontaktfrekvens</label><select id="assignmentContactFrequencyInput" class="form-select form-select-sm" required><option value="weekly">Varje vecka</option><option value="biweekly">Varannan vecka</option><option value="monthly">Varje månad</option><option value="custom">Enligt individuell plan</option></select></div>
                           <div class="col-md-3"><label class="form-label" for="assignmentContactModeInput">Normal kontaktform</label><select id="assignmentContactModeInput" class="form-select form-select-sm" required><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option><option value="mixed">Blandat</option></select></div>
+                          <div class="col-md-4"><label class="form-label" for="assignmentFirstMeetingInput">Första planerade mötet</label><input id="assignmentFirstMeetingInput" class="form-control form-control-sm" type="datetime-local" required></div>
+                          <div class="col-md-2"><label class="form-label" for="assignmentPlannedMeetingCountInput">Antal möten</label><input id="assignmentPlannedMeetingCountInput" class="form-control form-control-sm" type="number" min="1" max="24" value="4" required></div>
+                          <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-1"><input id="assignmentMentorPlanningAllowedInput" class="form-check-input" type="checkbox" checked><label class="form-check-label" for="assignmentMentorPlanningAllowedInput">Mentorn får ändra tid, plats och ställa in planerade möten</label></div></div>
                           <div class="col-md-3"><label class="form-label" for="assignmentFirstFollowUpInput">Första föräldraavstämning</label><input id="assignmentFirstFollowUpInput" class="form-control form-control-sm" type="date" required></div>
                           <div class="col-md-3"><label class="form-label" for="assignmentFollowUpFrequencyInput">Fortsatt avstämning</label><select id="assignmentFollowUpFrequencyInput" class="form-select form-select-sm" required><option value="monthly">Varje månad</option><option value="six_weeks">Var sjätte vecka</option><option value="quarterly">Var tredje månad</option><option value="custom">Enligt individuell plan</option></select></div>
                           <div class="col-md-3"><label class="form-label" for="assignmentReportDeadlineInput">Mentorn rapporterar inom</label><div class="input-group input-group-sm"><input id="assignmentReportDeadlineInput" class="form-control" type="number" min="0" max="30" required value="3"><span class="input-group-text">dagar</span></div></div>
@@ -2328,6 +2331,29 @@
       </div>
     </aside>
 
+    <div class="modal fade" id="mentorPlanningModal" tabindex="-1" aria-labelledby="mentorPlanningTitle" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <form id="mentorPlanningForm" class="modal-content mentor-planning-form">
+          <div class="modal-header">
+            <div><div class="record-type">Planerat möte</div><h2 id="mentorPlanningTitle" class="modal-title h5 mb-0">Ändra mötet</h2></div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button>
+          </div>
+          <div class="modal-body">
+            <div id="mentorPlanningContext" class="mentor-planning-context"></div>
+            <p class="text-secondary">Ändra datum, tid eller plats för det här mötet. Den tidigare tiden finns kvar i historiken.</p>
+            <div class="mentor-planning-grid">
+              <div><label class="form-label" for="mentorPlanningModeInput">Kontaktform</label><select id="mentorPlanningModeInput" name="mode" class="form-select" required><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefonsamtal</option></select></div>
+              <div><label class="form-label" for="mentorPlanningStartInput">Datum och tid</label><input id="mentorPlanningStartInput" name="startsAt" class="form-control" type="datetime-local" required></div>
+              <div><label class="form-label" for="mentorPlanningDurationInput">Ungefärlig längd</label><select id="mentorPlanningDurationInput" name="durationMinutes" class="form-select"><option value="30">30 minuter</option><option value="45">45 minuter</option><option value="60" selected>1 timme</option><option value="90">1,5 timmar</option><option value="120">2 timmar</option></select></div>
+              <div><label id="mentorPlanningLocationLabel" class="form-label" for="mentorPlanningLocationInput">Plats <span class="text-secondary fw-normal">(valfritt)</span></label><input id="mentorPlanningLocationInput" name="location" class="form-control" autocomplete="off"></div>
+            </div>
+            <div class="mentor-planning-message"><label class="form-label" for="mentorPlanningMessageInput">Meddelande efter att tiden sparats</label><select id="mentorPlanningMessageInput" name="messageChannel" class="form-select"><option value="none">Inget meddelande nu</option><option value="email">Förbered e-post i demo</option><option value="sms">Förbered SMS i demo</option></select><p id="mentorPlanningMessageHelp" class="form-text mb-0"></p></div>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Avbryt</button><button id="mentorPlanningSubmitButton" type="submit" class="btn btn-primary">Spara ändringar</button></div>
+        </form>
+      </div>
+    </div>
+
     <div class="modal fade" id="communicationComposerModal" tabindex="-1" aria-labelledby="communicationComposerTitle" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-lg">
         <form id="communicationComposerForm" class="modal-content">
@@ -2573,6 +2599,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260823-mentor-next-meeting-v126"></script>
+    <script type="module" src="app.js?v=20260823-assignment-meetings-v127"></script>
   </body>
 </html>

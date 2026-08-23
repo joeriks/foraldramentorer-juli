@@ -2,8 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [app, styles, domain] = await Promise.all([
+const [app, html, styles, domain] = await Promise.all([
   readFile(new URL("../app.js", import.meta.url), "utf8"),
+  readFile(new URL("../index.html", import.meta.url), "utf8"),
   readFile(new URL("../styles.css", import.meta.url), "utf8"),
   readFile(new URL("../mentor-self-service-domain.js", import.meta.url), "utf8")
 ]);
@@ -18,6 +19,19 @@ test("lets a mentor edit self-service fields but keeps protected fields read-onl
   const formRenderer = app.match(/function renderMentorProfileForm[\s\S]*?\n}\n/)?.[0] || "";
   assert.doesNotMatch(formRenderer, /personalNumber|identityMethod|registryChecked/);
   assert.match(formRenderer, /Uppgifter som kommunen ansvarar för/);
+});
+
+test("shows the assignment meeting series and limits mentor actions by the assignment plan", () => {
+  assert.match(html, /id="assignmentFirstMeetingInput"/);
+  assert.match(html, /id="assignmentPlannedMeetingCountInput"/);
+  assert.match(html, /id="assignmentMentorPlanningAllowedInput"/);
+  assert.match(app, /plannedMeetingStarts/);
+  assert.match(app, /mentorMeetingPlanningAllowed/);
+  assert.match(app, /mentor-meeting-schedule/);
+  assert.match(app, /data-mentor-edit-meeting/);
+  assert.match(app, /data-mentor-cancel-meeting/);
+  assert.match(app, /Mötet har ställts in och finns kvar i historiken/);
+  assert.match(styles, /\.mentor-meeting-schedule/);
 });
 
 test("persists an immutable audit event and a new matching profile version atomically", () => {
