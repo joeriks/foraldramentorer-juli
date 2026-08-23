@@ -40,11 +40,15 @@ test("keeps the profile editor within the mobile document width", () => {
 
 test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(app, /classList\.toggle\("is-mentor-portal", isMentorSession\(\)\)/);
-  assert.match(app, /Fortsätt uppdraget/);
-  assert.match(app, /mentor-next-contact/);
+  const homeRenderer = app.match(/function renderMentorHome\(\)[\s\S]*?\n}\n\nfunction renderMentorMessages/)?.[0] || "";
+  assert.match(homeRenderer, /Ditt uppdrag/);
+  assert.match(homeRenderer, /Öppna uppdraget/);
+  assert.match(homeRenderer, /Skriv till handläggaren/);
+  assert.doesNotMatch(homeRenderer, /mentor-summary-grid|Fortsätt uppdraget/);
   assert.match(app, /mentor-assignment-mobile-list/);
   assert.match(app, /mentor-assignments-table/);
-  assert.match(styles, /body\.is-mentor-portal \.mentor-summary-grid[\s\S]*display: none/);
+  assert.match(styles, /body\.is-mentor-portal \.mentor-home-assignment-item[\s\S]*grid-template-columns: 1fr/);
+  assert.match(styles, /body\.is-mentor-portal \.mentor-home-assignment-actions[\s\S]*flex-direction: column/);
   assert.match(styles, /body\.is-mentor-portal \.mentor-assignments-table[\s\S]*display: none/);
   assert.match(styles, /body\.is-mentor-portal \.mentor-assignment-mobile-list[\s\S]*display: block/);
   assert.match(styles, /body\.is-mentor-portal \.system-status/);

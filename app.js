@@ -105,7 +105,7 @@ import {
   prepareLearningMarkdown,
   requiredLearningContentIds,
   scoreKnowledgeTest
-} from "./learning-domain.js?v=20260823-mentor-pwa-v124";
+} from "./learning-domain.js?v=20260823-mentor-simple-v125";
 import {
   containsSensitivePersonalData,
   findSupportKnowledge,
@@ -210,6 +210,23 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "125",
+    date: "2026-08-23",
+    title: "Enklare mentorstart och meddelanden till handläggaren",
+    flow: "Mentorportal -> öppna uppdrag eller skriv till handläggaren",
+    simplified: "Startsidan utgår nu från mentorns ett eller få aktiva uppdrag. Den dubbla fortsätt-knappen och sammanfattande statistikrutor har tagits bort, och varje val förklarar kort vad mentorn kan göra.",
+    retained: "Uppdrag, rapportering, utbildning, profil, installation och den gemensamma kommunikationshistoriken fungerar vidare med samma data.",
+    changes: [
+      "Den generella Fortsätt uppdraget-knappen högst upp har tagits bort.",
+      "Ett enda aktivt uppdrag visas som Ditt uppdrag med en tydlig knapp för att öppna det.",
+      "Länken Alla uppdrag visas bara när det finns fler uppdrag att se.",
+      "Utbildning och meddelanden har fått egna korta val med tydliga verb.",
+      "Mentorn kan skriva e-post eller SMS till ansvarig handläggare från startsidan, uppdraget eller den nya sidan Meddelanden.",
+      "Mottagare och uppdragskoppling fylls i automatiskt och kommunikationen sparas i det befintliga globala registret.",
+      "E-post- och SMS-leverantörerna är fortsatt demo och skickar inget externt."
+    ]
+  },
   {
     version: "124",
     date: "2026-08-23",
@@ -1639,6 +1656,7 @@ let caseHistoryFilter = "all";
 let caseDescriptionExpanded = false;
 let deferredMentorInstallPrompt = null;
 let mentorInstallModal = null;
+let communicationComposerRecipient = null;
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
@@ -1674,6 +1692,7 @@ const els = {
   navGeographicAreas: document.querySelector("#navGeographicAreas"),
   navMentorHome: document.querySelector("#navMentorHome"),
   navMentorAssignments: document.querySelector("#navMentorAssignments"),
+  navMentorMessages: document.querySelector("#navMentorMessages"),
   navMentorLearning: document.querySelector("#navMentorLearning"),
   navMentorProfile: document.querySelector("#navMentorProfile"),
   navPublicHome: document.querySelector("#navPublicHome"),
@@ -1865,6 +1884,7 @@ const els = {
   communicationComposerTitle: document.querySelector("#communicationComposerTitle"),
   communicationContextSummary: document.querySelector("#communicationContextSummary"),
   communicationCaseInput: document.querySelector("#communicationCaseInput"),
+  communicationCaseField: document.querySelector("#communicationCaseField"),
   communicationRecipientNameInput: document.querySelector("#communicationRecipientNameInput"),
   communicationRecipientAddressLabel: document.querySelector("#communicationRecipientAddressLabel"),
   communicationRecipientAddressInput: document.querySelector("#communicationRecipientAddressInput"),
@@ -5731,6 +5751,12 @@ function mentorCourseSummary(mentorId) {
   return { courses, completed };
 }
 
+function mentorCommunicationRecords(mentorId) {
+  return communications
+    .filter((record) => record.createdBy === mentorId || record.recipients.some((recipient) => recipient.partyId === mentorId))
+    .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
+}
+
 function renderMentorHome() {
   const mentor = currentMentorUser();
   if (!mentor) {
@@ -5739,34 +5765,50 @@ function renderMentorHome() {
   }
   const assignments = mentorAssignments();
   const activeAssignments = assignments.filter((caseRecord) => caseRecord.status !== "closed");
-  const reports = mentorReports.filter((report) => report.mentorId === mentor.id);
   const learning = mentorCourseSummary(mentor.id);
-  const nextContact = reports.map((report) => report.nextContactOn).filter((date) => date && date >= new Date().toISOString().slice(0, 10)).sort()[0] || null;
   const latestAssignment = activeAssignments[0] || assignments[0] || null;
   const nextCourse = learning.courses.find((course) => courseProgressPercent(course, learningProgressRecord(mentor.id, course.id).completedModuleIds) < 100) || null;
-  const primaryAction = latestAssignment
-    ? { href: `#/mentor-assignment/${escapeHtml(latestAssignment.id)}`, label: "Fortsätt uppdraget" }
-    : nextCourse
-      ? { href: `#/learning/${encodeURIComponent(nextCourse.id)}`, label: "Fortsätt utbildningen" }
-      : { href: "#/mentor-profile", label: "Visa min profil" };
+  const assignmentHeading = activeAssignments.length === 1 ? "Ditt uppdrag" : "Dina uppdrag";
+  const assignmentSummary = activeAssignments.length === 1
+    ? "Du har ett aktivt uppdrag."
+    : activeAssignments.length > 1
+      ? `Du har ${activeAssignments.length} aktiva uppdrag.`
+      : "Du har inget aktivt uppdrag just nu.";
   els.mentorPortalView.innerHTML = `
-    <section class="mentor-welcome">
-      <div><div class="record-type">Mentorportal</div><h2>Hej, ${escapeHtml(mentor.name)}</h2><p class="mentor-welcome-copy">Här ser du dina uppdrag, rapporterar genomförda kontakter och fortsätter din utbildning.</p>${nextContact ? `<p class="mentor-next-contact"><strong>Nästa kontakt</strong> ${escapeHtml(formatDate(nextContact))}</p>` : ""}</div>
-      <a class="btn btn-primary" href="${primaryAction.href}">${primaryAction.label}</a>
-    </section>
-    <section class="mentor-summary-grid" aria-label="Din sammanfattning">
-      <article><strong>${activeAssignments.length}</strong><span>aktiva uppdrag</span></article>
-      <article><strong>${reports.length}</strong><span>registrerade rapporter</span></article>
-      <article><strong>${learning.completed} av ${learning.courses.length}</strong><span>kurser klara</span></article>
-      <article><strong>${nextContact ? escapeHtml(formatDate(nextContact)) : "Ej planerad"}</strong><span>nästa kontakt</span></article>
+    <section class="mentor-home-intro">
+      <div class="record-type">Mentorportal</div>
+      <h2>Hej, ${escapeHtml(mentor.name)}</h2>
+      <p>${escapeHtml(assignmentSummary)} Välj vad du vill göra nedan.</p>
     </section>
     <div class="mentor-home-grid">
-      <section class="card mentor-home-assignments"><div class="card-header bg-white"><h3 class="h5 mb-1">Mina uppdrag</h3><p class="text-secondary mb-0 mentor-home-help">Aktuella överenskommelser och återrapportering.</p></div><div class="list-group list-group-flush">${activeAssignments.slice(0, 3).map((caseRecord) => {
+      <section class="card mentor-home-assignments"><div class="card-header bg-white"><h3 class="h5 mb-1">${assignmentHeading}</h3><p class="text-secondary mb-0 mentor-home-help">Öppna ett uppdrag för att se planen eller rapportera en genomförd kontakt.</p></div><div class="mentor-home-assignment-list">${activeAssignments.slice(0, 3).map((caseRecord) => {
         const parent = caseParent(caseRecord);
-        return `<a class="list-group-item list-group-item-action mentor-task-link" href="#/mentor-assignment/${escapeHtml(caseRecord.id)}"><span><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><small>${escapeHtml(parent?.name || "Förälder")} · ${escapeHtml(caseStatusLabel(caseRecord.status))}</small></span><span>Öppna</span></a>`;
-      }).join("") || '<div class="card-body text-secondary">Du har inga aktiva uppdrag.</div>'}</div><div class="card-footer bg-white"><a href="#/mentor-assignments">Alla uppdrag</a></div></section>
-      <section class="card mentor-home-learning"><div class="card-header bg-white"><h3 class="h5 mb-1">Utbildning</h3><p class="text-secondary mb-0 mentor-home-help">Kommunens kurser och material för mentorer.</p></div><div class="card-body"><p class="mentor-progress-value"><strong>${learning.completed}</strong> av ${learning.courses.length} kurser slutförda</p><div class="progress mb-3" role="progressbar" aria-label="Genomförda kurser" aria-valuenow="${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}%"></div></div><a class="btn btn-outline-primary btn-sm" href="#/learning">${nextCourse ? "Fortsätt utbildningen" : "Visa utbildningar"}</a></div></section>
+        const assignmentReports = assignmentRecords(caseRecord.id).reports;
+        const nextContact = assignmentReports.map((report) => report.nextContactOn).filter((date) => date && date >= new Date().toISOString().slice(0, 10)).sort()[0] || null;
+        return `<article class="mentor-home-assignment-item"><div><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><p>${escapeHtml(parent?.name || "Förälder")} · ${escapeHtml(caseStatusLabel(caseRecord.status))}</p>${nextContact ? `<small>Nästa kontakt ${escapeHtml(formatDate(nextContact))}</small>` : '<small>Ingen nästa kontakt planerad</small>'}</div><div class="mentor-home-assignment-actions"><a class="btn btn-primary btn-sm" href="#/mentor-assignment/${escapeHtml(caseRecord.id)}">Öppna uppdraget</a><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}">Skriv till handläggaren</button></div></article>`;
+      }).join("") || '<div class="card-body"><p class="text-secondary mb-2">När ett uppdrag startar visas det här.</p><a href="#/learning">Fortsätt med utbildningen under tiden</a></div>'}</div>${assignments.length > activeAssignments.slice(0, 3).length ? '<div class="card-footer bg-white"><a href="#/mentor-assignments">Visa alla uppdrag</a></div>' : ""}</section>
+      <div class="mentor-home-side">
+        <section class="card mentor-home-learning"><div class="card-header bg-white"><h3 class="h5 mb-1">Din utbildning</h3></div><div class="card-body"><p class="mentor-progress-value"><strong>${learning.completed}</strong> av ${learning.courses.length} kurser slutförda</p><div class="progress mb-3" role="progressbar" aria-label="Genomförda kurser" aria-valuenow="${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}%"></div></div><a class="btn btn-outline-primary btn-sm" href="#/learning">${nextCourse ? "Fortsätt utbildningen" : "Visa utbildningarna"}</a></div></section>
+        <section class="card mentor-home-messages"><div class="card-header bg-white"><h3 class="h5 mb-1">Meddelanden</h3></div><div class="card-body"><p>Fråga din handläggare om uppdraget eller be om stöd.</p>${latestAssignment ? `<button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(latestAssignment.id)}">Skriv till handläggaren</button>` : '<p class="small text-secondary mb-0">Du kan skriva till en handläggare när du har fått ett uppdrag.</p>'}</div><div class="card-footer bg-white"><a href="#/mentor-messages">Visa meddelanden</a></div></section>
+      </div>
     </div>`;
+}
+
+function renderMentorMessages() {
+  const mentor = currentMentorUser();
+  if (!mentor) return renderMentorHome();
+  const assignments = mentorAssignments();
+  const activeAssignments = assignments.filter((caseRecord) => caseRecord.status !== "closed");
+  const records = mentorCommunicationRecords(mentor.id);
+  els.mentorPortalView.innerHTML = `
+    <section class="card mentor-messages-card">
+      <div class="card-header bg-white"><h2 class="h5 mb-1">Meddelanden</h2><p class="text-secondary mb-0">Skriv till ansvarig handläggare om ett av dina uppdrag.</p></div>
+      <div class="mentor-message-actions"><h3 class="h6">Välj uppdrag</h3>${activeAssignments.length ? activeAssignments.map((caseRecord) => {
+        const owner = responsibleHandler(caseRecord);
+        return `<article><div><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><small>${escapeHtml(caseRecord.number)} · Handläggare ${escapeHtml(owner?.name || "ej tilldelad")}</small></div><button type="button" class="btn btn-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></article>`;
+      }).join("") : '<p class="text-secondary mb-0">Du har inget aktivt uppdrag att koppla ett meddelande till.</p>'}</div>
+      <section class="mentor-message-history"><h3 class="h6">Tidigare meddelanden</h3>${records.length ? `<ol>${records.map((record) => `<li><div><strong>${escapeHtml(record.subject || (record.channel === "sms" ? "SMS" : "Meddelande"))}</strong><small>${escapeHtml(COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel)} · ${escapeHtml(formatDateTime(record.createdAt))}</small></div><p>${escapeHtml(record.body)}</p><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(COMMUNICATION_STATUS_LABELS[record.status] || record.status)}</span></li>`).join("")}</ol>` : '<p class="text-secondary mb-0">Du har inte skickat några meddelanden ännu.</p>'}</section>
+    </section>`;
 }
 
 function renderMentorAssignments() {
@@ -5804,6 +5846,7 @@ function renderMentorAssignment() {
   const owner = responsibleHandler(caseRecord);
   const closed = caseRecord.status === "closed";
   els.mentorPortalView.innerHTML = `<section class="card mentor-assignment-card"><div class="card-header record-header bg-white"><a class="small" href="#/mentor-assignments">Tillbaka till mina uppdrag</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">Mentoruppdrag · ${escapeHtml(caseRecord.number)}</div><h2 class="h5 mb-1">${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</h2><p class="text-secondary mb-0">${escapeHtml(caseRecord.details?.desiredOutcome || caseRecord.description || "")}</p></div><span class="${caseStatusBadge(caseRecord.status)} align-self-start">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></div><dl class="record-meta mt-3 mb-0"><div><dt>Förälder</dt><dd>${escapeHtml(parent?.name || "Ej angivet")}</dd></div><div><dt>Ansvarig handläggare</dt><dd>${escapeHtml(owner?.name || "Ej tilldelad")}</dd></div><div><dt>Period</dt><dd>${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}</dd></div></dl></div>
+    <div class="mentor-assignment-contact"><div><strong>Behöver du fråga något?</strong><span>Skriv till ${escapeHtml(owner?.name || "ansvarig handläggare")} om uppdraget.</span></div><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></div>
     <div class="card-body record-grid"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div><dt>Nästa uppföljning</dt><dd>${plan.firstFollowUpDate ? escapeHtml(formatDate(plan.firstFollowUpDate)) : "Ej angivet"}</dd></div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section>
     <section class="record-section"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h3 class="record-section-title mb-1">Återrapportera kontakt</h3><p class="small text-secondary mb-0">Registrera en kort saklig rapport efter varje planerad kontakt.</p></div></div>${closed ? '<div class="alert alert-secondary mt-3 mb-0">Uppdraget är avslutat och tar inte emot nya rapporter.</div>' : `<form id="mentorPortalReportForm" class="mentor-report-form mt-3" data-case-id="${escapeHtml(caseRecord.id)}"><div><label class="form-label" for="mentorPortalReportDate">Datum</label><input id="mentorPortalReportDate" name="occurredOn" class="form-control" type="date" value="${new Date().toISOString().slice(0, 10)}" required></div><div><label class="form-label" for="mentorPortalReportDuration">Tid i minuter</label><input id="mentorPortalReportDuration" name="durationMinutes" class="form-control" type="number" min="1" value="60" required></div><div><label class="form-label" for="mentorPortalReportMode">Kontaktform</label><select id="mentorPortalReportMode" name="mode" class="form-select"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option><option value="message">Meddelande</option></select></div><div><label class="form-label" for="mentorPortalReportOutcome">Resultat</label><select id="mentorPortalReportOutcome" name="outcome" class="form-select"><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div><div class="mentor-report-summary"><label class="form-label" for="mentorPortalReportSummary">Kort sammanfattning</label><textarea id="mentorPortalReportSummary" name="summary" class="form-control" rows="3" required></textarea></div><div><label class="form-label" for="mentorPortalNextContact">Nästa kontakt (valfritt)</label><input id="mentorPortalNextContact" name="nextContactOn" class="form-control" type="date"></div><div class="form-check mentor-report-support"><input id="mentorPortalNeedsSupport" name="needsHandlerSupport" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorPortalNeedsSupport">Jag behöver stöd från handläggaren</label></div><div class="mentor-report-actions"><button class="btn btn-primary" type="submit">Skicka rapport</button></div></form>`}</section>
     <section class="record-section record-section-wide"><h3 class="record-section-title">Tidigare rapporter</h3><div class="table-responsive border rounded"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Datum</th><th>Kontaktform</th><th>Tid</th><th>Resultat</th><th>Sammanfattning</th></tr></thead><tbody>${reports.map((report) => `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<small class="d-block text-danger">Stöd begärt</small>' : ""}</td><td>${escapeHtml(report.summary)}</td></tr>`).join("") || '<tr><td colspan="5" class="text-center text-secondary py-3">Ingen rapport har registrerats ännu.</td></tr>'}</tbody></table></div></section></div></section>`;
@@ -6013,6 +6056,7 @@ function renderMentorPortal() {
   if (currentView === "mentor-home") renderMentorHome();
   else if (currentView === "mentor-assignments") renderMentorAssignments();
   else if (currentView === "mentor-assignment") renderMentorAssignment();
+  else if (currentView === "mentor-messages") renderMentorMessages();
   else renderMentorProfile();
 }
 
@@ -7013,45 +7057,78 @@ function suggestedCommunicationRecipient(interaction, channel) {
 function updateCommunicationComposerChannel({ applySuggestion = false } = {}) {
   const channel = communicationChannelFromForm();
   const isEmail = channel === "email";
+  const mentorMode = els.communicationComposerForm.dataset.mentorMode === "true";
   els.communicationRecipientAddressLabel.textContent = isEmail ? "E-postadress" : "Telefonnummer";
   els.communicationRecipientAddressInput.type = isEmail ? "email" : "tel";
   els.communicationRecipientAddressInput.autocomplete = isEmail ? "email" : "tel";
   els.communicationSubjectField.hidden = !isEmail;
   els.communicationSubjectInput.required = isEmail;
-  els.communicationSubmitButton.textContent = isEmail ? "Registrera via e-postdemo" : "Registrera via SMS-demo";
-  els.communicationBodyHelp.textContent = isEmail ? "Texten registreras hos e-postdemot." : "Texten registreras hos SMS-demot.";
+  els.communicationSubmitButton.textContent = mentorMode ? `Skicka i ${isEmail ? "e-postdemo" : "SMS-demo"}` : isEmail ? "Registrera via e-postdemo" : "Registrera via SMS-demo";
+  els.communicationBodyHelp.textContent = mentorMode ? "I prototypen sparas meddelandet, men skickas inte utanför systemet." : isEmail ? "Texten registreras hos e-postdemot." : "Texten registreras hos SMS-demot.";
   if (!applySuggestion) return;
   const interaction = allInteractions().find((item) => item.id === els.communicationComposerForm.dataset.interactionId);
-  const recipient = suggestedCommunicationRecipient(interaction, channel);
+  const recipient = communicationComposerRecipient || suggestedCommunicationRecipient(interaction, channel);
   els.communicationRecipientNameInput.value = recipient?.displayName || "";
   els.communicationRecipientAddressInput.value = recipient?.[isEmail ? "email" : "phone"] || "";
   els.communicationComposerForm.dataset.recipientPartyType = recipient?.partyType || "";
   els.communicationComposerForm.dataset.recipientPartyId = recipient?.partyId || "";
 }
 
-function openCommunicationComposer({ channel = "email", interaction = null } = {}) {
+function openCommunicationComposer({ channel = "email", interaction = null, caseRecord = null, recipient = null } = {}) {
   els.communicationComposerForm.reset();
+  communicationComposerRecipient = recipient;
   els.communicationComposerForm.dataset.interactionId = interaction?.id || "";
+  els.communicationComposerForm.dataset.mentorMode = String(Boolean(recipient && isMentorSession()));
   els.communicationComposerForm.dataset.recipientPartyType = "";
   els.communicationComposerForm.dataset.recipientPartyId = "";
   const channelInput = els.communicationComposerForm.querySelector(`input[name="communicationChannel"][value="${channel}"]`);
   if (channelInput) channelInput.checked = true;
   els.communicationCaseInput.innerHTML = '<option value="">Ingen ärendekoppling</option>';
-  for (const caseRecord of [...cases].sort((left, right) => left.number.localeCompare(right.number, "sv"))) {
+  const availableCases = isMentorSession() ? mentorAssignments() : cases;
+  for (const availableCase of [...availableCases].sort((left, right) => left.number.localeCompare(right.number, "sv"))) {
     const option = document.createElement("option");
-    option.value = caseRecord.id;
-    option.textContent = `${caseRecord.number} · ${caseRecord.type} · ${caseRecord.title}`;
+    option.value = availableCase.id;
+    option.textContent = `${availableCase.number} · ${availableCase.type} · ${availableCase.title}`;
     els.communicationCaseInput.append(option);
   }
-  els.communicationCaseInput.value = interaction?.caseId || "";
-  els.communicationContextSummary.hidden = !interaction;
-  els.communicationContextSummary.textContent = interaction ? `Kopplas till mötet: ${interaction.title || "Möte"}` : "";
-  els.communicationComposerTitle.textContent = channel === "sms" ? "Nytt SMS" : "Ny e-post";
-  els.communicationSubjectInput.value = interaction ? `Möte: ${interaction.title || "Möte"}` : "";
+  els.communicationCaseInput.value = caseRecord?.id || interaction?.caseId || "";
+  els.communicationCaseField.hidden = Boolean(recipient && caseRecord);
+  els.communicationContextSummary.hidden = !interaction && !caseRecord;
+  els.communicationContextSummary.textContent = caseRecord ? `Kopplas till uppdraget ${caseRecord.number}.` : interaction ? `Kopplas till mötet: ${interaction.title || "Möte"}` : "";
+  els.communicationComposerTitle.textContent = recipient ? "Meddelande till handläggaren" : channel === "sms" ? "Nytt SMS" : "Ny e-post";
+  els.communicationSubjectInput.value = caseRecord ? `Fråga om ${caseRecord.number}` : interaction ? `Möte: ${interaction.title || "Möte"}` : "";
   els.communicationBodyInput.value = interaction?.invitationText || "";
   updateCommunicationComposerChannel({ applySuggestion: true });
   communicationComposerModal ||= bootstrap.Modal.getOrCreateInstance(els.communicationComposerModal);
   communicationComposerModal.show();
+}
+
+function openMentorMessageComposer(caseId) {
+  const caseRecord = mentorAssignments().find((assignment) => assignment.id === caseId);
+  const owner = caseRecord ? responsibleHandler(caseRecord) : null;
+  if (!caseRecord || !owner) {
+    showFeedback("Uppdraget saknar ansvarig handläggare.");
+    return;
+  }
+  const defaultContact = seedHandlers.find((handler) => handler.id === owner.id) || {};
+  const ownerContact = {
+    ...defaultContact,
+    ...owner,
+    email: owner.email || defaultContact.email || "",
+    phone: owner.phone || defaultContact.phone || ""
+  };
+  const channel = ownerContact.email ? "email" : "sms";
+  openCommunicationComposer({
+    channel,
+    caseRecord,
+    recipient: {
+      displayName: ownerContact.name,
+      email: ownerContact.email || "",
+      phone: ownerContact.phone || "",
+      partyType: "handler",
+      partyId: ownerContact.id
+    }
+  });
 }
 
 function renderVersions() {
@@ -7114,6 +7191,7 @@ function renderAll() {
     "mentor-assignments": renderMentorPortal,
     "mentor-assignment": renderMentorPortal,
     "mentor-profile": renderMentorPortal,
+    "mentor-messages": renderMentorPortal,
     "public-home": renderPublicPortal,
     "public-support": renderPublicPortal,
     "public-mentor": renderPublicPortal,
@@ -7805,7 +7883,7 @@ function applyRoute() {
   let route = parseRoute();
   const previousView = currentView;
   const previousCaseRouteIntent = caseRouteIntent;
-  const mentorRoutes = new Set(["mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "learning"]);
+  const mentorRoutes = new Set(["mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "mentor-messages", "learning"]);
   const publicRoutes = new Set(["public-home", "public-support", "public-mentor", "public-learning"]);
   if (isPublicSession() && !publicRoutes.has(route.view)) {
     window.history.replaceState(null, "", "#/public-home");
@@ -7830,7 +7908,7 @@ function applyRoute() {
   const routeCaseId = nestedCaseRoute?.[1] || route.id;
   const routeMentorId = nestedMentorRoute?.[1] || route.id;
   const previousCaseRecordId = selectedCaseRecordId;
-  currentView = ["dashboard", "calendar", "meetings", "communications", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "public-home", "public-support", "public-mentor", "public-learning"].includes(route.view) ? route.view : "dashboard";
+  currentView = ["dashboard", "calendar", "meetings", "communications", "versions", "presentation", "cases", "case", "mentors", "mentor", "parents", "parent", "learning", "administration", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "routines", "handler", "mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "mentor-messages", "public-home", "public-support", "public-mentor", "public-learning"].includes(route.view) ? route.view : "dashboard";
   if (currentView === "calendar" && previousView !== "calendar") {
     calendarTypeFilters.clear();
     ["meeting", "contact", "activity", "case"].forEach((type) => calendarTypeFilters.add(type));
@@ -7897,7 +7975,7 @@ function applyRoute() {
   els.parentsView.hidden = currentView !== "parents";
   els.parentDetailView.hidden = currentView !== "parent";
   els.learningView.hidden = currentView !== "learning";
-  els.mentorPortalView.hidden = !["mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile"].includes(currentView);
+  els.mentorPortalView.hidden = !["mentor-home", "mentor-assignments", "mentor-assignment", "mentor-profile", "mentor-messages"].includes(currentView);
   els.publicPortalView.hidden = !["public-home", "public-support", "public-mentor", "public-learning"].includes(currentView);
   els.administrationView.hidden = currentView !== "administration";
   els.caseNumberingAdministrationView.hidden = currentView !== "case-numbering";
@@ -7920,7 +7998,7 @@ function applyRoute() {
     navigationItem.hidden = mentorSession || publicSession;
   });
   document.querySelector(".sidebar-menu-group").hidden = mentorSession || publicSession || handlerSession;
-  for (const navigationItem of [els.navMentorHome, els.navMentorAssignments, els.navMentorLearning, els.navMentorProfile]) {
+  for (const navigationItem of [els.navMentorHome, els.navMentorAssignments, els.navMentorMessages, els.navMentorLearning, els.navMentorProfile]) {
     navigationItem.hidden = !mentorSession;
   }
   for (const navigationItem of [els.navPublicHome, els.navPublicSupport, els.navPublicMentorApplication, els.navPublicLearning]) {
@@ -7974,6 +8052,7 @@ function applyRoute() {
   els.navVersions.classList.toggle("active", currentView === "versions");
   els.navMentorHome.classList.toggle("active", currentView === "mentor-home");
   els.navMentorAssignments.classList.toggle("active", ["mentor-assignments", "mentor-assignment"].includes(currentView));
+  els.navMentorMessages.classList.toggle("active", currentView === "mentor-messages");
   els.navMentorLearning.classList.toggle("active", currentView === "learning");
   els.navMentorProfile.classList.toggle("active", currentView === "mentor-profile");
   els.navPublicHome.classList.toggle("active", currentView === "public-home");
@@ -8037,6 +8116,9 @@ function applyRoute() {
   } else if (currentView === "mentor-assignment") {
     els.pageTitle.textContent = "Uppdrag";
     els.breadcrumb.textContent = "Min portal / Mina uppdrag / Uppdrag";
+  } else if (currentView === "mentor-messages") {
+    els.pageTitle.textContent = "Meddelanden";
+    els.breadcrumb.textContent = "Min portal / Meddelanden";
   } else if (currentView === "mentor-profile") {
     els.pageTitle.textContent = "Min profil";
     els.breadcrumb.textContent = "Min portal / Min profil";
@@ -13428,6 +13510,11 @@ els.testUserTypeSelect.addEventListener("change", () => {
 });
 
 els.mentorPortalView.addEventListener("click", (event) => {
+  const messageButton = event.target.closest("[data-mentor-message-case]");
+  if (messageButton) {
+    openMentorMessageComposer(messageButton.dataset.mentorMessageCase);
+    return;
+  }
   if (event.target.closest("[data-edit-mentor-profile]")) {
     mentorProfileEditMode = true;
     renderMentorProfile();
@@ -14368,11 +14455,12 @@ els.communicationDetailContent.addEventListener("click", (event) => {
 });
 
 els.communicationComposerForm.querySelectorAll('input[name="communicationChannel"]').forEach((input) => input.addEventListener("change", () => {
-  els.communicationComposerTitle.textContent = input.value === "sms" ? "Nytt SMS" : "Ny e-post";
+  els.communicationComposerTitle.textContent = els.communicationComposerForm.dataset.mentorMode === "true" ? "Meddelande till handläggaren" : input.value === "sms" ? "Nytt SMS" : "Ny e-post";
   updateCommunicationComposerChannel({ applySuggestion: true });
 }));
 
 [els.communicationRecipientNameInput, els.communicationRecipientAddressInput].forEach((input) => input.addEventListener("input", () => {
+  communicationComposerRecipient = null;
   els.communicationComposerForm.dataset.recipientPartyType = "";
   els.communicationComposerForm.dataset.recipientPartyId = "";
 }));
@@ -14384,6 +14472,7 @@ els.communicationComposerForm.addEventListener("submit", async (event) => {
   const interaction = allInteractions().find((item) => item.id === els.communicationComposerForm.dataset.interactionId);
   const caseRecord = cases.find((item) => item.id === els.communicationCaseInput.value);
   const actor = handlers.find((handler) => [handler.id, handler.userId].includes(currentActorId()));
+  const mentorActor = isMentorSession() ? currentMentorUser() : null;
   const links = [];
   if (caseRecord) links.push({ entityType: "case", entityId: caseRecord.id, label: `${caseRecord.number} · ${caseRecord.type}` });
   if (interaction) links.push({ entityType: "interaction", entityId: interaction.id, label: interaction.title || "Möte" });
@@ -14397,7 +14486,7 @@ els.communicationComposerForm.addEventListener("submit", async (event) => {
         recipientAddress: els.communicationRecipientAddressInput.value,
         recipientPartyType: els.communicationComposerForm.dataset.recipientPartyType || null,
         recipientPartyId: els.communicationComposerForm.dataset.recipientPartyId || null,
-        sender: actor ? { name: actor.name, address: channel === "email" ? actor.email || "kommun@demo.local" : actor.phone || "SMS demo" } : { name: "Kommunen", address: channel === "email" ? "kommun@demo.local" : "SMS demo" },
+        sender: actor ? { name: actor.name, address: channel === "email" ? actor.email || "kommun@demo.local" : actor.phone || "SMS demo" } : mentorActor ? { name: mentorActor.name, address: channel === "email" ? mentorActor.email || "mentor@demo.local" : mentorActor.phone || "SMS demo" } : { name: "Kommunen", address: channel === "email" ? "kommun@demo.local" : "SMS demo" },
         subject: els.communicationSubjectInput.value,
         body: els.communicationBodyInput.value,
         links,

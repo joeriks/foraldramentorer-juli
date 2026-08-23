@@ -81,3 +81,18 @@ test("places Communication last in desktop and mobile navigation", () => {
   const mobileNavigation = html.slice(html.indexOf('<ul class="dropdown-menu">'), html.indexOf("</ul>", html.indexOf('<ul class="dropdown-menu">')));
   assert.ok(mobileNavigation.lastIndexOf("#/communications") > mobileNavigation.lastIndexOf("#/versions"));
 });
+
+test("lets mentors message the responsible handler through the shared communication system", () => {
+  assert.match(html, /id="navMentorMessages"[^>]*href="#\/mentor-messages"/);
+  assert.match(html, /class="mentor-mobile-nav"[^>]*><a class="dropdown-item" href="#\/mentor-messages"/);
+  assert.match(app, /function renderMentorMessages\(\)/);
+  assert.match(app, /function openMentorMessageComposer\(caseId\)/);
+  assert.match(app, /const defaultContact = seedHandlers\.find/);
+  assert.match(app, /email: owner\.email \|\| defaultContact\.email \|\| ""/);
+  assert.match(app, /recipient: \{[\s\S]*partyType: "handler"/);
+  assert.match(app, /const availableCases = isMentorSession\(\) \? mentorAssignments\(\) : cases/);
+  assert.match(app, /mentorActor \? \{ name: mentorActor\.name/);
+  assert.match(app, /createdBy: currentActorId\(\)/);
+  assert.match(styles, /\.mentor-message-actions/);
+  assert.match(styles, /\.mentor-message-history/);
+});

@@ -1,4 +1,4 @@
-const CACHE_NAME = "foraldramentorer-mentor-v124";
+const CACHE_NAME = "foraldramentorer-mentor-v125-2";
 const APP_SHELL = [
   "/",
   "/index.html",

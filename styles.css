@@ -939,6 +939,128 @@ body.is-system-administration .sidebar-menu-group {
   align-items: start;
 }
 
+.mentor-home-intro {
+  padding: 0.25rem 0;
+}
+
+.mentor-home-intro h2 {
+  margin: 0.2rem 0;
+  font-size: 1.5rem;
+}
+
+.mentor-home-intro p {
+  margin: 0;
+  color: var(--app-text-muted);
+}
+
+.mentor-home-side {
+  display: grid;
+  gap: var(--app-space-3);
+}
+
+.mentor-home-assignment-list {
+  display: grid;
+}
+
+.mentor-home-assignment-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--app-space-3);
+  align-items: center;
+  padding: var(--app-space-4);
+}
+
+.mentor-home-assignment-item + .mentor-home-assignment-item {
+  border-top: 1px solid var(--app-border);
+}
+
+.mentor-home-assignment-item p,
+.mentor-home-assignment-item small {
+  display: block;
+  margin: 0.2rem 0 0;
+  color: var(--app-text-muted);
+}
+
+.mentor-home-assignment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--app-space-2);
+}
+
+.mentor-home-messages .card-body > p {
+  color: var(--app-text-muted);
+}
+
+.mentor-assignment-contact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--app-space-3);
+  padding: var(--app-space-3) var(--app-space-4);
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-primary-soft);
+}
+
+.mentor-assignment-contact span {
+  display: block;
+  color: var(--app-text-muted);
+  font-size: 0.875rem;
+}
+
+.mentor-message-actions,
+.mentor-message-history {
+  padding: var(--app-space-4);
+}
+
+.mentor-message-actions {
+  border-bottom: 1px solid var(--app-border);
+}
+
+.mentor-message-actions article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--app-space-3);
+  padding: var(--app-space-3) 0;
+}
+
+.mentor-message-actions article + article {
+  border-top: 1px solid var(--app-border-soft);
+}
+
+.mentor-message-actions small,
+.mentor-message-history small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--app-text-muted);
+}
+
+.mentor-message-history ol {
+  margin: var(--app-space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mentor-message-history li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--app-space-2) var(--app-space-3);
+  padding: var(--app-space-3) 0;
+  border-top: 1px solid var(--app-border-soft);
+}
+
+.mentor-message-history li p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--app-text-muted);
+}
+
+.mentor-message-history li > .badge {
+  align-self: start;
+  justify-self: end;
+}
+
 .mentor-task-link {
   display: flex;
   justify-content: space-between;
@@ -1940,6 +2062,48 @@ body.is-system-administration .sidebar-menu-group {
 
   body.is-mentor-portal .mentor-home-grid {
     gap: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-home-intro {
+    padding-inline: 0.15rem;
+  }
+
+  body.is-mentor-portal .mentor-home-intro .record-type {
+    display: none;
+  }
+
+  body.is-mentor-portal .mentor-home-intro h2 {
+    margin-top: 0;
+    font-size: 1.2rem;
+  }
+
+  body.is-mentor-portal .mentor-home-assignment-item {
+    grid-template-columns: 1fr;
+    padding: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-home-assignment-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  body.is-mentor-portal .mentor-home-assignment-actions .btn {
+    width: 100%;
+  }
+
+  body.is-mentor-portal .mentor-assignment-contact,
+  body.is-mentor-portal .mentor-message-actions article {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  body.is-mentor-portal .mentor-assignment-contact .btn,
+  body.is-mentor-portal .mentor-message-actions article .btn {
+    width: 100%;
+  }
+
+  body.is-mentor-portal .mentor-message-history li {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   body.is-mentor-portal .mentor-home-grid .card-header,

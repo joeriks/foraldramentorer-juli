@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260823-mentor-pwa-v124">
+    <link rel="stylesheet" href="styles.css?v=20260823-mentor-simple-v125">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -42,6 +42,7 @@
           <a id="navLearning" class="nav-link" href="#/learning">Utbildning</a>
           <a id="navMentorHome" class="nav-link" href="#/mentor-home" hidden>Översikt</a>
           <a id="navMentorAssignments" class="nav-link" href="#/mentor-assignments" hidden>Mina uppdrag</a>
+          <a id="navMentorMessages" class="nav-link" href="#/mentor-messages" hidden>Meddelanden</a>
           <a id="navMentorLearning" class="nav-link" href="#/learning" hidden>Utbildning</a>
           <a id="navMentorProfile" class="nav-link" href="#/mentor-profile" hidden>Min profil</a>
           <button id="navMentorInstall" class="mentor-install-action" type="button" hidden>Lägg till på hemskärmen</button>
@@ -82,6 +83,7 @@
                 <ul class="dropdown-menu">
                   <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/mentor-home">Översikt</a></li>
                   <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/mentor-assignments">Mina uppdrag</a></li>
+                  <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/mentor-messages">Meddelanden</a></li>
                   <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/learning">Utbildning</a></li>
                   <li class="mentor-mobile-nav" hidden><a class="dropdown-item" href="#/mentor-profile">Min profil</a></li>
                   <li class="mentor-mobile-nav" hidden><hr class="dropdown-divider"></li>
@@ -2334,7 +2336,7 @@
             <div class="communication-demo-notice" role="note"><strong>Demo:</strong> Kommandot behandlas av vald demoleverantör och loggas, men inget e-postmeddelande eller SMS skickas externt.</div>
             <fieldset><legend class="form-label">Kanal</legend><div class="communication-channel-options"><label><input class="form-check-input" type="radio" name="communicationChannel" value="email" checked><span>E-post demo</span></label><label><input class="form-check-input" type="radio" name="communicationChannel" value="sms"><span>SMS demo</span></label></div></fieldset>
             <div id="communicationContextSummary" class="communication-context-summary" hidden></div>
-            <div><label class="form-label" for="communicationCaseInput">Koppla till ärende <span class="text-secondary fw-normal">(valfritt)</span></label><select id="communicationCaseInput" class="form-select"><option value="">Ingen ärendekoppling</option></select></div>
+            <div id="communicationCaseField"><label class="form-label" for="communicationCaseInput">Koppla till ärende <span class="text-secondary fw-normal">(valfritt)</span></label><select id="communicationCaseInput" class="form-select"><option value="">Ingen ärendekoppling</option></select></div>
             <div class="row g-3"><div class="col-md-6"><label class="form-label" for="communicationRecipientNameInput">Mottagare</label><input id="communicationRecipientNameInput" class="form-control" autocomplete="name" required></div><div class="col-md-6"><label id="communicationRecipientAddressLabel" class="form-label" for="communicationRecipientAddressInput">E-postadress</label><input id="communicationRecipientAddressInput" class="form-control" type="email" autocomplete="email" required></div></div>
             <div id="communicationSubjectField"><label class="form-label" for="communicationSubjectInput">Ämne</label><input id="communicationSubjectInput" class="form-control" required></div>
             <div><label class="form-label" for="communicationBodyInput">Meddelande</label><textarea id="communicationBodyInput" class="form-control" rows="6" maxlength="4000" required></textarea><div id="communicationBodyHelp" class="form-text">Texten registreras hos e-postdemot.</div></div>
@@ -2571,6 +2573,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260823-mentor-pwa-v124"></script>
+    <script type="module" src="app.js?v=20260823-mentor-simple-v125"></script>
   </body>
 </html>
