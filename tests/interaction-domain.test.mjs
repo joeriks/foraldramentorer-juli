@@ -1,10 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  INTERACTION_TIMING_LABELS,
   interactionFromCaseMeeting,
   interactionFromIncomingContact,
   interactionParticipant,
   interactionStatusFromForm,
+  interactionTimingState,
   meetingSatisfiesRequirement,
   nextProposedMeetingForCase,
   nextScheduledMeetingForCase,
@@ -13,6 +15,18 @@ import {
   suggestedInteractionParticipants,
   validateInteractionForSave
 } from "../interaction-domain.js";
+
+test("classifies meetings consistently from the current date and time", () => {
+  const now = new Date(2026, 7, 23, 12, 0, 0).getTime();
+  const record = (status, date) => ({ kind: "meeting", status, startsAt: date.toISOString() });
+
+  assert.equal(interactionTimingState(record("scheduled", new Date(2026, 7, 24, 9, 0, 0)), now), "upcoming");
+  assert.equal(interactionTimingState(record("scheduled", new Date(2026, 7, 23, 15, 0, 0)), now), "today");
+  assert.equal(interactionTimingState(record("scheduled", new Date(2026, 7, 23, 9, 0, 0)), now), "past_due");
+  assert.equal(interactionTimingState(record("completed", new Date(2026, 7, 20, 9, 0, 0)), now), "completed");
+  assert.equal(interactionTimingState(record("cancelled", new Date(2026, 7, 24, 9, 0, 0)), now), "cancelled");
+  assert.equal(INTERACTION_TIMING_LABELS.past_due, "Passerat, utfall saknas");
+});
 
 test("finds the next scheduled meeting for a case", () => {
   const records = [

@@ -53,7 +53,7 @@ test("links meeting messages to the global communication history", () => {
 
 test("offers a visible send action from saved meetings", () => {
   assert.match(html, /id="interactionSendMessageButton"[^>]*>Skicka meddelande<\/button>/);
-  assert.match(app, /interactionSendMessageButton\.hidden = !savedInteraction \|\| savedInteraction\.kind !== "meeting"/);
+  assert.match(app, /interactionSendMessageButton\.hidden = !existingInteraction \|\| existingInteraction\.kind !== "meeting"/);
   assert.match(app, /interactionSendMessageButton\.addEventListener\("click"/);
   assert.match(app, /interaction\.participants\.some\(\(participant\) => participant\.email\)/);
   assert.match(app, /communicationsForInteraction\(interaction\.id\)/);

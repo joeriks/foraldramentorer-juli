@@ -65,6 +65,9 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(homeRenderer, /Skriv till handläggaren/);
   assert.match(homeRenderer, /mentorAssignmentNextMarkup\(caseRecord\)/);
   assert.match(app, /Nästa möte med föräldern/);
+  assert.match(app, /interactionTimingState\(item\) === "past_due"/);
+  assert.match(app, /Behöver följas upp/);
+  assert.match(app, /saknar registrerat utfall/);
   assert.match(app, /Det här gör du härnäst/);
   assert.match(app, /Inget möte inbokat/);
   assert.doesNotMatch(homeRenderer, /mentor-summary-grid|Fortsätt uppdraget/);

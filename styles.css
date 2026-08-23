@@ -1041,6 +1041,18 @@ body.is-system-administration .sidebar-menu-group {
   border-left: 0.2rem solid #6aa5a2;
 }
 
+.mentor-assignment-next > .is-past-due {
+  grid-column: 1 / -1;
+  padding: var(--app-space-3);
+  border-left-color: #a63d40;
+  background: #fff4f2;
+}
+
+.mentor-assignment-next > .is-past-due dt,
+.mentor-assignment-next > .is-past-due dd {
+  color: #7d2c30;
+}
+
 .mentor-assignment-next dt {
   color: var(--app-text-muted);
   font-size: 0.75rem;
@@ -1160,6 +1172,17 @@ body.is-system-administration .sidebar-menu-group {
   padding: var(--app-space-3);
   border: 1px solid var(--app-border);
   background: #fff;
+}
+
+.mentor-meeting-history > ol > li.is-past-due {
+  border-left: 4px solid #b33f36;
+  background: #fff8f7;
+}
+
+.mentor-meeting-past-due {
+  margin: var(--app-space-2) 0 0;
+  color: #862f2a;
+  font-weight: 650;
 }
 
 .mentor-meeting-history header {
@@ -2739,6 +2762,11 @@ body.is-system-administration .sidebar-menu-group {
   color: #3d684e;
 }
 
+.calendar-entry.is-today-meeting:not(.is-completed):not(.is-overdue) {
+  background: #fff4cf;
+  color: #725000;
+}
+
 .calendar-entry time {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -2941,6 +2969,30 @@ body.is-system-administration .sidebar-menu-group {
 .meeting-register-communication {
   overflow-wrap: normal;
   word-break: normal;
+}
+
+.meeting-register-table tr.is-past-due > td {
+  background: #fff8f7;
+}
+
+.meeting-register-table tr.is-past-due > td:first-child {
+  box-shadow: inset 4px 0 0 #b33f36;
+}
+
+.meeting-register-table tr.is-today > td {
+  background: #fffdf5;
+}
+
+.meeting-register-attention {
+  display: block;
+  margin-top: 0.25rem;
+  color: #862f2a;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.meeting-table tr.is-past-due > td {
+  background: #fff8f7;
 }
 
 @media (max-width: 767.98px) {

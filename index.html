@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260823-meeting-history-v128">
+    <link rel="stylesheet" href="styles.css?v=20260823-meeting-time-v129">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -336,7 +336,8 @@
                     <label class="form-label" for="meetingRegisterStatusFilter">Läge</label>
                     <select id="meetingRegisterStatusFilter" class="form-select">
                       <option value="">Alla lägen</option>
-                      <option value="scheduled">Bokat</option>
+                      <option value="upcoming">Kommande</option>
+                      <option value="past_due">Passerat, utfall saknas</option>
                       <option value="completed">Genomfört</option>
                       <option value="cancelled">Inställt</option>
                       <option value="no_show">Uteblev</option>
@@ -2599,6 +2600,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260823-meeting-history-v128"></script>
+    <script type="module" src="app.js?v=20260823-meeting-time-v129"></script>
   </body>
 </html>

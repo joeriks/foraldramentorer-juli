@@ -54,6 +54,12 @@ test("keeps meetings in a dedicated searchable register", () => {
   assert.match(app, /els\.calendarView\.hidden = currentView !== "calendar"/);
   assert.match(app, /els\.meetingsView\.hidden = currentView !== "meetings"/);
   assert.match(styles, /\.meeting-register-table \{\s*min-width: 56rem;/);
+  assert.match(html, /option value="upcoming">Kommande/);
+  assert.match(html, /option value="past_due">Passerat, utfall saknas/);
+  assert.match(app, /interactionTimingState\(interaction/);
+  assert.match(app, /Registrera mötets utfall/);
+  assert.match(styles, /\.meeting-register-table tr\.is-past-due/);
+  assert.match(styles, /\.calendar-entry\.is-today-meeting/);
 });
 
 test("offers a shared flow for planned meetings and completed contacts", () => {

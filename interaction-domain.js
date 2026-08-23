@@ -13,6 +13,34 @@ export const INTERACTION_STATUS_LABELS = {
   no_show: "Uteblev"
 };
 
+export const INTERACTION_TIMING_LABELS = {
+  upcoming: "Kommande",
+  today: "Idag",
+  past_due: "Passerat, utfall saknas",
+  completed: INTERACTION_STATUS_LABELS.completed,
+  cancelled: INTERACTION_STATUS_LABELS.cancelled,
+  no_show: INTERACTION_STATUS_LABELS.no_show
+};
+
+function localDateKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join("-");
+}
+
+export function interactionTimingState(record = {}, now = Date.now()) {
+  if (["completed", "cancelled", "no_show"].includes(record.status)) return record.status;
+  if (record.status !== "scheduled") return record.status || "scheduled";
+  const startsAt = new Date(record.startsAt).getTime();
+  if (!Number.isFinite(startsAt)) return "upcoming";
+  if (startsAt < now) return "past_due";
+  return localDateKey(startsAt) === localDateKey(now) ? "today" : "upcoming";
+}
+
 export function interactionStatusFromForm({ scheduled, kind, outcomeStatus = "completed" }) {
   if (scheduled) return "scheduled";
   return kind === "meeting" ? outcomeStatus : "completed";

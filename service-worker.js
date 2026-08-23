@@ -1,4 +1,4 @@
-const CACHE_NAME = "foraldramentorer-mentor-v128";
+const CACHE_NAME = "foraldramentorer-mentor-v129-time-aware";
 const APP_SHELL = [
   "/",
   "/index.html",

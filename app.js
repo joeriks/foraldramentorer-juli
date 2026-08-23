@@ -60,10 +60,12 @@ import { calendarDate, calendarDateKey, calendarMonthDays } from "./calendar-dom
 import {
   INTERACTION_KIND_LABELS,
   INTERACTION_STATUS_LABELS,
+  INTERACTION_TIMING_LABELS,
   interactionFromCaseMeeting,
   interactionFromIncomingContact,
   interactionParticipant,
   interactionStatusFromForm,
+  interactionTimingState,
   meetingSatisfiesRequirement,
   nextProposedMeetingForCase,
   nextScheduledMeetingForCase,
@@ -71,7 +73,7 @@ import {
   plannedMeetingStarts,
   suggestedInteractionParticipants,
   validateInteractionForSave
-} from "./interaction-domain.js?v=20260823-assignment-meetings-v127";
+} from "./interaction-domain.js?v=20260823-meeting-time-v129";
 import {
   COMMUNICATION_CHANNEL_LABELS,
   COMMUNICATION_DIRECTION_LABELS,
@@ -213,6 +215,22 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "129",
+    date: "2026-08-23",
+    title: "Tidsmedvetna mötesvyer",
+    flow: "Bokat möte -> dagens datum och tid -> rätt visningsläge i alla mötesvyer",
+    simplified: "Kommande möten, möten idag och passerade bokningar skiljs nu åt överallt. Ett passerat möte visas som att utfall saknas i stället för att se fortsatt kommande ut.",
+    retained: "Mötets registrerade status ändras inte automatiskt. Handläggaren eller mentorn registrerar fortfarande om mötet genomfördes, ställdes in eller ledde till utebliven närvaro.",
+    changes: [
+      "Mötesregister, kalender, ärenden, mentorregister och mentorportal använder samma datumregel.",
+      "Passerade bokningar markeras tydligt med Passerat, utfall saknas.",
+      "Möten senare under dagen visas som Idag och framtida möten som Kommande.",
+      "Mötesregistret kan filtrera fram kommande respektive passerade bokningar.",
+      "Kalendern använder avvikande färg för passerade möten utan registrerat utfall.",
+      "Prototypdatat innehåller ett passerat möte som behöver följas upp."
+    ]
+  },
   {
     version: "128",
     date: "2026-08-23",
@@ -3880,7 +3898,7 @@ function exampleTemplates(count) {
   });
 }
 
-const EXAMPLE_DATA_VERSION = 10;
+const EXAMPLE_DATA_VERSION = 11;
 
 function exampleTime(base, hours) {
   return new Date(new Date(base).getTime() + (hours * 60 * 60 * 1000)).toISOString();
@@ -4550,6 +4568,37 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
           ...historyShared, id: historyInteractionId, kind: "meeting", status: "completed", direction: "not_applicable",
           sourceType: "case_meeting", sourceId: historyMeetingId
         });
+        if (concern) {
+          const overdueStartsAt = exampleTime(now, -48);
+          const overdueEndsAt = exampleTime(overdueStartsAt, 1);
+          const overdueMeetingId = crypto.randomUUID();
+          const overdueInteractionId = crypto.randomUUID();
+          const overdueHistory = [{
+            id: crypto.randomUUID(), type: "invitation_sent", comment: "Kallelsen registrerades i demosystemet.",
+            occurredAt: exampleTime(overdueStartsAt, -72), createdAt: exampleTime(overdueStartsAt, -72), createdBy: ownerId
+          }];
+          const overdueShared = {
+            tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, activityId: null, organizerId: ownerId,
+            confirmationStatus: "confirmed", participants: historyParticipants, title: `Uppföljningsmöte med ${parent.name}`,
+            startsAt: overdueStartsAt, endsAt: overdueEndsAt, mode: meetingMode,
+            location: meetingMode === "digital" ? "Digitalt möte" : "Kommunhuset",
+            invitationText: "Uppföljning av uppdraget.", reminder: { enabled: false, offsetMinutes: 1440 },
+            communicationHistory: overdueHistory, summary: "", nextStep: "Registrera mötets utfall.",
+            scheduleSource: "example_overdue", scheduleIndex: null, version: 1,
+            createdAt: exampleTime(overdueStartsAt, -72), createdBy: ownerId, updatedAt: exampleTime(overdueStartsAt, -72), updatedBy: ownerId,
+            exampleData: true, exampleDataVersion: EXAMPLE_DATA_VERSION
+          };
+          records[CASE_MEETINGS_STORE].push({
+            ...overdueShared, id: overdueMeetingId, interactionId: overdueInteractionId, meetingType: "follow_up",
+            meetingStatus: "scheduled", occurredAt: overdueStartsAt, participantHandlerIds: [ownerId], externalParticipantNames: [],
+            supersedesMeetingId: null, supersededByMeetingId: null
+          });
+          records[INTERACTIONS_STORE].push({
+            ...overdueShared, id: overdueInteractionId, kind: "meeting", status: "scheduled", direction: "not_applicable",
+            sourceType: "case_meeting", sourceId: overdueMeetingId
+          });
+          addEvent(assignmentCaseId, "meeting_followup_required", "Ett bokat möte har passerat utan registrerat utfall");
+        }
         addEvent(assignmentCaseId, "assignment_meetings_planned", `Fyra möten planerades ${assignmentCase.details.assignmentPlan.mentorMeetingPlanningAllowed ? "med möjlighet för mentorn att ändra tider" : "med ändringar hanterade av handläggaren"}`);
         addEvent(assignmentCaseId, "meeting_registered", `Tidigare möte dokumenterades: ${historySummary}`);
       }
@@ -5963,21 +6012,26 @@ function mentorAssignmentNextOverview(caseRecord) {
   const latestReport = reports[0] || null;
   const interactionRecords = allInteractions();
   const nextMeeting = nextScheduledMeetingForCase(interactionRecords, caseRecord.id);
-  const today = new Date().toISOString().slice(0, 10);
+  const pastDueMeeting = interactionRecords
+    .filter((item) => item.caseId === caseRecord.id && item.kind === "meeting" && interactionTimingState(item) === "past_due")
+    .sort((left, right) => new Date(right.startsAt) - new Date(left.startsAt))[0] || null;
+  const today = calendarDateKey(new Date());
   const nextContact = reports
     .map((report) => report.nextContactOn)
     .filter((date) => date && date >= today)
     .sort()[0] || null;
   const parentName = caseParent(caseRecord)?.name || "föräldern";
   const waitingForHandler = caseRecord.status === "decision_required" || latestReport?.needsHandlerSupport;
-  const nextAction = waitingForHandler
-    ? "Invänta handläggarens besked innan nästa kontakt."
-    : nextMeeting
-      ? `Förbered mötet med ${parentName} och gå igenom uppdragsplanen.`
-      : nextContact
-        ? `Kontakta ${parentName} ${formatDate(nextContact)} och kom överens om tid och mötesform.`
-        : `Kom överens med ${parentName} om nästa kontakt.`;
-  return { nextMeeting, nextContact, nextAction };
+  const nextAction = pastDueMeeting
+    ? `Registrera vad som hände vid mötet med ${parentName} ${formatDateTime(pastDueMeeting.startsAt)}.`
+    : waitingForHandler
+      ? "Invänta handläggarens besked innan nästa kontakt."
+      : nextMeeting
+        ? `Förbered mötet med ${parentName} och gå igenom uppdragsplanen.`
+        : nextContact
+          ? `Kontakta ${parentName} ${formatDate(nextContact)} och kom överens om tid och mötesform.`
+          : `Kom överens med ${parentName} om nästa kontakt.`;
+  return { nextMeeting, pastDueMeeting, nextContact, nextAction };
 }
 
 function mentorCanPlanContacts(caseRecord) {
@@ -5985,11 +6039,12 @@ function mentorCanPlanContacts(caseRecord) {
 }
 
 function mentorAssignmentNextMarkup(caseRecord) {
-  const { nextMeeting, nextContact, nextAction } = mentorAssignmentNextOverview(caseRecord);
+  const { nextMeeting, pastDueMeeting, nextContact, nextAction } = mentorAssignmentNextOverview(caseRecord);
   const meetingDetails = nextMeeting
     ? [mentorMeetingModeLabels[nextMeeting.mode] || nextMeeting.mode, nextMeeting.location].filter(Boolean).join(" · ")
     : "";
   return `<dl class="mentor-assignment-next">
+    ${pastDueMeeting ? `<div class="is-past-due"><dt>Behöver följas upp</dt><dd>Mötet ${escapeHtml(formatDateTime(pastDueMeeting.startsAt))} saknar registrerat utfall</dd><small>Öppna uppdraget och registrera om mötet genomfördes, ställdes in eller om någon uteblev.</small></div>` : ""}
     <div><dt>Nästa möte med föräldern</dt><dd>${nextMeeting ? escapeHtml(formatDateTime(nextMeeting.startsAt)) : "Inget möte inbokat"}</dd>${meetingDetails ? `<small>${escapeHtml(meetingDetails)}</small>` : !nextMeeting && nextContact ? `<small>Kontakt planerad ${escapeHtml(formatDate(nextContact))}, men ingen mötestid är bokad.</small>` : ""}</div>
     <div><dt>Det här gör du härnäst</dt><dd>${escapeHtml(nextAction)}</dd></div>
   </dl>${nextMeeting && mentorCanPlanContacts(caseRecord) ? `<button type="button" class="btn btn-outline-primary btn-sm mentor-plan-contact-button" data-mentor-edit-meeting="${escapeHtml(nextMeeting.id)}">Ändra mötet</button>` : ""}`;
@@ -6003,7 +6058,7 @@ function mentorMeetingScheduleMarkup(caseRecord) {
   const canEdit = mentorCanPlanContacts(caseRecord);
   return `<section class="mentor-meeting-schedule"><div><h3>Planerade möten</h3><p>${canEdit ? "Du kan ändra eller ställa in en tid. Alla ändringar sparas i historiken." : "Kontakta handläggaren om en tid behöver ändras."}</p></div>${meetingsForCase.length ? `<ol>${meetingsForCase.map((meeting) => {
     const details = [mentorMeetingModeLabels[meeting.mode] || meeting.mode, meeting.location].filter(Boolean).join(" · ");
-    return `<li class="${meeting.status === "cancelled" ? "is-cancelled" : ""}"><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><span>${escapeHtml(details || "Plats anges senare")}</span></div><span class="badge ${meeting.status === "cancelled" ? "text-bg-secondary" : "text-bg-warning"}">${meeting.status === "cancelled" ? "Inställt" : "Inplanerat"}</span>${canEdit && meeting.status === "scheduled" ? `<div class="mentor-meeting-actions"><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-edit-meeting="${escapeHtml(meeting.id)}">Ändra</button><button type="button" class="btn btn-outline-danger btn-sm" data-mentor-cancel-meeting="${escapeHtml(meeting.id)}">Ställ in</button></div>` : ""}</li>`;
+    return `<li class="${meeting.status === "cancelled" ? "is-cancelled" : ""}"><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><span>${escapeHtml(details || "Plats anges senare")}</span></div><span class="badge ${interactionStatusBadge(meeting)}">${escapeHtml(interactionStatusLabel(meeting))}</span>${canEdit && meeting.status === "scheduled" ? `<div class="mentor-meeting-actions"><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-edit-meeting="${escapeHtml(meeting.id)}">Ändra</button><button type="button" class="btn btn-outline-danger btn-sm" data-mentor-cancel-meeting="${escapeHtml(meeting.id)}">Ställ in</button></div>` : ""}</li>`;
   }).join("")}</ol>` : '<p class="text-secondary mb-0">Inga kommande möten finns i uppdragsplanen.</p>'}</section>`;
 }
 
@@ -6021,7 +6076,8 @@ function mentorMeetingHistoryMarkup(caseRecord) {
     const durationMinutes = meeting.startsAt && meeting.endsAt ? Math.max(0, Math.round((new Date(meeting.endsAt) - new Date(meeting.startsAt)) / 60000)) : 0;
     const facts = [mentorMeetingModeLabels[meeting.mode] || meeting.mode, meeting.location, durationMinutes ? formatMinutes(durationMinutes) : ""].filter(Boolean).join(" · ");
     const communicationHistory = meeting.communicationHistory || [];
-    return `<li><header><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><strong>${escapeHtml(meeting.title || "Möte med föräldern")}</strong></div><span class="badge ${interactionStatusBadge(meeting.status)}">${escapeHtml(INTERACTION_STATUS_LABELS[meeting.status] || meeting.status)}</span></header>${facts ? `<p class="mentor-meeting-history-facts">${escapeHtml(facts)}</p>` : ""}${participants ? `<p class="mentor-meeting-history-facts">Deltagare: ${escapeHtml(participants)}</p>` : ""}<div class="mentor-meeting-history-note"><strong>Anteckning</strong><p>${escapeHtml(meeting.summary || "Ingen anteckning registrerad.")}</p></div>${meeting.nextStep ? `<div class="mentor-meeting-history-next"><strong>Nästa steg</strong><p>${escapeHtml(meeting.nextStep)}</p></div>` : ""}${communicationHistory.length ? `<details><summary>Kommunikation och ändringar (${communicationHistory.length})</summary><ol>${communicationHistory.map((item) => `<li><time datetime="${escapeHtml(item.occurredAt)}">${escapeHtml(formatDateTime(item.occurredAt))}</time><span>${escapeHtml(item.comment)}</span></li>`).join("")}</ol></details>` : ""}<small>Senast registrerad ${escapeHtml(formatDateTime(meeting.updatedAt || meeting.createdAt))} av ${escapeHtml(actorNameById(meeting.updatedBy || meeting.createdBy))}</small></li>`;
+    const pastDue = interactionTimingState(meeting) === "past_due";
+    return `<li class="${pastDue ? "is-past-due" : ""}"><header><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><strong>${escapeHtml(meeting.title || "Möte med föräldern")}</strong></div><span class="badge ${interactionStatusBadge(meeting)}">${escapeHtml(interactionStatusLabel(meeting))}</span></header>${pastDue ? '<p class="mentor-meeting-past-due">Registrera om mötet genomfördes, ställdes in eller om någon uteblev.</p>' : ""}${facts ? `<p class="mentor-meeting-history-facts">${escapeHtml(facts)}</p>` : ""}${participants ? `<p class="mentor-meeting-history-facts">Deltagare: ${escapeHtml(participants)}</p>` : ""}<div class="mentor-meeting-history-note"><strong>Anteckning</strong><p>${escapeHtml(meeting.summary || "Ingen anteckning registrerad.")}</p></div>${meeting.nextStep ? `<div class="mentor-meeting-history-next"><strong>Nästa steg</strong><p>${escapeHtml(meeting.nextStep)}</p></div>` : ""}${communicationHistory.length ? `<details><summary>Kommunikation och ändringar (${communicationHistory.length})</summary><ol>${communicationHistory.map((item) => `<li><time datetime="${escapeHtml(item.occurredAt)}">${escapeHtml(formatDateTime(item.occurredAt))}</time><span>${escapeHtml(item.comment)}</span></li>`).join("")}</ol></details>` : ""}<small>Senast registrerad ${escapeHtml(formatDateTime(meeting.updatedAt || meeting.createdAt))} av ${escapeHtml(actorNameById(meeting.updatedBy || meeting.createdBy))}</small></li>`;
   }).join("")}</ol></section>`;
 }
 
@@ -6946,13 +7002,23 @@ function interactionsForParty(partyType, partyId) {
     || interaction.participants.some((participant) => participant.partyType === partyType && participant.partyId === partyId));
 }
 
-function interactionStatusBadge(status) {
-  return status === "completed"
+function interactionStatusLabel(interaction, now = Date.now()) {
+  const state = interactionTimingState(interaction, now);
+  return INTERACTION_TIMING_LABELS[state] || INTERACTION_STATUS_LABELS[interaction?.status] || interaction?.status || "Ej angivet";
+}
+
+function interactionStatusBadge(interactionOrState, now = Date.now()) {
+  const state = typeof interactionOrState === "object"
+    ? interactionTimingState(interactionOrState, now)
+    : interactionOrState;
+  return state === "completed"
     ? "text-bg-success"
-    : status === "scheduled"
+    : state === "past_due" || state === "no_show"
+      ? "text-bg-danger"
+      : state === "today" || state === "scheduled"
       ? "text-bg-warning"
-      : status === "no_show"
-        ? "text-bg-danger"
+      : state === "upcoming"
+        ? "text-bg-primary"
         : "text-bg-secondary";
 }
 
@@ -6960,7 +7026,7 @@ function interactionTimelineItemMarkup(interaction, { next = false } = {}) {
   const caseRecord = cases.find((item) => item.id === interaction.caseId);
   const participants = interaction.participants.map((participant) => participant.displayName).filter(Boolean).join(", ");
   const kind = INTERACTION_KIND_LABELS[interaction.kind] || "Kontakt";
-  const status = INTERACTION_STATUS_LABELS[interaction.status] || interaction.status;
+  const status = interactionStatusLabel(interaction);
   const historical = interaction.status !== "scheduled" || new Date(interaction.startsAt).getTime() < Date.now();
   const durationMinutes = interaction.endsAt && interaction.startsAt
     ? Math.max(0, Math.round((new Date(interaction.endsAt) - new Date(interaction.startsAt)) / 60000))
@@ -6975,7 +7041,7 @@ function interactionTimelineItemMarkup(interaction, { next = false } = {}) {
   return `<article class="interaction-timeline-item ${next ? "is-next" : ""}">
     <div class="interaction-timeline-date"><time datetime="${escapeHtml(interaction.startsAt || "")}">${escapeHtml(formatDateTime(interaction.startsAt))}</time><span>${escapeHtml(kind)}</span></div>
     <div class="interaction-timeline-content">
-      <div class="d-flex flex-wrap gap-2 align-items-center"><strong>${escapeHtml(interaction.title || kind)}</strong><span class="badge ${interactionStatusBadge(interaction.status)}">${escapeHtml(status)}</span>${next ? '<span class="interaction-next-label">Nästa planerade</span>' : ""}</div>
+      <div class="d-flex flex-wrap gap-2 align-items-center"><strong>${escapeHtml(interaction.title || kind)}</strong><span class="badge ${interactionStatusBadge(interaction)}">${escapeHtml(status)}</span>${next ? '<span class="interaction-next-label">Nästa planerade</span>' : ""}</div>
       ${caseRecord ? `<a class="small" href="#/case/${escapeHtml(caseRecord.id)}">${escapeHtml(caseRecord.number)} · ${escapeHtml(caseRecord.type)}</a>` : '<small class="text-secondary">Fristående kontakt</small>'}
       ${meetingFacts ? `<small>${escapeHtml(meetingFacts)}</small>` : ""}
       ${participants ? `<small>Deltagare: ${escapeHtml(participants)}</small>` : ""}
@@ -7010,6 +7076,7 @@ function calendarEntries() {
   for (const interaction of allInteractions().filter((item) => item.startsAt)) {
     const type = interaction.kind === "meeting" ? "meeting" : "contact";
     const caseRecord = caseById.get(interaction.caseId);
+    const timingState = interactionTimingState(interaction);
     const participantHandlerIds = interaction.participants
       .filter((participant) => participant.partyType === "handler")
       .map((participant) => participant.partyId);
@@ -7021,11 +7088,12 @@ function calendarEntries() {
       dateKey: calendarDateKey(interaction.startsAt),
       time: new Intl.DateTimeFormat("sv-SE", { hour: "2-digit", minute: "2-digit" }).format(calendarDate(interaction.startsAt)),
       title: interaction.title || INTERACTION_KIND_LABELS[interaction.kind] || "Kontakt",
-      meta: `${caseRecord ? `${caseRecord.number} · ` : ""}${INTERACTION_STATUS_LABELS[interaction.status] || interaction.status}`,
+      meta: `${caseRecord ? `${caseRecord.number} · ` : ""}${type === "meeting" ? interactionStatusLabel(interaction) : INTERACTION_STATUS_LABELS[interaction.status] || interaction.status}`,
       href: caseRecord ? `#/case/${caseRecord.id}/meetings` : "#/calendar",
       ownerIds: [...ownerIds],
       completed: interaction.status === "completed",
-      overdue: false
+      overdue: type === "meeting" && timingState === "past_due",
+      timingState: type === "meeting" ? timingState : ""
     });
   }
 
@@ -7077,6 +7145,7 @@ function calendarEntryMarkup(entry) {
   const classes = ["calendar-entry", `calendar-entry-${entry.type}`];
   if (entry.completed) classes.push("is-completed");
   if (entry.overdue) classes.push("is-overdue");
+  if (entry.timingState === "today") classes.push("is-today-meeting");
   const accessibleLabel = `${CALENDAR_TYPE_LABELS[entry.type]}: ${entry.title}. ${entry.meta}`;
   return `<a class="${classes.join(" ")}" href="${escapeHtml(entry.href)}" ${entry.interactionId ? `data-calendar-interaction="${escapeHtml(entry.interactionId)}"` : ""} aria-label="${escapeHtml(accessibleLabel)}" title="${escapeHtml(accessibleLabel)}">
     ${entry.time ? `<time>${escapeHtml(entry.time)}</time>` : ""}
@@ -7119,8 +7188,8 @@ function renderCalendar() {
   const monthEntries = entries.filter((entry) => entry.dateKey.startsWith(monthPrefix));
   const overdueCount = monthEntries.filter((entry) => entry.overdue).length;
   els.calendarSummary.textContent = monthEntries.length === 1
-    ? `1 post i månaden${overdueCount ? " · 1 försenad" : ""}`
-    : `${monthEntries.length} poster i månaden${overdueCount ? ` · ${overdueCount} försenade` : ""}`;
+    ? `1 post i månaden${overdueCount ? " · 1 behöver följas upp" : ""}`
+    : `${monthEntries.length} poster i månaden${overdueCount ? ` · ${overdueCount} behöver följas upp` : ""}`;
 
   const entriesByDate = groupCalendarEntries(entries);
   const todayKey = calendarDateKey(new Date());
@@ -7166,7 +7235,13 @@ function meetingRegisterRecords() {
   const now = Date.now();
   return allInteractions()
     .filter((interaction) => interaction.kind === "meeting")
-    .filter((interaction) => !meetingRegisterStatusFilter || interaction.status === meetingRegisterStatusFilter)
+    .filter((interaction) => {
+      if (!meetingRegisterStatusFilter) return true;
+      const timingState = interactionTimingState(interaction, now);
+      if (meetingRegisterStatusFilter === "upcoming") return ["today", "upcoming"].includes(timingState);
+      if (meetingRegisterStatusFilter === "past_due") return timingState === "past_due";
+      return interaction.status === meetingRegisterStatusFilter;
+    })
     .filter((interaction) => {
       if (meetingRegisterOwnerFilter === "all") return true;
       const ownerId = meetingRegisterOwnerFilter === "mine" ? currentActorId() : meetingRegisterOwnerFilter;
@@ -7205,10 +7280,14 @@ function renderMeetingsRegister() {
   els.meetingRegisterSearchInput.value = meetingRegisterSearchTerm;
   els.meetingRegisterStatusFilter.value = meetingRegisterStatusFilter;
   const records = meetingRegisterRecords();
-  els.meetingRegisterSummary.textContent = records.length === 1 ? "1 möte visas." : `${records.length} möten visas.`;
+  const pastDueCount = records.filter((interaction) => interactionTimingState(interaction) === "past_due").length;
+  els.meetingRegisterSummary.textContent = `${records.length === 1 ? "1 möte visas" : `${records.length} möten visas`}${pastDueCount ? ` · ${pastDueCount} har passerat utan utfall` : ""}.`;
   els.meetingRegisterTableBody.replaceChildren();
   for (const interaction of records) {
     const row = document.createElement("tr");
+    const timingState = interactionTimingState(interaction);
+    if (timingState === "past_due") row.classList.add("is-past-due");
+    if (timingState === "today") row.classList.add("is-today");
     const caseRecord = cases.find((item) => item.id === interaction.caseId);
     const participants = interaction.participants.map((participant) => participant.displayName).filter(Boolean);
     const latestSystemCommunication = [...communicationsForInteraction(interaction.id)]
@@ -7222,7 +7301,7 @@ function renderMeetingsRegister() {
     row.innerHTML = `<td class="meeting-register-date"><time datetime="${escapeHtml(interaction.startsAt || "")}">${escapeHtml(formatDateTime(interaction.startsAt))}</time><small>${escapeHtml(mode)}</small></td>
       <td><strong class="meeting-register-title">${escapeHtml(interaction.title || "Möte")}</strong>${caseMarkup}</td>
       <td><span class="meeting-register-participants">${escapeHtml(participants.slice(0, 3).join(", ") || "Inga deltagare angivna")}</span>${participants.length > 3 ? `<small>+ ${participants.length - 3} till</small>` : ""}</td>
-      <td><span class="badge ${interactionStatusBadge(interaction.status)}">${escapeHtml(INTERACTION_STATUS_LABELS[interaction.status] || interaction.status)}</span>${latestSystemCommunication ? `<small class="meeting-register-communication">Senast: ${escapeHtml(COMMUNICATION_CHANNEL_LABELS[latestSystemCommunication.channel] || latestSystemCommunication.channel)} · ${escapeHtml(COMMUNICATION_STATUS_LABELS[latestSystemCommunication.status] || latestSystemCommunication.status)} · ${escapeHtml(formatDateTime(latestSystemCommunication.createdAt))}</small>` : latestManualCommunication ? `<small class="meeting-register-communication">Senast: ${escapeHtml(INTERACTION_COMMUNICATION_LABELS[latestManualCommunication.type] || INTERACTION_COMMUNICATION_LABELS.other)} · ${escapeHtml(formatDateTime(latestManualCommunication.occurredAt))}</small>` : '<small class="meeting-register-communication">Ingen kommunikation registrerad</small>'}</td>
+      <td><span class="badge ${interactionStatusBadge(interaction)}">${escapeHtml(interactionStatusLabel(interaction))}</span>${timingState === "past_due" ? '<small class="meeting-register-attention">Registrera mötets utfall</small>' : ""}${latestSystemCommunication ? `<small class="meeting-register-communication">Senast: ${escapeHtml(COMMUNICATION_CHANNEL_LABELS[latestSystemCommunication.channel] || latestSystemCommunication.channel)} · ${escapeHtml(COMMUNICATION_STATUS_LABELS[latestSystemCommunication.status] || latestSystemCommunication.status)} · ${escapeHtml(formatDateTime(latestSystemCommunication.createdAt))}</small>` : latestManualCommunication ? `<small class="meeting-register-communication">Senast: ${escapeHtml(INTERACTION_COMMUNICATION_LABELS[latestManualCommunication.type] || INTERACTION_COMMUNICATION_LABELS.other)} · ${escapeHtml(formatDateTime(latestManualCommunication.occurredAt))}</small>` : '<small class="meeting-register-communication">Ingen kommunikation registrerad</small>'}</td>
       <td>${escapeHtml(handlerNameById(interaction.organizerId))}</td>
       <td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-open-meeting-register="${escapeHtml(interaction.id)}">Öppna</button></td>`;
     row.querySelector("[data-open-meeting-register]").addEventListener("click", () => openMeetingRegisterRecord(interaction));
@@ -9526,7 +9605,7 @@ function caseMeetingStatus(meeting) {
 }
 
 function caseMeetingStatusLabel(meeting) {
-  return INTERACTION_STATUS_LABELS[caseMeetingStatus(meeting)] || "Bokat";
+  return interactionStatusLabel({ status: caseMeetingStatus(meeting), startsAt: meeting?.startsAt || meeting?.occurredAt });
 }
 
 function workInputStateClass(state) {
@@ -9550,6 +9629,7 @@ function activityWorkInputSummary(activity, caseRecord) {
   let complete = false;
   let updatedAt = null;
   let updatedBy = null;
+  let meetingTiming = "";
   let help = "Öppna den kopplade registreringen och komplettera underlaget innan aktiviteten avslutas.";
   const routeParameters = { caseId: caseRecord.id, activityId: activity.id, mentorId: caseRecord.mentorId };
 
@@ -9565,6 +9645,7 @@ function activityWorkInputSummary(activity, caseRecord) {
       && !meeting.supersededByMeetingId
       && (meeting.activityId === activity.id || activity.templateId === "interviewDone" && meeting.meetingType === "certification_interview"));
     const latest = latestRecord(records);
+    meetingTiming = latest ? interactionTimingState({ status: caseMeetingStatus(latest), startsAt: latest.startsAt || latest.occurredAt }) : "";
     started = records.length > 0;
     const meetingRequirement = activity.templateId === "matchingFirstMeeting" ? "scheduled" : "completed";
     complete = records.some((meeting) => meetingSatisfiesRequirement(
@@ -9655,15 +9736,19 @@ function activityWorkInputSummary(activity, caseRecord) {
   return {
     ...definition,
     state,
-    stateLabel: interviewRegistration
+    stateLabel: meetingTiming === "past_due"
+      ? "Passerat, utfall saknas"
+      : interviewRegistration
       ? ({ not_started: "Inte bokad", in_progress: "Bokad", complete: "Genomförd" })[state]
       : WORK_INPUT_STATE_LABELS[state],
-    stateClass: workInputStateClass(state),
+    stateClass: meetingTiming === "past_due" ? "text-bg-danger" : workInputStateClass(state),
     updatedAt,
     updatedBy,
     help,
     href,
-    actionLabel: interviewRegistration
+    actionLabel: meetingTiming === "past_due"
+      ? "Registrera utfall"
+      : interviewRegistration
       ? state === "not_started" ? "Boka intervju" : state === "in_progress" ? "Öppna bokning" : "Öppna intervju"
       : state === "not_started" ? "Påbörja registrering" : state === "in_progress" ? "Fortsätt registrering" : "Öppna registrering"
   };
@@ -12681,14 +12766,17 @@ function renderMeetings(candidate) {
 
   for (const meeting of candidateMeetings) {
     const meetingType = ({ certification_interview: "Intervju inför godkännande", follow_up: "Uppföljning", other: "Annat möte" })[meeting.meetingType] || meeting.meetingType;
+    const meetingTimingRecord = { status: caseMeetingStatus(meeting), startsAt: meeting.startsAt || meeting.occurredAt };
+    const meetingTiming = interactionTimingState(meetingTimingRecord);
     const row = document.createElement("tr");
+    if (meetingTiming === "past_due") row.classList.add("is-past-due");
     const nextStep = meeting.nextStep
       ? `<small class="d-block text-secondary mt-1">Nästa steg: ${escapeHtml(meeting.nextStep)}</small>`
       : "";
     row.innerHTML = `
-      <td><time datetime="${escapeHtml(meeting.occurredAt)}">${escapeHtml(formatDateTime(meeting.occurredAt))}</time></td>
+      <td><time datetime="${escapeHtml(meeting.occurredAt)}">${escapeHtml(formatDateTime(meeting.occurredAt))}</time><span class="badge ${interactionStatusBadge(meetingTimingRecord)} d-block mt-1">${escapeHtml(interactionStatusLabel(meetingTimingRecord))}</span></td>
       <td>${escapeHtml(meetingType)}<small class="d-block text-secondary">${escapeHtml(({ physical: "Fysiskt möte", digital: "Digitalt möte", phone: "Telefon" })[meeting.mode] || "Ej angivet")}</small></td>
-      <td class="meeting-summary">${escapeHtml(meeting.summary)}${nextStep}</td>
+      <td class="meeting-summary">${escapeHtml(meeting.summary || (meetingTiming === "past_due" ? "Utfall behöver registreras." : "Ingen anteckning ännu."))}${nextStep}</td>
       <td>${escapeHtml(handlerNameById(meeting.createdBy))}</td>
       <td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" data-edit-meeting="${escapeHtml(meeting.id)}">Öppna</button></td>
     `;
@@ -14474,13 +14562,15 @@ function updateInteractionFormState({ applyCaseSuggestions = false } = {}) {
   const originalStatus = els.interactionForm.dataset.originalStatus || "";
   const interactionKind = scheduled ? "meeting" : els.interactionKindInput.value;
   const editingScheduledMeeting = editing && originalStatus === "scheduled";
+  const existingInteraction = allInteractions().find((item) => item.id === els.interactionForm.dataset.interactionId);
+  const editingPastDueMeeting = editingScheduledMeeting && interactionTimingState(existingInteraction || {}) === "past_due";
   els.interactionIntentSwitch.hidden = editing && !editingScheduledMeeting;
-  els.interactionIntentLegend.textContent = editingScheduledMeeting ? "Vad vill du göra?" : "Vad vill du registrera?";
+  els.interactionIntentLegend.textContent = editingPastDueMeeting ? "Mötet har passerat. Vad hände?" : editingScheduledMeeting ? "Vad vill du göra?" : "Vad vill du registrera?";
   els.interactionScheduledLabel.textContent = editingScheduledMeeting ? "Ändra bokningen" : "Planerat möte";
   els.interactionCompletedLabel.textContent = editingScheduledMeeting ? "Registrera utfall" : "Genomförd kontakt";
   els.interactionCaseInput.options[0].textContent = scheduled ? "Fristående möte" : "Fristående kontakt";
   els.interactionTitle.textContent = editingScheduledMeeting
-    ? scheduled ? "Bokat möte" : "Registrera mötesutfall"
+    ? scheduled ? editingPastDueMeeting ? "Passerat möte, utfall saknas" : "Bokat möte" : "Registrera mötesutfall"
     : editing && interactionKind === "meeting"
       ? `${INTERACTION_STATUS_LABELS[originalStatus] || "Öppna"} möte`
       : editing
@@ -14537,8 +14627,7 @@ function updateInteractionFormState({ applyCaseSuggestions = false } = {}) {
   } else {
     els.interactionReminderSummary.textContent = "Ingen automatisk påminnelse är planerad.";
   }
-  const savedInteraction = allInteractions().find((item) => item.id === els.interactionForm.dataset.interactionId);
-  els.interactionSendMessageButton.hidden = !savedInteraction || savedInteraction.kind !== "meeting";
+  els.interactionSendMessageButton.hidden = !existingInteraction || existingInteraction.kind !== "meeting";
 
   const caseRecord = cases.find((item) => item.id === els.interactionCaseInput.value);
   els.interactionCaseHelp.textContent = caseRecord
