@@ -30,6 +30,8 @@ test("keeps the register concise and opens a dedicated communication detail view
   assert.match(app, /communication-delivery-timeline/);
   assert.match(styles, /\.communication-detail-grid/);
   assert.match(styles, /\.communication-detail-message/);
+  const detailRenderer = app.match(/function renderCommunicationDetail\(record\)[\s\S]*?\n}\n/)?.[0] || "";
+  assert.match(detailRenderer, /Registrerad av[\s\S]*actorNameById\(record\.createdBy\)/);
 });
 
 test("routes outbound email and sms through swappable demo providers", () => {
@@ -111,4 +113,6 @@ test("lets mentors message the responsible handler through the shared communicat
   assert.match(app, /createdBy: currentActorId\(\)/);
   assert.match(styles, /\.mentor-message-actions/);
   assert.match(styles, /\.mentor-message-history/);
+  assert.match(app, /function hideFeedback\(\)/);
+  assert.match(app, /window\.setTimeout\(\(\) => \{[\s\S]*toast\.hide\(\)/);
 });

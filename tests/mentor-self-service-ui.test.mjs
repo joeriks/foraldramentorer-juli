@@ -58,6 +58,8 @@ test("keeps the profile editor within the mobile document width", () => {
   assert.match(styles, /\.mentor-self-service-support-fields/);
   assert.match(styles, /@media \(max-width: 600px\)[\s\S]*\.mentor-self-service-grid,[\s\S]*\.mentor-self-service-choice-grid,[\s\S]*\.mentor-self-service-support-fields,[\s\S]*grid-template-columns: 1fr/);
   assert.match(styles, /\.mentor-self-service-actions[\s\S]*flex-direction: column-reverse/);
+  assert.match(app, /class="mentor-self-service-section"/);
+  assert.match(styles, /\.mentor-self-service-actions[\s\S]*position: sticky/);
 });
 
 test("gives the mentor portal a direct and compact mobile flow", () => {
@@ -74,8 +76,10 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(app, /interactionTimingState\(item\) === "past_due"/);
   assert.match(app, /Behöver följas upp/);
   assert.match(app, /saknar registrerat utfall/);
-  assert.match(app, /Föräldraavstämning försenad/);
-  assert.match(app, /nextAssignmentFollowUp\(plan, assignmentRecords\(caseRecord\.id\)\.checkIns\)/);
+  const assignmentRenderer = app.match(/function renderMentorAssignment\(\)[\s\S]*?\n}\n\nconst mentorMeetingModeLabels/)?.[0] || "";
+  assert.doesNotMatch(assignmentRenderer, /Föräldraavstämning/);
+  assert.doesNotMatch(assignmentRenderer, /Rapporterade möten/);
+  assert.match(app, /mentor-report-history-item/);
   assert.match(app, /mentorReportSubmittedMarkup\(report\)/);
   assert.match(app, /data-open-mentor-report/);
   assert.match(app, /Kompletteringen tidsstämplas\. Den ursprungliga rapporten ändras inte\./);
@@ -108,4 +112,6 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(styles, /\.mentor-meeting-report-queue/);
   assert.match(styles, /body\.is-mentor-portal \.mentor-meeting-report-queue li[\s\S]*grid-template-columns: 1fr/);
   assert.match(styles, /body\.is-mentor-portal \.system-status/);
+  assert.match(styles, /body\.is-mentor-portal \.btn,[\s\S]*min-height: 2\.75rem/);
+  assert.match(styles, /body\.is-mentor-portal \.mentor-planning-context[\s\S]*display: grid/);
 });

@@ -219,6 +219,22 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "137",
+    date: "2026-08-23",
+    title: "Tydligare mentorflöden på mobil",
+    flow: "Mentoröversikt -> uppdrag, möten, meddelanden, utbildning och profil",
+    simplified: "Mentorns viktigaste mobilvyer har kortats, grupperats och fått större tryckytor. Möteshistorik och rapporter visas nu tillsammans utan dubbla listor.",
+    retained: "Mötesändringar, rapportkompletteringar, intern kommunikation, utbildningsprogression och full ändringshistorik fungerar vidare med samma verksamhetsdata.",
+    changes: [
+      "Uppdraget visar en sammanhållen historik för tidigare möten och äldre rapporter.",
+      "Handläggarens interna föräldraavstämning visas inte längre som en mentoråtgärd.",
+      "Profil och intresseanmälan använder öppningsbara avsnitt som minskar skroll på mobil.",
+      "Viktiga knappar har större tryckytor och mötesdialogens sammanhang radbryts tydligt.",
+      "Bekräftelser försvinner säkert och stängs vid navigering.",
+      "Interna meddelanden visar rätt registrerande användare i kommunikationshistoriken."
+    ]
+  },
+  {
     version: "136",
     date: "2026-08-23",
     title: "Färre genvägar i mentorportalen",
@@ -2765,9 +2781,23 @@ function markSaved() {
   els.saveStatus.textContent = `Senast sparad ${time}`;
 }
 
+let feedbackToastTimer = null;
+
+function hideFeedback() {
+  window.clearTimeout(feedbackToastTimer);
+  feedbackToastTimer = null;
+  bootstrap.Toast.getInstance(els.feedbackToast)?.hide();
+}
+
 function showFeedback(message) {
+  hideFeedback();
   els.feedbackToastBody.textContent = message;
-  bootstrap.Toast.getOrCreateInstance(els.feedbackToast, { delay: 3200 }).show();
+  const toast = bootstrap.Toast.getOrCreateInstance(els.feedbackToast, { autohide: false });
+  toast.show();
+  feedbackToastTimer = window.setTimeout(() => {
+    toast.hide();
+    feedbackToastTimer = null;
+  }, 3200);
 }
 
 function isMentorAppInstalled() {
@@ -6350,10 +6380,13 @@ function openMentorMeetingReport(interactionId) {
 }
 
 function mentorMeetingHistoryMarkup(caseRecord) {
-  const records = mentorPastMeetings(caseRecord)
+  const meetings = mentorPastMeetings(caseRecord)
     .filter((meeting) => caseRecord.status === "closed" || mentorReportForMeeting(caseRecord, meeting));
-  if (!records.length) return "";
-  return `<section class="mentor-meeting-history"><div><h3>Tidigare möten</h3><p>Återrapporterade och avslutade möten med anteckningar och nästa steg.</p></div><ol>${records.map((meeting) => {
+  const reports = assignmentRecords(caseRecord.id).reports;
+  const linkedReportIds = new Set(meetings.map((meeting) => mentorReportForMeeting(caseRecord, meeting)?.id).filter(Boolean));
+  const olderReports = reports.filter((report) => !linkedReportIds.has(report.id));
+  if (!meetings.length && !olderReports.length) return "";
+  const meetingItems = meetings.map((meeting) => {
     const participants = meeting.participants.map((participant) => participant.displayName).filter(Boolean).join(", ");
     const durationMinutes = meeting.startsAt && meeting.endsAt ? Math.max(0, Math.round((new Date(meeting.endsAt) - new Date(meeting.startsAt)) / 60000)) : 0;
     const facts = [mentorMeetingModeLabels[meeting.mode] || meeting.mode, meeting.location, durationMinutes ? formatMinutes(durationMinutes) : ""].filter(Boolean).join(" · ");
@@ -6364,7 +6397,9 @@ function mentorMeetingHistoryMarkup(caseRecord) {
       ? `<button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna rapport${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button>`
       : "";
     return `<li class="${pastDue ? "is-past-due" : ""}"><header><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><strong>${escapeHtml(meeting.title || "Möte med föräldern")}</strong></div><span class="badge ${interactionStatusBadge(meeting)}">${escapeHtml(interactionStatusLabel(meeting))}</span></header>${pastDue ? '<p class="mentor-meeting-past-due">Registrera om mötet genomfördes, ställdes in eller om någon uteblev.</p>' : ""}${facts ? `<p class="mentor-meeting-history-facts">${escapeHtml(facts)}</p>` : ""}${participants ? `<p class="mentor-meeting-history-facts">Deltagare: ${escapeHtml(participants)}</p>` : ""}<div class="mentor-meeting-history-note"><strong>Anteckning</strong><p>${escapeHtml(meeting.summary || "Ingen anteckning registrerad.")}</p></div>${meeting.nextStep ? `<div class="mentor-meeting-history-next"><strong>Nästa steg</strong><p>${escapeHtml(meeting.nextStep)}</p></div>` : ""}${communicationHistory.length ? `<details><summary>Kommunikation och ändringar (${communicationHistory.length})</summary><ol>${communicationHistory.map((item) => `<li><time datetime="${escapeHtml(item.occurredAt)}">${escapeHtml(formatDateTime(item.occurredAt))}</time><span>${escapeHtml(item.comment)}</span></li>`).join("")}</ol></details>` : ""}<footer><small>Senast registrerad ${escapeHtml(formatDateTime(meeting.updatedAt || meeting.createdAt))} av ${escapeHtml(actorNameById(meeting.updatedBy || meeting.createdBy))}</small>${reportAction}</footer></li>`;
-  }).join("")}</ol></section>`;
+  }).join("");
+  const olderReportItems = olderReports.map((report) => `<li class="mentor-report-history-item"><header><div><time datetime="${escapeHtml(report.occurredOn)}">${escapeHtml(formatDate(report.occurredOn))}</time><strong>Tidigare mötesrapport</strong></div><span class="badge text-bg-success">${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}</span></header><p class="mentor-meeting-history-facts">${escapeHtml(contactModeLabels[report.mode] || report.mode)} · ${escapeHtml(formatMinutes(report.durationMinutes))}</p><div class="mentor-meeting-history-note"><strong>Sammanfattning</strong><p>${escapeHtml(report.summary)}</p></div><footer><small>Inskickad ${escapeHtml(formatDateTime(report.createdAt))} av ${escapeHtml(mentorReportSubmittedBy(report))}</small><button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna rapport${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button></footer></li>`).join("");
+  return `<section class="mentor-meeting-history"><div><h3>Tidigare möten</h3><p>Genomförda möten och äldre rapporter med anteckningar och nästa steg.</p></div><ol>${meetingItems}${olderReportItems}</ol></section>`;
 }
 
 function renderMentorHome() {
@@ -6505,17 +6540,6 @@ function renderMentorAssignment() {
     return;
   }
   const plan = caseRecord.details?.assignmentPlan || {};
-  const reports = assignmentRecords(caseRecord.id).reports;
-  const followUp = nextAssignmentFollowUp(plan, assignmentRecords(caseRecord.id).checkIns);
-  const followUpFact = followUp.state === "overdue"
-    ? { className: "is-past-due", label: "Föräldraavstämning försenad", value: formatDate(followUp.date), help: "Handläggaren behöver registrera avstämningen eller planera om den." }
-    : followUp.state === "today"
-      ? { className: "is-today", label: "Föräldraavstämning idag", value: formatDate(followUp.date), help: "" }
-      : followUp.state === "upcoming"
-        ? { className: "", label: "Nästa föräldraavstämning", value: formatDate(followUp.date), help: "" }
-        : followUp.state === "none"
-          ? { className: "", label: "Fler föräldraavstämningar", value: "Inga inom uppdragsperioden", help: "" }
-          : { className: "", label: "Nästa föräldraavstämning", value: "Inte planerad", help: "" };
   const parent = caseParent(caseRecord);
   const owner = responsibleHandler(caseRecord);
   els.mentorPortalView.innerHTML = `<section class="card mentor-assignment-card"><div class="card-header record-header bg-white"><a class="small" href="#/mentor-assignments">Tillbaka till mina uppdrag</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">Mentoruppdrag · ${escapeHtml(caseRecord.number)}</div><h2 class="h5 mb-1">${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</h2><p class="text-secondary mb-0">${escapeHtml(caseRecord.details?.desiredOutcome || caseRecord.description || "")}</p></div><span class="${caseStatusBadge(caseRecord.status)} align-self-start">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></div><dl class="record-meta mt-3 mb-0"><div><dt>Förälder</dt><dd>${escapeHtml(parent?.name || "Ej angivet")}</dd></div><div><dt>Ansvarig handläggare</dt><dd>${escapeHtml(owner?.name || "Ej tilldelad")}</dd></div><div><dt>Period</dt><dd>${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}</dd></div></dl></div>
@@ -6525,8 +6549,7 @@ function renderMentorAssignment() {
     ${mentorMeetingScheduleMarkup(caseRecord)}
     ${mentorMeetingHistoryMarkup(caseRecord)}
     <div class="mentor-assignment-contact"><div><strong>Behöver du fråga något?</strong><span>Skriv till ${escapeHtml(owner?.name || "ansvarig handläggare")} om uppdraget.</span></div><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></div>
-    <div class="card-body record-grid"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div class="${followUpFact.className}"><dt>${escapeHtml(followUpFact.label)}</dt><dd>${escapeHtml(followUpFact.value)}</dd>${followUpFact.help ? `<small>${escapeHtml(followUpFact.help)}</small>` : ""}</div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section>
-    <section class="record-section record-section-wide"><h3 class="record-section-title mb-1">Rapporterade möten</h3><p class="small text-secondary">En ny rapport skapas från valt möte under Möten att återrapportera ovan.</p><div class="table-responsive border rounded"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Mötesdatum</th><th>Kontaktform</th><th>Tid</th><th>Resultat</th><th>Sammanfattning</th><th>Inskickad</th><th></th></tr></thead><tbody>${reports.map((report) => `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<small class="d-block text-danger">Stöd begärt</small>' : ""}</td><td>${escapeHtml(report.summary)}</td><td>${mentorReportSubmittedMarkup(report)}</td><td><button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button></td></tr>`).join("") || '<tr><td colspan="7" class="text-center text-secondary py-3">Inget möte har återrapporterats ännu.</td></tr>'}</tbody></table></div></section></div></section>`;
+    <div class="card-body"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section></div></section>`;
 }
 
 const mentorMeetingModeLabels = { physical: "Fysiskt", digital: "Digitalt", phone: "Telefon" };
@@ -6576,7 +6599,32 @@ function renderMentorProfileForm(mentor, owner) {
   const legacyAvailabilityNote = !availabilityIds.size && mentor.availability
     ? `<p class="form-text mentor-profile-legacy-value"><strong>Tidigare uppgift:</strong> ${escapeHtml(mentor.availability)}. Välj aktuella tider ovan.</p>`
     : "";
-  return `<form id="mentorSelfServiceProfileForm" class="card-body mentor-self-service-form" novalidate><div id="mentorSelfServiceFormError" class="alert alert-danger" role="alert" hidden></div><section class="record-section"><h3 class="record-section-title">Kontaktuppgifter</h3><div class="mentor-self-service-grid"><label><span class="form-label">Namn</span><input class="form-control" name="name" autocomplete="name" maxlength="120" value="${escapeHtml(mentor.name || "")}" required></label><label><span class="form-label">E-post</span><input class="form-control" name="email" type="email" autocomplete="email" maxlength="160" value="${escapeHtml(mentor.email || "")}"></label><label><span class="form-label">Telefon</span><input class="form-control" name="phone" type="tel" autocomplete="tel" maxlength="40" value="${escapeHtml(mentor.phone || "")}"></label></div><p class="form-text">Minst e-post eller telefon behöver anges.</p></section><section class="record-section"><h3 class="record-section-title">Var och hur jag kan bidra</h3><div class="mentor-self-service-choice-grid"><fieldset><legend class="form-label">Geografiska områden</legend>${geographicAreaOptions([...areaIds]).map(([id, label, inactive]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="geographicAreaId" value="${escapeHtml(id)}" ${areaIds.has(id) ? "checked" : ""} ${inactive && !areaIds.has(id) ? "disabled" : ""}><span class="form-check-label">${escapeHtml(label)}${inactive ? " (inaktivt)" : ""}</span></label>`).join("")}${legacyAreaNote}</fieldset><fieldset><legend class="form-label">Språk</legend>${languageOptions([...languageIds], mentor.languageEntries, mentor.languages).map(([id, label, inactive]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="languageId" value="${escapeHtml(id)}" ${languageIds.has(id) ? "checked" : ""} ${inactive && !languageIds.has(id) ? "disabled" : ""}><span class="form-check-label">${escapeHtml(label)}${inactive ? " (tidigare värde)" : ""}</span></label>`).join("")}</fieldset><fieldset><legend class="form-label">Tillgänglighet</legend>${AVAILABILITY_OPTIONS.map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="availabilitySlotId" value="${escapeHtml(id)}" ${availabilityIds.has(id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}${legacyAvailabilityNote}</fieldset><fieldset><legend class="form-label">Mötesformer</legend>${Object.entries(mentorMeetingModeLabels).map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="meetingMode" value="${id}" ${meetingModes.has(id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}<label class="mt-3"><span class="form-label">Kapacitet för nya uppdrag</span><select class="form-select" name="availableAssignmentCapacity">${[[0, "Tar inte emot nya uppdrag"], [1, "1 samtidigt uppdrag"], [2, "2 samtidiga uppdrag"], [3, "3 samtidiga uppdrag"]].map(([value, label]) => `<option value="${value}" ${Number(mentor.availableAssignmentCapacity ?? 1) === value ? "selected" : ""}>${label}</option>`).join("")}</select></label></fieldset></div><label class="mt-3"><span class="form-label">Kommentar om min tillgänglighet <span class="text-secondary">(valfritt)</span></span><textarea class="form-control" name="availabilityNote" rows="2" maxlength="500">${escapeHtml(mentor.availabilityNote || "")}</textarea></label></section><section class="record-section"><h3 class="record-section-title">Mina erfarenhetsområden</h3><p class="small text-secondary">Välj vad du känner dig trygg att ge vardagsnära stöd inom och vad erfarenheten bygger på.</p><div class="mentor-self-service-support-list">${mentorSelfServiceSupportEditor(mentor)}</div></section><section class="mentor-profile-protected"><h3 class="h6">Uppgifter som kommunen ansvarar för</h3><dl><div><dt>Status</dt><dd>${escapeHtml(mentor.status)}</dd></div><div><dt>Kontaktperson</dt><dd>${escapeHtml(owner?.name || mentor.coordinator || "Ej tilldelad")}</dd></div></dl><p>Identitet, registerkontroller och beslut ändras av kommunen och visas inte här.</p></section><div class="mentor-self-service-actions"><button type="button" class="btn btn-outline-secondary" data-cancel-mentor-profile>Avbryt</button><button type="submit" class="btn btn-primary">Spara ändringar</button></div></form>`;
+  const contributionSummary = [
+    `${areaIds.size} ${areaIds.size === 1 ? "område" : "områden"}`,
+    `${languageIds.size} ${languageIds.size === 1 ? "språk" : "språk"}`,
+    `${availabilityIds.size} ${availabilityIds.size === 1 ? "tid" : "tider"}`
+  ].join(" · ");
+  const selectedSupportCount = normalizeMentorSupportAreas(mentor.supportAreas).length;
+  return `<form id="mentorSelfServiceProfileForm" class="card-body mentor-self-service-form" novalidate>
+    <div id="mentorSelfServiceFormError" class="alert alert-danger" role="alert" hidden></div>
+    <details class="mentor-self-service-section" open>
+      <summary><span>Kontaktuppgifter</span><small>Namn och minst en kontaktväg</small></summary>
+      <div class="mentor-self-service-section-body"><div class="mentor-self-service-grid"><label><span class="form-label">Namn</span><input class="form-control" name="name" autocomplete="name" maxlength="120" value="${escapeHtml(mentor.name || "")}" required></label><label><span class="form-label">E-post</span><input class="form-control" name="email" type="email" autocomplete="email" maxlength="160" value="${escapeHtml(mentor.email || "")}"></label><label><span class="form-label">Telefon</span><input class="form-control" name="phone" type="tel" autocomplete="tel" maxlength="40" value="${escapeHtml(mentor.phone || "")}"></label></div><p class="form-text mb-0">Minst e-post eller telefon behöver anges.</p></div>
+    </details>
+    <details class="mentor-self-service-section">
+      <summary><span>Var och hur jag kan bidra</span><small>${escapeHtml(contributionSummary)}</small></summary>
+      <div class="mentor-self-service-section-body"><div class="mentor-self-service-choice-grid"><fieldset><legend class="form-label">Geografiska områden</legend>${geographicAreaOptions([...areaIds]).map(([id, label, inactive]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="geographicAreaId" value="${escapeHtml(id)}" ${areaIds.has(id) ? "checked" : ""} ${inactive && !areaIds.has(id) ? "disabled" : ""}><span class="form-check-label">${escapeHtml(label)}${inactive ? " (inaktivt)" : ""}</span></label>`).join("")}${legacyAreaNote}</fieldset><fieldset><legend class="form-label">Språk</legend>${languageOptions([...languageIds], mentor.languageEntries, mentor.languages).map(([id, label, inactive]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="languageId" value="${escapeHtml(id)}" ${languageIds.has(id) ? "checked" : ""} ${inactive && !languageIds.has(id) ? "disabled" : ""}><span class="form-check-label">${escapeHtml(label)}${inactive ? " (tidigare värde)" : ""}</span></label>`).join("")}</fieldset><fieldset><legend class="form-label">Tillgänglighet</legend>${AVAILABILITY_OPTIONS.map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="availabilitySlotId" value="${escapeHtml(id)}" ${availabilityIds.has(id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}${legacyAvailabilityNote}</fieldset><fieldset><legend class="form-label">Mötesformer</legend>${Object.entries(mentorMeetingModeLabels).map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="meetingMode" value="${id}" ${meetingModes.has(id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}<label class="mt-3"><span class="form-label">Kapacitet för nya uppdrag</span><select class="form-select" name="availableAssignmentCapacity">${[[0, "Tar inte emot nya uppdrag"], [1, "1 samtidigt uppdrag"], [2, "2 samtidiga uppdrag"], [3, "3 samtidiga uppdrag"]].map(([value, label]) => `<option value="${value}" ${Number(mentor.availableAssignmentCapacity ?? 1) === value ? "selected" : ""}>${label}</option>`).join("")}</select></label></fieldset></div><label class="mt-3"><span class="form-label">Kommentar om min tillgänglighet <span class="text-secondary">(valfritt)</span></span><textarea class="form-control" name="availabilityNote" rows="2" maxlength="500">${escapeHtml(mentor.availabilityNote || "")}</textarea></label></div>
+    </details>
+    <details class="mentor-self-service-section">
+      <summary><span>Mina erfarenhetsområden</span><small>${selectedSupportCount} valda</small></summary>
+      <div class="mentor-self-service-section-body"><p class="small text-secondary">Välj vad du känner dig trygg att ge vardagsnära stöd inom och vad erfarenheten bygger på.</p><div class="mentor-self-service-support-list">${mentorSelfServiceSupportEditor(mentor)}</div></div>
+    </details>
+    <details class="mentor-self-service-section mentor-self-service-protected-section">
+      <summary><span>Uppgifter som kommunen ansvarar för</span><small>Status och kontaktperson</small></summary>
+      <div class="mentor-profile-protected"><dl><div><dt>Status</dt><dd>${escapeHtml(mentor.status)}</dd></div><div><dt>Kontaktperson</dt><dd>${escapeHtml(owner?.name || mentor.coordinator || "Ej tilldelad")}</dd></div></dl><p>Identitet, registerkontroller och beslut ändras av kommunen och visas inte här.</p></div>
+    </details>
+    <div class="mentor-self-service-actions"><button type="button" class="btn btn-outline-secondary" data-cancel-mentor-profile>Avbryt</button><button type="submit" class="btn btn-primary">Spara ändringar</button></div>
+  </form>`;
 }
 
 function renderMentorProfile() {
@@ -6777,16 +6825,23 @@ function mentorApplicationSupportRows(application) {
   const selected = new Map(normalizeMentorSupportAreas(application?.supportAreas).map((entry) => [entry.areaId, entry]));
   const confidenceLabels = Object.fromEntries(MENTOR_SUPPORT_CONFIDENCE_LEVELS);
   const experienceLabels = Object.fromEntries(MENTOR_EXPERIENCE_LEVELS);
-  return enabledSupportAreas().map((area) => {
-    const entry = selected.get(area.id);
-    return `<div class="public-mentor-support-row" data-public-mentor-support-row="${escapeHtml(area.id)}">
-      <label class="form-check mb-0"><input class="form-check-input" type="checkbox" name="mentorSupportArea" value="${escapeHtml(area.id)}" ${entry ? "checked" : ""}><span class="form-check-label"><strong>${escapeHtml(area.title)}</strong><small>${escapeHtml(area.publicDescription || "")}</small></span></label>
-      <div class="public-mentor-support-details" ${entry ? "" : "hidden"}>
-        <label><span class="form-label">Hur trygg känner du dig inom området?</span><select class="form-select" data-public-mentor-confidence="${escapeHtml(area.id)}">${MENTOR_SUPPORT_CONFIDENCE_LEVELS.map(([id, label]) => `<option value="${id}" ${(entry?.confidenceLevel || "good") === id ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select></label>
-        <fieldset><legend class="form-label">Vad bygger erfarenheten på?</legend><div class="public-mentor-check-list">${MENTOR_EXPERIENCE_LEVELS.map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" value="${id}" data-public-mentor-experience="${escapeHtml(area.id)}" ${entry?.experienceLevels.includes(id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}</div></fieldset>
-        ${entry ? `<p class="small text-secondary mb-0">Valt: ${escapeHtml(confidenceLabels[entry.confidenceLevel] || "")} · ${escapeHtml(entry.experienceLevels.map((id) => experienceLabels[id]).filter(Boolean).join(", "))}</p>` : ""}
-      </div>
-    </div>`;
+  const enabledAreas = enabledSupportAreas();
+  return SUPPORT_AREA_CATEGORIES.map((category, categoryIndex) => {
+    const areas = enabledAreas.filter((area) => area.categoryId === category.id);
+    if (!areas.length) return "";
+    const selectedCount = areas.filter((area) => selected.has(area.id)).length;
+    const areaRows = areas.map((area) => {
+      const entry = selected.get(area.id);
+      return `<div class="public-mentor-support-row" data-public-mentor-support-row="${escapeHtml(area.id)}">
+        <label class="form-check mb-0"><input class="form-check-input" type="checkbox" name="mentorSupportArea" value="${escapeHtml(area.id)}" ${entry ? "checked" : ""}><span class="form-check-label"><strong>${escapeHtml(area.title)}</strong><small>${escapeHtml(area.publicDescription || "")}</small></span></label>
+        <div class="public-mentor-support-details" ${entry ? "" : "hidden"}>
+          <label><span class="form-label">Hur trygg känner du dig inom området?</span><select class="form-select" data-public-mentor-confidence="${escapeHtml(area.id)}">${MENTOR_SUPPORT_CONFIDENCE_LEVELS.map(([id, label]) => `<option value="${id}" ${(entry?.confidenceLevel || "good") === id ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select></label>
+          <fieldset><legend class="form-label">Vad bygger erfarenheten på?</legend><div class="public-mentor-check-list">${MENTOR_EXPERIENCE_LEVELS.map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" value="${id}" data-public-mentor-experience="${escapeHtml(area.id)}" ${entry?.experienceLevels.includes(id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}</div></fieldset>
+          ${entry ? `<p class="small text-secondary mb-0">Valt: ${escapeHtml(confidenceLabels[entry.confidenceLevel] || "")} · ${escapeHtml(entry.experienceLevels.map((id) => experienceLabels[id]).filter(Boolean).join(", "))}</p>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+    return `<details class="public-mentor-support-group" ${selectedCount || categoryIndex === 0 ? "open" : ""}><summary><span>${escapeHtml(category.label)}</span><small>${selectedCount ? `${selectedCount} valda` : `${areas.length} alternativ`}</small></summary><div>${areaRows}</div></details>`;
   }).join("");
 }
 
@@ -7865,7 +7920,7 @@ function renderCommunicationDetail(record) {
   els.communicationDetailHeader.innerHTML = `<div class="communication-detail-heading"><div><div class="record-type">${record.automationType === "meeting_reminder" ? `Automatisk påminnelse${communicationWasProcessedLate(record) ? " · Behandlad i efterhand" : ""} · ` : ""}${escapeHtml(channel)} · ${escapeHtml(direction)}</div><h2 id="communicationDetailTitle" class="h5 mb-1">${escapeHtml(subject)}</h2><p class="text-secondary mb-0"><time datetime="${escapeHtml(record.createdAt || "")}">${escapeHtml(formatDateTime(record.createdAt))}</time></p></div><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(status)}</span></div>`;
   els.communicationDetailContent.innerHTML = `
     <section class="communication-detail-overview" aria-label="Kommunikationsöversikt">
-      <dl><div><dt>Kanal</dt><dd>${escapeHtml(channel)}</dd></div><div><dt>Riktning</dt><dd>${escapeHtml(direction)}</dd></div><div><dt>Avsändare</dt><dd>${escapeHtml(sender)}</dd></div><div><dt>Registrerad av</dt><dd>${escapeHtml(handlerNameById(record.createdBy) || record.createdBy || "System")}</dd></div></dl>
+      <dl><div><dt>Kanal</dt><dd>${escapeHtml(channel)}</dd></div><div><dt>Riktning</dt><dd>${escapeHtml(direction)}</dd></div><div><dt>Avsändare</dt><dd>${escapeHtml(sender)}</dd></div><div><dt>Registrerad av</dt><dd>${escapeHtml(actorNameById(record.createdBy) || record.createdBy || "System")}</dd></div></dl>
       <div><h3 class="h6">Mottagare</h3><ul class="communication-detail-recipients">${recipients}</ul></div>
     </section>
     <section class="communication-detail-section">
@@ -19238,6 +19293,7 @@ document.addEventListener("click", (event) => {
 });
 
 window.addEventListener("hashchange", () => {
+  hideFeedback();
   if (pendingIncomingContactId && window.location.hash !== "#/case/new") pendingIncomingContactId = null;
   if (pendingSourceCaseId && window.location.hash !== "#/case/new") pendingSourceCaseId = null;
   renderAll();

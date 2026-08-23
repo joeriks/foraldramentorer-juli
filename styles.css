@@ -1223,6 +1223,23 @@ body.is-system-administration .sidebar-menu-group {
   gap: var(--app-space-2);
 }
 
+.mentor-planning-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem var(--app-space-2);
+  margin-bottom: var(--app-space-2);
+}
+
+.mentor-planning-context strong,
+.mentor-planning-context span {
+  min-width: 0;
+}
+
+.mentor-planning-context span {
+  color: var(--app-text-muted);
+}
+
 .mentor-meeting-history {
   padding: var(--app-space-4);
   border-bottom: 1px solid var(--app-border);
@@ -1258,6 +1275,10 @@ body.is-system-administration .sidebar-menu-group {
 .mentor-meeting-history > ol > li.is-past-due {
   border-left: 4px solid #b33f36;
   background: #fff8f7;
+}
+
+.mentor-meeting-history > ol > li.mentor-report-history-item {
+  border-left: 3px solid var(--app-primary);
 }
 
 .mentor-meeting-past-due {
@@ -1602,8 +1623,40 @@ body.is-system-administration .sidebar-menu-group {
   gap: var(--app-space-4);
 }
 
-.mentor-self-service-form > .record-section {
-  margin: 0;
+.mentor-self-service-section {
+  min-width: 0;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: #fff;
+}
+
+.mentor-self-service-section > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--app-space-3);
+  min-height: 3.25rem;
+  padding: var(--app-space-3);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.mentor-self-service-section > summary span {
+  font-weight: 700;
+}
+
+.mentor-self-service-section > summary small {
+  color: var(--app-text-muted);
+  text-align: right;
+}
+
+.mentor-self-service-section[open] > summary {
+  border-bottom: 1px solid var(--app-border);
+  background: #f7f9fa;
+}
+
+.mentor-self-service-section-body {
+  padding: var(--app-space-3);
 }
 
 .mentor-self-service-grid,
@@ -2108,6 +2161,35 @@ body.is-system-administration .sidebar-menu-group {
 .public-mentor-support-list {
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius);
+  overflow: hidden;
+}
+
+.public-mentor-support-group + .public-mentor-support-group {
+  border-top: 1px solid var(--app-border);
+}
+
+.public-mentor-support-group > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--app-space-3);
+  min-height: 3rem;
+  padding: var(--app-space-3);
+  background: #f7f9fa;
+  cursor: pointer;
+}
+
+.public-mentor-support-group > summary span {
+  font-weight: 700;
+}
+
+.public-mentor-support-group > summary small {
+  color: var(--app-text-muted);
+  font-weight: 400;
+}
+
+.public-mentor-support-group[open] > summary {
+  border-bottom: 1px solid var(--app-border);
 }
 
 .public-mentor-support-row {
@@ -2651,6 +2733,24 @@ body.is-system-administration .sidebar-menu-group {
     flex: 1;
   }
 
+  body.is-mentor-portal .btn,
+  body.is-mentor-portal a.btn,
+  body.is-mentor-portal .mentor-parent-contact-method {
+    min-height: 2.75rem;
+  }
+
+  body.is-mentor-portal .btn,
+  body.is-mentor-portal a.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  body.is-mentor-portal .mentor-planning-context {
+    display: grid;
+    gap: 0.1rem;
+  }
+
   body.is-mentor-portal .mentor-assignment-contact .btn,
   body.is-mentor-portal .mentor-message-actions article .btn {
     width: 100%;
@@ -2704,8 +2804,26 @@ body.is-system-administration .sidebar-menu-group {
   }
 
   .mentor-self-service-actions {
+    position: sticky;
+    z-index: 5;
+    bottom: 0;
     align-items: stretch;
     flex-direction: column-reverse;
+    margin: 0 calc(var(--app-space-3) * -1) calc(var(--app-space-3) * -1);
+    padding: var(--app-space-3);
+    border: 1px solid var(--app-border);
+    background: #fff;
+    box-shadow: 0 -0.35rem 0.8rem rgb(35 49 61 / 10%);
+  }
+
+  .mentor-self-service-section > summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .mentor-self-service-section > summary small {
+    text-align: left;
   }
 
   .mentor-profile-history details dd {
@@ -2733,6 +2851,10 @@ body.is-system-administration .sidebar-menu-group {
   .public-mentor-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .public-mentor-actions .btn {
+    min-height: 2.75rem;
   }
 
   .public-mentor-actions [data-public-mentor-back] {

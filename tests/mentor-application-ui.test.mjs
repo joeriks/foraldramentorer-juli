@@ -44,4 +44,7 @@ test("lays out the step flow responsively without page-width assumptions", () =>
   assert.match(styles, /\.public-mentor-support-details/);
   assert.match(styles, /@media \(max-width: 600px\)/);
   assert.match(styles, /\.public-mentor-actions/);
+  assert.match(app, /class="public-mentor-support-group"/);
+  assert.match(app, /SUPPORT_AREA_CATEGORIES\.map/);
+  assert.match(styles, /\.public-mentor-support-group > summary/);
 });
