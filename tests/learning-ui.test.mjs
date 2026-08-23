@@ -29,7 +29,9 @@ test("persists municipality selection and learner progress separately", () => {
 test("puts the next learning step first without locking later parts", () => {
   assert.match(app, /function learningCourseState/);
   assert.match(app, /Nästa steg i utbildningen/);
-  assert.match(app, /Fortsätt.*nextModule\.title/s);
+  assert.match(app, /const primaryCourse = courses\.find\(\(course\) => courseStates\.get\(course\.id\)\.percent < 100\) \|\| null/);
+  assert.doesNotMatch(app, /primaryCourse = [^\n]+\|\| courses\[0\]/);
+  assert.match(app, />Öppna utbildningen<\/a>/);
   assert.match(app, /Påbörja utbildningen/);
   assert.match(app, /Fortsätt utbildningen/);
   assert.match(app, /mode=focus/);
@@ -41,19 +43,54 @@ test("puts the next learning step first without locking later parts", () => {
   assert.match(app, /learning-course-objectives/);
   assert.match(app, /Klar, gå vidare/);
   assert.match(app, /aria-current="step"/);
+  assert.match(app, /assessLearningReflection/);
+  assert.match(app, /Skriv minst fem begripliga ord/);
+  assert.match(app, /data-learning-reflection-count/);
+  assert.match(app, /updateLearningReflectionValidation/);
   assert.doesNotMatch(app, /is-upcoming[^\n]+disabled/);
   assert.match(styles, /\.learning-module > summary/);
+  assert.match(styles, /\.learning-reflection-help\.is-invalid/);
   assert.match(styles, /\.learning-question-option:has\(input:checked\)/);
+});
+
+test("shows reliable course start and completion dates in the learning list", () => {
+  assert.match(app, /function learningProgressWithTimestamps/);
+  assert.match(app, /startedAt: record\.startedAt \|\| occurredAt/);
+  assert.match(app, /completedAt: record\.completedAt \|\| \(wasComplete \? record\.updatedAt : ""\) \|\| occurredAt/);
+  assert.match(app, /Påbörjad \$\{escapeHtml\(formatDate\(startedAt\)\)\}/);
+  assert.match(app, /Slutförd \$\{escapeHtml\(formatDate\(completedAt\)\)\}/);
+  assert.match(app, /Inte påbörjad/);
+  assert.match(styles, /\.learning-course-item-dates/);
 });
 
 test("enters a focused course mode from a clear course overview", () => {
   assert.match(app, /function renderCourseOverview/);
   assert.match(app, /function renderFocusedCourse/);
   assert.match(app, /Avsluta utbildningsläget/);
+  assert.match(app, /Utbildningen är klar/);
+  assert.match(app, /Till mina utbildningar/);
+  assert.match(app, /<details class="learning-course-review"><summary>Visa kursinnehållet igen<\/summary>/);
+  assert.match(app, /const reviewModuleId = nextModule\?\.id \|\| null/);
   assert.match(app, /document\.body\.classList\.toggle\("is-learning-focus"/);
   assert.match(styles, /body\.is-learning-focus \.sidebar,[\s\S]*body\.is-learning-focus \.app-header,[\s\S]*body\.is-learning-focus \.system-status/);
   assert.match(styles, /\.learning-focus-toolbar/);
   assert.match(styles, /\.learning-course-entry/);
+  assert.match(styles, /\.learning-course-completion/);
+  assert.match(styles, /\.learning-course-review > summary/);
+});
+
+test("supports joint learning and gives staff read-only access to mentor progress and answers", () => {
+  assert.match(app, /Du kan gå igenom utbildningen själv eller tillsammans med din handläggare/);
+  assert.match(app, /Handläggaren kan följa din progression och se de reflektions- och testsvar som du sparar/);
+  assert.match(html, /Följ progression och granska mentorns sparade reflektions- och testsvar/);
+  assert.match(app, /class="mentor-learning-review"/);
+  assert.match(app, /Visa progression och svar/);
+  assert.match(app, /Sparat reflektionssvar/);
+  assert.match(app, /moduleAttempts\.map/);
+  assert.match(app, /attempt\.answers\?\.\[question\.id\]/);
+  assert.match(app, /attempt\.attemptedAt \|\| attempt\.submittedAt/);
+  assert.match(styles, /\.mentor-learning-module-review/);
+  assert.match(styles, /\.mentor-learning-attempt dl/);
 });
 
 test("marks system administration with text and a shared visual context", () => {

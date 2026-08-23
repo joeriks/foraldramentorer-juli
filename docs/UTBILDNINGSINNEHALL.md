@@ -10,7 +10,7 @@ Utbildningsinnehåll lagras som versionshanterade innehållspaket. Ett paket kan
 
 Kommunens urval lagras separat som referenser till innehållspaket. Gemensamt material kopieras därför inte när en kommun väljer att använda det. En kurs tar automatiskt med de material och test som kursen refererar till.
 
-I den aktuella prototypen visar utbildningsvyn först nästa del i mentorens utbildning och därefter hela utbildningar med antal genomförda delar. När en kurs öppnas visas en kursöversikt med mål, uppskattad tid, delar och en tydlig åtgärd för att påbörja eller fortsätta. Själva genomförandet sker i ett fokuserat utbildningsläge där portalens ordinarie navigering och prototypverktyg döljs. Bara den aktuella delen är normalt öppen; klara och kommande delar ligger kompakt men kan öppnas. Delar märks som `Klar`, `Aktuell` eller `Kommande`, men presentationen låser inte ordningen tekniskt. Fristående material och kunskapstest finns kvar i en utfällbar stödsektion. Administratören kan välja kommunens innehåll, se versionsläge och styra publik exponering för material. Mentorportalen sparar progress och låter mentorn genomföra test. Den publika vyn visar endast material som kommunen uttryckligen har valt och publicerat.
+I den aktuella prototypen visar utbildningsvyn nästa del i mentorns utbildning endast när en utbildning återstår. När alla utbildningar är klara visas de enbart i den gemensamma listan, så att en genomförd kurs inte dubbleras i ett separat nästa-steg-fält. Listan visar antal genomförda delar samt när utbildningen påbörjades och, när den är klar, slutfördes. När en kurs öppnas visas en kursöversikt med mål, uppskattad tid, delar och en tydlig åtgärd för att påbörja eller fortsätta. Själva genomförandet sker i ett fokuserat utbildningsläge där portalens ordinarie navigering och prototypverktyg döljs. Bara den aktuella delen är normalt öppen; klara och kommande delar ligger kompakt men kan öppnas. Delar märks som `Klar`, `Aktuell` eller `Kommande`, men presentationen låser inte ordningen tekniskt. Fristående material och kunskapstest finns kvar i en utfällbar stödsektion. Mentorn informeras om att utbildningen kan genomföras självständigt eller tillsammans med handläggaren. På mentorkortets utbildningsflik kan handläggaren skrivskyddat granska kursprogression, reflektionssvar och samtliga testförsök med svar och tidpunkt. Administratören kan välja kommunens innehåll, se versionsläge och styra publik exponering för material. Mentorportalen sparar progress och låter mentorn genomföra test. Den publika vyn visar endast material som kommunen uttryckligen har valt och publicerat.
 
 Urvalet har två skilda dimensioner:
 
@@ -93,14 +93,14 @@ interface TestAttempt {
 }
 ```
 
-Ett test kan rättas först när alla obligatoriska frågor har ett valt svar. Resultat, poäng, innehållsversion och tidpunkt sparas för varje försök. Tidigare försök skrivs inte över. Facit skickas inte som fritt redigerbart Markdown-innehåll och ska i SaaS-versionen rättas på serversidan.
+Ett test kan rättas först när alla obligatoriska frågor har ett valt svar. En reflektion kräver minst fem begripliga ord och minst tre olika ord; enstaka tecken och rena upprepningar räknas inte. Hjälptexten visar kravet och återkopplar medan mentorn skriver. Resultat, poäng, innehållsversion och tidpunkt sparas för varje försök. Tidigare försök skrivs inte över. Facit skickas inte som fritt redigerbart Markdown-innehåll och ska i SaaS-versionen rättas på serversidan.
 
-Ett slutfört test eller en kurs uppdaterar utbildningsprogressen men fattar inte automatiskt beslut om mentorens godkännande. Handläggaren använder resultatet som underlag i aktiviteten för utbildning eller kunskapsavstämning. Systemet ska undvika en parallell manuellt underhållen utbildningsstatus när ett verifierbart genomförande redan finns.
+Ett slutfört test eller en kurs uppdaterar utbildningsprogressen men fattar inte automatiskt beslut om mentorns godkännande. Handläggaren använder resultatet som underlag i aktiviteten för utbildning eller kunskapsavstämning. Systemet ska undvika en parallell manuellt underhållen utbildningsstatus när ett verifierbart genomförande redan finns.
 
 ## Behörighet och visning
 
 - **Administratör:** väljer kommunens innehåll, publik exponering och när en ny publicerad version ska tas i bruk.
-- **Samordnare och handläggare:** ser kommunens urval och mentorens relevanta genomförandestatus, men ändrar inte mentorens testresultat.
+- **Samordnare och handläggare:** ser kommunens urval, mentorns progression, reflektionssvar och testförsök i en skrivskyddad granskningsvy, men ändrar inte mentorns svar eller testresultat.
 - **Mentor:** ser kommunens valda material, kurser och test samt sin egen progress och sina resultat.
 - **Oinloggad förälder:** ser endast valt och publikt exponerat referensmaterial.
 

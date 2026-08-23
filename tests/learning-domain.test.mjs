@@ -4,6 +4,7 @@ import {
   LEARNING_CONTENT,
   DEFAULT_TENANT_LEARNING_SELECTION,
   DEFAULT_PUBLIC_LEARNING_SELECTION,
+  assessLearningReflection,
   courseProgressPercent,
   prepareLearningMarkdown,
   requiredLearningContentIds,
@@ -32,6 +33,14 @@ test("calculates course progress from completed modules", () => {
   assert.equal(courseProgressPercent(course, []), 0);
   assert.equal(courseProgressPercent(course, ["role", "reflection"]), 50);
   assert.equal(courseProgressPercent(course, course.modules.map((module) => module.id)), 100);
+});
+
+test("requires several meaningful and varied words in a reflection", () => {
+  assert.equal(assessLearningReflection("").valid, false);
+  assert.equal(assessLearningReflection("dfsd").meaningfulWordCount, 0);
+  assert.equal(assessLearningReflection("jag jag jag jag jag").valid, false);
+  assert.equal(assessLearningReflection("Jag kontaktar ansvarig handläggare direkt").valid, true);
+  assert.match(assessLearningReflection("Ett riktigt svar").message, /5 ord/);
 });
 
 test("includes course dependencies in a municipality selection", () => {

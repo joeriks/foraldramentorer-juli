@@ -99,12 +99,13 @@ import {
   DEFAULT_TENANT_LEARNING_SELECTION,
   DEFAULT_PUBLIC_LEARNING_SELECTION,
   LEARNING_CONTENT,
+  assessLearningReflection,
   courseProgressPercent,
   learningContentById,
   prepareLearningMarkdown,
   requiredLearningContentIds,
   scoreKnowledgeTest
-} from "./learning-domain.js?v=20260823-learning-focus-v121";
+} from "./learning-domain.js?v=20260823-learning-collaboration-v122";
 import {
   containsSensitivePersonalData,
   findSupportKnowledge,
@@ -209,6 +210,26 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "122",
+    date: "2026-08-23",
+    title: "Tydligare kursöppning och bättre reflektionssvar",
+    flow: "Utbildning -> öppna kurs -> påbörja eller fortsätt -> skriv reflektion -> gå vidare",
+    simplified: "Utbildningskatalogen öppnar nu kursöversikten utan att antyda att kursen startar direkt. Reflektioner visar ett begripligt minimikrav medan användaren skriver.",
+    retained: "Kurs-ID:n, modul-ID:n, sparad progress och tidigare reflektionssvar behålls. Otillräckliga äldre svar behöver kompletteras innan delen åter räknas som klar.",
+    changes: [
+      "Katalogens primära kursknapp heter Öppna utbildningen.",
+      "Påbörja eller Fortsätt utbildningen visas först på kursöversikten.",
+      "En reflektion kräver minst fem begripliga ord och minst tre olika ord.",
+      "Hjälptexten visar kravet och räknar godtagbara ord medan användaren skriver.",
+      "Enstaka tecken, ord utan vokaler och rena upprepningar kan inte slutföra kursdelen.",
+      "En genomförd kurs visar en tydlig klarbekräftelse och döljer repetitionsinnehållet tills användaren väljer att visa det.",
+      "Mentorn informeras om att utbildningen kan gås igenom tillsammans med handläggaren.",
+      "Handläggaren kan granska mentorns progression, reflektionssvar och testförsök från mentorkortet.",
+      "Nästa steg lyfts bara fram när en utbildning återstår; genomförda utbildningar visas enbart i listan.",
+      "Utbildningslistan visar när varje utbildning påbörjades och slutfördes."
+    ]
+  },
   {
     version: "121",
     date: "2026-08-23",
@@ -5288,8 +5309,7 @@ function learningProgressRecord(mentorId, courseId) {
     courseId,
     completedModuleIds: [],
     reflections: {},
-    attempts: [],
-    startedAt: new Date().toISOString()
+    attempts: []
   };
 }
 
@@ -5299,11 +5319,25 @@ function queueLearningMutation(action) {
   return queued;
 }
 
+function learningProgressWithTimestamps(record, courseId, completedModuleIds, changes = {}, occurredAt = new Date().toISOString()) {
+  const course = learningContentById(selectedLearningContent(), courseId);
+  const wasComplete = course?.type === "course" && course.modules.every((module) => (record.completedModuleIds || []).includes(module.id));
+  const isComplete = course?.type === "course" && course.modules.every((module) => completedModuleIds.includes(module.id));
+  return {
+    ...record,
+    ...changes,
+    completedModuleIds,
+    startedAt: record.startedAt || occurredAt,
+    updatedAt: occurredAt,
+    ...(isComplete ? { completedAt: record.completedAt || (wasComplete ? record.updatedAt : "") || occurredAt } : {})
+  };
+}
+
 async function completeLearningModule(courseId, moduleId, extra = {}) {
   if (!selectedLearnerId) return;
   const record = learningProgressRecord(selectedLearnerId, courseId);
   const completedModuleIds = [...new Set([...(record.completedModuleIds || []), moduleId])];
-  await saveLearningProgress({ ...record, ...extra, completedModuleIds, updatedAt: new Date().toISOString() });
+  await saveLearningProgress(learningProgressWithTimestamps(record, courseId, completedModuleIds, extra));
   markSaved();
   await refresh();
 }
@@ -5311,11 +5345,16 @@ async function completeLearningModule(courseId, moduleId, extra = {}) {
 function learningCourseState(course) {
   const progress = learningProgressRecord(selectedLearnerId || "", course.id);
   const completed = new Set(progress.completedModuleIds || []);
+  for (const module of course.modules) {
+    if (module.type === "reflection" && completed.has(module.id) && !assessLearningReflection(progress.reflections?.[module.id]).valid) {
+      completed.delete(module.id);
+    }
+  }
   return {
     progress,
     completed,
     nextModule: course.modules.find((module) => !completed.has(module.id)) || null,
-    percent: courseProgressPercent(course, progress.completedModuleIds),
+    percent: courseProgressPercent(course, [...completed]),
     completeCount: completed.size,
     total: course.modules.length
   };
@@ -5327,14 +5366,15 @@ function renderLearningCatalog() {
   if (learningTypeFilter === "course") learningTypeFilter = "all";
   const courses = items.filter((item) => item.type === "course");
   const courseStates = new Map(courses.map((course) => [course.id, learningCourseState(course)]));
-  const primaryCourse = courses.find((course) => courseStates.get(course.id).percent < 100) || courses[0] || null;
+  const primaryCourse = courses.find((course) => courseStates.get(course.id).percent < 100) || null;
   const primaryState = primaryCourse ? courseStates.get(primaryCourse.id) : null;
   const libraryItems = items.filter((item) => item.type !== "course");
   const visibleLibraryItems = libraryItems.filter((item) => learningTypeFilter === "all" || item.type === learningTypeFilter);
   const learnerOptions = candidates.map((candidate) => `<option value="${escapeHtml(candidate.id)}" ${candidate.id === selectedLearnerId ? "selected" : ""}>${escapeHtml(candidate.name)}</option>`).join("");
+  const selectedLearner = candidates.find((candidate) => candidate.id === selectedLearnerId);
   els.learningCatalogPanel.innerHTML = `
     <div class="card-header bg-white d-flex flex-wrap gap-3 justify-content-between align-items-start">
-      <div><h2 class="h5 mb-1">${isMentorSession() ? "Min utbildning" : "Mentorutbildning"}</h2><p class="text-secondary mb-0">Fortsätt med nästa del eller se hela utbildningen.</p></div>
+      <div><h2 class="h5 mb-1">${isMentorSession() ? "Min utbildning" : "Mentorutbildning"}</h2><p class="text-secondary mb-0">${primaryCourse ? "Fortsätt med nästa del eller se hela utbildningen." : "Se genomförda utbildningar och tillgängligt material."}</p></div>
       ${isMentorSession() ? `<div class="learning-current-mentor"><span>Genomförande för</span><strong>${escapeHtml(currentUserName())}</strong></div>` : `<div class="learning-learner-select">
         <label class="form-label" for="learningLearnerSelect">Mentor</label>
         <select id="learningLearnerSelect" class="form-select form-select-sm" ${candidates.length ? "" : "disabled"}>
@@ -5343,6 +5383,10 @@ function renderLearningCatalog() {
       </div>`}
     </div>
     <div class="card-body learning-catalog-body">
+      <section class="learning-collaboration-note" aria-label="Stöd under utbildningen">
+        <strong>${isMentorSession() ? "Du kan få stöd av din handläggare" : `Du granskar utbildningen för ${escapeHtml(selectedLearner?.name || "vald mentor")}`}</strong>
+        <p>${isMentorSession() ? "Du kan gå igenom utbildningen själv eller tillsammans med din handläggare. Handläggaren kan följa din progression och se de reflektions- och testsvar som du sparar." : "Utbildningen kan gås igenom tillsammans med mentorn. Progression och sparade svar finns även samlade i fliken Utbildning på mentorkortet."}</p>
+      </section>
       ${primaryCourse ? `<section class="learning-next-step" aria-label="Nästa steg i utbildningen">
         <div>
           <div class="record-type">${primaryState.nextModule ? "Nästa steg" : "Utbildningen är klar"}</div>
@@ -5350,15 +5394,17 @@ function renderLearningCatalog() {
           <p>${primaryState.nextModule ? `<strong>${escapeHtml(primaryState.nextModule.title)}</strong> · ${learningTypeLabel(primaryState.nextModule.type)}` : "Alla delar är genomförda."}</p>
           <span>${primaryState.completeCount} av ${primaryState.total} delar klara</span>
         </div>
-        <a class="btn btn-primary" href="#/learning/${encodeURIComponent(primaryCourse.id)}">${primaryState.nextModule ? `${primaryState.completeCount ? "Fortsätt" : "Starta"}: ${escapeHtml(primaryState.nextModule.title)}` : "Visa genomförd utbildning"}</a>
+        <a class="btn btn-primary" href="#/learning/${encodeURIComponent(primaryCourse.id)}">Öppna utbildningen</a>
       </section>` : '<div class="empty-list text-secondary">Kommunen har ännu inte valt någon utbildning.</div>'}
       <section class="learning-courses" aria-labelledby="learningCoursesHeading">
         <div class="learning-section-heading"><div><h3 id="learningCoursesHeading" class="h6 mb-1">Utbildningar</h3><p class="small text-secondary mb-0">Öppna en utbildning för att se alla delar.</p></div><span>${courses.length}</span></div>
         <div class="learning-course-list">
           ${courses.map((course) => {
             const state = courseStates.get(course.id);
+            const startedAt = state.progress.startedAt || "";
+            const completedAt = state.percent === 100 ? state.progress.completedAt || state.progress.updatedAt || "" : "";
             return `<article class="learning-course-item">
-              <div><span class="record-type">Utbildning · version ${course.version}</span><h4>${escapeHtml(course.title)}</h4><p>${escapeHtml(course.summary)}</p></div>
+              <div><span class="record-type">Utbildning · version ${course.version}</span><h4>${escapeHtml(course.title)}</h4><p>${escapeHtml(course.summary)}</p><div class="learning-course-item-dates">${startedAt ? `<span>Påbörjad ${escapeHtml(formatDate(startedAt))}</span>` : "<span>Inte påbörjad</span>"}${completedAt ? `<span>Slutförd ${escapeHtml(formatDate(completedAt))}</span>` : ""}</div></div>
               <div class="learning-course-item-progress"><div class="progress" role="progressbar" aria-label="Utbildningsförlopp" aria-valuenow="${state.percent}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${state.percent}%"></div></div><span>${state.completeCount} av ${state.total} delar klara</span></div>
               <a class="btn btn-outline-primary btn-sm" href="#/learning/${encodeURIComponent(course.id)}">${state.percent > 0 && state.percent < 100 ? "Fortsätt" : "Öppna"}</a>
             </article>`;
@@ -5408,9 +5454,17 @@ function learningCourseActionLabel({ completeCount, percent }) {
   return "Gå igenom utbildningen igen";
 }
 
+function renderLearningReflectionForm(course, module, progress, isComplete) {
+  const value = progress.reflections?.[module.id] || "";
+  const assessment = assessLearningReflection(value);
+  const helpId = `reflection-${module.id}-help`;
+  const validationClass = value ? assessment.valid ? "is-valid" : "is-invalid" : "";
+  return `<form data-learning-reflection="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}" novalidate><label class="form-label" for="reflection-${escapeHtml(module.id)}">${escapeHtml(module.prompt)}</label><textarea id="reflection-${escapeHtml(module.id)}" class="form-control" rows="4" aria-describedby="${escapeHtml(helpId)}" required>${escapeHtml(value)}</textarea><div id="${escapeHtml(helpId)}" class="form-text learning-reflection-help ${validationClass}" data-learning-reflection-help><span>Skriv minst fem begripliga ord och använd minst tre olika ord. Enstaka tecken och upprepningar räknas inte.</span><strong data-learning-reflection-count>${assessment.valid ? "Kravet uppfyllt" : `${assessment.meaningfulWordCount} av ${assessment.requiredWordCount} ord räknas`}</strong></div><button type="submit" class="btn btn-primary btn-sm mt-3" ${selectedLearnerId ? "" : "disabled"}>${isComplete ? "Spara ändring" : "Spara och fortsätt"}</button></form>`;
+}
+
 function renderLearningModuleList(course, state) {
   const { progress, completed, nextModule } = state;
-  const reviewModuleId = nextModule?.id || (state.percent === 100 ? course.modules[0]?.id : null);
+  const reviewModuleId = nextModule?.id || null;
   return `<div class="learning-module-list" aria-label="Utbildningens delar">
     ${course.modules.map((module, index) => {
       const content = module.contentId ? learningContentById(selectedLearningContent(), module.contentId) : null;
@@ -5421,7 +5475,7 @@ function renderLearningModuleList(course, state) {
       const statusBadge = isComplete ? '<span class="badge text-bg-success">Klar</span>' : isNext ? '<span class="badge text-bg-primary">Aktuell</span>' : '<span class="badge text-bg-light border">Kommande</span>';
       const sectionStart = `<details id="learning-module-${escapeHtml(module.id)}" class="learning-module ${statusClass}" ${isCurrent ? 'open aria-current="step"' : ""}><summary><span class="learning-module-number">${index + 1}</span><div><div class="record-type">${learningTypeLabel(module.type)}</div><h3 class="h6 mb-0">${escapeHtml(module.title)}</h3>${module.estimatedMinutes ? `<small>Cirka ${Number(module.estimatedMinutes)} min</small>` : ""}</div>${statusBadge}</summary><div class="learning-module-content">`;
       if (module.type === "test" && content) return `${sectionStart}${renderKnowledgeTestForm(content, course, module)}</div></details>`;
-      if (module.type === "reflection") return `${sectionStart}<form data-learning-reflection="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}"><label class="form-label" for="reflection-${escapeHtml(module.id)}">${escapeHtml(module.prompt)}</label><textarea id="reflection-${escapeHtml(module.id)}" class="form-control" rows="4" required>${escapeHtml(progress.reflections?.[module.id] || "")}</textarea><button type="submit" class="btn btn-primary btn-sm mt-3" ${selectedLearnerId ? "" : "disabled"}>${isComplete ? "Spara ändring" : "Spara och fortsätt"}</button></form></div></details>`;
+      if (module.type === "reflection") return `${sectionStart}${renderLearningReflectionForm(course, module, progress, isComplete)}</div></details>`;
       const materialAction = isComplete ? '<p class="learning-module-complete-note mb-0"><strong>Delen är klar.</strong> Du kan läsa innehållet igen.</p>' : `<button type="button" class="btn ${isNext ? "btn-primary" : "btn-outline-primary"} btn-sm mt-3" data-complete-learning-module="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}" ${selectedLearnerId ? "" : "disabled"}>${isNext ? "Klar, gå vidare" : "Markera som klar"}</button>`;
       return `${sectionStart}${content ? `<div class="learning-markdown">${renderLearningMarkdown(content.bodyMarkdown)}</div>` : '<div class="alert alert-warning">Materialet ingår inte i kommunens urval.</div>'}${materialAction}</div></details>`;
     }).join("")}</div>`;
@@ -5452,8 +5506,7 @@ function renderFocusedCourse(course) {
   const currentIndex = Math.max(0, course.modules.findIndex((module) => module.id === nextModule?.id));
   return `<div class="learning-focus-toolbar"><a href="#/learning/${encodeURIComponent(course.id)}">Avsluta utbildningsläget</a><div><strong>${escapeHtml(course.title)}</strong><span>${completeCount} av ${total} delar klara</span></div><div class="progress" role="progressbar" aria-label="Utbildningsförlopp" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${percent}%"></div></div></div>
   <div class="card-body learning-course-focus-body">
-    <header class="learning-focus-current"><span class="record-type">${nextModule ? `Aktuell del ${currentIndex + 1} av ${total}` : "Utbildningen är genomförd"}</span><h2>${escapeHtml(nextModule?.title || "Bra jobbat")}</h2><p>${nextModule ? "Arbeta igenom innehållet och markera delen som klar när du är färdig." : "Alla delar är klara. Du kan öppna dem nedan för att repetera innehållet."}</p></header>
-    ${renderLearningModuleList(course, state)}
+    ${nextModule ? `<header class="learning-focus-current"><span class="record-type">Aktuell del ${currentIndex + 1} av ${total}</span><h2>${escapeHtml(nextModule.title)}</h2><p>Arbeta igenom innehållet och markera delen som klar när du är färdig.</p></header>${renderLearningModuleList(course, state)}` : `<section class="learning-course-completion" aria-labelledby="learningCourseCompletionTitle"><span class="learning-course-completion-icon" aria-hidden="true">✓</span><div><span class="record-type">Utbildningen är genomförd</span><h2 id="learningCourseCompletionTitle">Utbildningen är klar</h2><p>Du har genomfört alla delar i ${escapeHtml(course.title)}.</p><strong>${total} av ${total} delar klara</strong><div class="learning-course-completion-actions"><a class="btn btn-primary" href="#/learning">Till mina utbildningar</a></div></div></section><details class="learning-course-review"><summary>Visa kursinnehållet igen</summary><div>${renderLearningModuleList(course, state)}</div></details>`}
   </div>`;
 }
 
@@ -11662,15 +11715,34 @@ function renderMentorLearning(candidate) {
   els.mentorLearningTabCount.textContent = courses.length;
   els.mentorLearningList.innerHTML = courses.map((course) => {
     const progress = learningProgressRecord(candidate.id, course.id);
-    const percent = courseProgressPercent(course, progress.completedModuleIds);
+    const completed = new Set(progress.completedModuleIds || []);
+    for (const module of course.modules) {
+      if (module.type === "reflection" && completed.has(module.id) && !assessLearningReflection(progress.reflections?.[module.id]).valid) completed.delete(module.id);
+    }
+    const percent = courseProgressPercent(course, [...completed]);
     const attempts = (progress.attempts || []).filter((attempt) => attempt.testId);
-    return `<article class="document-list-item">
-      <div class="document-list-content">
-        <div class="d-flex flex-wrap gap-2 align-items-center"><strong>${escapeHtml(course.title)}</strong><span class="badge ${percent === 100 ? "text-bg-success" : "text-bg-light border"}">${percent === 100 ? "Genomförd" : `${percent}%`}</span></div>
-        <small>${course.modules.length} moment · ${attempts.length} testförsök · version ${course.version}</small>
-      </div>
-      <button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-course="${escapeHtml(course.id)}" data-mentor-id="${escapeHtml(candidate.id)}">Öppna kurs</button>
-    </article>`;
+    return `<details class="mentor-learning-review">
+      <summary>
+        <div class="document-list-content">
+          <div class="d-flex flex-wrap gap-2 align-items-center"><strong>${escapeHtml(course.title)}</strong><span class="badge ${percent === 100 ? "text-bg-success" : "text-bg-light border"}">${percent === 100 ? "Genomförd" : `${percent}%`}</span></div>
+          <small>${completed.size} av ${course.modules.length} delar klara · ${attempts.length} testförsök · version ${course.version}</small>
+        </div>
+        <span class="mentor-learning-review-action">Visa progression och svar</span>
+      </summary>
+      <ol class="mentor-learning-module-review">
+        ${course.modules.map((module, index) => {
+          const isComplete = completed.has(module.id);
+          const content = module.contentId ? learningContentById(selectedLearningContent(), module.contentId) : null;
+          const reflection = module.type === "reflection" ? String(progress.reflections?.[module.id] || "").trim() : "";
+          const moduleAttempts = module.type === "test" && content ? attempts.filter((attempt) => attempt.testId === content.id) : [];
+          return `<li>
+            <div class="mentor-learning-module-heading"><span>${index + 1}</span><div><strong>${escapeHtml(module.title)}</strong><small>${learningTypeLabel(module.type)}</small></div><span class="badge ${isComplete ? "text-bg-success" : "text-bg-light border"}">${isComplete ? "Klar" : "Återstår"}</span></div>
+            ${module.type === "reflection" ? `<div class="mentor-learning-response"><span>Sparat reflektionssvar</span>${reflection ? `<blockquote>${escapeHtml(reflection)}</blockquote>` : "<p>Inget svar har sparats.</p>"}</div>` : ""}
+            ${module.type === "test" ? `<div class="mentor-learning-response"><span>Testförsök</span>${moduleAttempts.length ? moduleAttempts.map((attempt, attemptIndex) => `<details class="mentor-learning-attempt" ${attemptIndex === moduleAttempts.length - 1 ? "open" : ""}><summary><strong>${attempt.passed ? "Godkänt" : "Inte godkänt"} · ${Number(attempt.score)}%</strong><time datetime="${escapeHtml(attempt.attemptedAt || attempt.submittedAt || "")}">${escapeHtml(formatDateTime(attempt.attemptedAt || attempt.submittedAt))}</time></summary><dl>${(content?.questions || []).map((question) => { const answerId = attempt.answers?.[question.id]; const answer = question.options.find((option) => option.id === answerId); return `<div><dt>${escapeHtml(question.prompt)}</dt><dd>${escapeHtml(answer?.text || "Ej besvarad")} <span class="${answerId === question.correctOptionId ? "text-success" : "text-danger"}">${answerId === question.correctOptionId ? "Rätt" : "Fel"}</span></dd></div>`; }).join("")}</dl></details>`).join("") : "<p>Inget testförsök har registrerats.</p>"}</div>` : ""}
+          </li>`;
+        }).join("")}
+      </ol>
+    </details>`;
   }).join("") || '<div class="empty-list border rounded text-secondary">Kommunens urval innehåller inga kurser.</div>';
 }
 
@@ -17381,11 +17453,34 @@ els.mentorLearningList.addEventListener("click", (event) => {
 function moveToCurrentLearningModule() {
   if (parseRoute().params.get("mode") !== "focus") return;
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    const target = document.querySelector(".learning-module.is-next[aria-current='step']") || document.querySelector(".learning-focus-current");
+    const target = document.querySelector(".learning-module.is-next[aria-current='step']") || document.querySelector(".learning-course-completion") || document.querySelector(".learning-focus-current");
     target?.scrollIntoView({ behavior: "smooth", block: "start" });
     target?.querySelector("summary")?.focus({ preventScroll: true });
   }));
 }
+
+function updateLearningReflectionValidation(textarea, { report = false } = {}) {
+  const assessment = assessLearningReflection(textarea.value);
+  const form = textarea.closest("[data-learning-reflection]");
+  const help = form?.querySelector("[data-learning-reflection-help]");
+  const count = form?.querySelector("[data-learning-reflection-count]");
+  textarea.setCustomValidity(assessment.valid ? "" : assessment.message);
+  help?.classList.toggle("is-valid", assessment.valid);
+  help?.classList.toggle("is-invalid", !assessment.valid && Boolean(textarea.value.trim()));
+  if (count) count.textContent = assessment.valid
+    ? "Kravet uppfyllt"
+    : `${assessment.meaningfulWordCount} av ${assessment.requiredWordCount} ord räknas`;
+  if (report && !assessment.valid) {
+    textarea.reportValidity();
+    textarea.focus();
+  }
+  return assessment.valid;
+}
+
+els.learningView.addEventListener("input", (event) => {
+  const textarea = event.target.closest("[data-learning-reflection] textarea");
+  if (textarea) updateLearningReflectionValidation(textarea);
+});
 
 els.learningView.addEventListener("click", async (event) => {
   const focusButton = event.target.closest("[data-focus-learning-module]");
@@ -17420,7 +17515,9 @@ els.learningView.addEventListener("submit", async (event) => {
     event.preventDefault();
     const courseId = reflectionForm.dataset.courseId;
     const moduleId = reflectionForm.dataset.learningReflection;
-    const reflection = reflectionForm.querySelector("textarea").value.trim();
+    const textarea = reflectionForm.querySelector("textarea");
+    if (!updateLearningReflectionValidation(textarea, { report: true })) return;
+    const reflection = textarea.value.trim();
     reflectionForm.querySelector('button[type="submit"]').disabled = true;
     await queueLearningMutation(() => {
       const record = learningProgressRecord(selectedLearnerId, courseId);
@@ -17445,12 +17542,10 @@ els.learningView.addEventListener("submit", async (event) => {
   await queueLearningMutation(async () => {
     const record = learningProgressRecord(selectedLearnerId, courseId);
     const completedModuleIds = result.passed ? [...new Set([...(record.completedModuleIds || []), moduleId])] : record.completedModuleIds || [];
-    await saveLearningProgress({
-      ...record,
-      completedModuleIds,
-      attempts: [...(record.attempts || []), { testId: test.id, testVersion: test.version, answers, ...result, attemptedAt: new Date().toISOString() }],
-      updatedAt: new Date().toISOString()
-    });
+    const attemptedAt = new Date().toISOString();
+    await saveLearningProgress(learningProgressWithTimestamps(record, courseId, completedModuleIds, {
+      attempts: [...(record.attempts || []), { testId: test.id, testVersion: test.version, answers, ...result, attemptedAt }]
+    }, attemptedAt));
     markSaved();
     await refresh();
   });

@@ -281,6 +281,36 @@ export function courseProgressPercent(course, completedModuleIds = []) {
   return Math.round((moduleIds.filter((id) => completed.has(id)).length / moduleIds.length) * 100);
 }
 
+export const LEARNING_REFLECTION_MIN_WORDS = 5;
+export const LEARNING_REFLECTION_MIN_UNIQUE_WORDS = 3;
+
+export function assessLearningReflection(value) {
+  const words = String(value || "")
+    .normalize("NFC")
+    .toLocaleLowerCase("sv-SE")
+    .match(/\p{L}+(?:[-’']\p{L}+)*/gu) || [];
+  const meaningfulWords = words.filter((word) => {
+    const letters = word.replace(/[^\p{L}]/gu, "");
+    return letters.length >= 2 && /[aeiouyåäö]/u.test(letters);
+  });
+  const uniqueWordCount = new Set(meaningfulWords).size;
+  const valid = meaningfulWords.length >= LEARNING_REFLECTION_MIN_WORDS
+    && uniqueWordCount >= LEARNING_REFLECTION_MIN_UNIQUE_WORDS;
+  const message = meaningfulWords.length < LEARNING_REFLECTION_MIN_WORDS
+    ? `Skriv minst ${LEARNING_REFLECTION_MIN_WORDS} begripliga ord. ${meaningfulWords.length} av ${LEARNING_REFLECTION_MIN_WORDS} ord räknas just nu.`
+    : uniqueWordCount < LEARNING_REFLECTION_MIN_UNIQUE_WORDS
+      ? `Använd minst ${LEARNING_REFLECTION_MIN_UNIQUE_WORDS} olika ord. Upprepade ord räcker inte som reflektion.`
+      : "Reflektionen uppfyller kravet.";
+  return {
+    valid,
+    meaningfulWordCount: meaningfulWords.length,
+    uniqueWordCount,
+    requiredWordCount: LEARNING_REFLECTION_MIN_WORDS,
+    requiredUniqueWordCount: LEARNING_REFLECTION_MIN_UNIQUE_WORDS,
+    message
+  };
+}
+
 export function validateLearningContent(content) {
   const ids = new Set(content.map((item) => item.id));
   const errors = [];
