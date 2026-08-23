@@ -81,11 +81,12 @@ import {
   COMMUNICATION_DIRECTION_LABELS,
   COMMUNICATION_STATUS_LABELS,
   createDemoCommunicationProvider,
+  createInternalCommunicationProvider,
   dispatchOutboundCommunication,
   meetingReminderJobs,
   normalizeMeetingReminder,
   normalizeCommunicationRecord
-} from "./communication-domain.js?v=20260821-reminder-catchup-v115";
+} from "./communication-domain.js?v=20260823-internal-messages-v135";
 import {
   MENTOR_APPLICATION_STATUS_LABELS,
   convertMentorApplication,
@@ -217,6 +218,21 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "135",
+    date: "2026-08-23",
+    title: "Interna meddelanden mellan mentor och handläggare",
+    flow: "Mentoruppdrag -> skriv internt -> handläggarens kommunikationsvy -> svar",
+    simplified: "Mentor och handläggare kan nu skicka och besvara meddelanden i portalen utan att välja e-post- eller SMS-demo.",
+    retained: "Extern e-post och SMS finns kvar som separata demokanaler och alla meddelanden använder fortsatt det gemensamma kommunikationsregistret.",
+    changes: [
+      "Internt meddelande är förstahandsval när mentorn skriver till ansvarig handläggare.",
+      "Interna meddelanden får avsändare, mottagare, ämne, leveransstatus och ärendekoppling.",
+      "Mottagaren kan svara från kommunikationspostens detaljvy eller från mentorportalens meddelandelista.",
+      "Kommunikationsregistret kan filtreras på interna meddelanden.",
+      "Interna leveranser skiljs tydligt från e-post- och SMS-demot."
+    ]
+  },
   {
     version: "134",
     date: "2026-08-23",
@@ -2049,10 +2065,12 @@ const els = {
   communicationComposerModal: document.querySelector("#communicationComposerModal"),
   communicationComposerForm: document.querySelector("#communicationComposerForm"),
   communicationComposerTitle: document.querySelector("#communicationComposerTitle"),
+  communicationDeliveryNotice: document.querySelector("#communicationDeliveryNotice"),
   communicationContextSummary: document.querySelector("#communicationContextSummary"),
   communicationCaseInput: document.querySelector("#communicationCaseInput"),
   communicationCaseField: document.querySelector("#communicationCaseField"),
   communicationRecipientNameInput: document.querySelector("#communicationRecipientNameInput"),
+  communicationRecipientAddressField: document.querySelector("#communicationRecipientAddressField"),
   communicationRecipientAddressLabel: document.querySelector("#communicationRecipientAddressLabel"),
   communicationRecipientAddressInput: document.querySelector("#communicationRecipientAddressInput"),
   communicationSubjectField: document.querySelector("#communicationSubjectField"),
@@ -6111,6 +6129,14 @@ function mentorCommunicationRecords(mentorId) {
     .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
 }
 
+function mentorMessagePartyMarkup(record, mentorId) {
+  const received = record.createdBy !== mentorId && record.recipients.some((recipient) => recipient.partyId === mentorId);
+  const partyName = received
+    ? record.sender?.name || "Avsändare"
+    : record.recipients.map((recipient) => recipient.name).filter(Boolean).join(", ") || "Mottagare";
+  return `${received ? "Från" : "Till"} ${partyName}`;
+}
+
 function communicationContactsForParty(record) {
   const rawContact = String(record?.contactDetails || record?.contact || "").trim();
   const rawEmail = rawContact.match(/[^\s·,;]+@[^\s·,;]+/)?.[0] || "";
@@ -6374,7 +6400,10 @@ function renderMentorMessages() {
         const owner = responsibleHandler(caseRecord);
         return `<article><div><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><small>${escapeHtml(caseRecord.number)} · Handläggare ${escapeHtml(owner?.name || "ej tilldelad")}</small></div><button type="button" class="btn btn-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></article>`;
       }).join("") : '<p class="text-secondary mb-0">Du har inget aktivt uppdrag att koppla ett meddelande till.</p>'}</div>
-      <section class="mentor-message-history"><h3 class="h6">Tidigare meddelanden</h3>${records.length ? `<ol>${records.map((record) => `<li><div><strong>${escapeHtml(record.subject || (record.channel === "sms" ? "SMS" : "Meddelande"))}</strong><small>${escapeHtml(COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel)} · ${escapeHtml(formatDateTime(record.createdAt))}</small></div><p>${escapeHtml(record.body)}</p><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(COMMUNICATION_STATUS_LABELS[record.status] || record.status)}</span></li>`).join("")}</ol>` : '<p class="text-secondary mb-0">Du har inte skickat några meddelanden ännu.</p>'}</section>
+      <section class="mentor-message-history"><h3 class="h6">Tidigare meddelanden</h3>${records.length ? `<ol>${records.map((record) => {
+        const received = record.createdBy !== mentor.id && record.recipients.some((recipient) => recipient.partyId === mentor.id);
+        return `<li><div><strong>${escapeHtml(record.subject || (record.channel === "sms" ? "SMS" : "Meddelande"))}</strong><small>${escapeHtml(mentorMessagePartyMarkup(record, mentor.id))} · ${escapeHtml(COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel)} · ${escapeHtml(formatDateTime(record.createdAt))}</small></div><div class="mentor-message-history-actions"><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(COMMUNICATION_STATUS_LABELS[record.status] || record.status)}</span>${received && record.channel === "internal" ? `<button type="button" class="btn btn-outline-primary btn-sm" data-reply-internal-message="${escapeHtml(record.id)}">Svara</button>` : ""}</div><p>${escapeHtml(record.body)}</p></li>`;
+      }).join("")}</ol>` : '<p class="text-secondary mb-0">Du har inte skickat några meddelanden ännu.</p>'}</section>
     </section>`;
 }
 
@@ -7631,8 +7660,21 @@ function communicationsForInteraction(interactionId) {
   return communications.filter((record) => record.links.some((link) => link.entityType === "interaction" && link.entityId === interactionId));
 }
 
+function communicationDisplayDirection(record) {
+  if (record.channel !== "internal") return record.direction;
+  const actorId = currentActorId();
+  if (record.sender?.partyId === actorId) return "outgoing";
+  if (record.recipients.some((recipient) => recipient.partyId === actorId)) return "incoming";
+  return record.direction;
+}
+
 function communicationPartyLabel(record) {
-  if (record.direction === "incoming") return [record.sender?.name, record.sender?.address].filter(Boolean).join(" · ") || "Okänd avsändare";
+  const direction = communicationDisplayDirection(record);
+  if (record.channel === "internal") {
+    if (direction === "incoming") return record.sender?.name || "Okänd avsändare";
+    return record.recipients.map((recipient) => recipient.name).filter(Boolean).join(", ") || "Mottagare saknas";
+  }
+  if (direction === "incoming") return [record.sender?.name, record.sender?.address].filter(Boolean).join(" · ") || "Okänd avsändare";
   return record.recipients.map((recipient) => [recipient.name, recipient.address].filter(Boolean).join(" · ")).filter(Boolean).join(", ") || "Mottagare saknas";
 }
 
@@ -7791,11 +7833,14 @@ function renderCommunicationDetail(record) {
   }
   const subject = record.subject || (record.channel === "sms" ? "SMS-meddelande" : "Meddelande");
   const channel = COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel;
-  const direction = COMMUNICATION_DIRECTION_LABELS[record.direction] || record.direction;
+  const displayDirection = communicationDisplayDirection(record);
+  const direction = COMMUNICATION_DIRECTION_LABELS[displayDirection] || displayDirection;
   const status = COMMUNICATION_STATUS_LABELS[record.status] || record.status;
-  const sender = [record.sender?.name, record.sender?.address].filter(Boolean).join(" · ") || "Avsändare saknas";
+  const sender = record.channel === "internal"
+    ? record.sender?.name || "Avsändare saknas"
+    : [record.sender?.name, record.sender?.address].filter(Boolean).join(" · ") || "Avsändare saknas";
   const recipients = record.recipients.length
-    ? record.recipients.map((recipient) => `<li><strong>${escapeHtml(recipient.name || recipient.address)}</strong>${recipient.name && recipient.address ? `<span>${escapeHtml(recipient.address)}</span>` : ""}</li>`).join("")
+    ? record.recipients.map((recipient) => `<li><strong>${escapeHtml(recipient.name || recipient.address)}</strong>${record.channel !== "internal" && recipient.name && recipient.address ? `<span>${escapeHtml(recipient.address)}</span>` : ""}</li>`).join("")
     : '<li class="text-secondary">Mottagare saknas</li>';
   const events = [...record.deliveryEvents].sort((left, right) => new Date(left.occurredAt || 0) - new Date(right.occurredAt || 0));
   els.communicationDetailHeader.innerHTML = `<div class="communication-detail-heading"><div><div class="record-type">${record.automationType === "meeting_reminder" ? `Automatisk påminnelse${communicationWasProcessedLate(record) ? " · Behandlad i efterhand" : ""} · ` : ""}${escapeHtml(channel)} · ${escapeHtml(direction)}</div><h2 id="communicationDetailTitle" class="h5 mb-1">${escapeHtml(subject)}</h2><p class="text-secondary mb-0"><time datetime="${escapeHtml(record.createdAt || "")}">${escapeHtml(formatDateTime(record.createdAt))}</time></p></div><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(status)}</span></div>`;
@@ -7808,6 +7853,7 @@ function renderCommunicationDetail(record) {
       <h3 class="h6">Meddelande</h3>
       ${record.subject ? `<div class="communication-detail-subject"><span>Ämne</span><strong>${escapeHtml(record.subject)}</strong></div>` : ""}
       <div class="communication-detail-message">${escapeHtml(record.body)}</div>
+      ${record.channel === "internal" ? `<button type="button" class="btn btn-primary btn-sm mt-3" data-reply-internal-message="${escapeHtml(record.id)}">Svara internt</button>` : ""}
     </section>
     <section class="communication-detail-grid">
       <div class="communication-detail-section"><h3 class="h6">Kopplingar</h3>${communicationDetailContextMarkup(record)}</div>
@@ -7820,7 +7866,7 @@ function filteredCommunications() {
   const query = communicationSearchTerm.trim().toLocaleLowerCase("sv-SE");
   return communications.filter((record) => {
     if (communicationChannelFilter && record.channel !== communicationChannelFilter) return false;
-    if (communicationDirectionFilter && record.direction !== communicationDirectionFilter) return false;
+    if (communicationDirectionFilter && communicationDisplayDirection(record) !== communicationDirectionFilter) return false;
     if (!query) return true;
     const searchValue = [
       record.subject,
@@ -7852,10 +7898,11 @@ function renderCommunications() {
   els.communicationTableBody.replaceChildren();
   for (const record of records) {
     const subject = record.subject || (record.channel === "sms" ? "SMS" : "Meddelande");
+    const displayDirection = communicationDisplayDirection(record);
     const row = document.createElement("tr");
     row.innerHTML = `<td class="communication-date-cell"><time datetime="${escapeHtml(record.createdAt || "")}">${escapeHtml(formatDateTime(record.createdAt))}</time></td>
       <td class="communication-message-cell"><span class="communication-channel-badge">${escapeHtml(COMMUNICATION_CHANNEL_LABELS[record.channel] || record.channel)}</span>${record.automationType === "meeting_reminder" ? `<span class="communication-automation-label">${communicationWasProcessedLate(record) ? "Försenad" : "Automatisk"}</span>` : ""}<strong>${escapeHtml(subject)}</strong><span>${escapeHtml(record.body)}</span></td>
-      <td class="communication-party-cell"><small>${escapeHtml(COMMUNICATION_DIRECTION_LABELS[record.direction] || record.direction)}</small><strong>${escapeHtml(communicationPartyLabel(record))}</strong></td>
+      <td class="communication-party-cell"><small>${escapeHtml(COMMUNICATION_DIRECTION_LABELS[displayDirection] || displayDirection)}</small><strong>${escapeHtml(communicationPartyLabel(record))}</strong></td>
       <td class="communication-context-cell">${communicationContextMarkup(record)}</td>
       <td><span class="badge ${communicationStatusBadge(record.status)}">${escapeHtml(COMMUNICATION_STATUS_LABELS[record.status] || record.status)}</span></td>
       <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="#/communications/${escapeHtml(record.id)}">Öppna</a></td>`;
@@ -7885,6 +7932,9 @@ function communicationChannelFromForm() {
 }
 
 function suggestedCommunicationRecipient(interaction, channel) {
+  if (channel === "internal") {
+    return interaction?.participants.find((item) => ["handler", "mentor"].includes(item.partyType) && item.partyId) || null;
+  }
   const contactKey = channel === "email" ? "email" : "phone";
   const participant = interaction?.participants.find((item) => item.partyType !== "handler" && item[contactKey])
     || interaction?.participants.find((participant) => participant[contactKey])
@@ -7905,28 +7955,48 @@ function suggestedCommunicationRecipient(interaction, channel) {
 function updateCommunicationComposerChannel({ applySuggestion = false } = {}) {
   const channel = communicationChannelFromForm();
   const isEmail = channel === "email";
+  const isInternal = channel === "internal";
   const mentorMode = els.communicationComposerForm.dataset.mentorMode === "true";
+  els.communicationDeliveryNotice.innerHTML = isInternal
+    ? "<strong>Internt:</strong> Meddelandet levereras mellan roller i den lokala prototypmiljön och sparas i kommunikationshistoriken."
+    : "<strong>Demo:</strong> Kommandot behandlas av vald demoleverantör och loggas, men inget e-postmeddelande eller SMS skickas externt.";
+  els.communicationRecipientAddressField.hidden = isInternal;
   els.communicationRecipientAddressLabel.textContent = isEmail ? "E-postadress" : "Telefonnummer";
   els.communicationRecipientAddressInput.type = isEmail ? "email" : "tel";
   els.communicationRecipientAddressInput.autocomplete = isEmail ? "email" : "tel";
-  els.communicationSubjectField.hidden = !isEmail;
-  els.communicationSubjectInput.required = isEmail;
-  els.communicationSubmitButton.textContent = mentorMode ? `Skicka i ${isEmail ? "e-postdemo" : "SMS-demo"}` : isEmail ? "Registrera via e-postdemo" : "Registrera via SMS-demo";
-  els.communicationBodyHelp.textContent = mentorMode ? "I prototypen sparas meddelandet, men skickas inte utanför systemet." : isEmail ? "Texten registreras hos e-postdemot." : "Texten registreras hos SMS-demot.";
+  els.communicationRecipientAddressInput.required = !isInternal;
+  els.communicationRecipientNameInput.readOnly = isInternal;
+  els.communicationSubjectField.hidden = !isEmail && !isInternal;
+  els.communicationSubjectInput.required = isEmail || isInternal;
+  els.communicationSubmitButton.textContent = isInternal
+    ? "Skicka internt"
+    : mentorMode
+      ? `Skicka i ${isEmail ? "e-postdemo" : "SMS-demo"}`
+      : isEmail
+        ? "Registrera via e-postdemo"
+        : "Registrera via SMS-demo";
+  els.communicationBodyHelp.textContent = isInternal
+    ? "Mottagaren ser meddelandet under Meddelanden när prototypen visas som den rollen."
+    : mentorMode
+      ? "I prototypen sparas meddelandet, men skickas inte utanför systemet."
+      : isEmail
+        ? "Texten registreras hos e-postdemot."
+        : "Texten registreras hos SMS-demot.";
   if (!applySuggestion) return;
   const interaction = allInteractions().find((item) => item.id === els.communicationComposerForm.dataset.interactionId);
   const recipient = communicationComposerRecipient || suggestedCommunicationRecipient(interaction, channel);
   els.communicationRecipientNameInput.value = recipient?.displayName || "";
-  els.communicationRecipientAddressInput.value = recipient?.[isEmail ? "email" : "phone"] || "";
+  els.communicationRecipientAddressInput.value = isInternal ? recipient?.partyId || "" : recipient?.[isEmail ? "email" : "phone"] || "";
   els.communicationComposerForm.dataset.recipientPartyType = recipient?.partyType || "";
   els.communicationComposerForm.dataset.recipientPartyId = recipient?.partyId || "";
 }
 
-function openCommunicationComposer({ channel = "email", interaction = null, caseRecord = null, recipient = null } = {}) {
+function openCommunicationComposer({ channel = "email", interaction = null, caseRecord = null, recipient = null, replyTo = null } = {}) {
   els.communicationComposerForm.reset();
   communicationComposerRecipient = recipient;
   els.communicationComposerForm.dataset.interactionId = interaction?.id || "";
   els.communicationComposerForm.dataset.mentorMode = String(Boolean(recipient && isMentorSession()));
+  els.communicationComposerForm.dataset.replyToCommunicationId = replyTo?.id || "";
   els.communicationComposerForm.dataset.recipientPartyType = "";
   els.communicationComposerForm.dataset.recipientPartyId = "";
   const channelInput = els.communicationComposerForm.querySelector(`input[name="communicationChannel"][value="${channel}"]`);
@@ -7943,8 +8013,22 @@ function openCommunicationComposer({ channel = "email", interaction = null, case
   els.communicationCaseField.hidden = Boolean(recipient && caseRecord);
   els.communicationContextSummary.hidden = !interaction && !caseRecord;
   els.communicationContextSummary.textContent = caseRecord ? `Kopplas till uppdraget ${caseRecord.number}.` : interaction ? `Kopplas till mötet: ${interaction.title || "Möte"}` : "";
-  els.communicationComposerTitle.textContent = recipient ? "Meddelande till handläggaren" : channel === "sms" ? "Nytt SMS" : "Ny e-post";
-  els.communicationSubjectInput.value = caseRecord ? `Fråga om ${caseRecord.number}` : interaction ? `Möte: ${interaction.title || "Möte"}` : "";
+  els.communicationComposerTitle.textContent = replyTo
+    ? `Svar till ${recipient?.displayName || "mottagaren"}`
+    : recipient && isMentorSession()
+      ? "Meddelande till handläggaren"
+      : channel === "internal"
+        ? "Nytt internt meddelande"
+        : channel === "sms"
+          ? "Nytt SMS"
+          : "Ny e-post";
+  els.communicationSubjectInput.value = replyTo?.subject
+    ? `Sv: ${replyTo.subject.replace(/^Sv:\s*/i, "")}`
+    : caseRecord
+      ? `Fråga om ${caseRecord.number}`
+      : interaction
+        ? `Möte: ${interaction.title || "Möte"}`
+        : "";
   els.communicationBodyInput.value = interaction?.invitationText || "";
   updateCommunicationComposerChannel({ applySuggestion: true });
   communicationComposerModal ||= bootstrap.Modal.getOrCreateInstance(els.communicationComposerModal);
@@ -7965,9 +8049,8 @@ function openMentorMessageComposer(caseId) {
     email: owner.email || defaultContact.email || "",
     phone: owner.phone || defaultContact.phone || ""
   };
-  const channel = ownerContact.email ? "email" : "sms";
   openCommunicationComposer({
-    channel,
+    channel: "internal",
     caseRecord,
     recipient: {
       displayName: ownerContact.name,
@@ -7976,6 +8059,26 @@ function openMentorMessageComposer(caseId) {
       partyType: "handler",
       partyId: ownerContact.id
     }
+  });
+}
+
+function openInternalReplyComposer(record) {
+  if (!record || record.channel !== "internal") return;
+  const recipientSource = record.sender?.partyId === currentActorId() ? record.recipients[0] : record.sender;
+  if (!recipientSource?.partyId) {
+    showFeedback("Mottagaren för svaret kunde inte identifieras.");
+    return;
+  }
+  const caseLink = communicationLink(record, "case");
+  openCommunicationComposer({
+    channel: "internal",
+    caseRecord: cases.find((item) => item.id === caseLink?.entityId) || null,
+    recipient: {
+      displayName: recipientSource.name || "Mottagare",
+      partyType: recipientSource.partyType,
+      partyId: recipientSource.partyId
+    },
+    replyTo: record
   });
 }
 
@@ -14425,6 +14528,11 @@ els.mentorPortalView.addEventListener("click", async (event) => {
     openMentorMessageComposer(messageButton.dataset.mentorMessageCase);
     return;
   }
+  const replyButton = event.target.closest("[data-reply-internal-message]");
+  if (replyButton) {
+    openInternalReplyComposer(communications.find((record) => record.id === replyButton.dataset.replyInternalMessage));
+    return;
+  }
   if (event.target.closest("[data-edit-mentor-profile]")) {
     mentorProfileEditMode = true;
     renderMentorProfile();
@@ -15547,6 +15655,11 @@ els.interactionSendMessageButton.addEventListener("click", () => {
 });
 
 els.communicationDetailContent.addEventListener("click", (event) => {
+  const replyButton = event.target.closest("[data-reply-internal-message]");
+  if (replyButton) {
+    openInternalReplyComposer(communications.find((record) => record.id === replyButton.dataset.replyInternalMessage));
+    return;
+  }
   const button = event.target.closest("[data-open-communication-meeting]");
   if (!button) return;
   const interaction = allInteractions().find((item) => item.id === button.dataset.openCommunicationMeeting);
@@ -15554,7 +15667,13 @@ els.communicationDetailContent.addEventListener("click", (event) => {
 });
 
 els.communicationComposerForm.querySelectorAll('input[name="communicationChannel"]').forEach((input) => input.addEventListener("change", () => {
-  els.communicationComposerTitle.textContent = els.communicationComposerForm.dataset.mentorMode === "true" ? "Meddelande till handläggaren" : input.value === "sms" ? "Nytt SMS" : "Ny e-post";
+  els.communicationComposerTitle.textContent = els.communicationComposerForm.dataset.mentorMode === "true"
+    ? "Meddelande till handläggaren"
+    : input.value === "internal"
+      ? "Nytt internt meddelande"
+      : input.value === "sms"
+        ? "Nytt SMS"
+        : "Ny e-post";
   updateCommunicationComposerChannel({ applySuggestion: true });
 }));
 
@@ -15576,8 +15695,13 @@ els.communicationComposerForm.addEventListener("submit", async (event) => {
   if (caseRecord) links.push({ entityType: "case", entityId: caseRecord.id, label: `${caseRecord.number} · ${caseRecord.type}` });
   if (interaction) links.push({ entityType: "interaction", entityId: interaction.id, label: interaction.title || "Möte" });
   els.communicationSubmitButton.disabled = true;
-  els.communicationSubmitButton.textContent = "Behandlar i demo...";
+  els.communicationSubmitButton.textContent = channel === "internal" ? "Skickar..." : "Behandlar i demo...";
   try {
+    const senderParty = actor
+      ? { name: actor.name, address: channel === "internal" ? actor.id : channel === "email" ? actor.email || "kommun@demo.local" : actor.phone || "SMS demo", partyType: "handler", partyId: actor.id }
+      : mentorActor
+        ? { name: mentorActor.name, address: channel === "internal" ? mentorActor.id : channel === "email" ? mentorActor.email || "mentor@demo.local" : mentorActor.phone || "SMS demo", partyType: "mentor", partyId: mentorActor.id }
+        : { name: "Kommunen", address: channel === "internal" ? currentActorId() : channel === "email" ? "kommun@demo.local" : "SMS demo", partyType: "handler", partyId: currentActorId() };
     const record = await dispatchOutboundCommunication({
       draft: {
         tenantId: DEFAULT_TENANT_ID,
@@ -15585,13 +15709,14 @@ els.communicationComposerForm.addEventListener("submit", async (event) => {
         recipientAddress: els.communicationRecipientAddressInput.value,
         recipientPartyType: els.communicationComposerForm.dataset.recipientPartyType || null,
         recipientPartyId: els.communicationComposerForm.dataset.recipientPartyId || null,
-        sender: actor ? { name: actor.name, address: channel === "email" ? actor.email || "kommun@demo.local" : actor.phone || "SMS demo" } : mentorActor ? { name: mentorActor.name, address: channel === "email" ? mentorActor.email || "mentor@demo.local" : mentorActor.phone || "SMS demo" } : { name: "Kommunen", address: channel === "email" ? "kommun@demo.local" : "SMS demo" },
+        sender: senderParty,
         subject: els.communicationSubjectInput.value,
         body: els.communicationBodyInput.value,
+        replyToCommunicationId: els.communicationComposerForm.dataset.replyToCommunicationId || null,
         links,
         createdBy: currentActorId()
       },
-      provider: createDemoCommunicationProvider(channel)
+      provider: channel === "internal" ? createInternalCommunicationProvider() : createDemoCommunicationProvider(channel)
     });
     if (caseRecord) {
       const now = record.updatedAt;
@@ -15604,7 +15729,9 @@ els.communicationComposerForm.addEventListener("submit", async (event) => {
           eventType: "communication_registered",
           entityType: "communication",
           entityId: record.id,
-          message: `${COMMUNICATION_CHANNEL_LABELS[channel]} registrerades via demo till ${els.communicationRecipientNameInput.value}. Ingen extern leverans gjordes.`,
+          message: channel === "internal"
+            ? `Internt meddelande skickades till ${els.communicationRecipientNameInput.value}.`
+            : `${COMMUNICATION_CHANNEL_LABELS[channel]} registrerades via demo till ${els.communicationRecipientNameInput.value}. Ingen extern leverans gjordes.`,
           idempotencyKey: crypto.randomUUID(), correlationId: crypto.randomUUID(), now
         })]
       });
@@ -15615,7 +15742,9 @@ els.communicationComposerForm.addEventListener("submit", async (event) => {
     markSaved();
     await refresh();
     if (interaction) renderInteractionSystemCommunications(interaction.id);
-    showFeedback(`${COMMUNICATION_CHANNEL_LABELS[channel]} har behandlats av demot och registrerats. Inget skickades externt.`);
+    showFeedback(channel === "internal"
+      ? `Meddelandet har levererats till ${els.communicationRecipientNameInput.value}.`
+      : `${COMMUNICATION_CHANNEL_LABELS[channel]} har behandlats av demot och registrerats. Inget skickades externt.`);
   } catch (error) {
     console.error("Kunde inte behandla kommunikationen", error);
     showFeedback(error?.message || "Kommunikationen kunde inte registreras.");

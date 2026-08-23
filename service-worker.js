@@ -1,4 +1,4 @@
-const CACHE_NAME = "foraldramentorer-mentor-v134-meeting-queue-current-data";
+const CACHE_NAME = "foraldramentorer-mentor-v135-internal-messages-b";
 const APP_SHELL = [
   "/",
   "/index.html",

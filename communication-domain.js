@@ -1,4 +1,5 @@
 export const COMMUNICATION_CHANNEL_LABELS = {
+  internal: "Internt meddelande",
   email: "E-post",
   sms: "SMS",
   letter: "Brev",
@@ -90,7 +91,9 @@ export function normalizeCommunicationRecord(record = {}) {
     status: record.status || (record.direction === "incoming" ? "received" : "queued"),
     sender: record.sender ? {
       name: String(record.sender.name || "").trim(),
-      address: String(record.sender.address || "").trim()
+      address: String(record.sender.address || "").trim(),
+      partyType: record.sender.partyType || null,
+      partyId: record.sender.partyId || null
     } : null,
     recipients: Array.isArray(record.recipients) ? record.recipients.map((recipient) => ({
       name: String(recipient.name || "").trim(),
@@ -100,6 +103,7 @@ export function normalizeCommunicationRecord(record = {}) {
     })).filter((recipient) => recipient.address) : [],
     subject: String(record.subject || "").trim(),
     body: String(record.body || "").trim(),
+    replyToCommunicationId: record.replyToCommunicationId || null,
     links: Array.isArray(record.links) ? record.links.map((link) => ({
       entityType: String(link.entityType || "").trim(),
       entityId: String(link.entityId || "").trim(),
@@ -111,6 +115,24 @@ export function normalizeCommunicationRecord(record = {}) {
       actorId: event.actorId || null,
       detail: String(event.detail || "").trim()
     })).filter((event) => event.status && event.occurredAt) : []
+  };
+}
+
+export function createInternalCommunicationProvider({ now = () => new Date().toISOString() } = {}) {
+  return {
+    id: "internal-messaging",
+    channel: "internal",
+    mode: "internal",
+    capabilities: { outbound: true, inbound: true, deliveryReceipts: true },
+    async send(message) {
+      if (message.channel !== "internal") throw new Error("Meddelandets kanal stämmer inte med internmeddelanden.");
+      return {
+        externalMessageId: null,
+        status: "delivered",
+        occurredAt: now(),
+        detail: "Levererat till mottagarens inkorg i den lokala prototypmiljön."
+      };
+    }
   };
 }
 
@@ -165,8 +187,9 @@ export async function dispatchOutboundCommunication({
       partyType: draft.recipientPartyType || null,
       partyId: draft.recipientPartyId || null
     }],
-    subject: provider.channel === "email" ? requiredText(draft.subject, "Ange en ämnesrad för e-postmeddelandet.") : "",
+    subject: ["email", "internal"].includes(provider.channel) ? requiredText(draft.subject, "Ange en ämnesrad för meddelandet.") : "",
     body,
+    replyToCommunicationId: draft.replyToCommunicationId || null,
     links: draft.links || [],
     deliveryEvents: [{
       status: "queued",

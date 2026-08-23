@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260823-meeting-queue-v134-current-data">
+    <link rel="stylesheet" href="styles.css?v=20260823-internal-messages-v135b">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -373,10 +373,10 @@
                 <button id="newCommunicationButton" type="button" class="btn btn-primary">Nytt meddelande</button>
               </div>
               <div class="card-body communication-register-body">
-                <div class="communication-provider-notice" role="note"><strong>Demoläge:</strong> E-post- och SMS-systemen registrerar sändningsbegäran och leverantörssvar, men skickar inget utanför prototypen.</div>
+                <div class="communication-provider-notice" role="note"><strong>Kommunikationssystem:</strong> Interna meddelanden levereras mellan roller i den lokala prototypmiljön. E-post- och SMS-systemen är demo och skickar inget utanför prototypen.</div>
                 <div class="communication-register-filters">
                   <div><label class="form-label" for="communicationSearchInput">Sök</label><input id="communicationSearchInput" class="form-control" type="search" autocomplete="off" placeholder="Mottagare, ärende, ämne eller innehåll"></div>
-                  <div><label class="form-label" for="communicationChannelFilter">Kanal</label><select id="communicationChannelFilter" class="form-select"><option value="">Alla kanaler</option><option value="email">E-post</option><option value="sms">SMS</option></select></div>
+                  <div><label class="form-label" for="communicationChannelFilter">Kanal</label><select id="communicationChannelFilter" class="form-select"><option value="">Alla kanaler</option><option value="internal">Internt meddelande</option><option value="email">E-post</option><option value="sms">SMS</option></select></div>
                   <div><label class="form-label" for="communicationDirectionFilter">Riktning</label><select id="communicationDirectionFilter" class="form-select"><option value="">Inkommande och utgående</option><option value="outgoing">Utgående</option><option value="incoming">Inkommande</option></select></div>
                 </div>
                 <div class="table-responsive border communication-register-table-wrap">
@@ -2360,11 +2360,11 @@
         <form id="communicationComposerForm" class="modal-content">
           <div class="modal-header"><div><div class="record-type">Kommunikationssystem</div><h2 id="communicationComposerTitle" class="modal-title h5 mb-0">Nytt meddelande</h2></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button></div>
           <div class="modal-body communication-composer-body">
-            <div class="communication-demo-notice" role="note"><strong>Demo:</strong> Kommandot behandlas av vald demoleverantör och loggas, men inget e-postmeddelande eller SMS skickas externt.</div>
-            <fieldset><legend class="form-label">Kanal</legend><div class="communication-channel-options"><label><input class="form-check-input" type="radio" name="communicationChannel" value="email" checked><span>E-post demo</span></label><label><input class="form-check-input" type="radio" name="communicationChannel" value="sms"><span>SMS demo</span></label></div></fieldset>
+            <div id="communicationDeliveryNotice" class="communication-demo-notice" role="note"><strong>Demo:</strong> Kommandot behandlas av vald demoleverantör och loggas, men inget e-postmeddelande eller SMS skickas externt.</div>
+            <fieldset><legend class="form-label">Kanal</legend><div class="communication-channel-options"><label><input class="form-check-input" type="radio" name="communicationChannel" value="internal"><span>Internt meddelande</span></label><label><input class="form-check-input" type="radio" name="communicationChannel" value="email" checked><span>E-post demo</span></label><label><input class="form-check-input" type="radio" name="communicationChannel" value="sms"><span>SMS demo</span></label></div></fieldset>
             <div id="communicationContextSummary" class="communication-context-summary" hidden></div>
             <div id="communicationCaseField"><label class="form-label" for="communicationCaseInput">Koppla till ärende <span class="text-secondary fw-normal">(valfritt)</span></label><select id="communicationCaseInput" class="form-select"><option value="">Ingen ärendekoppling</option></select></div>
-            <div class="row g-3"><div class="col-md-6"><label class="form-label" for="communicationRecipientNameInput">Mottagare</label><input id="communicationRecipientNameInput" class="form-control" autocomplete="name" required></div><div class="col-md-6"><label id="communicationRecipientAddressLabel" class="form-label" for="communicationRecipientAddressInput">E-postadress</label><input id="communicationRecipientAddressInput" class="form-control" type="email" autocomplete="email" required></div></div>
+            <div class="row g-3"><div class="col-md-6"><label class="form-label" for="communicationRecipientNameInput">Mottagare</label><input id="communicationRecipientNameInput" class="form-control" autocomplete="name" required></div><div id="communicationRecipientAddressField" class="col-md-6"><label id="communicationRecipientAddressLabel" class="form-label" for="communicationRecipientAddressInput">E-postadress</label><input id="communicationRecipientAddressInput" class="form-control" type="email" autocomplete="email" required></div></div>
             <div id="communicationSubjectField"><label class="form-label" for="communicationSubjectInput">Ämne</label><input id="communicationSubjectInput" class="form-control" required></div>
             <div><label class="form-label" for="communicationBodyInput">Meddelande</label><textarea id="communicationBodyInput" class="form-control" rows="6" maxlength="4000" required></textarea><div id="communicationBodyHelp" class="form-text">Texten registreras hos e-postdemot.</div></div>
           </div>
@@ -2637,6 +2637,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260823-meeting-queue-v134-current-data"></script>
+    <script type="module" src="app.js?v=20260823-internal-messages-v135b"></script>
   </body>
 </html>

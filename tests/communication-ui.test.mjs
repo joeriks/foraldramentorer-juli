@@ -42,6 +42,21 @@ test("routes outbound email and sms through swappable demo providers", () => {
   assert.match(app, /communication_registered/);
 });
 
+test("delivers and replies to internal messages through the shared communication register", () => {
+  assert.match(html, /name="communicationChannel" value="internal"/);
+  assert.match(html, /<option value="internal">Internt meddelande<\/option>/);
+  assert.match(app, /createInternalCommunicationProvider/);
+  assert.match(app, /channel: "internal"/);
+  assert.match(app, /data-reply-internal-message/);
+  assert.match(app, /function openInternalReplyComposer/);
+  assert.match(app, /replyToCommunicationId/);
+  assert.match(app, /function communicationDisplayDirection\(record\)/);
+  assert.match(app, /record\.recipients\.some\(\(recipient\) => recipient\.partyId === actorId\)\) return "incoming"/);
+  assert.match(app, /communicationDisplayDirection\(record\) !== communicationDirectionFilter/);
+  assert.match(app, /Internt meddelande skickades till/);
+  assert.match(styles, /\.mentor-message-history-actions/);
+});
+
 test("links meeting messages to the global communication history", () => {
   assert.match(html, /id="interactionEmailButton"/);
   assert.match(html, /id="interactionSmsButton"/);
@@ -90,8 +105,9 @@ test("lets mentors message the responsible handler through the shared communicat
   assert.match(app, /const defaultContact = seedHandlers\.find/);
   assert.match(app, /email: owner\.email \|\| defaultContact\.email \|\| ""/);
   assert.match(app, /recipient: \{[\s\S]*partyType: "handler"/);
+  assert.match(app, /openCommunicationComposer\(\{[\s\S]*channel: "internal"/);
   assert.match(app, /const availableCases = isMentorSession\(\) \? mentorAssignments\(\) : cases/);
-  assert.match(app, /mentorActor \? \{ name: mentorActor\.name/);
+  assert.match(app, /: mentorActor\s*\? \{ name: mentorActor\.name/);
   assert.match(app, /createdBy: currentActorId\(\)/);
   assert.match(styles, /\.mentor-message-actions/);
   assert.match(styles, /\.mentor-message-history/);

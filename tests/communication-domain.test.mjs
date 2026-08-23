@@ -2,11 +2,39 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   createDemoCommunicationProvider,
+  createInternalCommunicationProvider,
   dispatchOutboundCommunication,
   meetingReminderJobs,
   normalizeMeetingReminder,
   recordInboundCommunication
 } from "../communication-domain.js";
+
+test("internal messages are delivered inside the system with traceable parties", async () => {
+  const record = await dispatchOutboundCommunication({
+    draft: {
+      tenantId: "tenant-demo",
+      recipientName: "Jonas Berg",
+      recipientAddress: "handler-jonas",
+      recipientPartyType: "handler",
+      recipientPartyId: "handler-jonas",
+      sender: { name: "Omar Rahimi", address: "mentor-omar", partyType: "mentor", partyId: "mentor-omar" },
+      subject: "Fråga om uppdraget",
+      body: "Kan vi stämma av nästa möte?",
+      links: [{ entityType: "case", entityId: "case-1", label: "FM-26-00026" }],
+      createdBy: "mentor-omar"
+    },
+    provider: createInternalCommunicationProvider({ now: () => "2026-08-23T14:00:00.000Z" }),
+    idFactory: () => "internal-1",
+    now: () => "2026-08-23T14:00:00.000Z"
+  });
+
+  assert.equal(record.channel, "internal");
+  assert.equal(record.providerMode, "internal");
+  assert.equal(record.status, "delivered");
+  assert.equal(record.sender.partyId, "mentor-omar");
+  assert.equal(record.recipients[0].partyId, "handler-jonas");
+  assert.match(record.deliveryEvents.at(-1).detail, /inkorg i den lokala prototypmiljön/i);
+});
 
 test("demo providers process outbound commands without claiming external delivery", async () => {
   const provider = createDemoCommunicationProvider("email", {
