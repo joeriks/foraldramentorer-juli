@@ -28,6 +28,13 @@ test("keeps extended registry guidance compact and linked to the police", () => 
   assert.match(styles, /\.activity-guidance-more-content/);
 });
 
+test("connects the interview activity to booking and the shared interview guide", () => {
+  assert.match(app, /interviewDone: \{[\s\S]*Öppna intervjuguiden/);
+  assert.match(app, /activity\.templateId === "interviewDone"/);
+  assert.match(app, /state === "not_started" \? "Boka intervju"/);
+  assert.match(app, /Själva bokningen görs i mötesfunktionen/);
+});
+
 test("completion explains and opens the next activity", () => {
   assert.match(app, /version: "83"/);
   assert.match(app, /function nextOpenActivity\(activity\)/);
@@ -76,6 +83,8 @@ test("keeps register navigation and row interaction consistent", () => {
   assert.match(app, /makeRegisterRowInteractive\(row, `Öppna ärende/);
   assert.match(app, /makeRegisterRowInteractive\(row, `Öppna mentorkort/);
   assert.match(styles, /\.interactive-register-row:focus-visible/);
+  const mentorHeader = html.match(/aria-label="Mentorregister"[\s\S]*?<tbody id="candidateTableBody"/)?.[0] || "";
+  assert.ok(mentorHeader.indexOf("<th>Person</th>") < mentorHeader.indexOf("<th>Ärende</th>"));
 });
 
 test("keeps the activity list compact and finishes activities in their detail view", () => {

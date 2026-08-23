@@ -104,6 +104,14 @@ test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(html, /id="mentorMeetingReportNextMeeting"/);
   assert.match(html, /Nästa möte är inbokat/);
   assert.match(html, /Planera nästa kontakt/);
+  assert.match(html, /id="mentorMeetingReportDurationChoices"/);
+  assert.match(html, /id="mentorMeetingReportTopics"/);
+  assert.match(html, /Vad handlade mötet om\?/);
+  assert.match(app, /MENTOR_REPORT_DURATION_OPTIONS = \[15, 30, 45, 60, 75, 90, 105, 120\]/);
+  assert.match(app, /mentorReportTopicOptions\(caseRecord\)/);
+  assert.match(app, /topicIds,/);
+  assert.match(app, /mentorAssignmentMessagesMarkup\(caseRecord, caseRecord\.mentorId\)/);
+  assert.match(app, /communicationLink\(record, "case"\)\?\.entityId === caseRecord\.id/);
   assert.match(html, /id="mentorReportDetailModal"/);
   assert.match(app, /Det här gör du härnäst/);
   assert.match(app, /Inget möte inbokat/);

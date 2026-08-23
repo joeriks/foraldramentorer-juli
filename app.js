@@ -219,6 +219,21 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "140",
+    date: "2026-08-23",
+    title: "Sammanhållet mentorarbete",
+    flow: "Mentoruppdrag -> möte -> återrapportering -> dialog med handläggare",
+    simplified: "Mentorn väljer nu vad mötet handlade om och hur länge det pågick i tydliga val. Uppdragets meddelanden visas i samma arbetsyta och kompletterande fritext är valfri.",
+    retained: "Möten, rapporter, kompletteringar och intern kommunikation använder samma spårbara poster och befintliga uppdrag fungerar vidare.",
+    changes: [
+      "Mötesrapporten har tidsval i 15-minuterssteg och strukturerade ämnen från uppdragets stödområden.",
+      "Genomförda möten kräver minst ett valt ämne, medan känslig eller överflödig fritext inte efterfrågas.",
+      "De senaste uppdragskopplade meddelandena visas inne i uppdraget utan att kopieras från kommunikationsregistret.",
+      "Mentorregistret visar personen före ärendenumret och informationsstatusen Mer information behövs beskriver arbetet tydligare.",
+      "Intervjuaktiviteten länkar till intervjuguiden och slutligt godkännande beskriver konsekvensen för matchning."
+    ]
+  },
+  {
     version: "139",
     date: "2026-08-23",
     title: "Nästa möte visas i återrapporteringen",
@@ -1314,6 +1329,17 @@ const ACTIVITY_GUIDANCE_MORE = {
     ],
     linkHref: "https://polisen.se/tjanster-tillstand/belastningsregistret/information-till-arbetsgivare-om-registerutdrag/",
     linkLabel: "Läs Polisens information om registerutdrag"
+  },
+  interviewDone: {
+    summary: "Förbered intervjun, boka deltagare och tid och dokumentera därefter en saklig sammanfattning. Själva bokningen görs i mötesfunktionen och kopplas automatiskt till aktiviteten.",
+    steps: [
+      "Gå igenom intervjuguiden och välj vilka frågor som behöver följas upp.",
+      "Boka intervjun med rätt deltagare, tid och mötesform.",
+      "Genomför intervjun och registrera mötets utfall.",
+      "Dokumentera en kort saklig sammanfattning och bedöm nästa steg."
+    ],
+    linkHref: "https://docs.google.com/document/d/1zRTaWUYgRv9fGANl9EK90GUfuQ5lZo61nkuT7uZy7v4/edit?usp=sharing",
+    linkLabel: "Öppna intervjuguiden"
   }
 };
 
@@ -1888,9 +1914,16 @@ const els = {
   mentorMeetingReportForm: document.querySelector("#mentorMeetingReportForm"),
   mentorMeetingReportTitle: document.querySelector("#mentorMeetingReportTitle"),
   mentorMeetingReportFacts: document.querySelector("#mentorMeetingReportFacts"),
+  mentorMeetingReportDurationField: document.querySelector("#mentorMeetingReportDurationField"),
   mentorMeetingReportDurationInput: document.querySelector("#mentorMeetingReportDurationInput"),
+  mentorMeetingReportDurationChoices: document.querySelector("#mentorMeetingReportDurationChoices"),
   mentorMeetingReportOutcomeInput: document.querySelector("#mentorMeetingReportOutcomeInput"),
+  mentorMeetingReportTopicsField: document.querySelector("#mentorMeetingReportTopicsField"),
+  mentorMeetingReportTopics: document.querySelector("#mentorMeetingReportTopics"),
+  mentorMeetingReportTopicsHelp: document.querySelector("#mentorMeetingReportTopicsHelp"),
   mentorMeetingReportSummaryInput: document.querySelector("#mentorMeetingReportSummaryInput"),
+  mentorMeetingReportSummaryLabel: document.querySelector("#mentorMeetingReportSummaryLabel"),
+  mentorMeetingReportSummaryHelp: document.querySelector("#mentorMeetingReportSummaryHelp"),
   mentorMeetingReportNextMeeting: document.querySelector("#mentorMeetingReportNextMeeting"),
   mentorMeetingReportNextMeetingTime: document.querySelector("#mentorMeetingReportNextMeetingTime"),
   mentorMeetingReportNextMeetingDetails: document.querySelector("#mentorMeetingReportNextMeetingDetails"),
@@ -4881,6 +4914,11 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
         mentorId: mentor.id, occurredOn: calendarDateKey(new Date(records[INTERACTIONS_STORE].find((item) => item.id === reportedMeetingInteractionId)?.startsAt || now)),
         durationMinutes: concern ? 45 : 90, mode: parentIndex % 2 ? "digital" : "physical",
         outcome: "completed", nextContactOn: null,
+        topicIds: [...supportAreaIds, "follow_up"],
+        topicLabels: [...supportAreaLabels(supportAreaIds), "Följa upp tidigare överenskommelse"],
+        note: concern
+          ? "Mentorn önskar stöd från handläggaren inför nästa kontakt."
+          : "Parterna vill fortsätta enligt uppdragsplanen.",
         summary: concern
           ? "Kontakten genomfördes men mentorn önskar stöd från handläggaren."
           : "Planerad kontakt genomfördes enligt uppdragsplanen.",
@@ -6198,12 +6236,51 @@ function mentorCommunicationRecords(mentorId) {
     .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
 }
 
+function mentorAssignmentCommunicationRecords(caseRecord, mentorId) {
+  return mentorCommunicationRecords(mentorId).filter((record) => communicationLink(record, "case")?.entityId === caseRecord.id);
+}
+
 function mentorMessagePartyMarkup(record, mentorId) {
   const received = record.createdBy !== mentorId && record.recipients.some((recipient) => recipient.partyId === mentorId);
   const partyName = received
     ? record.sender?.name || "Avsändare"
     : record.recipients.map((recipient) => recipient.name).filter(Boolean).join(", ") || "Mottagare";
   return `${received ? "Från" : "Till"} ${partyName}`;
+}
+
+function mentorAssignmentMessagesMarkup(caseRecord, mentorId) {
+  const records = mentorAssignmentCommunicationRecords(caseRecord, mentorId);
+  if (!records.length) return "";
+  return `<section class="mentor-assignment-messages"><div class="mentor-assignment-section-heading"><div><h3>Meddelanden om uppdraget</h3><p>Senaste kommunikationen med ansvarig handläggare.</p></div><a href="#/mentor-messages">Visa alla</a></div><ol>${records.slice(0, 3).map((record) => {
+    const received = record.createdBy !== mentorId && record.recipients.some((recipient) => recipient.partyId === mentorId);
+    return `<li><div><strong>${escapeHtml(record.subject || "Meddelande")}</strong><small>${escapeHtml(mentorMessagePartyMarkup(record, mentorId))} · ${escapeHtml(formatDateTime(record.createdAt))}</small></div>${received && record.channel === "internal" ? `<button type="button" class="btn btn-outline-primary btn-sm" data-reply-internal-message="${escapeHtml(record.id)}">Svara</button>` : ""}<p>${escapeHtml(record.body)}</p></li>`;
+  }).join("")}</ol></section>`;
+}
+
+const MENTOR_REPORT_DURATION_OPTIONS = [15, 30, 45, 60, 75, 90, 105, 120];
+const MENTOR_REPORT_GENERAL_TOPICS = [
+  ["follow_up", "Följa upp tidigare överenskommelse"],
+  ["next_steps", "Planera nästa steg"],
+  ["other", "Annat"]
+];
+
+function mentorReportTopicOptions(caseRecord) {
+  const supportTopics = supportAreaIdsForCase(caseRecord).map((id) => [id, supportAreaById(id)?.title || id]);
+  return [...supportTopics, ...MENTOR_REPORT_GENERAL_TOPICS];
+}
+
+function mentorReportTopicLabels(report) {
+  if (report.topicLabels?.length) return report.topicLabels;
+  const labelsById = new Map([
+    ...SUPPORT_AREAS.map((area) => [area.id, area.title]),
+    ...MENTOR_REPORT_GENERAL_TOPICS
+  ]);
+  return (report.topicIds || []).map((id) => labelsById.get(id) || id);
+}
+
+function mentorReportSummaryText(topicLabels, note) {
+  const topicText = topicLabels.length ? `Områden: ${topicLabels.join(", ")}.` : "";
+  return [topicText, note].filter(Boolean).join(" ");
 }
 
 function communicationContactsForParty(record) {
@@ -6368,6 +6445,31 @@ function mentorMeetingReportQueueMarkup(caseRecord) {
   }).join("")}</ol></section>`;
 }
 
+function renderMentorMeetingReportDurationChoices(durationMinutes) {
+  const nearestDuration = MENTOR_REPORT_DURATION_OPTIONS.reduce((nearest, option) => Math.abs(option - durationMinutes) < Math.abs(nearest - durationMinutes) ? option : nearest, 60);
+  els.mentorMeetingReportDurationInput.value = String(nearestDuration);
+  els.mentorMeetingReportDurationChoices.innerHTML = MENTOR_REPORT_DURATION_OPTIONS.map((minutes) => `<button type="button" class="mentor-report-duration-choice ${minutes === nearestDuration ? "is-selected" : ""}" data-mentor-report-duration="${minutes}" aria-pressed="${minutes === nearestDuration}">${minutes} min</button>`).join("");
+}
+
+function renderMentorMeetingReportTopics(caseRecord) {
+  els.mentorMeetingReportTopicsField.classList.remove("has-error");
+  els.mentorMeetingReportTopicsHelp.textContent = "Välj minst ett område. Det gör rapporten lättare att följa upp utan onödig fritext.";
+  els.mentorMeetingReportTopics.innerHTML = mentorReportTopicOptions(caseRecord).map(([id, label]) => `<label class="mentor-report-topic"><input class="form-check-input" type="checkbox" name="mentorReportTopic" value="${escapeHtml(id)}"><span>${escapeHtml(label)}</span></label>`).join("");
+}
+
+function updateMentorMeetingReportFormState() {
+  const completed = els.mentorMeetingReportOutcomeInput.value === "completed";
+  els.mentorMeetingReportDurationField.hidden = !completed;
+  els.mentorMeetingReportTopicsField.hidden = !completed;
+  els.mentorMeetingReportTopics.querySelectorAll("input").forEach((input) => { input.disabled = !completed; });
+  els.mentorMeetingReportSummaryLabel.innerHTML = completed
+    ? 'Kompletterande anteckning <span class="text-secondary fw-normal">(valfritt)</span>'
+    : 'Kort kommentar <span class="text-secondary fw-normal">(valfritt)</span>';
+  els.mentorMeetingReportSummaryHelp.textContent = completed
+    ? "Skriv bara sådant som behövs utöver valda områden och undvik känsliga personuppgifter."
+    : "Du kan kort ange varför mötet ställdes in eller inte blev av.";
+}
+
 function openMentorMeetingReport(interactionId) {
   const meeting = allInteractions().find((item) => item.id === interactionId && item.kind === "meeting");
   const caseRecord = mentorAssignments().find((assignment) => assignment.id === meeting?.caseId);
@@ -6397,8 +6499,9 @@ function openMentorMeetingReport(interactionId) {
   els.mentorMeetingReportForm.dataset.interactionId = meeting.id;
   els.mentorMeetingReportTitle.textContent = meeting.title || "Möte med föräldern";
   els.mentorMeetingReportFacts.innerHTML = `<div><dt>Datum och tid</dt><dd>${escapeHtml(formatDateTime(meeting.startsAt))}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[meeting.mode] || meeting.mode || "Ej angivet")}</dd></div><div><dt>Förälder</dt><dd>${escapeHtml(caseParent(caseRecord)?.name || "Ej angivet")}</dd></div><div><dt>Uppdrag</dt><dd>${escapeHtml(caseRecord.number)}</dd></div>`;
-  els.mentorMeetingReportDurationInput.value = String(durationMinutes);
+  renderMentorMeetingReportDurationChoices(durationMinutes);
   els.mentorMeetingReportOutcomeInput.value = outcome;
+  renderMentorMeetingReportTopics(caseRecord);
   els.mentorMeetingReportSummaryInput.value = meeting.summary || "";
   els.mentorMeetingReportNextContactInput.value = "";
   els.mentorMeetingReportNextContactInput.disabled = Boolean(nextMeeting);
@@ -6407,6 +6510,7 @@ function openMentorMeetingReport(interactionId) {
   els.mentorMeetingReportNextMeetingTime.textContent = nextMeeting ? formatDateTime(nextMeeting.startsAt) : "";
   els.mentorMeetingReportNextMeetingDetails.textContent = nextMeetingDetails;
   els.mentorMeetingReportNeedsSupportInput.checked = false;
+  updateMentorMeetingReportFormState();
   mentorMeetingReportModal ||= bootstrap.Modal.getOrCreateInstance(els.mentorMeetingReportModal);
   mentorMeetingReportModal.show();
   setTimeout(() => els.mentorMeetingReportOutcomeInput.focus(), 150);
@@ -6431,7 +6535,10 @@ function mentorMeetingHistoryMarkup(caseRecord) {
       : "";
     return `<li class="${pastDue ? "is-past-due" : ""}"><header><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><strong>${escapeHtml(meeting.title || "Möte med föräldern")}</strong></div><span class="badge ${interactionStatusBadge(meeting)}">${escapeHtml(interactionStatusLabel(meeting))}</span></header>${pastDue ? '<p class="mentor-meeting-past-due">Registrera om mötet genomfördes, ställdes in eller om någon uteblev.</p>' : ""}${facts ? `<p class="mentor-meeting-history-facts">${escapeHtml(facts)}</p>` : ""}${participants ? `<p class="mentor-meeting-history-facts">Deltagare: ${escapeHtml(participants)}</p>` : ""}<div class="mentor-meeting-history-note"><strong>Anteckning</strong><p>${escapeHtml(meeting.summary || "Ingen anteckning registrerad.")}</p></div>${meeting.nextStep ? `<div class="mentor-meeting-history-next"><strong>Nästa steg</strong><p>${escapeHtml(meeting.nextStep)}</p></div>` : ""}${communicationHistory.length ? `<details><summary>Kommunikation och ändringar (${communicationHistory.length})</summary><ol>${communicationHistory.map((item) => `<li><time datetime="${escapeHtml(item.occurredAt)}">${escapeHtml(formatDateTime(item.occurredAt))}</time><span>${escapeHtml(item.comment)}</span></li>`).join("")}</ol></details>` : ""}<footer><small>Senast registrerad ${escapeHtml(formatDateTime(meeting.updatedAt || meeting.createdAt))} av ${escapeHtml(actorNameById(meeting.updatedBy || meeting.createdBy))}</small>${reportAction}</footer></li>`;
   }).join("");
-  const olderReportItems = olderReports.map((report) => `<li class="mentor-report-history-item"><header><div><time datetime="${escapeHtml(report.occurredOn)}">${escapeHtml(formatDate(report.occurredOn))}</time><strong>Tidigare mötesrapport</strong></div><span class="badge text-bg-success">${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}</span></header><p class="mentor-meeting-history-facts">${escapeHtml(contactModeLabels[report.mode] || report.mode)} · ${escapeHtml(formatMinutes(report.durationMinutes))}</p><div class="mentor-meeting-history-note"><strong>Sammanfattning</strong><p>${escapeHtml(report.summary)}</p></div><footer><small>Inskickad ${escapeHtml(formatDateTime(report.createdAt))} av ${escapeHtml(mentorReportSubmittedBy(report))}</small><button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna rapport${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button></footer></li>`).join("");
+  const olderReportItems = olderReports.map((report) => {
+    const topics = mentorReportTopicLabels(report);
+    return `<li class="mentor-report-history-item"><header><div><time datetime="${escapeHtml(report.occurredOn)}">${escapeHtml(formatDate(report.occurredOn))}</time><strong>Tidigare mötesrapport</strong></div><span class="badge text-bg-success">${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}</span></header><p class="mentor-meeting-history-facts">${escapeHtml(contactModeLabels[report.mode] || report.mode)} · ${escapeHtml(formatMinutes(report.durationMinutes))}</p>${topics.length ? `<p class="mentor-meeting-history-facts">Områden: ${escapeHtml(topics.join(", "))}</p>` : ""}<div class="mentor-meeting-history-note"><strong>${report.note != null ? "Kompletterande anteckning" : "Sammanfattning"}</strong><p>${escapeHtml(report.note || report.summary || "Ingen anteckning registrerad.")}</p></div><footer><small>Inskickad ${escapeHtml(formatDateTime(report.createdAt))} av ${escapeHtml(mentorReportSubmittedBy(report))}</small><button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna rapport${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button></footer></li>`;
+  }).join("");
   return `<section class="mentor-meeting-history"><div><h3>Tidigare möten</h3><p>Genomförda möten och äldre rapporter med anteckningar och nästa steg.</p></div><ol>${meetingItems}${olderReportItems}</ol></section>`;
 }
 
@@ -6540,6 +6647,7 @@ function renderMentorReportDetail(report) {
     return;
   }
   const caseRecord = cases.find((item) => item.id === report.caseId);
+  const topicLabels = mentorReportTopicLabels(report);
   const supplements = [...(report.supplements || [])].sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
   const canSupplement = canSupplementMentorReport(report, caseRecord);
   els.mentorReportDetailTitle.textContent = `Rapport ${formatDate(report.occurredOn)}`;
@@ -6552,7 +6660,7 @@ function renderMentorReportDetail(report) {
       <div><dt>Resultat</dt><dd>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}</dd></div>
       <div><dt>Nästa kontakt</dt><dd>${report.nextContactOn ? escapeHtml(formatDate(report.nextContactOn)) : "Inte angiven"}</dd></div>
     </dl>
-    <section class="mentor-report-original"><h3>Ursprunglig sammanfattning</h3><p>${escapeHtml(report.summary)}</p>${report.needsHandlerSupport ? '<strong class="text-danger">Stöd från handläggaren efterfrågades.</strong>' : ""}</section>
+    <section class="mentor-report-original"><h3>Ursprunglig rapport</h3>${topicLabels.length ? `<p><strong>Områden:</strong> ${escapeHtml(topicLabels.join(", "))}</p>` : ""}<p>${escapeHtml(report.note || report.summary || "Ingen kompletterande anteckning registrerades.")}</p>${report.needsHandlerSupport ? '<strong class="text-danger">Stöd från handläggaren efterfrågades.</strong>' : ""}</section>
     <section class="mentor-report-supplements"><h3>Kompletteringar <span>${supplements.length}</span></h3>${supplements.length ? `<ol>${supplements.map((supplement) => `<li><div><strong>${escapeHtml(actorNameById(supplement.createdBy))}</strong><time datetime="${escapeHtml(supplement.createdAt)}">${escapeHtml(formatDateTime(supplement.createdAt))}</time></div><p>${escapeHtml(supplement.text)}</p></li>`).join("")}</ol>` : '<p class="text-secondary">Inga kompletteringar har lagts till.</p>'}
       ${canSupplement ? `<form id="mentorReportSupplementForm" data-report-id="${escapeHtml(report.id)}"><label class="form-label" for="mentorReportSupplementText">Kompletterande anteckning</label><textarea id="mentorReportSupplementText" name="text" class="form-control" rows="3" maxlength="2000" required></textarea><p class="form-text">Kompletteringen tidsstämplas. Den ursprungliga rapporten ändras inte.</p><button type="submit" class="btn btn-primary">Lägg till komplettering</button></form>` : `<p class="alert alert-secondary mb-0">${caseRecord?.status === "closed" ? "Uppdraget är avslutat och rapporten är låst." : "Du kan läsa rapporten men inte komplettera den."}</p>`}
     </section>`;
@@ -6581,6 +6689,7 @@ function renderMentorAssignment() {
     ${mentorMeetingReportQueueMarkup(caseRecord)}
     ${mentorMeetingScheduleMarkup(caseRecord)}
     ${mentorMeetingHistoryMarkup(caseRecord)}
+    ${mentorAssignmentMessagesMarkup(caseRecord, caseRecord.mentorId)}
     <div class="mentor-assignment-contact"><div><strong>Behöver du fråga något?</strong><span>Skriv till ${escapeHtml(owner?.name || "ansvarig handläggare")} om uppdraget.</span></div><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></div>
     <div class="card-body"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section></div></section>`;
 }
@@ -12304,8 +12413,8 @@ function renderTable() {
     row.className = [candidate.id === selectedId ? "active" : "", candidate.active === false ? "mentor-register-inactive" : ""].filter(Boolean).join(" ");
     row.dataset.mentorId = candidate.id;
     row.innerHTML = `
+      <td><strong>${escapeHtml(candidate.name)}</strong><small>${escapeHtml(candidate.languages)}</small></td>
       <td><span class="case-number-text">${escapeHtml(candidate.caseNumber)}</span><small>Skapad ${escapeHtml(formatDate(candidate.createdAt))}</small></td>
-      <td>${escapeHtml(candidate.name)}<small>${escapeHtml(candidate.languages)}</small></td>
       <td><div class="mentor-register-status"><span class="${statusClass(candidate)}">${escapeHtml(candidate.status)}</span>${candidate.active === false ? '<span class="badge rounded-pill text-bg-secondary">Inaktiv</span>' : ""}</div></td>
       <td>${escapeHtml(candidate.area)}</td>
       <td>${escapeHtml(candidate.coordinator || "Ej tilldelad")}</td>
@@ -14483,7 +14592,7 @@ function identityMethodLabel(method) {
 function informationStatusLabel(status) {
   return ({
     provided: "Information lämnad",
-    pending: "Information ska lämnas",
+    pending: "Mer information behövs",
     not_applicable: "Ej aktuell"
   })[status] || "Ej angivet";
 }
@@ -14785,10 +14894,25 @@ els.mentorMeetingReportForm.addEventListener("submit", async (event) => {
   const reportId = crypto.randomUUID();
   const actor = currentActorId();
   const occurredOn = calendarDateKey(new Date(meeting.startsAt));
-  const durationMinutes = Number(formData.get("durationMinutes"));
   const outcome = String(formData.get("outcome") || "completed");
-  const summary = String(formData.get("summary") || "").trim();
+  const durationMinutes = outcome === "completed" ? Number(formData.get("durationMinutes")) : 0;
+  const topicIds = outcome === "completed" ? normalizeSelectionIds(formData.getAll("mentorReportTopic")) : [];
+  const topicLabelById = new Map(mentorReportTopicOptions(caseRecord));
+  const topicLabels = topicIds.map((id) => topicLabelById.get(id) || id);
+  const note = String(formData.get("summary") || "").trim();
+  const summary = mentorReportSummaryText(topicLabels, note) || (outcome === "cancelled" ? "Mötet ställdes in." : "Mötet genomfördes inte.");
   const nextContactOn = String(formData.get("nextContactOn") || "") || null;
+  if (outcome === "completed" && !MENTOR_REPORT_DURATION_OPTIONS.includes(durationMinutes)) {
+    showFeedback("Välj hur länge mötet pågick.");
+    return;
+  }
+  if (outcome === "completed" && !topicIds.length) {
+    els.mentorMeetingReportTopicsHelp.textContent = "Välj minst ett område innan du sparar rapporten.";
+    els.mentorMeetingReportTopicsField.classList.add("has-error");
+    els.mentorMeetingReportTopics.querySelector("input")?.focus();
+    return;
+  }
+  els.mentorMeetingReportTopicsField.classList.remove("has-error");
   const retainedNextStep = meeting.nextStep && !/återrapportera/i.test(meeting.nextStep)
     ? meeting.nextStep
     : "Fortsätt enligt uppdragsplanen.";
@@ -14836,6 +14960,9 @@ els.mentorMeetingReportForm.addEventListener("submit", async (event) => {
           outcome,
           nextContactOn,
           summary,
+          note,
+          topicIds,
+          topicLabels,
           needsHandlerSupport: formData.get("needsHandlerSupport") === "on",
           reportedByMentorId: currentCase.mentorId,
           recordedBy: actor,
@@ -14859,6 +14986,25 @@ els.mentorMeetingReportForm.addEventListener("submit", async (event) => {
     els.mentorMeetingReportSubmitButton.disabled = false;
     els.mentorMeetingReportSubmitButton.textContent = "Spara återrapportering";
   }
+});
+
+els.mentorMeetingReportOutcomeInput.addEventListener("change", updateMentorMeetingReportFormState);
+
+els.mentorMeetingReportDurationChoices.addEventListener("click", (event) => {
+  const choice = event.target.closest("[data-mentor-report-duration]");
+  if (!choice) return;
+  els.mentorMeetingReportDurationInput.value = choice.dataset.mentorReportDuration;
+  els.mentorMeetingReportDurationChoices.querySelectorAll("[data-mentor-report-duration]").forEach((button) => {
+    const selected = button === choice;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+});
+
+els.mentorMeetingReportTopics.addEventListener("change", () => {
+  if (!els.mentorMeetingReportTopics.querySelector("input:checked")) return;
+  els.mentorMeetingReportTopicsField.classList.remove("has-error");
+  els.mentorMeetingReportTopicsHelp.textContent = "Valda områden följer med rapporten. Anteckningen nedan är valfri.";
 });
 
 els.mentorReportDetailModal.addEventListener("submit", async (event) => {
@@ -17908,10 +18054,10 @@ els.activityDetailForm.addEventListener("submit", async (event) => {
   if (closesCase) {
     const confirmation = await confirmAction({
       eyebrow: "Beslut i ärendet",
-      title: "Godkänn mentor och avsluta ärendet?",
-      body: "Mentorn registreras som godkänd och godkännandeärendet avslutas. Beslutet och tidpunkten registreras i ärendets logg.",
+      title: "Godkänn för mentoruppdrag?",
+      body: "Alla obligatoriska kontroller är klara. Mentorn blir tillgänglig för matchning, ärendet avslutas och beslutet registreras med användare och tidpunkt.",
       mentorName: caseMentor(caseRecord)?.name || "Ej personanknutet",
-      confirmLabel: "Godkänn och avsluta"
+      confirmLabel: "Godkänn för mentoruppdrag"
     });
     if (!confirmation.confirmed) return;
   }

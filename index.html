@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260823-next-meeting-v139">
+    <link rel="stylesheet" href="styles.css?v=20260823-mentor-work-v140">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -575,7 +575,7 @@
                   <dl class="record-fields record-fields-edit mb-0">
                     <div><dt><label for="parentNameInput">Namn</label></dt><dd><input id="parentNameInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
                     <div><dt><label for="parentContactInput">Kontaktuppgift</label></dt><dd><input id="parentContactInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
-                    <div><dt><label for="parentInformationStatusInput">Informationsstatus</label></dt><dd><select id="parentInformationStatusInput" class="form-select form-select-sm" required><option value="">Välj status</option><option value="provided">Information lämnad</option><option value="pending">Information ska lämnas</option><option value="not_applicable">Ej aktuell</option></select></dd></div>
+                    <div><dt><label for="parentInformationStatusInput">Informationsstatus</label></dt><dd><select id="parentInformationStatusInput" class="form-select form-select-sm" required><option value="">Välj status</option><option value="provided">Information lämnad</option><option value="pending">Mer information behövs</option><option value="not_applicable">Ej aktuell</option></select></dd></div>
                     <div><dt><label for="parentAreaInput">Område <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="parentAreaInput" class="form-control form-control-sm"></dd></div>
                     <div><dt><label for="parentLanguagesInput">Språk <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="parentLanguagesInput" class="form-control form-control-sm"></dd></div>
                     <div><dt><label for="parentAvailabilityInput">Tillgänglighet <span class="text-secondary fw-normal">(valfritt)</span></label></dt><dd><input id="parentAvailabilityInput" class="form-control form-control-sm"></dd></div>
@@ -1374,8 +1374,8 @@
                 <table class="table table-sm table-hover align-middle mb-0 case-table">
                   <thead class="table-light">
                     <tr>
-                      <th>Ärende</th>
                       <th>Person</th>
+                      <th>Ärende</th>
                       <th>Status</th>
                       <th>Område</th>
                       <th>Handläggare</th>
@@ -1997,7 +1997,7 @@
                         <div><dt><label for="editNameInput">Namn</label></dt><dd><input id="editNameInput" class="form-control form-control-sm" required autocomplete="off"></dd></div>
                         <div><dt><label for="editPersonalNumberInput">Personnummer</label></dt><dd><input id="editPersonalNumberInput" class="form-control form-control-sm" disabled></dd></div>
                         <div><dt><label for="editContactDetailsInput">Kontaktuppgift</label></dt><dd><input id="editContactDetailsInput" class="form-control form-control-sm" autocomplete="off" placeholder="Telefon eller e-post"></dd></div>
-                        <div><dt><label for="editInformationStatusInput">Informationsstatus</label></dt><dd><select id="editInformationStatusInput" class="form-select form-select-sm"><option value="">Välj status</option><option value="provided">Information lämnad</option><option value="pending">Information ska lämnas</option><option value="not_applicable">Ej aktuell</option></select></dd></div>
+                        <div><dt><label for="editInformationStatusInput">Informationsstatus</label></dt><dd><select id="editInformationStatusInput" class="form-select form-select-sm"><option value="">Välj status</option><option value="provided">Information lämnad</option><option value="pending">Mer information behövs</option><option value="not_applicable">Ej aktuell</option></select></dd></div>
                         <div><dt><label for="editInterestNoteInput">Intresseanteckning</label></dt><dd><textarea id="editInterestNoteInput" class="form-control form-control-sm" rows="2" placeholder="Kort notering om intresset"></textarea></dd></div>
                         <div><dt>Geografiska områden <span class="text-secondary fw-normal">(valfritt)</span></dt><dd><div id="mentorGeographicAreasEdit" class="structured-option-grid"></div></dd></div>
                         <div><dt>Språk <span class="text-secondary fw-normal">(valfritt)</span></dt><dd><div id="mentorLanguagesEdit" class="structured-option-grid"></div></dd></div>
@@ -2590,8 +2590,9 @@
               <dl id="mentorMeetingReportFacts" class="mentor-report-detail-facts mb-4"></dl>
               <div class="mentor-report-form">
                 <div><label class="form-label" for="mentorMeetingReportOutcomeInput">Resultat</label><select id="mentorMeetingReportOutcomeInput" name="outcome" class="form-select"><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div>
-                <div><label class="form-label" for="mentorMeetingReportDurationInput">Faktisk tid i minuter</label><input id="mentorMeetingReportDurationInput" name="durationMinutes" class="form-control" type="number" min="1" required></div>
-                <div class="mentor-report-summary"><label class="form-label" for="mentorMeetingReportSummaryInput">Kort sammanfattning</label><textarea id="mentorMeetingReportSummaryInput" name="summary" class="form-control" rows="4" required></textarea><p class="form-text">Beskriv kort vad som hände och vad ni kom överens om.</p></div>
+                <fieldset id="mentorMeetingReportDurationField" class="mentor-report-duration"><legend class="form-label">Faktisk tid</legend><div id="mentorMeetingReportDurationChoices" class="mentor-report-duration-choices" aria-label="Faktisk tid i minuter"></div><input id="mentorMeetingReportDurationInput" name="durationMinutes" type="hidden" required></fieldset>
+                <fieldset id="mentorMeetingReportTopicsField" class="mentor-report-topics"><legend class="form-label">Vad handlade mötet om?</legend><div id="mentorMeetingReportTopics" class="mentor-report-topic-list"></div><p id="mentorMeetingReportTopicsHelp" class="form-text">Välj minst ett område. Det gör rapporten lättare att följa upp utan onödig fritext.</p></fieldset>
+                <div class="mentor-report-summary"><label id="mentorMeetingReportSummaryLabel" class="form-label" for="mentorMeetingReportSummaryInput">Kompletterande anteckning <span class="text-secondary fw-normal">(valfritt)</span></label><textarea id="mentorMeetingReportSummaryInput" name="summary" class="form-control" rows="3"></textarea><p id="mentorMeetingReportSummaryHelp" class="form-text">Skriv bara sådant som behövs utöver valda områden och undvik känsliga personuppgifter.</p></div>
                 <div id="mentorMeetingReportNextMeeting" class="mentor-report-next-meeting" hidden><span class="record-type">Nästa möte är inbokat</span><strong id="mentorMeetingReportNextMeetingTime"></strong><span id="mentorMeetingReportNextMeetingDetails" class="text-secondary"></span></div>
                 <div id="mentorMeetingReportNextContactField"><label class="form-label" for="mentorMeetingReportNextContactInput">Planera nästa kontakt <span class="text-secondary fw-normal">(valfritt)</span></label><input id="mentorMeetingReportNextContactInput" name="nextContactOn" class="form-control" type="date"><p class="form-text">Ange ett datum bara om nästa möte ännu inte är bokat.</p></div>
                 <div class="form-check mentor-report-support"><input id="mentorMeetingReportNeedsSupportInput" name="needsHandlerSupport" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorMeetingReportNeedsSupportInput">Jag behöver stöd från handläggaren</label></div>
@@ -2638,6 +2639,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260823-next-meeting-v139"></script>
+    <script type="module" src="app.js?v=20260823-mentor-work-v140"></script>
   </body>
 </html>
