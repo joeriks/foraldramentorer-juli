@@ -5,12 +5,13 @@ import { readFile } from "node:fs/promises";
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
 test("prototype data uses the current scenario version and real handler ids", () => {
-  assert.match(source, /const EXAMPLE_DATA_VERSION = 12;/);
+  assert.match(source, /const EXAMPLE_DATA_VERSION = 13;/);
   assert.match(source, /function exampleTime\(base, hours\)/);
   assert.match(source, /coordinatorId: assignedHandler\?\.id \|\| ""/);
   assert.match(source, /exampleDataVersion: EXAMPLE_DATA_VERSION/);
   assert.match(source, /Mentorn kompletterade den inskickade rapporten/);
   assert.match(source, /reportedByMentorId: mentor\.id, recordedBy: mentor\.id/);
+  assert.match(source, /interactionId: reportedMeetingInteractionId/);
   assert.match(source, /version: "82"/);
 });
 
@@ -31,6 +32,7 @@ test("prototype workflows contain auditable activity evidence", () => {
   assert.match(source, /Tiden flyttades efter överenskommelse med föräldern/);
   assert.match(source, /Påminnelse registrerades dagen före mötet/);
   assert.match(source, /Ett bokat möte har passerat utan registrerat utfall/);
+  assert.match(source, /Ett genomfört möte väntar på mentorrapport/);
   assert.match(source, /Följ upp hur vardagsrutinen har fungerat/);
   assert.match(source, /mentor_report_registered/);
   assert.match(source, /parent_checkin_registered/);

@@ -218,6 +218,21 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "133",
+    date: "2026-08-23",
+    title: "Återrapportering från mötet",
+    flow: "Tidigare möte -> återrapportera mötet -> registrerat utfall och rapport",
+    simplified: "Det öppna rapportformuläret har tagits bort från uppdraget. Mentorn återrapporterar i stället det möte som kontakten gäller och får mötesuppgifterna förifyllda.",
+    retained: "Tidigare rapporter, spårbara kompletteringar, stödbehov och handläggarens uppföljning finns kvar.",
+    changes: [
+      "Passerade möten utan rapport visar åtgärden Återrapportera mötet.",
+      "Datum, mötestid och kontaktform hämtas från mötet och behöver inte anges på nytt.",
+      "Rapportens resultat uppdaterar mötets utfall till genomfört, inställt eller uteblivet.",
+      "Redan rapporterade möten länkar direkt till rapportens detaljvy.",
+      "Prototypens exempelrapport är kopplad till sitt genomförda möte."
+    ]
+  },
+  {
     version: "132",
     date: "2026-08-23",
     title: "Förälderns kontaktuppgifter i mentoruppdraget",
@@ -1708,6 +1723,7 @@ let communicationDirectionFilter = "";
 let candidateModal;
 let communicationComposerModal;
 let mentorPlanningModal;
+let mentorMeetingReportModal;
 let meetingReminderSchedulerRunning = false;
 let meetingReminderTimerId = null;
 let currentView = "dashboard";
@@ -1786,6 +1802,16 @@ const els = {
   mentorInstallIntro: document.querySelector("#mentorInstallIntro"),
   mentorInstallInstructions: document.querySelector("#mentorInstallInstructions"),
   mentorReportDetailModal: document.querySelector("#mentorReportDetailModal"),
+  mentorMeetingReportModal: document.querySelector("#mentorMeetingReportModal"),
+  mentorMeetingReportForm: document.querySelector("#mentorMeetingReportForm"),
+  mentorMeetingReportTitle: document.querySelector("#mentorMeetingReportTitle"),
+  mentorMeetingReportFacts: document.querySelector("#mentorMeetingReportFacts"),
+  mentorMeetingReportDurationInput: document.querySelector("#mentorMeetingReportDurationInput"),
+  mentorMeetingReportOutcomeInput: document.querySelector("#mentorMeetingReportOutcomeInput"),
+  mentorMeetingReportSummaryInput: document.querySelector("#mentorMeetingReportSummaryInput"),
+  mentorMeetingReportNextContactInput: document.querySelector("#mentorMeetingReportNextContactInput"),
+  mentorMeetingReportNeedsSupportInput: document.querySelector("#mentorMeetingReportNeedsSupportInput"),
+  mentorMeetingReportSubmitButton: document.querySelector("#mentorMeetingReportSubmitButton"),
   mentorReportDetailTitle: document.querySelector("#mentorReportDetailTitle"),
   mentorReportDetailBody: document.querySelector("#mentorReportDetailBody"),
   navDashboard: document.querySelector("#navDashboard"),
@@ -3946,7 +3972,7 @@ function exampleTemplates(count) {
   });
 }
 
-const EXAMPLE_DATA_VERSION = 12;
+const EXAMPLE_DATA_VERSION = 13;
 
 function exampleTime(base, hours) {
   return new Date(new Date(base).getTime() + (hours * 60 * 60 * 1000)).toISOString();
@@ -4557,6 +4583,8 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       };
       records[CASES_STORE].push(assignmentCase);
       addAssignment(assignmentCaseId, ownerId);
+      let reportedMeetingId = null;
+      let reportedMeetingInteractionId = null;
       {
         const meetingMode = parentIndex % 2 ? "digital" : "physical";
         plannedMeetingStarts({ firstStartsAt: assignmentCase.details.assignmentPlan.firstMeetingAt, frequency: "weekly", count: 4 }).forEach((meetingStartsAt, scheduleIndex) => {
@@ -4598,6 +4626,8 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
         const historyEndsAt = exampleTime(historyStartsAt, 1.5);
         const historyMeetingId = crypto.randomUUID();
         const historyInteractionId = crypto.randomUUID();
+        reportedMeetingId = historyMeetingId;
+        reportedMeetingInteractionId = historyInteractionId;
         const historyParticipants = suggestedInteractionParticipants({ parent, mentor, handler: seedHandlers.find((handler) => handler.id === ownerId) });
         const historySummary = concern
           ? "Föräldern och mentorn beskrev att kontakten behöver pausas. Handläggaren tar ställning till hur uppdraget ska fortsätta."
@@ -4629,6 +4659,33 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
           ...historyShared, id: historyInteractionId, kind: "meeting", status: "completed", direction: "not_applicable",
           sourceType: "case_meeting", sourceId: historyMeetingId
         });
+        if (mentor.name === "Omar Rahimi") {
+          const pendingReportStartsAt = exampleTime(now, -48);
+          const pendingReportEndsAt = exampleTime(pendingReportStartsAt, 1);
+          const pendingReportMeetingId = crypto.randomUUID();
+          const pendingReportInteractionId = crypto.randomUUID();
+          const pendingReportShared = {
+            ...historyShared,
+            title: `Planerat möte med ${parent.name}`,
+            startsAt: pendingReportStartsAt,
+            endsAt: pendingReportEndsAt,
+            communicationHistory: [],
+            summary: "Mötet genomfördes enligt den planerade tiden.",
+            nextStep: "Mentorn återrapporterar mötet till handläggaren.",
+            scheduleSource: "example_pending_report",
+            createdAt: pendingReportEndsAt,
+            updatedAt: pendingReportEndsAt
+          };
+          records[CASE_MEETINGS_STORE].push({
+            ...pendingReportShared, id: pendingReportMeetingId, interactionId: pendingReportInteractionId,
+            meetingStatus: "completed", occurredAt: pendingReportStartsAt
+          });
+          records[INTERACTIONS_STORE].push({
+            ...pendingReportShared, id: pendingReportInteractionId, kind: "meeting", status: "completed",
+            direction: "not_applicable", sourceType: "case_meeting", sourceId: pendingReportMeetingId
+          });
+          addEvent(assignmentCaseId, "mentor_report_due", "Ett genomfört möte väntar på mentorrapport");
+        }
         if (concern) {
           const overdueStartsAt = exampleTime(now, -48);
           const overdueEndsAt = exampleTime(overdueStartsAt, 1);
@@ -4688,7 +4745,8 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
       addEvent(assignmentCaseId, "assignment_created_from_matching", `Uppdraget ${assignmentNumber} skapades från ${matchingNumber}`);
       records[MENTOR_REPORTS_STORE].push({
         id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId,
-        activityId: reportActivity?.id || null, mentorId: mentor.id, occurredOn: today,
+        activityId: reportActivity?.id || null, meetingId: reportedMeetingId, interactionId: reportedMeetingInteractionId,
+        mentorId: mentor.id, occurredOn: calendarDateKey(new Date(records[INTERACTIONS_STORE].find((item) => item.id === reportedMeetingInteractionId)?.startsAt || now)),
         durationMinutes: concern ? 45 : 90, mode: parentIndex % 2 ? "digital" : "physical",
         outcome: "completed", nextContactOn: null,
         summary: concern
@@ -6139,6 +6197,47 @@ function mentorMeetingScheduleMarkup(caseRecord) {
   }).join("")}</ol>` : '<p class="text-secondary mb-0">Inga kommande möten finns i uppdragsplanen.</p>'}</section>`;
 }
 
+function mentorReportForMeeting(caseRecord, meeting) {
+  const meetingDate = calendarDateKey(new Date(meeting.startsAt));
+  return assignmentRecords(caseRecord.id).reports.find((report) => report.interactionId === meeting.id
+    || (!report.interactionId && report.occurredOn === meetingDate && report.mode === meeting.mode)) || null;
+}
+
+function openMentorMeetingReport(interactionId) {
+  const meeting = allInteractions().find((item) => item.id === interactionId && item.kind === "meeting");
+  const caseRecord = mentorAssignments().find((assignment) => assignment.id === meeting?.caseId);
+  if (!meeting || !caseRecord || caseRecord.status === "closed") {
+    showFeedback("Mötet kan inte återrapporteras från det här uppdraget.");
+    return;
+  }
+  const existingReport = mentorReportForMeeting(caseRecord, meeting);
+  if (existingReport) {
+    openMentorReportDetail(existingReport.id);
+    return;
+  }
+  if (meeting.status === "scheduled" && interactionTimingState(meeting) !== "past_due") {
+    showFeedback("Mötet kan återrapporteras när mötestiden har passerat.");
+    return;
+  }
+  const durationMinutes = meeting.startsAt && meeting.endsAt
+    ? Math.max(1, Math.round((new Date(meeting.endsAt) - new Date(meeting.startsAt)) / 60000))
+    : 60;
+  const outcome = ["completed", "cancelled", "no_show"].includes(meeting.status) ? meeting.status : "completed";
+  els.mentorMeetingReportForm.reset();
+  els.mentorMeetingReportForm.dataset.caseId = caseRecord.id;
+  els.mentorMeetingReportForm.dataset.interactionId = meeting.id;
+  els.mentorMeetingReportTitle.textContent = meeting.title || "Möte med föräldern";
+  els.mentorMeetingReportFacts.innerHTML = `<div><dt>Datum och tid</dt><dd>${escapeHtml(formatDateTime(meeting.startsAt))}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[meeting.mode] || meeting.mode || "Ej angivet")}</dd></div><div><dt>Förälder</dt><dd>${escapeHtml(caseParent(caseRecord)?.name || "Ej angivet")}</dd></div><div><dt>Uppdrag</dt><dd>${escapeHtml(caseRecord.number)}</dd></div>`;
+  els.mentorMeetingReportDurationInput.value = String(durationMinutes);
+  els.mentorMeetingReportOutcomeInput.value = outcome;
+  els.mentorMeetingReportSummaryInput.value = meeting.summary || "";
+  els.mentorMeetingReportNextContactInput.value = "";
+  els.mentorMeetingReportNeedsSupportInput.checked = false;
+  mentorMeetingReportModal ||= bootstrap.Modal.getOrCreateInstance(els.mentorMeetingReportModal);
+  mentorMeetingReportModal.show();
+  setTimeout(() => els.mentorMeetingReportOutcomeInput.focus(), 150);
+}
+
 function mentorMeetingHistoryMarkup(caseRecord) {
   const now = Date.now();
   const records = allInteractions()
@@ -6154,7 +6253,13 @@ function mentorMeetingHistoryMarkup(caseRecord) {
     const facts = [mentorMeetingModeLabels[meeting.mode] || meeting.mode, meeting.location, durationMinutes ? formatMinutes(durationMinutes) : ""].filter(Boolean).join(" · ");
     const communicationHistory = meeting.communicationHistory || [];
     const pastDue = interactionTimingState(meeting) === "past_due";
-    return `<li class="${pastDue ? "is-past-due" : ""}"><header><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><strong>${escapeHtml(meeting.title || "Möte med föräldern")}</strong></div><span class="badge ${interactionStatusBadge(meeting)}">${escapeHtml(interactionStatusLabel(meeting))}</span></header>${pastDue ? '<p class="mentor-meeting-past-due">Registrera om mötet genomfördes, ställdes in eller om någon uteblev.</p>' : ""}${facts ? `<p class="mentor-meeting-history-facts">${escapeHtml(facts)}</p>` : ""}${participants ? `<p class="mentor-meeting-history-facts">Deltagare: ${escapeHtml(participants)}</p>` : ""}<div class="mentor-meeting-history-note"><strong>Anteckning</strong><p>${escapeHtml(meeting.summary || "Ingen anteckning registrerad.")}</p></div>${meeting.nextStep ? `<div class="mentor-meeting-history-next"><strong>Nästa steg</strong><p>${escapeHtml(meeting.nextStep)}</p></div>` : ""}${communicationHistory.length ? `<details><summary>Kommunikation och ändringar (${communicationHistory.length})</summary><ol>${communicationHistory.map((item) => `<li><time datetime="${escapeHtml(item.occurredAt)}">${escapeHtml(formatDateTime(item.occurredAt))}</time><span>${escapeHtml(item.comment)}</span></li>`).join("")}</ol></details>` : ""}<small>Senast registrerad ${escapeHtml(formatDateTime(meeting.updatedAt || meeting.createdAt))} av ${escapeHtml(actorNameById(meeting.updatedBy || meeting.createdBy))}</small></li>`;
+    const report = mentorReportForMeeting(caseRecord, meeting);
+    const reportAction = report
+      ? `<button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna rapport${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button>`
+      : caseRecord.status !== "closed"
+        ? `<button type="button" class="btn ${pastDue ? "btn-primary" : "btn-outline-primary"} btn-sm" data-mentor-report-meeting="${escapeHtml(meeting.id)}">Återrapportera mötet</button>`
+        : "";
+    return `<li class="${pastDue ? "is-past-due" : ""}"><header><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><strong>${escapeHtml(meeting.title || "Möte med föräldern")}</strong></div><span class="badge ${interactionStatusBadge(meeting)}">${escapeHtml(interactionStatusLabel(meeting))}</span></header>${pastDue ? '<p class="mentor-meeting-past-due">Registrera om mötet genomfördes, ställdes in eller om någon uteblev.</p>' : ""}${facts ? `<p class="mentor-meeting-history-facts">${escapeHtml(facts)}</p>` : ""}${participants ? `<p class="mentor-meeting-history-facts">Deltagare: ${escapeHtml(participants)}</p>` : ""}<div class="mentor-meeting-history-note"><strong>Anteckning</strong><p>${escapeHtml(meeting.summary || "Ingen anteckning registrerad.")}</p></div>${meeting.nextStep ? `<div class="mentor-meeting-history-next"><strong>Nästa steg</strong><p>${escapeHtml(meeting.nextStep)}</p></div>` : ""}${communicationHistory.length ? `<details><summary>Kommunikation och ändringar (${communicationHistory.length})</summary><ol>${communicationHistory.map((item) => `<li><time datetime="${escapeHtml(item.occurredAt)}">${escapeHtml(formatDateTime(item.occurredAt))}</time><span>${escapeHtml(item.comment)}</span></li>`).join("")}</ol></details>` : ""}<footer><small>Senast registrerad ${escapeHtml(formatDateTime(meeting.updatedAt || meeting.createdAt))} av ${escapeHtml(actorNameById(meeting.updatedBy || meeting.createdBy))}</small>${reportAction}</footer></li>`;
   }).join("")}</ol></section>`;
 }
 
@@ -6302,7 +6407,6 @@ function renderMentorAssignment() {
           : { className: "", label: "Nästa föräldraavstämning", value: "Inte planerad", help: "" };
   const parent = caseParent(caseRecord);
   const owner = responsibleHandler(caseRecord);
-  const closed = caseRecord.status === "closed";
   els.mentorPortalView.innerHTML = `<section class="card mentor-assignment-card"><div class="card-header record-header bg-white"><a class="small" href="#/mentor-assignments">Tillbaka till mina uppdrag</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">Mentoruppdrag · ${escapeHtml(caseRecord.number)}</div><h2 class="h5 mb-1">${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</h2><p class="text-secondary mb-0">${escapeHtml(caseRecord.details?.desiredOutcome || caseRecord.description || "")}</p></div><span class="${caseStatusBadge(caseRecord.status)} align-self-start">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></div><dl class="record-meta mt-3 mb-0"><div><dt>Förälder</dt><dd>${escapeHtml(parent?.name || "Ej angivet")}</dd></div><div><dt>Ansvarig handläggare</dt><dd>${escapeHtml(owner?.name || "Ej tilldelad")}</dd></div><div><dt>Period</dt><dd>${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}</dd></div></dl></div>
     <div class="mentor-assignment-next-panel">${mentorAssignmentNextMarkup(caseRecord)}</div>
     ${mentorParentContactMarkup(parent, owner)}
@@ -6310,8 +6414,7 @@ function renderMentorAssignment() {
     ${mentorMeetingHistoryMarkup(caseRecord)}
     <div class="mentor-assignment-contact"><div><strong>Behöver du fråga något?</strong><span>Skriv till ${escapeHtml(owner?.name || "ansvarig handläggare")} om uppdraget.</span></div><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></div>
     <div class="card-body record-grid"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div class="${followUpFact.className}"><dt>${escapeHtml(followUpFact.label)}</dt><dd>${escapeHtml(followUpFact.value)}</dd>${followUpFact.help ? `<small>${escapeHtml(followUpFact.help)}</small>` : ""}</div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section>
-    <section class="record-section"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h3 class="record-section-title mb-1">Återrapportera kontakt</h3><p class="small text-secondary mb-0">Registrera en kort saklig rapport efter varje planerad kontakt.</p></div></div>${closed ? '<div class="alert alert-secondary mt-3 mb-0">Uppdraget är avslutat och tar inte emot nya rapporter.</div>' : `<form id="mentorPortalReportForm" class="mentor-report-form mt-3" data-case-id="${escapeHtml(caseRecord.id)}"><div><label class="form-label" for="mentorPortalReportDate">Datum</label><input id="mentorPortalReportDate" name="occurredOn" class="form-control" type="date" value="${new Date().toISOString().slice(0, 10)}" required></div><div><label class="form-label" for="mentorPortalReportDuration">Tid i minuter</label><input id="mentorPortalReportDuration" name="durationMinutes" class="form-control" type="number" min="1" value="60" required></div><div><label class="form-label" for="mentorPortalReportMode">Kontaktform</label><select id="mentorPortalReportMode" name="mode" class="form-select"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option><option value="message">Meddelande</option></select></div><div><label class="form-label" for="mentorPortalReportOutcome">Resultat</label><select id="mentorPortalReportOutcome" name="outcome" class="form-select"><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div><div class="mentor-report-summary"><label class="form-label" for="mentorPortalReportSummary">Kort sammanfattning</label><textarea id="mentorPortalReportSummary" name="summary" class="form-control" rows="3" required></textarea></div><div><label class="form-label" for="mentorPortalNextContact">Nästa kontakt (valfritt)</label><input id="mentorPortalNextContact" name="nextContactOn" class="form-control" type="date"></div><div class="form-check mentor-report-support"><input id="mentorPortalNeedsSupport" name="needsHandlerSupport" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorPortalNeedsSupport">Jag behöver stöd från handläggaren</label></div><div class="mentor-report-actions"><button class="btn btn-primary" type="submit">Skicka rapport</button></div></form>`}</section>
-    <section class="record-section record-section-wide"><h3 class="record-section-title">Tidigare rapporter</h3><div class="table-responsive border rounded"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Kontaktdatum</th><th>Kontaktform</th><th>Tid</th><th>Resultat</th><th>Sammanfattning</th><th>Inskickad</th><th></th></tr></thead><tbody>${reports.map((report) => `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<small class="d-block text-danger">Stöd begärt</small>' : ""}</td><td>${escapeHtml(report.summary)}</td><td>${mentorReportSubmittedMarkup(report)}</td><td><button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button></td></tr>`).join("") || '<tr><td colspan="7" class="text-center text-secondary py-3">Ingen rapport har registrerats ännu.</td></tr>'}</tbody></table></div></section></div></section>`;
+    <section class="record-section record-section-wide"><h3 class="record-section-title mb-1">Rapporterade möten</h3><p class="small text-secondary">En ny rapport skapas från mötet under Tidigare möten ovan.</p><div class="table-responsive border rounded"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Mötesdatum</th><th>Kontaktform</th><th>Tid</th><th>Resultat</th><th>Sammanfattning</th><th>Inskickad</th><th></th></tr></thead><tbody>${reports.map((report) => `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<small class="d-block text-danger">Stöd begärt</small>' : ""}</td><td>${escapeHtml(report.summary)}</td><td>${mentorReportSubmittedMarkup(report)}</td><td><button type="button" class="btn btn-outline-primary btn-sm" data-open-mentor-report="${escapeHtml(report.id)}">Öppna${report.supplements?.length ? ` (${report.supplements.length})` : ""}</button></td></tr>`).join("") || '<tr><td colspan="7" class="text-center text-secondary py-3">Inget möte har återrapporterats ännu.</td></tr>'}</tbody></table></div></section></div></section>`;
 }
 
 const mentorMeetingModeLabels = { physical: "Fysiskt", digital: "Digitalt", phone: "Telefon" };
@@ -14218,6 +14321,11 @@ els.testUserTypeSelect.addEventListener("change", () => {
 });
 
 els.mentorPortalView.addEventListener("click", async (event) => {
+  const reportMeetingButton = event.target.closest("[data-mentor-report-meeting]");
+  if (reportMeetingButton) {
+    openMentorMeetingReport(reportMeetingButton.dataset.mentorReportMeeting);
+    return;
+  }
   const editMeetingButton = event.target.closest("[data-mentor-edit-meeting]");
   if (editMeetingButton) {
     openMentorPlanning(editMeetingButton.dataset.mentorEditMeeting);
@@ -14375,48 +14483,103 @@ els.mentorPortalView.addEventListener("submit", async (event) => {
     }
     return;
   }
-  const form = event.target.closest("#mentorPortalReportForm");
-  if (!form) return;
+});
+
+els.mentorMeetingReportForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const form = event.currentTarget;
   const caseRecord = mentorAssignments().find((assignment) => assignment.id === form.dataset.caseId);
-  if (!caseRecord || caseRecord.status === "closed") return;
+  const meeting = allInteractions().find((item) => item.id === form.dataset.interactionId && item.kind === "meeting");
+  const existingMeeting = meeting?.sourceType === "case_meeting"
+    ? caseMeetings.find((item) => item.id === meeting.sourceId)
+    : null;
+  if (!caseRecord || caseRecord.status === "closed" || !meeting || !existingMeeting) {
+    showFeedback("Mötet kunde inte återrapporteras. Läs in sidan igen.");
+    return;
+  }
+  if (mentorReportForMeeting(caseRecord, meeting)) {
+    mentorMeetingReportModal?.hide();
+    showFeedback("Mötet har redan en rapport.");
+    return;
+  }
   const formData = new FormData(form);
   const reportId = crypto.randomUUID();
   const actor = currentActorId();
-  const occurredOn = String(formData.get("occurredOn") || "");
-  await executeCaseCommand({
-    commandType: "register_mentor_self_report",
-    caseId: caseRecord.id,
-    expectedVersion: caseRecord.version,
-    payload: { reportId, occurredOn },
-    additionalStores: [MENTOR_REPORTS_STORE],
-    mutate: ({ currentCase, now, put, event: recordEvent }) => {
-      put(MENTOR_REPORTS_STORE, {
-        id: reportId,
-        tenantId: DEFAULT_TENANT_ID,
-        caseId: currentCase.id,
-        mentorId: currentCase.mentorId,
-        occurredOn,
-        durationMinutes: Number(formData.get("durationMinutes")),
-        mode: String(formData.get("mode") || "physical"),
-        outcome: String(formData.get("outcome") || "completed"),
-        nextContactOn: String(formData.get("nextContactOn") || "") || null,
-        summary: String(formData.get("summary") || "").trim(),
-        needsHandlerSupport: formData.get("needsHandlerSupport") === "on",
-        reportedByMentorId: currentCase.mentorId,
-        recordedBy: actor,
-        createdAt: now,
-        createdBy: actor
-      });
-      const updated = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: actor };
-      put(CASES_STORE, updated);
-      recordEvent("mentor_self_report_registered", "mentor_report", reportId, `Mentorn återrapporterade kontakt ${occurredOn}`);
-      return { caseId: currentCase.id, version: updated.version };
-    }
-  });
-  markSaved();
-  showFeedback("Rapporten har skickats till handläggaren.");
-  await refresh();
+  const occurredOn = calendarDateKey(new Date(meeting.startsAt));
+  const durationMinutes = Number(formData.get("durationMinutes"));
+  const outcome = String(formData.get("outcome") || "completed");
+  const summary = String(formData.get("summary") || "").trim();
+  const nextContactOn = String(formData.get("nextContactOn") || "") || null;
+  const retainedNextStep = meeting.nextStep && !/återrapportera/i.test(meeting.nextStep)
+    ? meeting.nextStep
+    : "Fortsätt enligt uppdragsplanen.";
+  els.mentorMeetingReportSubmitButton.disabled = true;
+  els.mentorMeetingReportSubmitButton.textContent = "Skickar...";
+  try {
+    const meetingResult = await registerCaseMeetingCommand({
+      caseRecord,
+      existing: existingMeeting,
+      meetingType: existingMeeting.meetingType || "follow_up",
+      meetingStatus: outcome,
+      confirmationStatus: meeting.confirmationStatus,
+      occurredAt: meeting.startsAt,
+      endsAt: new Date(new Date(meeting.startsAt).getTime() + durationMinutes * 60 * 1000).toISOString(),
+      mode: meeting.mode,
+      activityId: meeting.activityId,
+      title: meeting.title,
+      location: meeting.location,
+      invitationText: meeting.invitationText,
+      communicationHistory: meeting.communicationHistory,
+      participants: meeting.participants,
+      reminder: { enabled: false, offsetMinutes: meeting.reminder?.offsetMinutes || 1440 },
+      organizerId: meeting.organizerId,
+      summary,
+      nextStep: nextContactOn ? `Nästa kontakt planerad ${formatDate(nextContactOn)}.` : retainedNextStep,
+      rescheduledFromInteractionId: meeting.rescheduledFromInteractionId
+    });
+    await executeCaseCommand({
+      commandType: "register_mentor_self_report",
+      caseId: caseRecord.id,
+      expectedVersion: null,
+      payload: { reportId, meetingId: meetingResult.meetingId, interactionId: meeting.id, occurredOn },
+      additionalStores: [MENTOR_REPORTS_STORE],
+      mutate: ({ currentCase, now, put, event: recordEvent }) => {
+        put(MENTOR_REPORTS_STORE, {
+          id: reportId,
+          tenantId: DEFAULT_TENANT_ID,
+          caseId: currentCase.id,
+          meetingId: meetingResult.meetingId,
+          interactionId: meeting.id,
+          mentorId: currentCase.mentorId,
+          occurredOn,
+          durationMinutes,
+          mode: meeting.mode || "physical",
+          outcome,
+          nextContactOn,
+          summary,
+          needsHandlerSupport: formData.get("needsHandlerSupport") === "on",
+          reportedByMentorId: currentCase.mentorId,
+          recordedBy: actor,
+          createdAt: now,
+          createdBy: actor
+        });
+        const updated = { ...currentCase, version: currentCase.version + 1, updatedAt: now, updatedBy: actor };
+        put(CASES_STORE, updated);
+        recordEvent("mentor_self_report_registered", "mentor_report", reportId, `Mentorn återrapporterade mötet ${occurredOn}`);
+        return { caseId: currentCase.id, version: updated.version };
+      }
+    });
+    mentorMeetingReportModal.hide();
+    markSaved();
+    showFeedback("Mötet har återrapporterats till handläggaren.");
+    await refresh();
+  } catch (error) {
+    console.error("Kunde inte återrapportera mötet", error);
+    showFeedback(error?.message || "Mötet kunde inte återrapporteras.");
+  } finally {
+    els.mentorMeetingReportSubmitButton.disabled = false;
+    els.mentorMeetingReportSubmitButton.textContent = "Skicka rapport";
+  }
 });
 
 els.mentorReportDetailModal.addEventListener("submit", async (event) => {

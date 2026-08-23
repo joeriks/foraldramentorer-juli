@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
     <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260823-parent-contact-v132">
+    <link rel="stylesheet" href="styles.css?v=20260823-meeting-report-v133">
   </head>
   <body class="bg-body-tertiary">
     <div class="app-shell">
@@ -2578,6 +2578,30 @@
       </div>
     </div>
 
+    <div class="modal fade" id="mentorMeetingReportModal" tabindex="-1" aria-labelledby="mentorMeetingReportTitle" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content mentor-meeting-report-modal">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow mb-1">Återrapportera möte</p><h2 id="mentorMeetingReportTitle" class="modal-title h5">Möte med föräldern</h2></div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button>
+          </div>
+          <form id="mentorMeetingReportForm">
+            <div class="modal-body">
+              <dl id="mentorMeetingReportFacts" class="mentor-report-detail-facts mb-4"></dl>
+              <div class="mentor-report-form">
+                <div><label class="form-label" for="mentorMeetingReportOutcomeInput">Resultat</label><select id="mentorMeetingReportOutcomeInput" name="outcome" class="form-select"><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div>
+                <div><label class="form-label" for="mentorMeetingReportDurationInput">Faktisk tid i minuter</label><input id="mentorMeetingReportDurationInput" name="durationMinutes" class="form-control" type="number" min="1" required></div>
+                <div class="mentor-report-summary"><label class="form-label" for="mentorMeetingReportSummaryInput">Kort sammanfattning</label><textarea id="mentorMeetingReportSummaryInput" name="summary" class="form-control" rows="4" required></textarea><p class="form-text">Beskriv kort vad som hände och vad ni kom överens om.</p></div>
+                <div><label class="form-label" for="mentorMeetingReportNextContactInput">Nästa kontakt <span class="text-secondary fw-normal">(valfritt)</span></label><input id="mentorMeetingReportNextContactInput" name="nextContactOn" class="form-control" type="date"></div>
+                <div class="form-check mentor-report-support"><input id="mentorMeetingReportNeedsSupportInput" name="needsHandlerSupport" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorMeetingReportNeedsSupportInput">Jag behöver stöd från handläggaren</label></div>
+              </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Avbryt</button><button id="mentorMeetingReportSubmitButton" type="submit" class="btn btn-primary">Skicka rapport</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="mentorReportDetailModal" tabindex="-1" aria-labelledby="mentorReportDetailTitle" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
         <div class="modal-content mentor-report-detail-modal">
@@ -2613,6 +2637,6 @@
     </div>
 
     <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20260823-parent-contact-v132"></script>
+    <script type="module" src="app.js?v=20260823-meeting-report-v133"></script>
   </body>
 </html>

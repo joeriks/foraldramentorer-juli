@@ -1220,9 +1220,21 @@ body.is-system-administration .sidebar-menu-group {
 
 .mentor-meeting-history header time,
 .mentor-meeting-history-facts,
-.mentor-meeting-history > ol > li > small {
+.mentor-meeting-history > ol > li > small,
+.mentor-meeting-history footer small {
   color: var(--app-text-muted);
   font-size: 0.8125rem;
+}
+
+.mentor-meeting-history footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--app-space-2);
+  margin-top: var(--app-space-3);
+  padding-top: var(--app-space-2);
+  border-top: 1px solid var(--app-border-soft);
 }
 
 .mentor-meeting-history-facts {
