@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
 
 test("prototype data uses the current scenario version and real handler ids", () => {
-  assert.match(source, /const EXAMPLE_DATA_VERSION = 9;/);
+  assert.match(source, /const EXAMPLE_DATA_VERSION = 10;/);
   assert.match(source, /function exampleTime\(base, hours\)/);
   assert.match(source, /coordinatorId: assignedHandler\?\.id \|\| ""/);
   assert.match(source, /exampleDataVersion: EXAMPLE_DATA_VERSION/);
@@ -27,6 +27,8 @@ test("prototype workflows contain auditable activity evidence", () => {
   assert.match(source, /mentorMeetingPlanningAllowed: !concern/);
   assert.match(source, /Fyra möten planerades/);
   assert.match(source, /Tiden flyttades efter överenskommelse med föräldern/);
+  assert.match(source, /Påminnelse registrerades dagen före mötet/);
+  assert.match(source, /Följ upp hur vardagsrutinen har fungerat/);
   assert.match(source, /mentor_report_registered/);
   assert.match(source, /parent_checkin_registered/);
   assert.match(source, /compensation_period_created/);

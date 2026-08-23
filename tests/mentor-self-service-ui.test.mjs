@@ -31,7 +31,12 @@ test("shows the assignment meeting series and limits mentor actions by the assig
   assert.match(app, /data-mentor-edit-meeting/);
   assert.match(app, /data-mentor-cancel-meeting/);
   assert.match(app, /Mötet har ställts in och finns kvar i historiken/);
+  assert.match(app, /function mentorMeetingHistoryMarkup/);
+  assert.match(app, /Tidigare möten/);
+  assert.match(app, /Kommunikation och ändringar/);
+  assert.match(app, /Ingen anteckning registrerad/);
   assert.match(styles, /\.mentor-meeting-schedule/);
+  assert.match(styles, /\.mentor-meeting-history/);
 });
 
 test("persists an immutable audit event and a new matching profile version atomically", () => {

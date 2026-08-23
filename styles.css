@@ -272,6 +272,49 @@
   margin: 0.35rem 0 0;
 }
 
+.interaction-history-note {
+  margin-top: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border-left: 3px solid var(--app-border-strong);
+  background: var(--app-surface-muted);
+}
+
+.interaction-history-note > strong {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.interaction-history-note p {
+  color: var(--app-text);
+}
+
+.interaction-history-details {
+  margin-top: 0.4rem;
+}
+
+.interaction-history-details summary {
+  color: var(--app-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.interaction-history-details ol {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0 0;
+}
+
+.interaction-history-details li {
+  font-size: 0.875rem;
+}
+
+.interaction-history-details time {
+  display: block;
+  color: var(--app-text-muted);
+  font-size: 0.75rem;
+}
+
 .interaction-next-label {
   font-size: 0.75rem;
   font-weight: 700;
@@ -1085,6 +1128,104 @@ body.is-system-administration .sidebar-menu-group {
 .mentor-meeting-actions {
   display: flex;
   gap: var(--app-space-2);
+}
+
+.mentor-meeting-history {
+  padding: var(--app-space-4);
+  border-bottom: 1px solid var(--app-border);
+  background: #fbfcfc;
+}
+
+.mentor-meeting-history > div > h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.mentor-meeting-history > div > p {
+  margin: 0.2rem 0 var(--app-space-3);
+  color: var(--app-text-muted);
+  font-size: 0.875rem;
+}
+
+.mentor-meeting-history > ol {
+  display: grid;
+  gap: var(--app-space-3);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.mentor-meeting-history > ol > li {
+  min-width: 0;
+  padding: var(--app-space-3);
+  border: 1px solid var(--app-border);
+  background: #fff;
+}
+
+.mentor-meeting-history header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--app-space-3);
+}
+
+.mentor-meeting-history header time,
+.mentor-meeting-history header strong {
+  display: block;
+}
+
+.mentor-meeting-history header time,
+.mentor-meeting-history-facts,
+.mentor-meeting-history > ol > li > small {
+  color: var(--app-text-muted);
+  font-size: 0.8125rem;
+}
+
+.mentor-meeting-history-facts {
+  margin: 0.35rem 0 0;
+}
+
+.mentor-meeting-history-note,
+.mentor-meeting-history-next {
+  margin-top: var(--app-space-3);
+}
+
+.mentor-meeting-history-note > strong,
+.mentor-meeting-history-next > strong {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.mentor-meeting-history-note p,
+.mentor-meeting-history-next p {
+  margin: 0.15rem 0 0;
+}
+
+.mentor-meeting-history details {
+  margin: var(--app-space-3) 0;
+}
+
+.mentor-meeting-history details summary {
+  color: var(--app-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.mentor-meeting-history details ol {
+  display: grid;
+  gap: 0.4rem;
+  padding-left: 1.25rem;
+  margin: 0.6rem 0 0;
+}
+
+.mentor-meeting-history details li {
+  font-size: 0.8125rem;
+}
+
+.mentor-meeting-history details time {
+  display: block;
+  color: var(--app-text-muted);
+  font-size: 0.75rem;
 }
 
 .mentor-home-assignment-actions {
@@ -2208,6 +2349,10 @@ body.is-system-administration .sidebar-menu-group {
   }
 
   body.is-mentor-portal .mentor-meeting-schedule {
+    padding: var(--app-space-3);
+  }
+
+  body.is-mentor-portal .mentor-meeting-history {
     padding: var(--app-space-3);
   }
 

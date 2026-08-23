@@ -214,6 +214,20 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "128",
+    date: "2026-08-23",
+    title: "Informativ historik för tidigare möten",
+    flow: "Mentoruppdrag eller ärende -> tidigare möten -> anteckning och detaljer",
+    simplified: "Tidigare möten visar nu den information som behövs för att förstå vad som hände och vad som bestämdes, utan att användaren först behöver öppna varje registrering.",
+    retained: "Planerade möten, mötesregistret, kommunikationshistoriken och den fullständiga mötesregistreringen använder fortsatt samma poster.",
+    changes: [
+      "Genomförda och inställda möten visas separat från kommande möten i mentoruppdraget.",
+      "Anteckning, nästa steg, mötesform, plats och deltagare visas i historiken.",
+      "Kommunikationshändelser kan öppnas under respektive tidigare möte.",
+      "Prototypdatat innehåller genomförda möten med realistiska anteckningar och historik."
+    ]
+  },
+  {
     version: "127",
     date: "2026-08-23",
     title: "Planerade möten i mentoruppdraget",
@@ -3866,7 +3880,7 @@ function exampleTemplates(count) {
   });
 }
 
-const EXAMPLE_DATA_VERSION = 9;
+const EXAMPLE_DATA_VERSION = 10;
 
 function exampleTime(base, hours) {
   return new Date(new Date(base).getTime() + (hours * 60 * 60 * 1000)).toISOString();
@@ -4501,7 +4515,43 @@ function buildExampleParentWorkflows(exampleCandidates, count) {
           });
           records[INTERACTIONS_STORE].push({ ...shared, id: interactionId, kind: "meeting", status: "scheduled", direction: "not_applicable", sourceType: "case_meeting", sourceId: meetingId });
         });
+        const historyStartsAt = exampleTime(now, -24 * 7);
+        const historyEndsAt = exampleTime(historyStartsAt, 1.5);
+        const historyMeetingId = crypto.randomUUID();
+        const historyInteractionId = crypto.randomUUID();
+        const historyParticipants = suggestedInteractionParticipants({ parent, mentor, handler: seedHandlers.find((handler) => handler.id === ownerId) });
+        const historySummary = concern
+          ? "Föräldern och mentorn beskrev att kontakten behöver pausas. Handläggaren tar ställning till hur uppdraget ska fortsätta."
+          : "Mötet genomfördes enligt planen. Föräldern vill fortsätta arbeta med den överenskomna vardagsrutinen till nästa träff.";
+        const historyNextStep = concern
+          ? "Invänta handläggarens bedömning innan nästa kontakt."
+          : "Följ upp hur vardagsrutinen har fungerat vid nästa planerade möte.";
+        const historyCommunication = [{
+          id: crypto.randomUUID(), type: "reminder_sent", comment: "Påminnelse registrerades dagen före mötet.",
+          occurredAt: exampleTime(historyStartsAt, -24), createdAt: exampleTime(historyStartsAt, -24), createdBy: ownerId
+        }];
+        const historyShared = {
+          tenantId: DEFAULT_TENANT_ID, caseId: assignmentCaseId, activityId: null,
+          organizerId: ownerId, confirmationStatus: "confirmed", participants: historyParticipants,
+          title: `Uppföljande möte med ${parent.name}`, startsAt: historyStartsAt, endsAt: historyEndsAt,
+          mode: meetingMode, location: meetingMode === "digital" ? "Digitalt möte" : "Stadsbiblioteket",
+          invitationText: "Uppföljning av uppdragets mål och nästa steg.", reminder: { enabled: false, offsetMinutes: 1440 },
+          communicationHistory: historyCommunication, summary: historySummary, nextStep: historyNextStep,
+          scheduleSource: "example_history", scheduleIndex: null, version: 1,
+          createdAt: historyEndsAt, createdBy: mentor.id, updatedAt: historyEndsAt, updatedBy: mentor.id,
+          exampleData: true, exampleDataVersion: EXAMPLE_DATA_VERSION
+        };
+        records[CASE_MEETINGS_STORE].push({
+          ...historyShared, id: historyMeetingId, interactionId: historyInteractionId, meetingType: "follow_up",
+          meetingStatus: "completed", occurredAt: historyStartsAt, participantHandlerIds: [ownerId], externalParticipantNames: [],
+          supersedesMeetingId: null, supersededByMeetingId: null
+        });
+        records[INTERACTIONS_STORE].push({
+          ...historyShared, id: historyInteractionId, kind: "meeting", status: "completed", direction: "not_applicable",
+          sourceType: "case_meeting", sourceId: historyMeetingId
+        });
         addEvent(assignmentCaseId, "assignment_meetings_planned", `Fyra möten planerades ${assignmentCase.details.assignmentPlan.mentorMeetingPlanningAllowed ? "med möjlighet för mentorn att ändra tider" : "med ändringar hanterade av handläggaren"}`);
+        addEvent(assignmentCaseId, "meeting_registered", `Tidigare möte dokumenterades: ${historySummary}`);
       }
       const assignmentActivities = addActivities(assignmentCaseId, assignmentType, {
         completed: concern
@@ -5957,6 +6007,24 @@ function mentorMeetingScheduleMarkup(caseRecord) {
   }).join("")}</ol>` : '<p class="text-secondary mb-0">Inga kommande möten finns i uppdragsplanen.</p>'}</section>`;
 }
 
+function mentorMeetingHistoryMarkup(caseRecord) {
+  const now = Date.now();
+  const records = allInteractions()
+    .filter((item) => item.caseId === caseRecord.id
+      && item.kind === "meeting"
+      && item.startsAt
+      && (new Date(item.startsAt).getTime() < now || ["completed", "no_show"].includes(item.status)))
+    .sort((left, right) => new Date(right.startsAt) - new Date(left.startsAt));
+  if (!records.length) return `<section class="mentor-meeting-history"><div><h3>Tidigare möten</h3><p>Genomförda, inställda och passerade möten visas här.</p></div><p class="text-secondary mb-0">Inga tidigare möten är registrerade.</p></section>`;
+  return `<section class="mentor-meeting-history"><div><h3>Tidigare möten</h3><p>Anteckningar och överenskomna nästa steg finns kvar med mötet.</p></div><ol>${records.map((meeting) => {
+    const participants = meeting.participants.map((participant) => participant.displayName).filter(Boolean).join(", ");
+    const durationMinutes = meeting.startsAt && meeting.endsAt ? Math.max(0, Math.round((new Date(meeting.endsAt) - new Date(meeting.startsAt)) / 60000)) : 0;
+    const facts = [mentorMeetingModeLabels[meeting.mode] || meeting.mode, meeting.location, durationMinutes ? formatMinutes(durationMinutes) : ""].filter(Boolean).join(" · ");
+    const communicationHistory = meeting.communicationHistory || [];
+    return `<li><header><div><time datetime="${escapeHtml(meeting.startsAt)}">${escapeHtml(formatDateTime(meeting.startsAt))}</time><strong>${escapeHtml(meeting.title || "Möte med föräldern")}</strong></div><span class="badge ${interactionStatusBadge(meeting.status)}">${escapeHtml(INTERACTION_STATUS_LABELS[meeting.status] || meeting.status)}</span></header>${facts ? `<p class="mentor-meeting-history-facts">${escapeHtml(facts)}</p>` : ""}${participants ? `<p class="mentor-meeting-history-facts">Deltagare: ${escapeHtml(participants)}</p>` : ""}<div class="mentor-meeting-history-note"><strong>Anteckning</strong><p>${escapeHtml(meeting.summary || "Ingen anteckning registrerad.")}</p></div>${meeting.nextStep ? `<div class="mentor-meeting-history-next"><strong>Nästa steg</strong><p>${escapeHtml(meeting.nextStep)}</p></div>` : ""}${communicationHistory.length ? `<details><summary>Kommunikation och ändringar (${communicationHistory.length})</summary><ol>${communicationHistory.map((item) => `<li><time datetime="${escapeHtml(item.occurredAt)}">${escapeHtml(formatDateTime(item.occurredAt))}</time><span>${escapeHtml(item.comment)}</span></li>`).join("")}</ol></details>` : ""}<small>Senast registrerad ${escapeHtml(formatDateTime(meeting.updatedAt || meeting.createdAt))} av ${escapeHtml(actorNameById(meeting.updatedBy || meeting.createdBy))}</small></li>`;
+  }).join("")}</ol></section>`;
+}
+
 function renderMentorHome() {
   const mentor = currentMentorUser();
   if (!mentor) {
@@ -6046,6 +6114,7 @@ function renderMentorAssignment() {
   els.mentorPortalView.innerHTML = `<section class="card mentor-assignment-card"><div class="card-header record-header bg-white"><a class="small" href="#/mentor-assignments">Tillbaka till mina uppdrag</a><div class="d-flex flex-wrap justify-content-between gap-3 mt-3"><div><div class="record-type">Mentoruppdrag · ${escapeHtml(caseRecord.number)}</div><h2 class="h5 mb-1">${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</h2><p class="text-secondary mb-0">${escapeHtml(caseRecord.details?.desiredOutcome || caseRecord.description || "")}</p></div><span class="${caseStatusBadge(caseRecord.status)} align-self-start">${escapeHtml(caseStatusLabel(caseRecord.status))}</span></div><dl class="record-meta mt-3 mb-0"><div><dt>Förälder</dt><dd>${escapeHtml(parent?.name || "Ej angivet")}</dd></div><div><dt>Ansvarig handläggare</dt><dd>${escapeHtml(owner?.name || "Ej tilldelad")}</dd></div><div><dt>Period</dt><dd>${plan.startDate ? escapeHtml(formatDate(plan.startDate)) : "Ej angivet"} – ${plan.endDate ? escapeHtml(formatDate(plan.endDate)) : "Tills vidare"}</dd></div></dl></div>
     <div class="mentor-assignment-next-panel">${mentorAssignmentNextMarkup(caseRecord)}</div>
     ${mentorMeetingScheduleMarkup(caseRecord)}
+    ${mentorMeetingHistoryMarkup(caseRecord)}
     <div class="mentor-assignment-contact"><div><strong>Behöver du fråga något?</strong><span>Skriv till ${escapeHtml(owner?.name || "ansvarig handläggare")} om uppdraget.</span></div><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}" ${owner ? "" : "disabled"}>Skriv meddelande</button></div>
     <div class="card-body record-grid"><section class="record-section"><h3 class="record-section-title">Uppdragsplan</h3><dl class="mentor-plan-facts"><div><dt>Kontakt</dt><dd>${escapeHtml(assignmentFrequencyLabels[plan.contactFrequency] || "Ej angivet")}</dd></div><div><dt>Kontaktform</dt><dd>${escapeHtml(contactModeLabels[plan.contactMode] || "Ej angivet")}</dd></div><div><dt>Nästa uppföljning</dt><dd>${plan.firstFollowUpDate ? escapeHtml(formatDate(plan.firstFollowUpDate)) : "Ej angivet"}</dd></div><div><dt>Rapportering</dt><dd>Senast ${Number(plan.reportDeadlineDays ?? 3)} dagar efter kontakt</dd></div></dl>${plan.note ? `<div class="mentor-instruction"><strong>Viktigt i uppdraget</strong><p>${escapeHtml(plan.note)}</p></div>` : ""}</section>
     <section class="record-section"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h3 class="record-section-title mb-1">Återrapportera kontakt</h3><p class="small text-secondary mb-0">Registrera en kort saklig rapport efter varje planerad kontakt.</p></div></div>${closed ? '<div class="alert alert-secondary mt-3 mb-0">Uppdraget är avslutat och tar inte emot nya rapporter.</div>' : `<form id="mentorPortalReportForm" class="mentor-report-form mt-3" data-case-id="${escapeHtml(caseRecord.id)}"><div><label class="form-label" for="mentorPortalReportDate">Datum</label><input id="mentorPortalReportDate" name="occurredOn" class="form-control" type="date" value="${new Date().toISOString().slice(0, 10)}" required></div><div><label class="form-label" for="mentorPortalReportDuration">Tid i minuter</label><input id="mentorPortalReportDuration" name="durationMinutes" class="form-control" type="number" min="1" value="60" required></div><div><label class="form-label" for="mentorPortalReportMode">Kontaktform</label><select id="mentorPortalReportMode" name="mode" class="form-select"><option value="physical">Fysiskt möte</option><option value="digital">Digitalt möte</option><option value="phone">Telefon</option><option value="message">Meddelande</option></select></div><div><label class="form-label" for="mentorPortalReportOutcome">Resultat</label><select id="mentorPortalReportOutcome" name="outcome" class="form-select"><option value="completed">Genomförd</option><option value="cancelled">Inställd</option><option value="no_show">Uteblev</option></select></div><div class="mentor-report-summary"><label class="form-label" for="mentorPortalReportSummary">Kort sammanfattning</label><textarea id="mentorPortalReportSummary" name="summary" class="form-control" rows="3" required></textarea></div><div><label class="form-label" for="mentorPortalNextContact">Nästa kontakt (valfritt)</label><input id="mentorPortalNextContact" name="nextContactOn" class="form-control" type="date"></div><div class="form-check mentor-report-support"><input id="mentorPortalNeedsSupport" name="needsHandlerSupport" class="form-check-input" type="checkbox"><label class="form-check-label" for="mentorPortalNeedsSupport">Jag behöver stöd från handläggaren</label></div><div class="mentor-report-actions"><button class="btn btn-primary" type="submit">Skicka rapport</button></div></form>`}</section>
@@ -6805,6 +6874,42 @@ async function ensureAssignmentMeetingSchedules() {
       createdCount += 1;
     }
 
+    const hasExampleHistory = interactions.some((item) => item.caseId === caseRecord.id && item.kind === "meeting" && item.status === "completed");
+    if (caseRecord.exampleData && !hasExampleHistory) {
+      const historyStarts = new Date(now);
+      historyStarts.setDate(historyStarts.getDate() - 7);
+      historyStarts.setHours(17, 0, 0, 0);
+      const pair = assignmentMeetingPair({
+        caseRecord: { ...caseRecord, details: { ...(caseRecord.details || {}), assignmentPlan: nextPlan } },
+        startsAt: historyStarts.toISOString(), scheduleIndex: -1, now: nowIso, actorId: caseRecord.mentorId || "system"
+      });
+      const historyEndsAt = new Date(historyStarts.getTime() + 90 * 60000).toISOString();
+      const historySummary = "Mötet genomfördes enligt planen. Föräldern vill fortsätta arbeta med den överenskomna vardagsrutinen till nästa träff.";
+      const historyNextStep = "Följ upp hur vardagsrutinen har fungerat vid nästa planerade möte.";
+      const communicationHistory = [{
+        id: crypto.randomUUID(), type: "reminder_sent", comment: "Påminnelse registrerades dagen före mötet.",
+        occurredAt: new Date(historyStarts.getTime() - 24 * 60 * 60000).toISOString(), createdAt: new Date(historyStarts.getTime() - 24 * 60 * 60000).toISOString(), createdBy: caseRecord.updatedBy || "system"
+      }];
+      meetingWrites.push({
+        ...pair.meeting, meetingStatus: "completed", title: `Uppföljande möte med ${caseParent(caseRecord)?.name || "föräldern"}`,
+        endsAt: historyEndsAt, location: pair.meeting.mode === "digital" ? "Digitalt möte" : "Stadsbiblioteket",
+        communicationHistory, summary: historySummary, nextStep: historyNextStep, scheduleSource: "example_history", scheduleIndex: null,
+        createdAt: historyEndsAt, createdBy: caseRecord.mentorId || "system", updatedAt: historyEndsAt, updatedBy: caseRecord.mentorId || "system"
+      });
+      interactionWrites.push(normalizeInteraction({
+        ...pair.interaction, status: "completed", title: `Uppföljande möte med ${caseParent(caseRecord)?.name || "föräldern"}`,
+        endsAt: historyEndsAt, location: pair.interaction.mode === "digital" ? "Digitalt möte" : "Stadsbiblioteket",
+        communicationHistory, summary: historySummary, nextStep: historyNextStep, scheduleSource: "example_history", scheduleIndex: null,
+        createdAt: historyEndsAt, createdBy: caseRecord.mentorId || "system", updatedAt: historyEndsAt, updatedBy: caseRecord.mentorId || "system"
+      }));
+      eventWrites.push({
+        id: crypto.randomUUID(), tenantId: DEFAULT_TENANT_ID, caseId: caseRecord.id,
+        eventType: "meeting_registered", schemaVersion: 1, entityType: "meeting", entityId: pair.meeting.id,
+        actorId: caseRecord.mentorId || "system", occurredAt: historyEndsAt, correlationId: crypto.randomUUID(), idempotencyKey: crypto.randomUUID(),
+        payload: { message: `Tidigare möte dokumenterades: ${historySummary}` }
+      });
+    }
+
     if (planChanged || createdCount) {
       caseWrites.push({
         ...caseRecord,
@@ -6856,6 +6961,14 @@ function interactionTimelineItemMarkup(interaction, { next = false } = {}) {
   const participants = interaction.participants.map((participant) => participant.displayName).filter(Boolean).join(", ");
   const kind = INTERACTION_KIND_LABELS[interaction.kind] || "Kontakt";
   const status = INTERACTION_STATUS_LABELS[interaction.status] || interaction.status;
+  const historical = interaction.status !== "scheduled" || new Date(interaction.startsAt).getTime() < Date.now();
+  const durationMinutes = interaction.endsAt && interaction.startsAt
+    ? Math.max(0, Math.round((new Date(interaction.endsAt) - new Date(interaction.startsAt)) / 60000))
+    : 0;
+  const meetingFacts = interaction.kind === "meeting"
+    ? [mentorMeetingModeLabels[interaction.mode] || interaction.mode, interaction.location, durationMinutes ? formatMinutes(durationMinutes) : ""].filter(Boolean).join(" · ")
+    : "";
+  const communicationHistory = interaction.communicationHistory || [];
   const rescheduleButton = ["cancelled", "no_show"].includes(interaction.status)
     ? `<button type="button" class="btn btn-outline-primary btn-sm" data-reschedule-interaction="${escapeHtml(interaction.id)}">Boka ny tid</button>`
     : "";
@@ -6864,9 +6977,12 @@ function interactionTimelineItemMarkup(interaction, { next = false } = {}) {
     <div class="interaction-timeline-content">
       <div class="d-flex flex-wrap gap-2 align-items-center"><strong>${escapeHtml(interaction.title || kind)}</strong><span class="badge ${interactionStatusBadge(interaction.status)}">${escapeHtml(status)}</span>${next ? '<span class="interaction-next-label">Nästa planerade</span>' : ""}</div>
       ${caseRecord ? `<a class="small" href="#/case/${escapeHtml(caseRecord.id)}">${escapeHtml(caseRecord.number)} · ${escapeHtml(caseRecord.type)}</a>` : '<small class="text-secondary">Fristående kontakt</small>'}
+      ${meetingFacts ? `<small>${escapeHtml(meetingFacts)}</small>` : ""}
       ${participants ? `<small>Deltagare: ${escapeHtml(participants)}</small>` : ""}
-      ${interaction.summary ? `<p>${escapeHtml(interaction.summary)}</p>` : ""}
+      ${historical ? `<div class="interaction-history-note"><strong>Anteckning</strong><p>${escapeHtml(interaction.summary || "Ingen anteckning registrerad.")}</p></div>` : interaction.summary ? `<p>${escapeHtml(interaction.summary)}</p>` : ""}
       ${interaction.nextStep ? `<small class="interaction-next-step"><strong>Nästa steg:</strong> ${escapeHtml(interaction.nextStep)}</small>` : ""}
+      ${historical && communicationHistory.length ? `<details class="interaction-history-details"><summary>Kommunikation och ändringar (${communicationHistory.length})</summary><ol>${communicationHistory.map((item) => `<li><time datetime="${escapeHtml(item.occurredAt)}">${escapeHtml(formatDateTime(item.occurredAt))}</time><span>${escapeHtml(item.comment)}</span></li>`).join("")}</ol></details>` : ""}
+      ${historical && interaction.updatedAt ? `<small>Senast registrerad ${escapeHtml(formatDateTime(interaction.updatedAt))} av ${escapeHtml(actorNameById(interaction.updatedBy || interaction.createdBy))}</small>` : ""}
       ${interaction.rescheduledFromInteractionId ? '<small class="text-secondary">Ny bokning efter ett tidigare inställt eller uteblivet möte.</small>' : ""}
     </div>
     <div class="interaction-timeline-actions"><button type="button" class="btn btn-outline-secondary btn-sm" data-open-interaction="${escapeHtml(interaction.id)}">Öppna</button>${rescheduleButton}</div>
