@@ -63,10 +63,13 @@ test("keeps the profile editor within the mobile document width", () => {
 test("gives the mentor portal a direct and compact mobile flow", () => {
   assert.match(app, /classList\.toggle\("is-mentor-portal", isMentorSession\(\)\)/);
   const homeRenderer = app.match(/function renderMentorHome\(\)[\s\S]*?\n}\n\nfunction renderMentorMessages/)?.[0] || "";
+  const nextRenderer = app.match(/function mentorAssignmentNextMarkup\(caseRecord\)[\s\S]*?\n}\n/)?.[0] || "";
   assert.match(homeRenderer, /Ditt uppdrag/);
   assert.match(homeRenderer, /Öppna uppdraget/);
   assert.match(homeRenderer, /Skriv till handläggaren/);
   assert.match(homeRenderer, /mentorAssignmentNextMarkup\(caseRecord\)/);
+  assert.match(homeRenderer, /const primaryAction = reportDueMeeting[\s\S]*Återrapportera mötet[\s\S]*Öppna uppdraget/);
+  assert.doesNotMatch(nextRenderer, /data-mentor-report-meeting|data-mentor-edit-meeting|class="btn/);
   assert.match(app, /Nästa möte med föräldern/);
   assert.match(app, /interactionTimingState\(item\) === "past_due"/);
   assert.match(app, /Behöver följas upp/);

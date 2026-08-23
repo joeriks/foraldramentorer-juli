@@ -219,6 +219,21 @@ const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
   {
+    version: "136",
+    date: "2026-08-23",
+    title: "Färre genvägar i mentorportalen",
+    flow: "Mentoröversikt -> öppna uppdrag -> arbeta med möten, rapporter eller meddelanden",
+    simplified: "Varje uppdrag på översikten visar nu bara den viktigaste åtgärden. Dubbla knappar för återrapportering och mötesändring har tagits bort.",
+    retained: "Rapportering, mötesändringar och interna meddelanden finns kvar i sina tydliga sammanhang inne i uppdraget och under Meddelanden.",
+    changes: [
+      "Översikten visar en situationsstyrd huvudknapp per uppdrag.",
+      "Ett möte som väntar på rapport får Återrapportera mötet som enda huvudåtgärd.",
+      "Övriga uppdrag får Öppna uppdraget som enda huvudåtgärd.",
+      "Den dubbla återrapporteringsknappen överst i uppdraget har tagits bort.",
+      "Ändra möte visas bara vid det planerade möte som ska ändras."
+    ]
+  },
+  {
     version: "135",
     date: "2026-08-23",
     title: "Interna meddelanden mellan mentor och handläggare",
@@ -6258,7 +6273,7 @@ function mentorAssignmentNextMarkup(caseRecord) {
     ${reportDueMeeting ? `<div class="is-past-due"><dt>Möte att återrapportera</dt><dd>${escapeHtml(formatDateTime(reportDueMeeting.startsAt))}</dd><small>Registrera vad som hände och om något behöver följas upp.</small></div>` : pastDueMeeting ? `<div class="is-past-due"><dt>Behöver följas upp</dt><dd>Mötet ${escapeHtml(formatDateTime(pastDueMeeting.startsAt))} saknar registrerat utfall</dd><small>Öppna uppdraget och registrera om mötet genomfördes, ställdes in eller om någon uteblev.</small></div>` : ""}
     <div><dt>Nästa möte med föräldern</dt><dd>${nextMeeting ? escapeHtml(formatDateTime(nextMeeting.startsAt)) : "Inget möte inbokat"}</dd>${meetingDetails ? `<small>${escapeHtml(meetingDetails)}</small>` : !nextMeeting && nextContact ? `<small>Kontakt planerad ${escapeHtml(formatDate(nextContact))}, men ingen mötestid är bokad.</small>` : ""}</div>
     <div><dt>Det här gör du härnäst</dt><dd>${escapeHtml(nextAction)}</dd></div>
-  </dl><div class="mentor-assignment-next-actions">${reportDueMeeting ? `<button type="button" class="btn btn-primary btn-sm" data-mentor-report-meeting="${escapeHtml(reportDueMeeting.id)}">Återrapportera mötet</button>` : ""}${nextMeeting && mentorCanPlanContacts(caseRecord) ? `<button type="button" class="btn btn-outline-primary btn-sm mentor-plan-contact-button" data-mentor-edit-meeting="${escapeHtml(nextMeeting.id)}">Ändra mötet</button>` : ""}</div>`;
+  </dl>`;
 }
 
 function mentorMeetingScheduleMarkup(caseRecord) {
@@ -6378,7 +6393,11 @@ function renderMentorHome() {
     <div class="mentor-home-grid">
       <section class="card mentor-home-assignments"><div class="card-header bg-white"><h3 class="h5 mb-1">${assignmentHeading}</h3><p class="text-secondary mb-0 mentor-home-help">Öppna ett uppdrag för att se planen eller rapportera en genomförd kontakt.</p></div><div class="mentor-home-assignment-list">${activeAssignments.slice(0, 3).map((caseRecord) => {
         const parent = caseParent(caseRecord);
-        return `<article class="mentor-home-assignment-item"><div class="mentor-home-assignment-copy"><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><p>${escapeHtml(parent?.name || "Förälder")} · ${escapeHtml(caseStatusLabel(caseRecord.status))}</p>${mentorAssignmentNextMarkup(caseRecord)}</div><div class="mentor-home-assignment-actions"><a class="btn btn-primary btn-sm" href="#/mentor-assignment/${escapeHtml(caseRecord.id)}">Öppna uppdraget</a><button type="button" class="btn btn-outline-primary btn-sm" data-mentor-message-case="${escapeHtml(caseRecord.id)}">Skriv till handläggaren</button></div></article>`;
+        const reportDueMeeting = mentorAssignmentNextOverview(caseRecord).reportDueMeeting;
+        const primaryAction = reportDueMeeting
+          ? `<button type="button" class="btn btn-primary btn-sm" data-mentor-report-meeting="${escapeHtml(reportDueMeeting.id)}">Återrapportera mötet</button>`
+          : `<a class="btn btn-primary btn-sm" href="#/mentor-assignment/${escapeHtml(caseRecord.id)}">Öppna uppdraget</a>`;
+        return `<article class="mentor-home-assignment-item"><div class="mentor-home-assignment-copy"><strong>${escapeHtml(caseRecord.details?.supportPurpose || caseRecord.title)}</strong><p>${escapeHtml(parent?.name || "Förälder")} · ${escapeHtml(caseStatusLabel(caseRecord.status))}</p>${mentorAssignmentNextMarkup(caseRecord)}</div><div class="mentor-home-assignment-actions">${primaryAction}</div></article>`;
       }).join("") || '<div class="card-body"><p class="text-secondary mb-2">När ett uppdrag startar visas det här.</p><a href="#/learning">Fortsätt med utbildningen under tiden</a></div>'}</div>${assignments.length > activeAssignments.slice(0, 3).length ? '<div class="card-footer bg-white"><a href="#/mentor-assignments">Visa alla uppdrag</a></div>' : ""}</section>
       <div class="mentor-home-side">
         <section class="card mentor-home-learning"><div class="card-header bg-white"><h3 class="h5 mb-1">Din utbildning</h3></div><div class="card-body"><p class="mentor-progress-value"><strong>${learning.completed}</strong> av ${learning.courses.length} kurser slutförda</p><div class="progress mb-3" role="progressbar" aria-label="Genomförda kurser" aria-valuenow="${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${learning.courses.length ? Math.round(learning.completed / learning.courses.length * 100) : 0}%"></div></div><a class="btn btn-outline-primary btn-sm" href="#/learning">${nextCourse ? "Fortsätt utbildningen" : "Visa utbildningarna"}</a></div></section>
