@@ -2,7 +2,7 @@
 
 Status: Implementerat prototypformat och målbild för produktion
 
-Senast uppdaterad: 2026-08-20
+Senast uppdaterad: 2026-08-23
 
 ## Princip
 
@@ -10,7 +10,7 @@ Utbildningsinnehåll lagras som versionshanterade innehållspaket. Ett paket kan
 
 Kommunens urval lagras separat som referenser till innehållspaket. Gemensamt material kopieras därför inte när en kommun väljer att använda det. En kurs tar automatiskt med de material och test som kursen refererar till.
 
-I den aktuella prototypen visar utbildningsvyn först nästa del i mentorens utbildning och därefter hela utbildningar med antal genomförda delar. Fristående material och kunskapstest finns kvar i en utfällbar stödsektion. Delar märks som `Klar`, `Nästa` eller `Kommande`, men presentationen låser inte ordningen tekniskt. Administratören kan välja kommunens innehåll, se versionsläge och styra publik exponering för material. Mentorportalen sparar progress och låter mentorn genomföra test. Den publika vyn visar endast material som kommunen uttryckligen har valt och publicerat.
+I den aktuella prototypen visar utbildningsvyn först nästa del i mentorens utbildning och därefter hela utbildningar med antal genomförda delar. När en kurs öppnas visas en kursöversikt med mål, uppskattad tid, delar och en tydlig åtgärd för att påbörja eller fortsätta. Själva genomförandet sker i ett fokuserat utbildningsläge där portalens ordinarie navigering och prototypverktyg döljs. Bara den aktuella delen är normalt öppen; klara och kommande delar ligger kompakt men kan öppnas. Delar märks som `Klar`, `Aktuell` eller `Kommande`, men presentationen låser inte ordningen tekniskt. Fristående material och kunskapstest finns kvar i en utfällbar stödsektion. Administratören kan välja kommunens innehåll, se versionsläge och styra publik exponering för material. Mentorportalen sparar progress och låter mentorn genomföra test. Den publika vyn visar endast material som kommunen uttryckligen har valt och publicerat.
 
 Urvalet har två skilda dimensioner:
 
@@ -28,6 +28,8 @@ Endast `material` får exponeras publikt. `course` och `test` kräver inloggad m
 - `title` och `summary`: sökbar metadata
 - `bodyMarkdown`: presenterande text i Markdown
 - `status`: exempelvis `draft`, `published` eller `retired`
+
+En kurs har dessutom lärandemål i `learningObjectives`, en uppskattad total tid i `estimatedMinutes` och en uppskattad tid per modul. Tiderna är orienterande och används för planering, inte för kontroll av hur länge användaren har haft sidan öppen.
 
 Kommunens val lagras separat:
 
@@ -117,6 +119,6 @@ Administrationsvyn heter **Administrera utbildning** och ligger i den visuellt o
 
 ## Versionshantering
 
-Publicerat innehåll ändras genom att en ny version skapas. Ett pågående eller avslutat genomförande behåller referensen till den version som användes. Kommunen kan därefter välja när en ny publicerad version ska tas in i det egna urvalet.
+Publicerat innehåll ändras genom att en ny version skapas. Ett pågående eller avslutat genomförande behåller sin progress och sina testförsök. Kommunen kan därefter välja när en ny publicerad version ska tas in i det egna urvalet. Exempelkursernas version 2 aktiveras genom en avgränsad engångsmigrering i prototypen; stabila kurs- och modul-ID:n gör att redan klara moment följer med.
 
 En pensionerad version får inte väljas för nya genomföranden men måste kunna visas i historiken när den refereras av ett genomförande eller testförsök. Byte av vald version får inte skriva om tidigare progress eller resultat.

@@ -22,7 +22,7 @@ test("learning content has valid references and answers", () => {
 test("scores knowledge tests against the configured pass threshold", () => {
   const knowledgeTest = LEARNING_CONTENT.find((item) => item.type === "test");
   const allCorrect = Object.fromEntries(knowledgeTest.questions.map((question) => [question.id, question.correctOptionId]));
-  assert.deepEqual(scoreKnowledgeTest(knowledgeTest, allCorrect), { correct: 3, total: 3, score: 100, passed: true });
+  assert.deepEqual(scoreKnowledgeTest(knowledgeTest, allCorrect), { correct: 4, total: 4, score: 100, passed: true });
   assert.equal(scoreKnowledgeTest(knowledgeTest, { ...allCorrect, "q-role": "a" }).passed, true);
   assert.equal(scoreKnowledgeTest(knowledgeTest, { "q-role": "b" }).passed, false);
 });
@@ -55,6 +55,10 @@ test("provides realistic examples of every supported content type", () => {
   assert.ok(LEARNING_CONTENT.filter((item) => item.type === "material").length >= 5);
   assert.ok(LEARNING_CONTENT.filter((item) => item.type === "course").length >= 2);
   assert.ok(LEARNING_CONTENT.filter((item) => item.type === "test").length >= 2);
+  assert.ok(LEARNING_CONTENT.filter((item) => item.type === "course").every((course) => course.learningObjectives.length >= 3));
+  assert.ok(LEARNING_CONTENT.filter((item) => item.type === "course").every((course) => course.modules.every((module) => module.estimatedMinutes > 0)));
+  assert.match(LEARNING_CONTENT.find((item) => item.id === "material-role-and-boundaries").bodyMarkdown, /integritet|privata anteckningar/i);
+  assert.match(LEARNING_CONTENT.find((item) => item.id === "material-first-meeting").bodyMarkdown, /agenda|nästa steg/i);
 });
 
 test("defaults public learning to parent-facing reference material only", () => {

@@ -17,6 +17,7 @@ const sourceFiles = [
   ["/matching-profile-domain.js", "matching-profile-domain.js", "text/javascript; charset=utf-8"],
   ["/matching-catalog-domain.js", "matching-catalog-domain.js", "text/javascript; charset=utf-8"],
   ["/mentor-application-domain.js", "mentor-application-domain.js", "text/javascript; charset=utf-8"],
+  ["/mentor-self-service-domain.js", "mentor-self-service-domain.js", "text/javascript; charset=utf-8"],
   ["/learning-domain.js", "learning-domain.js", "text/javascript; charset=utf-8"],
   ["/support-domain.js", "support-domain.js", "text/javascript; charset=utf-8"],
   ["/case-domain.js", "case-domain.js", "text/javascript; charset=utf-8"],

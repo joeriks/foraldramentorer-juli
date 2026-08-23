@@ -30,12 +30,30 @@ test("puts the next learning step first without locking later parts", () => {
   assert.match(app, /function learningCourseState/);
   assert.match(app, /Nästa steg i utbildningen/);
   assert.match(app, /Fortsätt.*nextModule\.title/s);
+  assert.match(app, /Påbörja utbildningen/);
+  assert.match(app, /Fortsätt utbildningen/);
+  assert.match(app, /mode=focus/);
   assert.match(app, /Material och kunskapstest/);
   assert.match(app, /completeCount} av \$\{state\.total} delar klara/);
   assert.match(app, /is-next/);
   assert.match(app, /is-upcoming/);
+  assert.match(app, /<details id="learning-module-/);
+  assert.match(app, /learning-course-objectives/);
+  assert.match(app, /Klar, gå vidare/);
   assert.match(app, /aria-current="step"/);
   assert.doesNotMatch(app, /is-upcoming[^\n]+disabled/);
+  assert.match(styles, /\.learning-module > summary/);
+  assert.match(styles, /\.learning-question-option:has\(input:checked\)/);
+});
+
+test("enters a focused course mode from a clear course overview", () => {
+  assert.match(app, /function renderCourseOverview/);
+  assert.match(app, /function renderFocusedCourse/);
+  assert.match(app, /Avsluta utbildningsläget/);
+  assert.match(app, /document\.body\.classList\.toggle\("is-learning-focus"/);
+  assert.match(styles, /body\.is-learning-focus \.sidebar,[\s\S]*body\.is-learning-focus \.app-header,[\s\S]*body\.is-learning-focus \.system-status/);
+  assert.match(styles, /\.learning-focus-toolbar/);
+  assert.match(styles, /\.learning-course-entry/);
 });
 
 test("marks system administration with text and a shared visual context", () => {
@@ -49,8 +67,9 @@ test("marks system administration with text and a shared visual context", () => 
 });
 
 test("stacks the simplified learning flow on small screens", () => {
-  assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.learning-next-step,[\s\S]*\.learning-course-item[\s\S]*grid-template-columns: 1fr/);
-  assert.match(styles, /\.learning-next-step \.btn,[\s\S]*\.learning-course-item \.btn[\s\S]*width: 100%/);
+  assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.learning-next-step,[\s\S]*\.learning-course-item,[\s\S]*\.learning-course-entry[\s\S]*grid-template-columns: 1fr/);
+  assert.match(styles, /\.learning-next-step \.btn,[\s\S]*\.learning-course-item \.btn,[\s\S]*\.learning-course-entry \.btn[\s\S]*width: 100%/);
+  assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.learning-module > summary[\s\S]*grid-template-columns: 2rem minmax\(0, 1fr\) 0\.75rem/);
   assert.match(styles, /\.learning-selection-summary[\s\S]*grid-template-columns: 1fr/);
 });
 
@@ -63,7 +82,7 @@ test("offers a role-switched mentor portal with protected mentor routes", () => 
   }
   assert.match(app, /register_mentor_self_report/);
   assert.match(app, /Du kan bara öppna uppdrag som är kopplade till din mentorprofil/);
-  assert.match(app, /Känsliga register- och identitetsuppgifter visas inte i mentorportalen/);
+  assert.match(app, /Identitet, registerkontroller och beslut ändras av kommunen och visas inte här/);
   assert.match(app, /DEMO_MENTOR_USER = \{ id: "mentor-demo", name: "Mentor testanvändare" \}/);
   assert.match(app, /mentorId: DEMO_MENTOR_USER\.id/);
   assert.match(app, /if \(isMentorSession\(\)\) \{\s*selectedLearnerId = currentUser\(\)\.mentorId;/);

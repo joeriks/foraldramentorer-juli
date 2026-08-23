@@ -138,6 +138,7 @@ Prototypens viktigaste funktioner är:
 - Enkla och guidade aktiviteter som handläggarens huvudsakliga arbetsyta, med strukturerade resultat och tydligt nästa steg.
 - Godkännandeflöde för mentor med kontroller, utbildning, intervju och beslut.
 - Publik intresseanmälan där en ny mentor kan registrera kontaktuppgifter, förutsättningar, erfarenhetsområden och motivation samt följa ansökans status.
+- Mentorportal där en registrerad mentor kan hålla sina egna kontakt- och matchningsuppgifter aktuella och se en fullständig ändringshistorik.
 - Stöd- och matchningsflöde med sökbar mentorlista och synliga matchande respektive saknade kriterier.
 - Kontaktmottagning för inkommande samtal och e-post utan krav på personkoppling.
 - Lokal datalagring i IndexedDB med realistiska exempelärenden och bevarad historik.
@@ -149,6 +150,8 @@ Vyerna använder progressiv visning. Det som behövs för nästa normala arbetsm
 Ärendet är den sammanhållande handläggningsakten. Ett ärende kan vara kopplat till högst en mentor och, för stöd till förälder, högst en förälder. En person kan ha flera avgränsade ärenden över tid. Generella verksamhetsärenden kan sakna personkoppling. Matchningar och mentoruppdrag hör alltid till ett bestämt stödärende och skapar inte en permanent direktrelation mellan en förälder och en mentor.
 
 Stödområden hör till stödbehovet och lagras därför på stödärendet. De ska inte bli permanenta etiketter på föräldern. Mentorns erfarenhetsområden hör däremot till mentorprofilen och kan återanvändas i flera matchningar. När ett uppdrag skapas sparas en ögonblicksbild av de områden som uppdraget avser, så att senare katalogändringar inte skriver om historiken.
+
+I mentorportalen kan mentorn själv uppdatera namn, kontaktvägar, geografiska områden, språk, tillgänglighet, mötesformer, uppdragskapacitet och självuppgivna erfarenhetsområden. Varje sparande skapar en separat revisionspost med aktör, tidpunkt, ändrade fält samt tidigare och nya värden. Matchningspåverkande ändringar skapar en ny aktiv matchningsprofil; tidigare profilversioner och redan frysta matchningsögonblick påverkas inte. Status, ansvarig handläggare, identitet, registerkontroller och kommunens beslut kan inte ändras av mentorn.
 
 Handläggaren arbetar normalt med aktiviteter. När en aktivitet ändras eller slutförs skapar systemet en händelse i historiken med tidpunkt och användare. Ett dokument, meddelande eller annat underlag registreras som en handling och kan kopplas till den aktivitet där underlaget användes.
 

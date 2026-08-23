@@ -87,6 +87,11 @@ import {
   normalizeMentorApplication,
   submitMentorApplication
 } from "./mentor-application-domain.js?v=20260823-mentor-application-v2";
+import {
+  createMentorProfileEvent,
+  mentorSelfServiceChanges,
+  mergeSelfReportedSupportAreas
+} from "./mentor-self-service-domain.js?v=20260823-mentor-self-service-v120";
 import { marked } from "./vendor/marked/marked.esm.js";
 import { resolveFeatureLink, resolveFeatureRoute, routineSectionKey, routineSectionRoute } from "./feature-links.js?v=20260820-calendar-v4";
 import { ROUTINE_ILLUSTRATIONS } from "./routine-illustrations.js?v=20260806-assignment-followup-v21";
@@ -99,7 +104,7 @@ import {
   prepareLearningMarkdown,
   requiredLearningContentIds,
   scoreKnowledgeTest
-} from "./learning-domain.js?v=20260807-public-parent-v3";
+} from "./learning-domain.js?v=20260823-learning-focus-v121";
 import {
   containsSensitivePersonalData,
   findSupportKnowledge,
@@ -138,7 +143,7 @@ import {
 } from "./matching-catalog-domain.js?v=20260821-structured-matching-v1";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
-const DB_VERSION = 13;
+const DB_VERSION = 14;
 const STORE = "candidates";
 const PARENTS_STORE = "parents";
 const INCOMING_CONTACTS_STORE = "incomingContacts";
@@ -169,6 +174,7 @@ const TENANT_LEARNING_SELECTION_STORE = "tenantLearningSelection";
 const LEARNING_PROGRESS_STORE = "learningProgress";
 const PUBLIC_SUPPORT_REQUESTS_STORE = "publicSupportRequests";
 const MENTOR_APPLICATIONS_STORE = "mentorApplications";
+const MENTOR_PROFILE_EVENTS_STORE = "mentorProfileEvents";
 const SUPPORT_TICKETS_STORE = "supportTickets";
 const TENANT_SUPPORT_AREA_SELECTION_STORE = "tenantSupportAreaSelection";
 const TENANT_GEOGRAPHIC_AREAS_STORE = "tenantGeographicAreas";
@@ -185,11 +191,69 @@ const SYSTEM_ACTIVITY_TEMPLATE_IDS = new Set(ACTIVITY_TEMPLATES.map((definition)
 const SYSTEM_ADMINISTRATION_VIEWS = new Set(["administration", "handler", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "presentation", "routines", "versions"]);
 const SUPPORT_PANEL_SESSION_KEY = "foraldramentorer.supportPanelOpen";
 const LEARNING_SELECTION_INITIALIZED_ID = "__selection_initialized__";
+const LEARNING_EXAMPLE_RELEASE_ID = "__example_course_release_2__";
+const LEARNING_SELECTION_METADATA_IDS = new Set([LEARNING_SELECTION_INITIALIZED_ID, LEARNING_EXAMPLE_RELEASE_ID]);
+const LEARNING_EXAMPLE_RELEASE_CONTENT_IDS = new Set([
+  "material-role-and-boundaries",
+  "material-contact-and-reporting",
+  "material-first-meeting",
+  "material-difficult-situations",
+  "material-child-perspective",
+  "test-foundation",
+  "course-foundation",
+  "test-safe-contact",
+  "course-safe-contact"
+]);
 let CURRENT_USER_ID = "handler-sara";
 const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "121",
+    date: "2026-08-23",
+    title: "Fokuserat utbildningsläge",
+    flow: "Utbildning -> kursöversikt -> påbörja eller fortsätt -> fokuserat kursinnehåll",
+    simplified: "När en kurs öppnas visas först mål, tidsåtgång, delar och en enda tydlig väg vidare. Under själva utbildningen döljs portalens ordinarie navigering och prototypverktyg.",
+    retained: "Samma kursdelar, tester, reflektioner och sparade framsteg används. Användaren kan lämna utbildningsläget och återvända till kursöversikten när som helst.",
+    changes: [
+      "Kurser har fått en egen översikt med knappen Påbörja utbildningen eller Fortsätt utbildningen.",
+      "Det fokuserade utbildningsläget döljer sidomeny, vanligt sidhuvud, prototypstatus och supportknapp.",
+      "En kompakt kursrad visar titel och progression medan användaren arbetar med innehållet.",
+      "Kursöversikten visar mål och samtliga delar utan att samtidigt visa allt kursinnehåll.",
+      "Fokusläget fungerar utan dokumentöverflöde på både dator och mobil."
+    ]
+  },
+  {
+    version: "120",
+    date: "2026-08-23",
+    title: "Mentorn kan uppdatera sin egen profil",
+    flow: "Mentorportal -> Min profil -> redigera -> granska ändringar -> versionshistorik",
+    simplified: "Mentorn kan själv hålla kontaktuppgifter, tillgänglighet, områden, språk, mötesformer och erfarenheter aktuella utan att be handläggaren skriva om uppgifterna.",
+    retained: "Status, ansvarig handläggare, identitet, registerkontroller och myndighetsbedömningar är fortsatt skyddade. Tidigare profilversioner och matchningsögonblick skrivs inte om.",
+    changes: [
+      "Min profil har fått ett eget redigeringsläge med tydliga självservicefält.",
+      "Varje sparande skapar en separat revisionspost med aktör, tidpunkt, fältändringar och ny profilsnapshot.",
+      "Matchningspåverkande ändringar skapar en ny versionshanterad matchningsprofil.",
+      "Verifiering av ett erfarenhetsområde behålls om uppgiften är oförändrad och återställs om mentorn ändrar underlaget.",
+      "Mentorn ser sin ändringshistorik och handläggarens befintliga mentorlogg får en sammanfattning av samma sparande."
+    ]
+  },
+  {
+    version: "119",
+    date: "2026-08-23",
+    title: "Stegvisa och mer praktiska mentorutbildningar",
+    flow: "Utbildning -> aktuell del -> nästa åtgärd -> reflektion eller kunskapstest",
+    simplified: "Bara den aktuella kursdelen är öppen från början. Klara och kommande delar visas kompakt och kan öppnas vid behov.",
+    retained: "Samma kurs- och modul-ID:n, sparad progress, testresultat, kommunurval och versionshistorik används vidare. Delarna är fortfarande inte tekniskt låsta.",
+    changes: [
+      "Kursens mål, uppskattad tid och tydliga nästa steg visas innan innehållet.",
+      "Kursdelarna har fått en lugn steglista som fungerar vertikalt på mobil.",
+      "Svarsalternativen i kunskapstesten är större och lättare att välja och kontrollera.",
+      "Exempelkurserna innehåller nu praktiska checklistor för rollgränser, första mötet, integritet, avvikelser, barnperspektiv och dokumentation.",
+      "Befintliga prototypmiljöer går en gång över till version 2 av exempelkurserna utan att radera genomförda moment."
+    ]
+  },
   {
     version: "118",
     date: "2026-08-23",
@@ -1494,7 +1558,9 @@ let learningContentVersions = [];
 let learningContent = [];
 let tenantLearningSelection = [];
 let learningProgress = [];
+let mentorProfileEvents = [];
 let selectedLearnerId = "";
+let mentorProfileEditMode = false;
 let learningTypeFilter = "all";
 let learningAdminFilter = "all";
 let learningMutationQueue = Promise.resolve();
@@ -2609,6 +2675,9 @@ function openDatabase() {
       ensureIndex(mentorApplicationStore, "tenantCreatedAt", ["tenantId", "createdAt"]);
       ensureIndex(mentorApplicationStore, "tenantStatus", ["tenantId", "status"]);
       ensureIndex(mentorApplicationStore, "tenantEmail", ["tenantId", "email"]);
+      const mentorProfileEventStore = ensureStore(MENTOR_PROFILE_EVENTS_STORE);
+      ensureIndex(mentorProfileEventStore, "tenantMentor", ["tenantId", "mentorId"]);
+      ensureIndex(mentorProfileEventStore, "tenantOccurredAt", ["tenantId", "occurredAt"]);
       const supportTicketStore = ensureStore(SUPPORT_TICKETS_STORE);
       ensureIndex(supportTicketStore, "tenantCreatedAt", ["tenantId", "createdAt"]);
       ensureIndex(supportTicketStore, "tenantStatus", ["tenantId", "status"]);
@@ -2766,6 +2835,10 @@ function mentorApplicationTx(mode = "readonly") {
   return db.transaction(MENTOR_APPLICATIONS_STORE, mode).objectStore(MENTOR_APPLICATIONS_STORE);
 }
 
+function mentorProfileEventTx(mode = "readonly") {
+  return db.transaction(MENTOR_PROFILE_EVENTS_STORE, mode).objectStore(MENTOR_PROFILE_EVENTS_STORE);
+}
+
 function supportTicketTx(mode = "readonly") {
   return db.transaction(SUPPORT_TICKETS_STORE, mode).objectStore(SUPPORT_TICKETS_STORE);
 }
@@ -2870,6 +2943,8 @@ const clearPublicSupportRequests = () => clearStore(publicSupportRequestTx);
 const getAllMentorApplications = () => getAllFrom(mentorApplicationTx);
 const saveMentorApplication = (value) => putInto(mentorApplicationTx, value);
 const clearMentorApplications = () => clearStore(mentorApplicationTx);
+const getAllMentorProfileEvents = () => getAllFrom(mentorProfileEventTx);
+const clearMentorProfileEvents = () => clearStore(mentorProfileEventTx);
 const getAllSupportTickets = () => getAllFrom(supportTicketTx);
 const saveSupportTicket = (value) => putInto(supportTicketTx, value);
 const clearSupportTickets = () => clearStore(supportTicketTx);
@@ -3306,7 +3381,7 @@ async function loadLearningData() {
 
   let tenantSelectionRecords = (await getAllTenantLearningSelection()).filter((item) => item.tenantId === DEFAULT_TENANT_ID);
   const selectionInitialized = tenantSelectionRecords.some((item) => item.contentId === LEARNING_SELECTION_INITIALIZED_ID);
-  tenantLearningSelection = tenantSelectionRecords.filter((item) => item.contentId !== LEARNING_SELECTION_INITIALIZED_ID);
+  tenantLearningSelection = tenantSelectionRecords.filter((item) => !LEARNING_SELECTION_METADATA_IDS.has(item.contentId));
   if (!selectionInitialized) {
     const explicitDefaultIds = [...new Set([...DEFAULT_TENANT_LEARNING_SELECTION, ...DEFAULT_PUBLIC_LEARNING_SELECTION])];
     const effectiveIds = requiredLearningContentIds(learningContent, explicitDefaultIds);
@@ -3327,7 +3402,7 @@ async function loadLearningData() {
       });
     })]);
     tenantSelectionRecords = (await getAllTenantLearningSelection()).filter((item) => item.tenantId === DEFAULT_TENANT_ID);
-    tenantLearningSelection = tenantSelectionRecords.filter((item) => item.contentId !== LEARNING_SELECTION_INITIALIZED_ID);
+    tenantLearningSelection = tenantSelectionRecords.filter((item) => !LEARNING_SELECTION_METADATA_IDS.has(item.contentId));
   }
   if (!tenantLearningSelection.some((selection) => typeof selection.public === "boolean")) {
     const existingById = new Map(tenantLearningSelection.map((selection) => [selection.contentId, selection]));
@@ -3345,7 +3420,30 @@ async function loadLearningData() {
       });
     }));
     tenantSelectionRecords = (await getAllTenantLearningSelection()).filter((item) => item.tenantId === DEFAULT_TENANT_ID);
-    tenantLearningSelection = tenantSelectionRecords.filter((item) => item.contentId !== LEARNING_SELECTION_INITIALIZED_ID);
+    tenantLearningSelection = tenantSelectionRecords.filter((item) => !LEARNING_SELECTION_METADATA_IDS.has(item.contentId));
+  }
+  if (!tenantSelectionRecords.some((item) => item.contentId === LEARNING_EXAMPLE_RELEASE_ID)) {
+    const releaseAt = new Date().toISOString();
+    await Promise.all([
+      saveTenantLearningSelection({
+        tenantId: DEFAULT_TENANT_ID,
+        contentId: LEARNING_EXAMPLE_RELEASE_ID,
+        appliedAt: releaseAt
+      }),
+      ...tenantLearningSelection
+        .filter((selection) => LEARNING_EXAMPLE_RELEASE_CONTENT_IDS.has(selection.contentId))
+        .map((selection) => {
+          const latest = learningContentById(learningContent, selection.contentId);
+          return latest ? saveTenantLearningSelection({
+            ...selection,
+            selectedVersion: latest.version,
+            releaseUpdatedAt: releaseAt,
+            releaseUpdatedBy: "system"
+          }) : Promise.resolve();
+        })
+    ]);
+    tenantSelectionRecords = (await getAllTenantLearningSelection()).filter((item) => item.tenantId === DEFAULT_TENANT_ID);
+    tenantLearningSelection = tenantSelectionRecords.filter((item) => !LEARNING_SELECTION_METADATA_IDS.has(item.contentId));
   }
   learningProgress = (await getAllLearningProgress()).filter((item) => item.tenantId === DEFAULT_TENANT_ID);
   if (isMentorSession()) {
@@ -3384,11 +3482,18 @@ async function updateTenantLearningSelection(contentId, selected) {
   const effectiveIds = requiredLearningContentIds(learningContent, [...explicitIds]);
   const previousById = new Map(tenantLearningSelection.map((item) => [item.contentId, item]));
   await clearTenantLearningSelection();
-  await Promise.all([saveTenantLearningSelection({
-    tenantId: DEFAULT_TENANT_ID,
-    contentId: LEARNING_SELECTION_INITIALIZED_ID,
-    initializedAt: new Date().toISOString()
-  }), ...effectiveIds.map((id) => {
+  await Promise.all([
+    saveTenantLearningSelection({
+      tenantId: DEFAULT_TENANT_ID,
+      contentId: LEARNING_SELECTION_INITIALIZED_ID,
+      initializedAt: new Date().toISOString()
+    }),
+    saveTenantLearningSelection({
+      tenantId: DEFAULT_TENANT_ID,
+      contentId: LEARNING_EXAMPLE_RELEASE_ID,
+      appliedAt: new Date().toISOString()
+    }),
+    ...effectiveIds.map((id) => {
     const latest = learningContentById(learningContent, id);
     const previous = previousById.get(id);
     return saveTenantLearningSelection({
@@ -3400,7 +3505,8 @@ async function updateTenantLearningSelection(contentId, selected) {
       selectedAt: previous?.selectedAt || new Date().toISOString(),
       selectedBy: previous?.selectedBy || CURRENT_USER_ID
     });
-  })]);
+    })
+  ]);
 }
 
 const CASE_DATA_STORES = [
@@ -3536,7 +3642,7 @@ function replaceCandidates(nextCandidates) {
 }
 
 function replacePrototypeDataset(exampleCandidates, workflowRecords) {
-  const storeNames = [STORE, PARENTS_STORE, INCOMING_CONTACTS_STORE, MEETINGS_STORE, LEARNING_PROGRESS_STORE, ...CASE_DATA_STORES, ...MATCHING_PROFILE_STORES];
+  const storeNames = [STORE, PARENTS_STORE, INCOMING_CONTACTS_STORE, MEETINGS_STORE, LEARNING_PROGRESS_STORE, MENTOR_PROFILE_EVENTS_STORE, ...CASE_DATA_STORES, ...MATCHING_PROFILE_STORES];
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(storeNames, "readwrite");
     for (const storeName of storeNames) transaction.objectStore(storeName).clear();
@@ -5035,6 +5141,9 @@ async function refresh() {
   await loadMatchingProfileData();
   await ensureMatchingProfileRecords();
   projectMatchingProfiles();
+  mentorProfileEvents = (await getAllMentorProfileEvents())
+    .filter((event) => event.tenantId === DEFAULT_TENANT_ID)
+    .sort((left, right) => new Date(right.occurredAt) - new Date(left.occurredAt));
   candidates = candidates.map(projectMentorWorkflow);
   meetings = await getAllMeetings();
   meetings.sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt));
@@ -5285,37 +5394,71 @@ function renderKnowledgeTestForm(test, course = null, module = null) {
     <div class="learning-markdown mb-4">${renderLearningMarkdown(test.bodyMarkdown)}</div>
     ${test.questions.map((question, questionIndex) => `<fieldset class="learning-question">
       <legend><span>${questionIndex + 1}</span>${escapeHtml(question.prompt)}</legend>
-      ${question.options.map((option) => `<div class="form-check"><input class="form-check-input" type="radio" name="${escapeHtml(question.id)}" id="${escapeHtml(progressId)}-${escapeHtml(question.id)}-${escapeHtml(option.id)}" value="${escapeHtml(option.id)}" ${latestAttempt?.answers?.[question.id] === option.id ? "checked" : ""} required><label class="form-check-label" for="${escapeHtml(progressId)}-${escapeHtml(question.id)}-${escapeHtml(option.id)}">${escapeHtml(option.text)}</label></div>`).join("")}
+      ${question.options.map((option) => `<div class="form-check learning-question-option"><input class="form-check-input" type="radio" name="${escapeHtml(question.id)}" id="${escapeHtml(progressId)}-${escapeHtml(question.id)}-${escapeHtml(option.id)}" value="${escapeHtml(option.id)}" ${latestAttempt?.answers?.[question.id] === option.id ? "checked" : ""} required><label class="form-check-label" for="${escapeHtml(progressId)}-${escapeHtml(question.id)}-${escapeHtml(option.id)}">${escapeHtml(option.text)}</label></div>`).join("")}
       ${latestAttempt ? `<div class="learning-answer-feedback ${latestAttempt.answers?.[question.id] === question.correctOptionId ? "is-correct" : "is-incorrect"}"><strong>${latestAttempt.answers?.[question.id] === question.correctOptionId ? "Rätt svar" : "Fel svar"}.</strong> ${escapeHtml(question.explanation)}</div>` : ""}
     </fieldset>`).join("")}
     ${latestAttempt ? `<div class="alert ${latestAttempt.passed ? "alert-success" : "alert-warning"}">Senaste resultat: ${latestAttempt.score}% (${latestAttempt.passed ? "Godkänt" : "Inte godkänt"}).</div>` : ""}
-    <button type="submit" class="btn btn-primary btn-sm" ${selectedLearnerId ? "" : "disabled"}>Rätta svaren</button>
+    <button type="submit" class="btn btn-primary btn-sm" ${selectedLearnerId ? "" : "disabled"}>${course ? "Rätta och fortsätt" : "Rätta svaren"}</button>
   </form>`;
 }
 
-function renderCourseDetail(course) {
-  const state = learningCourseState(course);
-  const { progress, completed, nextModule, percent, completeCount, total } = state;
-  return `<div class="card-header record-header bg-white">
-    <a class="small" href="#/learning">Tillbaka till utbildning</a>
-    <div class="record-type mt-3">Utbildning · version ${course.version}</div><h2 class="h5 mb-1">${escapeHtml(course.title)}</h2><p class="text-secondary mb-0">${escapeHtml(course.summary)}</p>
-    <div class="learning-course-progress mt-3"><div class="progress" role="progressbar" aria-label="Utbildningsförlopp" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${percent}%"></div></div><strong>${completeCount} av ${total} delar klara</strong></div>
-  </div>
-  <div class="card-body learning-course-body">
-    <div class="learning-course-next"><span class="record-type">${nextModule ? "Nästa del" : "Utbildningen är klar"}</span><strong>${escapeHtml(nextModule?.title || "Alla delar är genomförda")}</strong></div>
-    <div class="learning-markdown mb-4">${renderLearningMarkdown(course.bodyMarkdown)}</div>
+function learningCourseActionLabel({ completeCount, percent }) {
+  if (!completeCount) return "Påbörja utbildningen";
+  if (percent < 100) return "Fortsätt utbildningen";
+  return "Gå igenom utbildningen igen";
+}
+
+function renderLearningModuleList(course, state) {
+  const { progress, completed, nextModule } = state;
+  const reviewModuleId = nextModule?.id || (state.percent === 100 ? course.modules[0]?.id : null);
+  return `<div class="learning-module-list" aria-label="Utbildningens delar">
     ${course.modules.map((module, index) => {
       const content = module.contentId ? learningContentById(selectedLearningContent(), module.contentId) : null;
       const isComplete = completed.has(module.id);
       const isNext = module.id === nextModule?.id;
+      const isCurrent = module.id === reviewModuleId;
       const statusClass = isComplete ? "is-complete" : isNext ? "is-next" : "is-upcoming";
-      const statusBadge = isComplete ? '<span class="badge text-bg-success">Klar</span>' : isNext ? '<span class="badge text-bg-primary">Nästa</span>' : '<span class="badge text-bg-light border">Kommande</span>';
-      const sectionStart = `<section class="learning-module ${statusClass}" ${isNext ? 'aria-current="step"' : ""}><header><span>${index + 1}</span><div><div class="record-type">${learningTypeLabel(module.type)}</div><h3 class="h6 mb-0">${escapeHtml(module.title)}</h3></div>${statusBadge}</header>`;
-      if (module.type === "test" && content) return `${sectionStart}${renderKnowledgeTestForm(content, course, module)}</section>`;
-      if (module.type === "reflection") return `${sectionStart}<form data-learning-reflection="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}"><label class="form-label" for="reflection-${escapeHtml(module.id)}">${escapeHtml(module.prompt)}</label><textarea id="reflection-${escapeHtml(module.id)}" class="form-control" rows="3" required>${escapeHtml(progress.reflections?.[module.id] || "")}</textarea><button type="submit" class="btn btn-primary btn-sm mt-3" ${selectedLearnerId ? "" : "disabled"}>Spara reflektion</button></form></section>`;
-      return `${sectionStart}${content ? `<div class="learning-markdown">${renderLearningMarkdown(content.bodyMarkdown)}</div>` : '<div class="alert alert-warning">Materialet ingår inte i kommunens urval.</div>'}<button type="button" class="btn btn-outline-primary btn-sm mt-3" data-complete-learning-module="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}" ${selectedLearnerId ? "" : "disabled"}>${isComplete ? "Delen är klar" : "Markera delen som klar"}</button></section>`;
-    }).join("")}
+      const statusBadge = isComplete ? '<span class="badge text-bg-success">Klar</span>' : isNext ? '<span class="badge text-bg-primary">Aktuell</span>' : '<span class="badge text-bg-light border">Kommande</span>';
+      const sectionStart = `<details id="learning-module-${escapeHtml(module.id)}" class="learning-module ${statusClass}" ${isCurrent ? 'open aria-current="step"' : ""}><summary><span class="learning-module-number">${index + 1}</span><div><div class="record-type">${learningTypeLabel(module.type)}</div><h3 class="h6 mb-0">${escapeHtml(module.title)}</h3>${module.estimatedMinutes ? `<small>Cirka ${Number(module.estimatedMinutes)} min</small>` : ""}</div>${statusBadge}</summary><div class="learning-module-content">`;
+      if (module.type === "test" && content) return `${sectionStart}${renderKnowledgeTestForm(content, course, module)}</div></details>`;
+      if (module.type === "reflection") return `${sectionStart}<form data-learning-reflection="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}"><label class="form-label" for="reflection-${escapeHtml(module.id)}">${escapeHtml(module.prompt)}</label><textarea id="reflection-${escapeHtml(module.id)}" class="form-control" rows="4" required>${escapeHtml(progress.reflections?.[module.id] || "")}</textarea><button type="submit" class="btn btn-primary btn-sm mt-3" ${selectedLearnerId ? "" : "disabled"}>${isComplete ? "Spara ändring" : "Spara och fortsätt"}</button></form></div></details>`;
+      const materialAction = isComplete ? '<p class="learning-module-complete-note mb-0"><strong>Delen är klar.</strong> Du kan läsa innehållet igen.</p>' : `<button type="button" class="btn ${isNext ? "btn-primary" : "btn-outline-primary"} btn-sm mt-3" data-complete-learning-module="${escapeHtml(module.id)}" data-course-id="${escapeHtml(course.id)}" ${selectedLearnerId ? "" : "disabled"}>${isNext ? "Klar, gå vidare" : "Markera som klar"}</button>`;
+      return `${sectionStart}${content ? `<div class="learning-markdown">${renderLearningMarkdown(content.bodyMarkdown)}</div>` : '<div class="alert alert-warning">Materialet ingår inte i kommunens urval.</div>'}${materialAction}</div></details>`;
+    }).join("")}</div>`;
+}
+
+function renderCourseOverview(course) {
+  const state = learningCourseState(course);
+  const { nextModule, percent, completeCount, total } = state;
+  const estimatedMinutes = Number(course.estimatedMinutes) || course.modules.reduce((sum, module) => sum + Number(module.estimatedMinutes || 0), 0);
+  const actionLabel = learningCourseActionLabel(state);
+  const currentModule = nextModule || course.modules[0];
+  return `<div class="card-header record-header bg-white learning-course-overview-header">
+    <a class="small" href="#/learning">Tillbaka till utbildning</a>
+    <div class="record-type mt-3">Utbildning · version ${course.version}</div><h2 class="h5 mb-1">${escapeHtml(course.title)}</h2><p class="text-secondary mb-0">${escapeHtml(course.summary)}</p>
+    <div class="learning-course-header-meta"><span>Cirka ${estimatedMinutes} minuter</span><span>${total} delar</span></div>
+    <div class="learning-course-progress mt-3"><div class="progress" role="progressbar" aria-label="Utbildningsförlopp" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${percent}%"></div></div><strong>${completeCount} av ${total} delar klara</strong></div>
+  </div>
+  <div class="card-body learning-course-overview-body">
+    <section class="learning-course-entry" aria-label="Starta eller fortsätt utbildningen"><div><span class="record-type">${nextModule ? completeCount ? "Fortsätt där du slutade" : "Redo att börja" : "Utbildningen är genomförd"}</span><h3>${escapeHtml(currentModule?.title || "Alla delar är genomförda")}</h3>${currentModule?.estimatedMinutes ? `<p>Cirka ${Number(currentModule.estimatedMinutes)} minuter för nästa del</p>` : ""}</div><a class="btn btn-primary btn-lg" href="#/learning/${encodeURIComponent(course.id)}?mode=focus">${actionLabel}</a></section>
+    <section class="learning-course-intro" aria-labelledby="learningCourseGoals"><div class="learning-markdown">${renderLearningMarkdown(course.bodyMarkdown)}</div>${course.learningObjectives?.length ? `<div class="learning-course-objectives"><h3 id="learningCourseGoals" class="h6">Efter utbildningen kan du</h3><ul>${course.learningObjectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></div>` : ""}</section>
+    <section class="learning-course-outline" aria-labelledby="learningCourseOutline"><h3 id="learningCourseOutline" class="h6">Utbildningens delar</h3><ol>${course.modules.map((module, index) => `<li class="${state.completed.has(module.id) ? "is-complete" : module.id === nextModule?.id ? "is-current" : ""}"><span>${index + 1}</span><div><strong>${escapeHtml(module.title)}</strong><small>${learningTypeLabel(module.type)}${module.estimatedMinutes ? ` · cirka ${Number(module.estimatedMinutes)} min` : ""}</small></div><span>${state.completed.has(module.id) ? "Klar" : module.id === nextModule?.id ? "Nästa" : ""}</span></li>`).join("")}</ol></section>
   </div>`;
+}
+
+function renderFocusedCourse(course) {
+  const state = learningCourseState(course);
+  const { nextModule, percent, completeCount, total } = state;
+  const currentIndex = Math.max(0, course.modules.findIndex((module) => module.id === nextModule?.id));
+  return `<div class="learning-focus-toolbar"><a href="#/learning/${encodeURIComponent(course.id)}">Avsluta utbildningsläget</a><div><strong>${escapeHtml(course.title)}</strong><span>${completeCount} av ${total} delar klara</span></div><div class="progress" role="progressbar" aria-label="Utbildningsförlopp" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${percent}%"></div></div></div>
+  <div class="card-body learning-course-focus-body">
+    <header class="learning-focus-current"><span class="record-type">${nextModule ? `Aktuell del ${currentIndex + 1} av ${total}` : "Utbildningen är genomförd"}</span><h2>${escapeHtml(nextModule?.title || "Bra jobbat")}</h2><p>${nextModule ? "Arbeta igenom innehållet och markera delen som klar när du är färdig." : "Alla delar är klara. Du kan öppna dem nedan för att repetera innehållet."}</p></header>
+    ${renderLearningModuleList(course, state)}
+  </div>`;
+}
+
+function renderCourseDetail(course, { focused = false } = {}) {
+  return focused ? renderFocusedCourse(course) : renderCourseOverview(course);
 }
 
 function renderLearning() {
@@ -5329,7 +5472,7 @@ function renderLearning() {
     els.learningDetailPanel.innerHTML = '<div class="card-body py-5"><h2 class="h5">Innehållet finns inte i kommunens urval</h2><a class="btn btn-outline-primary btn-sm" href="#/learning">Tillbaka till utbildning</a></div>';
     return;
   }
-  if (item.type === "course") els.learningDetailPanel.innerHTML = renderCourseDetail(item);
+  if (item.type === "course") els.learningDetailPanel.innerHTML = renderCourseDetail(item, { focused: route.params.get("mode") === "focus" });
   else if (item.type === "test") els.learningDetailPanel.innerHTML = `<div class="card-header record-header bg-white"><a class="small" href="#/learning">Tillbaka till utbildning</a><div class="record-type mt-3">Kunskapstest · version ${item.version}</div><h2 class="h5 mb-1">${escapeHtml(item.title)}</h2><p class="text-secondary mb-0">${escapeHtml(item.summary)}</p></div><div class="card-body">${renderKnowledgeTestForm(item)}</div>`;
   else els.learningDetailPanel.innerHTML = `<div class="card-header record-header bg-white"><a class="small" href="#/learning">Tillbaka till utbildning</a><div class="record-type mt-3">Material · version ${item.version}</div><h2 class="h5 mb-1">${escapeHtml(item.title)}</h2><p class="text-secondary mb-0">${escapeHtml(item.summary)}</p></div><article class="card-body learning-markdown learning-material-body">${renderLearningMarkdown(item.bodyMarkdown)}</article>`;
 }
@@ -5468,12 +5611,204 @@ function renderMentorAssignment() {
     <section class="record-section record-section-wide"><h3 class="record-section-title">Tidigare rapporter</h3><div class="table-responsive border rounded"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Datum</th><th>Kontaktform</th><th>Tid</th><th>Resultat</th><th>Sammanfattning</th></tr></thead><tbody>${reports.map((report) => `<tr><td>${escapeHtml(formatDate(report.occurredOn))}</td><td>${escapeHtml(contactModeLabels[report.mode] || report.mode)}</td><td>${escapeHtml(formatMinutes(report.durationMinutes))}</td><td>${escapeHtml(reportOutcomeLabels[report.outcome] || report.outcome)}${report.needsHandlerSupport ? '<small class="d-block text-danger">Stöd begärt</small>' : ""}</td><td>${escapeHtml(report.summary)}</td></tr>`).join("") || '<tr><td colspan="5" class="text-center text-secondary py-3">Ingen rapport har registrerats ännu.</td></tr>'}</tbody></table></div></section></div></section>`;
 }
 
+const mentorMeetingModeLabels = { physical: "Fysiskt", digital: "Digitalt", phone: "Telefon" };
+
+function mentorProfileEventsFor(mentorId) {
+  return mentorProfileEvents.filter((event) => event.mentorId === mentorId);
+}
+
+function mentorProfileChangeValue(field, value) {
+  if (value == null || value === "") return "Ej angivet";
+  if (field === "geographicAreaIds") return geographicAreaLabels(value, tenantGeographicAreas).join(", ") || "Inga val";
+  if (field === "languageIds") return selectedOptionLabels(value, LANGUAGE_OPTIONS).join(", ") || "Inga val";
+  if (field === "availabilitySlotIds") return selectedOptionLabels(value, AVAILABILITY_OPTIONS).join(", ") || "Inga val";
+  if (field === "meetingModes") return (value || []).map((id) => mentorMeetingModeLabels[id] || id).join(", ") || "Inga val";
+  if (field === "availableAssignmentCapacity") return Number(value) === 0 ? "Tar inte emot nya uppdrag" : `${Number(value)} samtidiga uppdrag`;
+  if (field === "supportAreas") return (value || []).map((entry) => supportAreaById(entry.areaId)?.title || entry.areaId).join(", ") || "Inga val";
+  return String(value);
+}
+
+function mentorSelfServiceSupportEditor(mentor) {
+  const selected = new Map(normalizeMentorSupportAreas(mentor.supportAreas).map((entry) => [entry.areaId, entry]));
+  const enabledIds = new Set(enabledSupportAreas().map((area) => area.id));
+  return SUPPORT_AREA_CATEGORIES.map((category) => {
+    const areas = SUPPORT_AREAS.filter((area) => area.categoryId === category.id && (enabledIds.has(area.id) || selected.has(area.id)));
+    if (!areas.length) return "";
+    const hasSelected = areas.some((area) => selected.has(area.id));
+    return `<details class="mentor-self-service-support-group" ${hasSelected ? "open" : ""}><summary>${escapeHtml(category.label)}</summary><div>${areas.map((area) => {
+      const entry = selected.get(area.id);
+      return `<section class="mentor-self-service-support-row" data-self-support-row="${escapeHtml(area.id)}"><label class="form-check"><input class="form-check-input" type="checkbox" data-self-support-area="${escapeHtml(area.id)}" ${entry ? "checked" : ""}><span class="form-check-label"><strong>${escapeHtml(area.title)}</strong>${enabledIds.has(area.id) ? "" : '<small class="d-block text-secondary">Inte längre i kommunens urval</small>'}</span></label><div class="mentor-self-service-support-fields" ${entry ? "" : "hidden"}><label><span class="form-label">Hur trygg känner du dig inom området?</span><select class="form-select form-select-sm" data-self-support-confidence="${escapeHtml(area.id)}" ${entry ? "" : "disabled"}>${MENTOR_SUPPORT_CONFIDENCE_LEVELS.map(([id, label]) => `<option value="${id}" ${(entry?.confidenceLevel || "good") === id ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select></label><fieldset><legend class="form-label">Vad bygger erfarenheten på?</legend>${MENTOR_EXPERIENCE_LEVELS.map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" value="${id}" data-self-support-experience="${escapeHtml(area.id)}" ${entry?.experienceLevels.includes(id) ? "checked" : ""} ${entry ? "" : "disabled"}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}</fieldset></div></section>`;
+    }).join("")}</div></details>`;
+  }).join("");
+}
+
+function renderMentorProfileHistory(mentor) {
+  const events = mentorProfileEventsFor(mentor.id);
+  return `<section class="record-section mentor-profile-history"><div><h3 class="record-section-title mb-1">Ändringshistorik</h3><p class="small text-secondary mb-0">Varje sparad ändring behåller tidpunkt, användare och tidigare värde.</p></div>${events.length ? `<ol>${events.map((event) => `<li><div><time datetime="${escapeHtml(event.occurredAt)}">${escapeHtml(formatDateTime(event.occurredAt))}</time><strong>${escapeHtml(event.actorName || "Mentorn")} ändrade ${escapeHtml(event.changes.map((change) => change.label.toLocaleLowerCase("sv-SE")).join(", "))}</strong>${event.matchingProfileVersion ? `<small>Matchningsprofil version ${Number(event.matchingProfileVersion)}</small>` : ""}</div><details><summary>Visa ändringar</summary><dl>${event.changes.map((change) => `<div><dt>${escapeHtml(change.label)}</dt><dd><span>${escapeHtml(mentorProfileChangeValue(change.field, change.before))}</span><strong>${escapeHtml(mentorProfileChangeValue(change.field, change.after))}</strong></dd></div>`).join("")}</dl></details></li>`).join("")}</ol>` : '<p class="text-secondary mb-0">Inga egna profiländringar har sparats ännu.</p>'}</section>`;
+}
+
+function renderMentorProfileForm(mentor, owner) {
+  const areaIds = new Set(normalizeSelectionIds(mentor.geographicAreaIds));
+  const languageIds = new Set(normalizeSelectionIds(mentor.languageIds || mentor.languageEntries?.map((entry) => entry.languageId)));
+  const availabilityIds = new Set(normalizeSelectionIds(mentor.availabilitySlotIds));
+  const meetingModes = new Set(mentor.meetingModes || []);
+  const legacyAreaNote = !areaIds.size && mentor.area
+    ? `<p class="form-text mentor-profile-legacy-value"><strong>Tidigare uppgift:</strong> ${escapeHtml(mentor.area)}. Välj aktuella områden ovan.</p>`
+    : "";
+  const legacyAvailabilityNote = !availabilityIds.size && mentor.availability
+    ? `<p class="form-text mentor-profile-legacy-value"><strong>Tidigare uppgift:</strong> ${escapeHtml(mentor.availability)}. Välj aktuella tider ovan.</p>`
+    : "";
+  return `<form id="mentorSelfServiceProfileForm" class="card-body mentor-self-service-form" novalidate><div id="mentorSelfServiceFormError" class="alert alert-danger" role="alert" hidden></div><section class="record-section"><h3 class="record-section-title">Kontaktuppgifter</h3><div class="mentor-self-service-grid"><label><span class="form-label">Namn</span><input class="form-control" name="name" autocomplete="name" maxlength="120" value="${escapeHtml(mentor.name || "")}" required></label><label><span class="form-label">E-post</span><input class="form-control" name="email" type="email" autocomplete="email" maxlength="160" value="${escapeHtml(mentor.email || "")}"></label><label><span class="form-label">Telefon</span><input class="form-control" name="phone" type="tel" autocomplete="tel" maxlength="40" value="${escapeHtml(mentor.phone || "")}"></label></div><p class="form-text">Minst e-post eller telefon behöver anges.</p></section><section class="record-section"><h3 class="record-section-title">Var och hur jag kan bidra</h3><div class="mentor-self-service-choice-grid"><fieldset><legend class="form-label">Geografiska områden</legend>${geographicAreaOptions([...areaIds]).map(([id, label, inactive]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="geographicAreaId" value="${escapeHtml(id)}" ${areaIds.has(id) ? "checked" : ""} ${inactive && !areaIds.has(id) ? "disabled" : ""}><span class="form-check-label">${escapeHtml(label)}${inactive ? " (inaktivt)" : ""}</span></label>`).join("")}${legacyAreaNote}</fieldset><fieldset><legend class="form-label">Språk</legend>${languageOptions([...languageIds], mentor.languageEntries, mentor.languages).map(([id, label, inactive]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="languageId" value="${escapeHtml(id)}" ${languageIds.has(id) ? "checked" : ""} ${inactive && !languageIds.has(id) ? "disabled" : ""}><span class="form-check-label">${escapeHtml(label)}${inactive ? " (tidigare värde)" : ""}</span></label>`).join("")}</fieldset><fieldset><legend class="form-label">Tillgänglighet</legend>${AVAILABILITY_OPTIONS.map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="availabilitySlotId" value="${escapeHtml(id)}" ${availabilityIds.has(id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}${legacyAvailabilityNote}</fieldset><fieldset><legend class="form-label">Mötesformer</legend>${Object.entries(mentorMeetingModeLabels).map(([id, label]) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="meetingMode" value="${id}" ${meetingModes.has(id) ? "checked" : ""}><span class="form-check-label">${escapeHtml(label)}</span></label>`).join("")}<label class="mt-3"><span class="form-label">Kapacitet för nya uppdrag</span><select class="form-select" name="availableAssignmentCapacity">${[[0, "Tar inte emot nya uppdrag"], [1, "1 samtidigt uppdrag"], [2, "2 samtidiga uppdrag"], [3, "3 samtidiga uppdrag"]].map(([value, label]) => `<option value="${value}" ${Number(mentor.availableAssignmentCapacity ?? 1) === value ? "selected" : ""}>${label}</option>`).join("")}</select></label></fieldset></div><label class="mt-3"><span class="form-label">Kommentar om min tillgänglighet <span class="text-secondary">(valfritt)</span></span><textarea class="form-control" name="availabilityNote" rows="2" maxlength="500">${escapeHtml(mentor.availabilityNote || "")}</textarea></label></section><section class="record-section"><h3 class="record-section-title">Mina erfarenhetsområden</h3><p class="small text-secondary">Välj vad du känner dig trygg att ge vardagsnära stöd inom och vad erfarenheten bygger på.</p><div class="mentor-self-service-support-list">${mentorSelfServiceSupportEditor(mentor)}</div></section><section class="mentor-profile-protected"><h3 class="h6">Uppgifter som kommunen ansvarar för</h3><dl><div><dt>Status</dt><dd>${escapeHtml(mentor.status)}</dd></div><div><dt>Kontaktperson</dt><dd>${escapeHtml(owner?.name || mentor.coordinator || "Ej tilldelad")}</dd></div></dl><p>Identitet, registerkontroller och beslut ändras av kommunen och visas inte här.</p></section><div class="mentor-self-service-actions"><button type="button" class="btn btn-outline-secondary" data-cancel-mentor-profile>Avbryt</button><button type="submit" class="btn btn-primary">Spara ändringar</button></div></form>`;
+}
+
 function renderMentorProfile() {
   const mentor = currentMentorUser();
   if (!mentor) return renderMentorHome();
   const owner = handlers.find((handler) => handler.id === mentor.coordinatorId);
   const experienceAreas = normalizeMentorSupportAreas(mentor.supportAreas);
-  els.mentorPortalView.innerHTML = `<section class="card mentor-profile-card"><div class="card-header record-header bg-white"><div class="record-type">Mentorprofil</div><h2 class="h5 mb-1">${escapeHtml(mentor.name)}</h2><p class="text-secondary mb-0">De uppgifter kommunen använder vid matchning och kontakt.</p></div><div class="card-body"><dl class="mentor-profile-facts"><div><dt>Kontaktuppgift</dt><dd>${escapeHtml(mentor.contactDetails || mentor.contact || "Ej angivet")}</dd></div><div><dt>Område</dt><dd>${escapeHtml(mentor.area || "Ej angivet")}</dd></div><div><dt>Språk</dt><dd>${escapeHtml(mentor.languages || "Ej angivet")}</dd></div><div><dt>Tillgänglighet</dt><dd>${escapeHtml(mentor.availability || "Ej angivet")}</dd></div><div><dt>Status</dt><dd><span class="${statusClass(mentor)}">${escapeHtml(mentor.status)}</span></dd></div><div><dt>Kontaktperson</dt><dd>${escapeHtml(owner?.name || mentor.coordinator || "Ej tilldelad")}</dd></div></dl><section class="record-section mt-4"><h3 class="record-section-title">Mina erfarenhetsområden</h3><p class="small text-secondary">Uppgifterna används som underlag när kommunen bedömer en möjlig matchning.</p><div class="support-area-facts">${experienceAreas.length ? experienceAreas.map((entry) => `<div class="support-area-fact"><strong>${escapeHtml(supportAreaById(entry.areaId)?.title || entry.areaId)}</strong><span>${escapeHtml(entry.experienceLevels.map((level) => Object.fromEntries(MENTOR_EXPERIENCE_LEVELS)[level]).filter(Boolean).join(" · ") || "Erfarenhet registrerad")}</span></div>`).join("") : '<p class="text-secondary mb-0">Inga erfarenhetsområden är registrerade.</p>'}</div></section><div class="alert alert-light border mt-4 mb-0"><strong>Behöver något ändras?</strong><p class="mb-0 mt-1">Kontakta din handläggare. Känsliga register- och identitetsuppgifter visas inte i mentorportalen.</p></div></div></section>`;
+  const capacity = Number(mentor.availableAssignmentCapacity ?? 1);
+  els.mentorPortalView.innerHTML = `<section class="card mentor-profile-card"><div class="card-header record-header bg-white"><div class="d-flex flex-wrap justify-content-between align-items-start gap-3"><div><div class="record-type">Min profil</div><h2 class="h5 mb-1">${escapeHtml(mentor.name)}</h2><p class="text-secondary mb-0">Dina uppgifter används för kontakt och som underlag vid matchning.</p></div>${!mentorProfileEditMode && isMentorSession() ? '<button type="button" class="btn btn-primary btn-sm" data-edit-mentor-profile>Redigera mina uppgifter</button>' : ""}</div></div>${mentorProfileEditMode ? renderMentorProfileForm(mentor, owner) : `<div class="card-body mentor-profile-read"><dl class="mentor-profile-facts"><div><dt>Kontakt</dt><dd>${escapeHtml([mentor.email, mentor.phone].filter(Boolean).join(" · ") || mentor.contactDetails || mentor.contact || "Ej angivet")}</dd></div><div><dt>Område</dt><dd>${escapeHtml(mentor.area || "Ej angivet")}</dd></div><div><dt>Språk</dt><dd>${escapeHtml(mentor.languages || "Ej angivet")}</dd></div><div><dt>Tillgänglighet</dt><dd>${escapeHtml(mentor.availability || "Ej angivet")}</dd></div><div><dt>Mötesformer</dt><dd>${escapeHtml((mentor.meetingModes || []).map((id) => mentorMeetingModeLabels[id] || id).join(", ") || "Ej angivet")}</dd></div><div><dt>Kapacitet</dt><dd>${escapeHtml(capacity === 0 ? "Tar inte emot nya uppdrag" : `${capacity} samtidiga uppdrag`)}</dd></div><div><dt>Status</dt><dd><span class="${statusClass(mentor)}">${escapeHtml(mentor.status)}</span></dd></div><div><dt>Kontaktperson</dt><dd>${escapeHtml(owner?.name || mentor.coordinator || "Ej tilldelad")}</dd></div></dl><section class="record-section mt-4"><h3 class="record-section-title">Mina erfarenhetsområden</h3><p class="small text-secondary">Uppgifterna används som underlag när kommunen bedömer en möjlig matchning.</p><div class="support-area-facts">${experienceAreas.length ? experienceAreas.map((entry) => `<div class="support-area-fact"><strong>${escapeHtml(supportAreaById(entry.areaId)?.title || entry.areaId)}</strong><span>${escapeHtml(entry.experienceLevels.map((level) => Object.fromEntries(MENTOR_EXPERIENCE_LEVELS)[level]).filter(Boolean).join(" · ") || "Erfarenhet registrerad")}</span>${entry.verified ? '<small class="text-success">Kontrollerad av kommunen</small>' : '<small>Inte kontrollerad av kommunen</small>'}</div>`).join("") : '<p class="text-secondary mb-0">Inga erfarenhetsområden är registrerade.</p>'}</div></section>${renderMentorProfileHistory(mentor)}<div class="mentor-profile-protected mt-4"><h3 class="h6">Kommunens uppgifter</h3><p class="mb-0">Status, identitet, registerkontroller och beslut hanteras av kommunen. Kontakta ${escapeHtml(owner?.name || "din handläggare")} om någon sådan uppgift verkar fel.</p></div></div>`}</section>`;
+}
+
+function mentorSelfServiceSupportAreasFromForm(form, mentor) {
+  const submitted = [...form.querySelectorAll("[data-self-support-area]:checked")].map((input) => ({
+    areaId: input.dataset.selfSupportArea,
+    confidenceLevel: form.querySelector(`[data-self-support-confidence="${cssEscape(input.dataset.selfSupportArea)}"]`)?.value || "good",
+    experienceLevels: [...form.querySelectorAll(`[data-self-support-experience="${cssEscape(input.dataset.selfSupportArea)}"]:checked`)].map((level) => level.value)
+  }));
+  return mergeSelfReportedSupportAreas(mentor.supportAreas, submitted);
+}
+
+function mentorSelfServiceProfileFromForm(form, mentor) {
+  const formData = new FormData(form);
+  const matching = structuredMatchingValues({
+    geographicAreaIds: formData.getAll("geographicAreaId"),
+    languageIds: formData.getAll("languageId"),
+    availabilitySlotIds: formData.getAll("availabilitySlotId"),
+    availabilityNote: formData.get("availabilityNote"),
+    previous: mentor
+  });
+  const email = String(formData.get("email") || "").trim().toLocaleLowerCase("sv-SE");
+  const phone = String(formData.get("phone") || "").trim();
+  return {
+    name: String(formData.get("name") || "").trim(),
+    email,
+    phone,
+    contactDetails: [email, phone].filter(Boolean).join(" · "),
+    ...matching,
+    meetingModes: normalizeSelectionIds(formData.getAll("meetingMode")),
+    availableAssignmentCapacity: Math.max(0, Number(formData.get("availableAssignmentCapacity") || 0)),
+    supportAreas: mentorSelfServiceSupportAreasFromForm(form, mentor)
+  };
+}
+
+function validateMentorSelfServiceProfile(form) {
+  const error = form.querySelector("#mentorSelfServiceFormError");
+  const formData = new FormData(form);
+  const emailInput = form.elements.email;
+  const phoneInput = form.elements.phone;
+  emailInput.setCustomValidity("");
+  phoneInput.setCustomValidity("");
+  let message = "";
+  let target = null;
+  if (!form.reportValidity()) return false;
+  if (!String(formData.get("email") || "").trim() && !String(formData.get("phone") || "").trim()) {
+    message = "Ange minst e-post eller telefon.";
+    target = emailInput;
+  } else if (!formData.getAll("geographicAreaId").length) {
+    message = "Välj minst ett geografiskt område.";
+    target = form.querySelector('[name="geographicAreaId"]');
+  } else if (!formData.getAll("languageId").length) {
+    message = "Välj minst ett språk.";
+    target = form.querySelector('[name="languageId"]');
+  } else if (!formData.getAll("availabilitySlotId").length) {
+    message = "Välj när du vanligen är tillgänglig.";
+    target = form.querySelector('[name="availabilitySlotId"]');
+  } else if (!formData.getAll("meetingMode").length) {
+    message = "Välj minst en mötesform.";
+    target = form.querySelector('[name="meetingMode"]');
+  } else {
+    const selectedAreas = [...form.querySelectorAll("[data-self-support-area]:checked")];
+    if (!selectedAreas.length) {
+      message = "Välj minst ett erfarenhetsområde.";
+      target = form.querySelector("[data-self-support-area]");
+    } else {
+      const missingExperience = selectedAreas.find((input) => !form.querySelector(`[data-self-support-experience="${cssEscape(input.dataset.selfSupportArea)}"]:checked`));
+      if (missingExperience) {
+        message = `Ange vad erfarenheten av ${supportAreaById(missingExperience.dataset.selfSupportArea)?.title || "området"} bygger på.`;
+        target = missingExperience;
+      }
+    }
+  }
+  if (!message) {
+    error.hidden = true;
+    error.textContent = "";
+    return true;
+  }
+  error.textContent = message;
+  error.hidden = false;
+  error.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  target?.focus({ preventScroll: true });
+  return false;
+}
+
+async function saveMentorSelfServiceProfile(form) {
+  const mentor = currentMentorUser();
+  if (!mentor || !isMentorSession() || currentUser().mentorId !== mentor.id) throw new Error("Du kan bara ändra din egen mentorprofil.");
+  const profilePatch = mentorSelfServiceProfileFromForm(form, mentor);
+  const nextMentor = { ...mentor, ...profilePatch };
+  const changes = mentorSelfServiceChanges(mentor, nextMentor);
+  if (!changes.length) {
+    mentorProfileEditMode = false;
+    renderMentorProfile();
+    showFeedback("Inga uppgifter hade ändrats.");
+    return;
+  }
+  const now = new Date().toISOString();
+  const actorId = currentActorId();
+  const matchingFields = new Set(["geographicAreaIds", "languageIds", "availabilitySlotIds", "availabilityNote", "meetingModes", "availableAssignmentCapacity", "supportAreas"]);
+  const changesMatchingProfile = changes.some((change) => matchingFields.has(change.field));
+  const previousProfile = changesMatchingProfile ? mentorMatchingProfile(mentor.id) : null;
+  const built = changesMatchingProfile ? buildMentorMatchingProfile({
+    tenantId: DEFAULT_TENANT_ID,
+    mentor: nextMentor,
+    profileId: crypto.randomUUID(),
+    previousProfile,
+    actorId,
+    now
+  }) : null;
+  const eventRecord = createMentorProfileEvent({
+    id: crypto.randomUUID(),
+    tenantId: DEFAULT_TENANT_ID,
+    mentorId: mentor.id,
+    beforeMentor: mentor,
+    afterMentor: nextMentor,
+    actorId,
+    actorName: currentUserName(),
+    now,
+    matchingProfileVersion: built?.profile.version || null
+  });
+  const updatedMentor = {
+    ...nextMentor,
+    version: Number(mentor.version || 1) + 1,
+    updatedAt: now,
+    updatedBy: actorId,
+    history: [...(mentor.history || []), {
+      at: now,
+      text: `Mentorn uppdaterade sin profil: ${changes.map((change) => change.label).join(", ")}`,
+      actor: currentUserName(),
+      eventId: eventRecord.id
+    }]
+  };
+  await atomicPut({
+    [STORE]: [updatedMentor],
+    [MENTOR_PROFILE_EVENTS_STORE]: [eventRecord],
+    ...(built ? profileWrites(built, MENTOR_MATCHING_PROFILES_STORE, MENTOR_MATCHING_AREAS_STORE, MENTOR_MATCHING_LANGUAGES_STORE, previousProfile) : {})
+  });
+  mentorProfileEditMode = false;
+  markSaved();
+  await refresh();
+  showFeedback("Dina profiluppgifter och ändringshistoriken har sparats.");
 }
 
 function renderMentorPortal() {
@@ -7302,7 +7637,13 @@ function applyRoute() {
     ["meeting", "contact", "activity", "case"].forEach((type) => calendarTypeFilters.add(type));
   }
   const systemAdministrationView = SYSTEM_ADMINISTRATION_VIEWS.has(currentView);
+  const focusedLearningView = currentView === "learning"
+    && route.params?.get("mode") === "focus"
+    && learningContentById(selectedLearningContent(), route.id)?.type === "course";
+  const enteringFocusedLearningView = focusedLearningView && !document.body.classList.contains("is-learning-focus");
   document.body.classList.toggle("is-system-administration", systemAdministrationView);
+  document.body.classList.toggle("is-learning-focus", focusedLearningView);
+  if (enteringFocusedLearningView) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, 0)));
   els.administrationContext.hidden = !systemAdministrationView;
   selectedId = currentView === "mentor" ? routeMentorId : selectedId;
   mentorRouteIntent = currentView === "mentor" ? nestedMentorRoute?.[2] || "" : "";
@@ -12830,6 +13171,7 @@ els.testUserTypeSelect.addEventListener("change", () => {
   const nextType = els.testUserTypeSelect.value;
   if (!TEST_USER_TYPES.has(nextType)) return;
   activeTestUserType = nextType;
+  mentorProfileEditMode = false;
   localStorage.setItem(TEST_USER_TYPE_KEY, nextType);
   if (nextType === "mentor") {
     selectedLearnerId = currentMentorUser()?.id || "";
@@ -12850,7 +13192,44 @@ els.testUserTypeSelect.addEventListener("change", () => {
   showFeedback(contextMessage);
 });
 
+els.mentorPortalView.addEventListener("click", (event) => {
+  if (event.target.closest("[data-edit-mentor-profile]")) {
+    mentorProfileEditMode = true;
+    renderMentorProfile();
+    requestAnimationFrame(() => els.mentorPortalView.querySelector('#mentorSelfServiceProfileForm [name="name"]')?.focus());
+    return;
+  }
+  if (event.target.closest("[data-cancel-mentor-profile]")) {
+    mentorProfileEditMode = false;
+    renderMentorProfile();
+  }
+});
+
+els.mentorPortalView.addEventListener("change", (event) => {
+  const supportInput = event.target.closest("[data-self-support-area]");
+  if (!supportInput) return;
+  const row = supportInput.closest("[data-self-support-row]");
+  const fields = row?.querySelector(".mentor-self-service-support-fields");
+  if (!fields) return;
+  fields.hidden = !supportInput.checked;
+  fields.querySelectorAll("input, select").forEach((input) => { input.disabled = !supportInput.checked; });
+});
+
 els.mentorPortalView.addEventListener("submit", async (event) => {
+  const profileForm = event.target.closest("#mentorSelfServiceProfileForm");
+  if (profileForm) {
+    event.preventDefault();
+    if (!validateMentorSelfServiceProfile(profileForm)) return;
+    const submitButton = profileForm.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    try {
+      await saveMentorSelfServiceProfile(profileForm);
+    } catch (error) {
+      submitButton.disabled = false;
+      showFeedback(error.message);
+    }
+    return;
+  }
   const form = event.target.closest("#mentorPortalReportForm");
   if (!form) return;
   event.preventDefault();
@@ -16977,7 +17356,7 @@ els.exampleDataMenu.addEventListener("click", async (event) => {
 els.resetButton.addEventListener("click", async () => {
   const confirmed = window.confirm("Nollställ all lokalt sparad prototypdata? Mentorärenden tas bort och grundhandläggarna återställs. Åtgärden kan inte ångras.");
   if (!confirmed) return;
-  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStores(MATCHING_PROFILE_STORES), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests(), clearMentorApplications(), clearSupportTickets(), clearTenantSupportAreaSelections(), clearTenantGeographicAreas()]);
+  await Promise.all([clearCandidates(), clearParents(), clearHandlers(), clearMeetings(), clearPresentationComments(), clearAllCaseData(), clearStores(MATCHING_PROFILE_STORES), clearStore(caseTypeDefinitionTx), clearStore(learningContentTx), clearStore(tenantLearningSelectionTx), clearStore(learningProgressTx), clearPublicSupportRequests(), clearMentorApplications(), clearMentorProfileEvents(), clearSupportTickets(), clearTenantSupportAreaSelections(), clearTenantGeographicAreas()]);
   localStorage.removeItem(PUBLIC_MENTOR_APPLICATION_KEY);
   await ensureDefaultHandlers();
   selectedId = null;
@@ -16999,7 +17378,26 @@ els.mentorLearningList.addEventListener("click", (event) => {
   navigateTo(`#/learning/${button.dataset.openMentorCourse}`);
 });
 
+function moveToCurrentLearningModule() {
+  if (parseRoute().params.get("mode") !== "focus") return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const target = document.querySelector(".learning-module.is-next[aria-current='step']") || document.querySelector(".learning-focus-current");
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    target?.querySelector("summary")?.focus({ preventScroll: true });
+  }));
+}
+
 els.learningView.addEventListener("click", async (event) => {
+  const focusButton = event.target.closest("[data-focus-learning-module]");
+  if (focusButton) {
+    const moduleElement = document.getElementById(`learning-module-${focusButton.dataset.focusLearningModule}`);
+    if (moduleElement) {
+      moduleElement.open = true;
+      moduleElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      moduleElement.querySelector("summary")?.focus({ preventScroll: true });
+    }
+    return;
+  }
   const filterButton = event.target.closest("[data-learning-filter]");
   if (filterButton) {
     learningTypeFilter = filterButton.dataset.learningFilter;
@@ -17013,6 +17411,7 @@ els.learningView.addEventListener("click", async (event) => {
   const moduleId = completeButton.dataset.completeLearningModule;
   await queueLearningMutation(() => completeLearningModule(courseId, moduleId));
   showFeedback("Kursmomentet har markerats som klart.");
+  moveToCurrentLearningModule();
 });
 
 els.learningView.addEventListener("submit", async (event) => {
@@ -17030,6 +17429,7 @@ els.learningView.addEventListener("submit", async (event) => {
       });
     });
     showFeedback("Reflektionen har sparats.");
+    moveToCurrentLearningModule();
     return;
   }
   const testForm = event.target.closest("[data-learning-test]");
@@ -17055,6 +17455,7 @@ els.learningView.addEventListener("submit", async (event) => {
     await refresh();
   });
   showFeedback(result.passed ? `Testet är godkänt med ${result.score}%.` : `Resultatet blev ${result.score}%. Testet behöver göras om.`);
+  if (result.passed) moveToCurrentLearningModule();
 });
 
 els.learningAdministrationView.addEventListener("change", async (event) => {

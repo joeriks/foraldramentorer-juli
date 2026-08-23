@@ -536,6 +536,8 @@ Stödområden används som en gemensam, kontrollerad begreppslista genom hela fl
 
 Geografiska områden, språk och återkommande tillgänglighetsfönster registreras som strukturerade val i både stödärendets och mentorns matchningsprofil. Samordnaren administrerar kommunens geografiska områden under systemadministration. Ett område som inte längre används inaktiveras i stället för att raderas, så att tidigare matchningar fortfarande kan förstås.
 
+Mentorn kan uppdatera sina egna kontakt- och matchningsuppgifter under `Min profil`. Systemet sparar vem som ändrade, när ändringen gjordes, berörda fält, tidigare värden och en ny profilsnapshot. Ändrade matchningsuppgifter skapar en ny profilversion. Om mentorn ändrar innehållet i ett erfarenhetsområde återställs eventuell verifiering för just det området tills kommunen har kontrollerat det igen. Kommunens status, ansvar, identitetskontroll, registerkontroll och beslut är aldrig självservicefält.
+
 ### 10.1 Registrera förälder och stödärende
 
 1. Handläggaren söker först efter en befintlig förälder för att undvika dubbletter.
