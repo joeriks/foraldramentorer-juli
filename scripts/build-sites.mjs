@@ -1,18 +1,39 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outputDir = resolve(root, "dist", "server");
+const clientOutputDir = resolve(root, "dist", "client");
+const vercelStaticOutputDir = resolve(root, "dist", "vercel-static");
+
+await rm(resolve(root, "dist"), { recursive: true, force: true });
+await mkdir(outputDir, { recursive: true });
+await mkdir(clientOutputDir, { recursive: true });
+await mkdir(vercelStaticOutputDir, { recursive: true });
+await build({
+  entryPoints: [resolve(root, "supabase-pilot.js")],
+  outfile: resolve(clientOutputDir, "supabase-pilot.js"),
+  bundle: true,
+  format: "esm",
+  platform: "browser",
+  target: "es2022"
+});
+
 const sourceFiles = [
   ["/", "index.html", "text/html; charset=utf-8"],
   ["/index.html", "index.html", "text/html; charset=utf-8"],
+  ["/supabase-pilot.html", "supabase-pilot.html", "text/html; charset=utf-8"],
+  ["/supabase-pilot.css", "supabase-pilot.css", "text/css; charset=utf-8"],
+  ["/supabase-pilot.js", "dist/client/supabase-pilot.js", "text/javascript; charset=utf-8"],
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
   ["/calendar-domain.js", "calendar-domain.js", "text/javascript; charset=utf-8"],
   ["/interaction-domain.js", "interaction-domain.js", "text/javascript; charset=utf-8"],
   ["/communication-domain.js", "communication-domain.js", "text/javascript; charset=utf-8"],
   ["/guided-activity-domain.js", "guided-activity-domain.js", "text/javascript; charset=utf-8"],
   ["/case-workspace-domain.js", "case-workspace-domain.js", "text/javascript; charset=utf-8"],
+  ["/migration-routing-domain.js", "migration-routing-domain.js", "text/javascript; charset=utf-8"],
   ["/support-area-domain.js", "support-area-domain.js", "text/javascript; charset=utf-8"],
   ["/matching-profile-domain.js", "matching-profile-domain.js", "text/javascript; charset=utf-8"],
   ["/matching-catalog-domain.js", "matching-catalog-domain.js", "text/javascript; charset=utf-8"],
@@ -47,9 +68,16 @@ for (const [pathname, filename, contentType, binary = false] of sourceFiles) {
     contentType,
     binary
   };
+  if (pathname !== "/") {
+    const staticFilename = resolve(vercelStaticOutputDir, pathname.slice(1));
+    await mkdir(dirname(staticFilename), { recursive: true });
+    await writeFile(staticFilename, content);
+  }
 }
 
-const worker = `const assets = ${JSON.stringify(assets)};
+const worker = `import { handleOrganizationInvitation, handleRuntimeConfiguration } from "../../supabase-admin-api.js";
+
+const assets = ${JSON.stringify(assets)};
 
 const sensitivePattern = /\\b(?:19|20)?\\d{6}[-+]?\\d{4}\\b/;
 
@@ -116,6 +144,12 @@ async function handleSupport(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/runtime-config") {
+      return handleRuntimeConfiguration(request, env);
+    }
+    if (url.pathname === "/api/platform/organization-invitations") {
+      return handleOrganizationInvitation(request, env);
+    }
     if (url.pathname === "/api/support") {
       if (request.method !== "POST") return jsonResponse({ code: "METHOD_NOT_ALLOWED" }, 405);
       return handleSupport(request, env);
@@ -131,6 +165,14 @@ export default {
 };
 `;
 
-await rm(resolve(root, "dist"), { recursive: true, force: true });
-await mkdir(outputDir, { recursive: true });
-await writeFile(resolve(outputDir, "index.js"), worker, "utf8");
+const workerSource = resolve(outputDir, "worker-source.js");
+await writeFile(workerSource, worker, "utf8");
+await build({
+  entryPoints: [workerSource],
+  outfile: resolve(outputDir, "index.js"),
+  bundle: true,
+  format: "esm",
+  platform: "browser",
+  target: "es2022"
+});
+await rm(workerSource, { force: true });

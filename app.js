@@ -150,6 +150,11 @@ import {
   slugifyCatalogLabel,
   structuredLanguageEntries
 } from "./matching-catalog-domain.js?v=20260821-structured-matching-v1";
+import {
+  SUPABASE_CASE_WORKSPACE_PATH,
+  caseWorkspaceEnabled,
+  isCaseWorkspaceHash
+} from "./migration-routing-domain.js?v=20260825-supabase-case-cutover-v1";
 
 const DB_NAME = "foraldramentorer-prototype-v2";
 const DB_VERSION = 14;
@@ -199,6 +204,7 @@ const SYSTEM_CASE_TYPE_IDS = new Set(CASE_TYPE_DEFINITIONS.map((definition) => d
 const SYSTEM_ACTIVITY_TEMPLATE_IDS = new Set(ACTIVITY_TEMPLATES.map((definition) => definition.id));
 const SYSTEM_ADMINISTRATION_VIEWS = new Set(["administration", "handler", "case-numbering", "case-types", "activity-types", "support-areas", "geographic-areas", "learning-admin", "support-admin", "presentation", "routines", "versions"]);
 const SUPPORT_PANEL_SESSION_KEY = "foraldramentorer.supportPanelOpen";
+const CASE_WORKSPACE_FLAG_STORAGE_KEY = "foraldramentorer.supabaseCaseWorkspaceEnabled";
 const LEARNING_SELECTION_INITIALIZED_ID = "__selection_initialized__";
 const LEARNING_EXAMPLE_RELEASE_ID = "__example_course_release_2__";
 const LEARNING_SELECTION_METADATA_IDS = new Set([LEARNING_SELECTION_INITIALIZED_ID, LEARNING_EXAMPLE_RELEASE_ID]);
@@ -218,6 +224,19 @@ const TEST_USER_TYPE_KEY = "foraldramentorer-test-user-type";
 const TEST_USER_TYPES = new Set(["coordinator", "handler", "mentor", "public"]);
 const DEMO_MENTOR_USER = { id: "mentor-demo", name: "Mentor testanvändare" };
 const APP_VERSION_HISTORY = [
+  {
+    version: "141",
+    date: "2026-08-25",
+    title: "Kontrollerad övergång till Supabase-ärenden",
+    flow: "Huvudapp -> ärendeingång -> isolerad Supabase-arbetsyta",
+    simplified: "En serverstyrd flagga kan nu styra alla ärendelänkar och nya registreringar till Supabase-piloten.",
+    retained: "Övriga prototypvyer och deras lokala testdata finns kvar. Avstängd flagga återställer den tidigare ärenderoutningen utan dual-write.",
+    changes: [
+      "Ärendelista, direkta ärendelänkar, inkommande kontakt och nyregistrering använder samma cutover-kontroll.",
+      "Flaggans senaste verifierade läge sparas lokalt så ett tillfälligt konfigurationsfel inte öppnar den gamla skrivvägen igen.",
+      "Ärendetyper, ärendenummer och annan systemadministration påverkas inte av routningsregeln."
+    ]
+  },
   {
     version: "140",
     date: "2026-08-23",
@@ -1893,6 +1912,8 @@ let mentorInstallModal = null;
 let mentorReportDetailModal = null;
 let selectedMentorReportId = "";
 let communicationComposerRecipient = null;
+let supabaseCaseWorkspaceEnabled = window.location.protocol !== "file:"
+  && localStorage.getItem(CASE_WORKSPACE_FLAG_STORAGE_KEY) === "true";
 
 const els = {
   pageTitle: document.querySelector("#pageTitle"),
@@ -1903,6 +1924,7 @@ const els = {
   currentUserName: document.querySelector("#currentUserName"),
   currentUserRole: document.querySelector("#currentUserRole"),
   systemStatusProduct: document.querySelector(".system-status-product"),
+  systemStatusStorage: document.querySelector(".system-status-storage"),
   testUserTypeSelect: document.querySelector("#testUserTypeSelect"),
   navMentorInstall: document.querySelector("#navMentorInstall"),
   mobileMentorInstall: document.querySelector("#mobileMentorInstall"),
@@ -9355,10 +9377,12 @@ function makeRegisterRowInteractive(row, label, openRecord) {
 }
 
 function navigateToCase(id) {
+  if (openSupabaseCaseWorkspace()) return;
   window.location.hash = `#/case/${id}`;
 }
 
 function navigateToNewCase(mentorId = "") {
+  if (openSupabaseCaseWorkspace()) return;
   window.location.hash = mentorId ? `#/case/new-${mentorId}` : "#/case/new";
 }
 
@@ -9375,11 +9399,13 @@ function navigateToNewParent() {
 }
 
 function navigateToNewParentCase(parentId) {
+  if (openSupabaseCaseWorkspace()) return;
   newCaseTypePreset = "parent-support";
   window.location.hash = `#/case/new-parent-${parentId}`;
 }
 
 function navigateToNewMatching(supportCaseId) {
+  if (openSupabaseCaseWorkspace()) return;
   newCaseTypePreset = "matching";
   window.location.hash = `#/case/new-support-${supportCaseId}`;
 }
@@ -9389,11 +9415,40 @@ function navigateToHandler(id) {
 }
 
 function navigateTo(hash) {
+  if (isCaseWorkspaceHash(hash) && openSupabaseCaseWorkspace()) return;
   if (window.location.hash === hash) {
     renderAll();
     return;
   }
   window.location.hash = hash;
+}
+
+function openSupabaseCaseWorkspace() {
+  if (!supabaseCaseWorkspaceEnabled) return false;
+  window.location.assign(SUPABASE_CASE_WORKSPACE_PATH);
+  return true;
+}
+
+async function loadMigrationRuntimeConfiguration() {
+  if (window.location.protocol === "file:") return;
+  try {
+    const response = await fetch("/api/runtime-config", {
+      headers: { accept: "application/json" },
+      cache: "no-store"
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    supabaseCaseWorkspaceEnabled = caseWorkspaceEnabled(await response.json());
+    localStorage.setItem(CASE_WORKSPACE_FLAG_STORAGE_KEY, String(supabaseCaseWorkspaceEnabled));
+  } catch (error) {
+    console.warn("Migreringskonfigurationen kunde inte läsas; lokal prototyproutning behålls.", error);
+  }
+  if (!supabaseCaseWorkspaceEnabled) return;
+  els.systemStatusStorage.textContent = "Ärenden använder isolerad Supabase-lagring; övrig prototypdata sparas lokalt";
+  els.saveStatus.textContent = "Supabase aktivt för ärenden";
+  els.navCases.href = SUPABASE_CASE_WORKSPACE_PATH;
+  document.querySelectorAll('.mobile-navigation a[href="#/cases"]').forEach((link) => {
+    link.href = SUPABASE_CASE_WORKSPACE_PATH;
+  });
 }
 
 function navigateToCandidateListWithStatus(status) {
@@ -9478,6 +9533,7 @@ function renderIncomingContactTable() {
 }
 
 function openIncomingContact(contactId = null, parentId = null) {
+  if (openSupabaseCaseWorkspace()) return;
   const existing = incomingContactById(contactId);
   activeIncomingContactId = existing?.id || null;
   incomingContactParentId = existing?.parentId || parentId || null;
@@ -17331,6 +17387,7 @@ els.nextCasePageButton.addEventListener("click", () => {
 });
 
 els.newGeneralCaseButton.addEventListener("click", () => {
+  if (openSupabaseCaseWorkspace()) return;
   if (caseTypeFilter === "incoming-contact") {
     openIncomingContact();
     return;
@@ -19473,6 +19530,7 @@ document.addEventListener("click", (event) => {
 
 window.addEventListener("hashchange", () => {
   hideFeedback();
+  if (isCaseWorkspaceHash(window.location.hash) && openSupabaseCaseWorkspace()) return;
   if (pendingIncomingContactId && window.location.hash !== "#/case/new") pendingIncomingContactId = null;
   if (pendingSourceCaseId && window.location.hash !== "#/case/new") pendingSourceCaseId = null;
   renderAll();
@@ -19490,36 +19548,39 @@ if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
   });
 }
 
-openDatabase()
-  .then(async (database) => {
-    const modalElement = document.querySelector("#candidateModal");
-    candidateModal = new bootstrap.Modal(modalElement);
-    const handlerModalElement = document.querySelector("#handlerModal");
-    handlerModal = new bootstrap.Modal(handlerModalElement);
-    caseLifecycleModal = new bootstrap.Modal(els.caseLifecycleModal);
-    confirmActionModal = new bootstrap.Modal(els.confirmActionModal);
-    modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());
-    handlerModalElement.addEventListener("shown.bs.modal", () => els.handlerNameInput.focus());
-    els.confirmActionButton.addEventListener("click", () => {
-      if (resolveConfirmation("confirm")) confirmActionModal.hide();
-    });
-    els.confirmActionAlternativeButton.addEventListener("click", () => {
-      if (resolveConfirmation("alternative")) confirmActionModal.hide();
-    });
-    els.confirmActionModal.addEventListener("hidden.bs.modal", () => resolveConfirmation("cancel"));
-    els.identityVerificationPanel.classList.add("mt-4", "mb-0");
-    els.mentorIdentityHost.append(els.identityVerificationPanel);
-    db = database;
-    await ensureDefaultHandlers();
-    if (!window.location.hash) {
-      window.location.hash = "#/dashboard";
-    }
-    await refresh();
-    startMeetingReminderScheduler();
-    if (sessionStorage.getItem(SUPPORT_PANEL_SESSION_KEY) === "true") {
-      bootstrap.Offcanvas.getOrCreateInstance(els.supportOffcanvas).show();
-    }
-  })
-  .catch((error) => {
-    document.body.innerHTML = `<main class="p-4"><h1>Kunde inte öppna IndexedDB</h1><p>${escapeHtml(error.message)}</p></main>`;
+async function initializeApplication() {
+  await loadMigrationRuntimeConfiguration();
+  if (isCaseWorkspaceHash(window.location.hash) && openSupabaseCaseWorkspace()) return;
+  const database = await openDatabase();
+  const modalElement = document.querySelector("#candidateModal");
+  candidateModal = new bootstrap.Modal(modalElement);
+  const handlerModalElement = document.querySelector("#handlerModal");
+  handlerModal = new bootstrap.Modal(handlerModalElement);
+  caseLifecycleModal = new bootstrap.Modal(els.caseLifecycleModal);
+  confirmActionModal = new bootstrap.Modal(els.confirmActionModal);
+  modalElement.addEventListener("shown.bs.modal", () => document.querySelector("#nameInput").focus());
+  handlerModalElement.addEventListener("shown.bs.modal", () => els.handlerNameInput.focus());
+  els.confirmActionButton.addEventListener("click", () => {
+    if (resolveConfirmation("confirm")) confirmActionModal.hide();
   });
+  els.confirmActionAlternativeButton.addEventListener("click", () => {
+    if (resolveConfirmation("alternative")) confirmActionModal.hide();
+  });
+  els.confirmActionModal.addEventListener("hidden.bs.modal", () => resolveConfirmation("cancel"));
+  els.identityVerificationPanel.classList.add("mt-4", "mb-0");
+  els.mentorIdentityHost.append(els.identityVerificationPanel);
+  db = database;
+  await ensureDefaultHandlers();
+  if (!window.location.hash) {
+    window.location.hash = "#/dashboard";
+  }
+  await refresh();
+  startMeetingReminderScheduler();
+  if (sessionStorage.getItem(SUPPORT_PANEL_SESSION_KEY) === "true") {
+    bootstrap.Offcanvas.getOrCreateInstance(els.supportOffcanvas).show();
+  }
+}
+
+initializeApplication().catch((error) => {
+  document.body.innerHTML = `<main class="p-4"><h1>Kunde inte starta applikationen</h1><p>${escapeHtml(error.message)}</p></main>`;
+});

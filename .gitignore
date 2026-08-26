@@ -2,3 +2,9 @@
 dist/
 node_modules/
 *.tgz
+.env
+.env.local
+.env.*.local
+.vercel
+.env*
+!.env.example

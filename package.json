@@ -5,9 +5,21 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-sites.mjs",
-    "test": "npm run build && node --test tests/sites-build.test.mjs tests/activity-ui.test.mjs tests/calendar-ui.test.mjs tests/interaction-domain.test.mjs tests/communication-domain.test.mjs tests/communication-ui.test.mjs tests/guided-activity-domain.test.mjs tests/case-workspace-domain.test.mjs tests/case-workspace-ui.test.mjs tests/case-domain.test.mjs tests/critical-workflows.test.mjs tests/definition-administration.test.mjs tests/feature-links.test.mjs tests/learning-domain.test.mjs tests/learning-ui.test.mjs tests/support-domain.test.mjs tests/support-area-domain.test.mjs tests/matching-catalog-domain.test.mjs tests/matching-profile-domain.test.mjs tests/mentor-application-domain.test.mjs tests/mentor-application-ui.test.mjs tests/mentor-self-service-domain.test.mjs tests/mentor-self-service-ui.test.mjs tests/prototype-data.test.mjs"
+    "start": "npm run build && node --env-file-if-exists=.env.local server.js",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "supabase:staging:preflight": "node scripts/verify-supabase-staging.mjs",
+    "test:db": "supabase test db",
+    "lint:db": "supabase db lint --local --schema public,private --level warning --fail-on warning",
+    "test": "npm run build && node --test tests/sites-build.test.mjs tests/supabase-admin-api.test.mjs tests/supabase-repository.test.mjs tests/supabase-pilot-ui.test.mjs tests/vercel-runtime.test.mjs tests/migration-routing-domain.test.mjs tests/staging-preflight-domain.test.mjs tests/activity-ui.test.mjs tests/calendar-ui.test.mjs tests/interaction-domain.test.mjs tests/communication-domain.test.mjs tests/communication-ui.test.mjs tests/guided-activity-domain.test.mjs tests/case-workspace-domain.test.mjs tests/case-workspace-ui.test.mjs tests/case-domain.test.mjs tests/critical-workflows.test.mjs tests/definition-administration.test.mjs tests/feature-links.test.mjs tests/learning-domain.test.mjs tests/learning-ui.test.mjs tests/support-domain.test.mjs tests/support-area-domain.test.mjs tests/matching-catalog-domain.test.mjs tests/matching-profile-domain.test.mjs tests/mentor-application-domain.test.mjs tests/mentor-application-ui.test.mjs tests/mentor-self-service-domain.test.mjs tests/mentor-self-service-ui.test.mjs tests/prototype-data.test.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.112.4",
     "marked": "16.2.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "supabase": "2.115.0"
   }
 }

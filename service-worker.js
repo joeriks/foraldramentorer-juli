@@ -1,4 +1,4 @@
-const CACHE_NAME = "foraldramentorer-mentor-v140-work";
+const CACHE_NAME = "foraldramentorer-mentor-v141-supabase-case-cutover";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -9,6 +9,7 @@ const APP_SHELL = [
   "/communication-domain.js",
   "/guided-activity-domain.js",
   "/case-workspace-domain.js",
+  "/migration-routing-domain.js",
   "/support-area-domain.js",
   "/matching-profile-domain.js",
   "/matching-catalog-domain.js",

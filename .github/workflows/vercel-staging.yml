@@ -1,0 +1,74 @@
+name: Deploy Vercel staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_case_workspace_enabled:
+        description: Expected server-side case workspace flag after deployment
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Test, deploy and verify staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install pinned application dependencies
+        run: npm ci
+
+      - name: Run application and deployment contract tests
+        run: npm test
+
+      - name: Install pinned Vercel CLI
+        run: npm install --global vercel@59.5.0
+
+      - name: Pull staging project configuration
+        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+
+      - name: Build the production target of the isolated staging project
+        run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+
+      - name: Deploy the verified prebuilt artifact
+        run: vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+
+      - name: Verify runtime flag, Auth sessions and cross-organization RLS
+        run: npm run supabase:staging:preflight
+        env:
+          STAGING_APP_URL: ${{ vars.STAGING_APP_URL }}
+          STAGING_EXPECT_CASE_WORKSPACE_ENABLED: ${{ inputs.expected_case_workspace_enabled }}
+          STAGING_ORG_A_EMAIL: ${{ secrets.STAGING_ORG_A_EMAIL }}
+          STAGING_ORG_A_PASSWORD: ${{ secrets.STAGING_ORG_A_PASSWORD }}
+          STAGING_ORG_B_EMAIL: ${{ secrets.STAGING_ORG_B_EMAIL }}
+          STAGING_ORG_B_PASSWORD: ${{ secrets.STAGING_ORG_B_PASSWORD }}

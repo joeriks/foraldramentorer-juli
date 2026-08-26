@@ -1,0 +1,77 @@
+name: Supabase migration verification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "supabase/**"
+      - "supabase-*.js"
+      - "supabase-*.html"
+      - "supabase-*.css"
+      - "tests/supabase-*.test.mjs"
+      - "tests/staging-preflight-domain.test.mjs"
+      - "staging-preflight-domain.js"
+      - "scripts/verify-supabase-staging.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/supabase.yml"
+      - ".github/workflows/supabase-staging-preflight.yml"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - "supabase-*.js"
+      - "supabase-*.html"
+      - "supabase-*.css"
+      - "tests/supabase-*.test.mjs"
+      - "tests/staging-preflight-domain.test.mjs"
+      - "staging-preflight-domain.js"
+      - "scripts/verify-supabase-staging.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/supabase.yml"
+      - ".github/workflows/supabase-staging-preflight.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Reset, test and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install pinned dependencies
+        run: npm ci
+
+      - name: Start local Supabase
+        run: npx supabase start
+
+      - name: Rebuild database from migrations and seed
+        run: npm run supabase:reset
+
+      - name: Run database isolation and contract tests
+        run: npm run test:db
+
+      - name: Run database lint
+        run: npm run lint:db
+
+      - name: Run security and performance advisors
+        run: npx supabase db advisors --local --type all --level warn --fail-on warn
+
+      - name: Build and run application tests
+        run: npm test

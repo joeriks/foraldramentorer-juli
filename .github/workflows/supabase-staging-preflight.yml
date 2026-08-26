@@ -1,0 +1,50 @@
+name: Supabase staging preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_case_workspace_enabled:
+        description: Expected server-side case workspace flag
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-staging-preflight
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Auth and RLS verification without business writes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install pinned dependencies
+        run: npm ci
+
+      - name: Verify runtime flag, Auth sessions and cross-organization RLS
+        run: npm run supabase:staging:preflight
+        env:
+          STAGING_APP_URL: ${{ vars.STAGING_APP_URL }}
+          STAGING_EXPECT_CASE_WORKSPACE_ENABLED: ${{ inputs.expected_case_workspace_enabled }}
+          STAGING_ORG_A_EMAIL: ${{ secrets.STAGING_ORG_A_EMAIL }}
+          STAGING_ORG_A_PASSWORD: ${{ secrets.STAGING_ORG_A_PASSWORD }}
+          STAGING_ORG_B_EMAIL: ${{ secrets.STAGING_ORG_B_EMAIL }}
+          STAGING_ORG_B_PASSWORD: ${{ secrets.STAGING_ORG_B_PASSWORD }}

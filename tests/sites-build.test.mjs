@@ -127,6 +127,9 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.match(scriptText, /CASE_ACTIVITIES_STORE/);
   assert.match(scriptText, /function installMentorApp/);
   assert.match(scriptText, /navigator\.serviceWorker\.register/);
+  assert.match(scriptText, /function loadMigrationRuntimeConfiguration/);
+  assert.match(scriptText, /if \(isCaseWorkspaceHash\(hash\) && openSupabaseCaseWorkspace\(\)\) return;/);
+  assert.match(scriptText, /localStorage\.setItem\(CASE_WORKSPACE_FLAG_STORAGE_KEY/);
   const manifestResponse = await worker.fetch(new Request("https://example.test/manifest.webmanifest"), {}, context);
   assert.equal(manifestResponse.status, 200);
   assert.match(manifestResponse.headers.get("content-type"), /^application\/manifest\+json/);
@@ -140,7 +143,10 @@ test("serves application assets and returns 404 for unknown files", async () => 
   assert.ok((await iconResponse.arrayBuffer()).byteLength > 1000);
   const serviceWorker = await worker.fetch(new Request("https://example.test/service-worker.js"), {}, context);
   assert.equal(serviceWorker.status, 200);
-  assert.match(await serviceWorker.text(), /foraldramentorer-mentor-v140-work/);
+  assert.match(await serviceWorker.text(), /foraldramentorer-mentor-v141-supabase-case-cutover/);
+  const migrationRouting = await worker.fetch(new Request("https://example.test/migration-routing-domain.js"), {}, context);
+  assert.equal(migrationRouting.status, 200);
+  assert.match(await migrationRouting.text(), /isCaseWorkspaceHash/);
   const interactionDomain = await worker.fetch(new Request("https://example.test/interaction-domain.js"), {}, context);
   assert.equal(interactionDomain.status, 200);
   assert.match(await interactionDomain.text(), /meetingSatisfiesRequirement/);
@@ -341,6 +347,32 @@ test("serves the standalone matching prototype without changing the application 
   assert.equal(script.status, 200);
   assert.match(script.headers.get("content-type"), /^text\/javascript/);
   assert.match(await script.text(), /complexSupportTopics/);
+});
+
+test("serves the isolated Supabase pilot and only publishes the browser key", async () => {
+  const page = await worker.fetch(new Request("https://example.test/supabase-pilot.html"), {}, context);
+  assert.equal(page.status, 200);
+  const html = await page.text();
+  assert.match(html, /Migreringspilot/);
+  assert.match(html, /id="invitationForm"/);
+  assert.match(html, /src="\/supabase-pilot\.js"/);
+
+  const script = await worker.fetch(new Request("https://example.test/supabase-pilot.js"), {}, context);
+  assert.equal(script.status, 200);
+  assert.match(script.headers.get("content-type"), /^text\/javascript/);
+  assert.match(await script.text(), /current_session_context/);
+
+  const configuration = await worker.fetch(new Request("https://example.test/api/runtime-config"), {
+    SUPABASE_URL: "https://project.example.supabase.co",
+    SUPABASE_PUBLISHABLE_KEY: "sb_publishable_safe",
+    SUPABASE_SECRET_KEY: "sb_secret_never_publish",
+    SUPABASE_CASE_WORKSPACE_ENABLED: "true"
+  }, context);
+  assert.equal(configuration.status, 200);
+  const body = await configuration.text();
+  assert.match(body, /sb_publishable_safe/);
+  assert.equal(JSON.parse(body).caseWorkspaceEnabled, true);
+  assert.doesNotMatch(body, /sb_secret_never_publish/);
 });
 
 test("support endpoint keeps the key server-side and disables OpenAI storage", async () => {
